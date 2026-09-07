@@ -13,6 +13,11 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  
+  // NEW: State for Course and Section dropdowns
+  const [course, setCourse] = useState('s2');
+  const [section, setSection] = useState('1A');
+  
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
@@ -36,12 +41,15 @@ const Login = () => {
             ? 'admin'
             : 'student';
 
+        // NEW: Course and Section added to Firestore payload
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
           firstName: firstName,
           lastName: lastName,
           role: assignedRole,
+          course: course,
+          section: section,
           highest_pod_reached: 0,
           current_path_points: 0,
           created_at: new Date().toISOString(),
@@ -113,58 +121,117 @@ const Login = () => {
         style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}
       >
         {isRegistering && (
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <label
-                style={{
-                  fontWeight: 'bold',
-                  display: 'block',
-                  marginBottom: '5px',
-                }}
-              >
-                Nombre
-              </label>
-              <input
-                type="text"
-                placeholder="First Name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  boxSizing: 'border-box',
-                  borderRadius: '5px',
-                  border: '1px solid #ccc',
-                }}
-              />
+          <>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  placeholder="First Name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    boxSizing: 'border-box',
+                    borderRadius: '5px',
+                    border: '1px solid #ccc',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Apellido
+                </label>
+                <input
+                  type="text"
+                  placeholder="Last Name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    boxSizing: 'border-box',
+                    borderRadius: '5px',
+                    border: '1px solid #ccc',
+                  }}
+                />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label
-                style={{
-                  fontWeight: 'bold',
-                  display: 'block',
-                  marginBottom: '5px',
-                }}
-              >
-                Apellido
-              </label>
-              <input
-                type="text"
-                placeholder="Last Name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  boxSizing: 'border-box',
-                  borderRadius: '5px',
-                  border: '1px solid #ccc',
-                }}
-              />
+
+            {/* NEW: Course and Section Dropdowns */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Curso
+                </label>
+                <select
+                  value={course}
+                  onChange={(e) => setCourse(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    boxSizing: 'border-box',
+                    borderRadius: '5px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }}
+                >
+                  <option value="s2">Español II</option>
+                  <option value="s4">IB Español B II</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Sección
+                </label>
+                <select
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    boxSizing: 'border-box',
+                    borderRadius: '5px',
+                    border: '1px solid #ccc',
+                    backgroundColor: 'white',
+                  }}
+                >
+                  <option value="4A">4A</option>
+                  <option value="1B">1B</option>
+                  <option value="4B">4B</option>
+                </select>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         <div>
