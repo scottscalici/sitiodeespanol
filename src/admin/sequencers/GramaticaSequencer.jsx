@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase'; 
+import { db } from '../../firebase'; 
 import { useCalendarMap } from '../hooks/useCalendarMap'; // 📅 Import the calendar hook
 
 const GramaticaSequencer = () => {

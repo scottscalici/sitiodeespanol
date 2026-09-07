@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, getDoc, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../../firebase';
 import { Link, useNavigate } from 'react-router-dom';
 
 const MusicaManager = () => {

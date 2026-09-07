@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase'; // Adjust relative path to your firebase.js if needed
+import { db } from '../../firebase'; // Adjust relative path to your firebase.js if needed
 
 const CuriosidadesUploader = () => {
   const [jsonInput, setJsonInput] = useState('');

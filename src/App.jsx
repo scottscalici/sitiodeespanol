@@ -1,52 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // 👈 Added Navigate
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore'; // 👈 Added Firestore imports
-import { auth, db } from './firebase'; // 👈 Make sure db is imported!
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
-import Login from './Login';
-import Dashboard from './Dashboard';
+// 🎓 STUDENT ECOSYSTEM & PAGES
+import Login from './student/Login';
+import Dashboard from './student/Dashboard';
+import MusicaEngine from './student/MusicaEngine';
+import AtandoCabosPage from './student/AtandoCabosPage';
+import CalentamientoEngine from './student/CalentamientoEngine';
+import CulturaSandbox from './student/CulturaSandbox';
+import EslabonesFinales from './student/EslabonesFinales';
+import MusicPage from './student/MusicPage';
+import RecreoHub from './student/RecreoHub';
+import SenordlePage from './student/SenordlePage';
+import StudentLearningPath from './student/StudentLearningPath';
+import TicoTalk from './student/TicoTalk';
+import WorkoutEngine from './student/WorkoutEngine';
+
+// ⚙️ GLOBAL UI COMPONENTS
 import ActivityPage from './components/ActivityPage';
-import SenordlePage from './pages/SenordlePage';
-import RecreoHub from './pages/RecreoHub';
-import TicoTalk from './pages/TicoTalk';
-import AtandoCabosPage from './pages/AtandoCabosPage';
-import EslabonesFinales from './pages/EslabonesFinales';
-import CulturaSandbox from './pages/CulturaSandbox';
-import MusicUploader from './admin/MusicUploader';
-import MusicPage from './pages/MusicPage';
-import VocabUploader from './admin/VocabUploader';
-import VerbUploader from './admin/VerbUploader';
-import CulturaUploader from './admin/CulturaUploader';
-import TieredCulturaUploader from './admin/TieredCulturaUploader';
-import DestacadoUploader from './admin/DestacadoUploader';
+
+// 🛠️ ADMIN MANAGERS & HUBS
 import MasterDashboard from './admin/MasterDashboard/MasterDashboard';
-import SenordleUploader from './admin/SenordleUploader';
-import AtandoCabosUploader from './admin/AtandoCabosUploader';
-import EslabonesUploader from './admin/EslabonesUploader';
+import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
+import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
-import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
-import StudentLearningPath from './pages/StudentLearningPath';
-import WorkoutEngine from './pages/WorkoutEngine';
-import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
-import CalentamientoAdmin from './admin/MasterDashboard/CalentamientoAdmin';
-import CalentamientoEngine from './pages/CalentamientoEngine';
-import EvaluacionesSequencer from './admin/EvaluacionesSequencer';
-import CuriosidadesUploader from './admin/CuriosidadesUploader';
-import GramaticaSequencer from './admin/GramaticaSequencer';
-import CuriosidadesManager from './admin/CuriosidadesManager';
 import TareasSequencer from './admin/MasterDashboard/components/TareasSequencer';
-import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
-import DestacadoManager from './admin/DestacadoManager';
-import VideosManager from './admin/VideosManager';
-import MusicaManager from './admin/MusicaManager';
-import MusicaEditor from './admin/MusicaEditor';
-import PrintMusica from './admin/PrintMusica';
-import MusicaEngine from './student/MusicaEngine';
-// 🚀 THE NEW BOUNCER COMPONENT
-// This wraps around any route you want to protect. If a student tries to enter, it kicks them back to the dashboard.
+
+import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import CuriosidadesManager from './admin/managers/CuriosidadesManager';
+import DestacadoManager from './admin/managers/DestacadoManager';
+import MusicaEditor from './admin/managers/MusicaEditor';
+import MusicaManager from './admin/managers/MusicaManager';
+import PrintMusica from './admin/managers/PrintMusica';
+import VideosManager from './admin/managers/VideosManager';
+
+// 📈 ADMIN SEQUENCERS & LEARNING PATHS
+import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
+import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
+import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
+
+// 📦 LEGACY ADMIN UPLOADERS
+import AtandoCabosUploader from './admin/uploaders/AtandoCabosUploader';
+import CulturaUploader from './admin/uploaders/CulturaUploader';
+import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
+import DestacadoUploader from './admin/uploaders/DestacadoUploader';
+import EslabonesUploader from './admin/uploaders/EslabonesUploader';
+import MusicUploader from './admin/uploaders/MusicUploader';
+import SenordleUploader from './admin/uploaders/SenordleUploader';
+import TieredCulturaUploader from './admin/uploaders/TieredCulturaUploader';
+import VerbUploader from './admin/uploaders/VerbUploader';
+import VocabUploader from './admin/uploaders/VocabUploader';
+
+// 🛡️ ADMIN BOUNCER COMPONENT
 const AdminRoute = ({ user, role, children }) => {
   if (!user || role !== 'admin') {
     return <Navigate to="/" replace />;
@@ -56,26 +66,21 @@ const AdminRoute = ({ user, role, children }) => {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); // 👈 New state to hold the role
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Auth Listener (Now fetches the role from Firestore!)
-  // Auth Listener (Now fetches the role from Firestore AND stops loading!)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
         try {
-          // 1. The user logged in. Grab their profile from Firestore.
           const userRef = doc(db, 'users', authUser.uid);
           const userSnap = await getDoc(userRef);
 
           if (userSnap.exists()) {
             const userData = userSnap.data();
-            // 2. Set both the user object AND the specific role state
             setUser({ ...authUser, ...userData });
             setRole(userData.role || null);
           } else {
-            // Fallback if they don't have a Firestore profile yet
             setUser(authUser);
             setRole(null);
           }
@@ -89,7 +94,6 @@ function App() {
         setRole(null);
       }
 
-      // 3. STOP THE LOADING SPINNER!
       setLoading(false);
     });
 
@@ -115,7 +119,6 @@ function App() {
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {/* Global Header */}
         <header className="w-full max-w-6xl mx-auto flex justify-between items-center px-4 sm:px-6 pt-6 pb-2">
-          {/* Replaced Title based on your earlier request! */}
           <h1 className="text-2xl font-black text-slate-800 tracking-tighter">
             ESPAÑOL CON SEÑOR
           </h1>
@@ -126,7 +129,7 @@ function App() {
 
         <main className="w-full flex-grow">
           <Routes>
-            {/* 🟢 PUBLIC STUDENT ROUTES (Anyone logged in can see these) */}
+            {/* 🟢 PUBLIC STUDENT ROUTES */}
             <Route path="/" element={<Dashboard user={user} />} />
             <Route path="/juegos/senordle" element={<SenordlePage />} />
             <Route path="/actividad/:type/:id" element={<ActivityPage />} />
@@ -134,18 +137,13 @@ function App() {
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
+            <Route path="/musica/:id" element={<MusicaEngine />} />
+            <Route path="/music-info/:id" element={<MusicPage />} />
+            <Route path="/student-learning-path" element={<StudentLearningPath />} />
+            <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
+            <Route path="/calentamiento" element={<CalentamientoEngine targetDia={1} courseId="s2" />} />
 
-            <Route path="/musica/:id" element={<MusicPage />} />
-            <Route
-              path="/student-learning-path"
-              element={<StudentLearningPath />}
-            />
-            <Route
-              path="/student-learning-path-questions"
-              element={<WorkoutEngine />}
-            />
-
-            {/* 🔴 SECURE ADMIN ROUTES (Only 'admin' can access these) */}
+            {/* 🔴 SECURE ADMIN ROUTES */}
             <Route
               path="/admin-secret-portal"
               element={
@@ -202,26 +200,46 @@ function App() {
                 </AdminRoute>
               }
             />
-<Route path="/admin-daily-plan-musica" element={<AdminRoute user={user} role={role}><MusicaManager /></AdminRoute>} />
-<Route path="/admin-musica-editor/:id" element={<AdminRoute user={user} role={role}><MusicaEditor /></AdminRoute>} />
-<Route path="/print-musica/:id" element={<AdminRoute user={user} role={role}><PrintMusica /></AdminRoute>} />
-<Route path="/musica/:id" element={<MusicaEngine />} />
             <Route
-  path="/admin-daily-plan-destacado"
-  element={
-    <AdminRoute user={user} role={role}>
-      <DestacadoManager />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/admin-daily-plan-videos"
-  element={
-    <AdminRoute user={user} role={role}>
-      <VideosManager />
-    </AdminRoute>
-  }
-/>
+              path="/admin-daily-plan-musica"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <MusicaManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-musica-editor/:id"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <MusicaEditor />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/print-musica/:id"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PrintMusica />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-destacado"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <DestacadoManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-videos"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <VideosManager />
+                </AdminRoute>
+              }
+            />
             <Route
               path="/admin-secret-portal-senordle"
               element={
@@ -295,66 +313,53 @@ function App() {
               }
             />
             <Route
-              path="/calentamiento"
-              element={<CalentamientoEngine targetDia={1} courseId="s2" />}
+              path="/admin-daily-plan-evals"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <EvaluacionesSequencer />
+                </AdminRoute>
+              }
             />
-<Route
-  path="/admin-daily-plan-evals"
-  element={
-    <AdminRoute user={user} role={role}>
-      <EvaluacionesSequencer />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/admin-daily-plan-gramatica"
-  element={
-    <AdminRoute user={user} role={role}>
-      <GramaticaSequencer />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/admin-daily-plan-curiosidades"
-  element={
-    <AdminRoute user={user} role={role}>
-      <CuriosidadesManager />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/admin-daily-plan-tareas"
-  element={
-    <AdminRoute user={user} role={role}>
-      <TareasSequencer />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/admin-daily-plan-curiosidadesupload"
-  element={
-    <AdminRoute user={user} role={role}>
-      <CuriosidadesUploader />
-    </AdminRoute>
-  }
-/>
-
-            <Route path="/admin-secret-portal-calentamiento"
+            <Route
+              path="/admin-daily-plan-gramatica"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GramaticaSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-curiosidades"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <CuriosidadesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-tareas"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <TareasSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-curiosidadesupload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <CuriosidadesUploader />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-calentamiento"
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
                 </AdminRoute>
               }
             />
-
-            <Route path="/admin-secret-portal-calentamiento"
-              element={
-                <AdminRoute user={user} role={role}>
-                  <CalentamientoAdmin />
-                </AdminRoute>
-              }
-            />
-
             <Route
               path="/test-firebase"
               element={

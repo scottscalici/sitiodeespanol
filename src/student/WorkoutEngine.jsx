@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase'; // Make sure this path is correct for your structure
-import { useAuth } from '../AuthContext'; 
+import { useAuth } from '../context/AuthContext'; 
 
 export default function WorkoutEngine({ segment, history = [], podIndex = 0, onClose, onComplete }) {
   const { currentUser } = useAuth(); // Grabs the logged-in student

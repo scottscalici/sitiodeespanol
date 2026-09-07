@@ -9,7 +9,7 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function CalentamientoEngine({
   targetDia,

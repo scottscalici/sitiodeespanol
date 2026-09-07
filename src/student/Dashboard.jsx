@@ -1,21 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useGymData } from './hooks/useGymData';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../firebase';
 import { Link } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 // Components
-import Header from './components/Header';
-import Anuncios from './components/Anuncios';
-import Evaluacion from './components/Evaluacion';
-import Curiosidad from './components/Curiosidad';
-import Destacado from './components/Destacado';
-import Countdown from './components/Countdown';
-import AITutor from './components/AITutor';
-import Recursos from './components/Recursos';
-import GamesSidebar from './components/GamesSidebar';
-import ActivityGrid from './components/ActivityGrid';
+import Header from '../components/Header';
+import Anuncios from '../components/Anuncios';
+import Evaluacion from '../components/Evaluacion';
+import Curiosidad from '../components/Curiosidad';
+import Destacado from '../components/Destacado';
+import Countdown from '../components/Countdown';
+import AITutor from '../components/AITutor';
+import Recursos from '../components/Recursos';
+import GamesSidebar from '../components/GamesSidebar';
+import ActivityGrid from '../components/ActivityGrid';
 
 const Dashboard = () => {
   const { userData } = useAuth();

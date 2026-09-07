@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; 
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 const PATH_ID = 's2_descubre2_preliminar';
 
