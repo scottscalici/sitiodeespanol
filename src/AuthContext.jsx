@@ -23,36 +23,38 @@ export function AuthProvider({ children }) {
   const [userData, setUserData] = useState(null); // Stores their Firestore profile (role, points, etc.)
   const [loading, setLoading] = useState(true);
 
-  // 1. REGISTER FUNCTION
-  const register = async (email, password, firstName, lastName) => {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    const user = userCredential.user;
+// 1. REGISTER FUNCTION
+const register = async (email, password, firstName, lastName, course, section) => {
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    email,
+    password
+  );
+  const user = userCredential.user;
 
-    // Auto-assign admin role to you
-    const assignedRole =
-      email.toLowerCase() === 'scott.scalici@uticak12.org'
-        ? 'admin'
-        : 'student';
+  // Auto-assign admin role to you
+  const assignedRole =
+    email.toLowerCase() === 'scott.scalici@uticak12.org'
+      ? 'admin'
+      : 'student';
 
-    const userProfile = {
-      uid: user.uid,
-      email: user.email,
-      firstName: firstName,
-      lastName: lastName,
-      role: assignedRole,
-      highest_pod_reached: 0,
-      current_path_points: 0,
-      created_at: new Date().toISOString(),
-    };
-
-    await setDoc(doc(db, 'users', user.uid), userProfile);
-    setUserData(userProfile);
-    return user;
+  const userProfile = {
+    uid: user.uid,
+    email: user.email,
+    firstName: firstName,
+    lastName: lastName,
+    role: assignedRole,
+    course: course || 's2',   // e.g., 's2' or 's4'
+    section: section || 'NA', // e.g., '4A' or '3B'
+    highest_pod_reached: 0,
+    current_path_points: 0,
+    created_at: new Date().toISOString(),
   };
+
+  await setDoc(doc(db, 'users', user.uid), userProfile);
+  setUserData(userProfile);
+  return user;
+};
 
   // 2. LOGIN FUNCTION
   const login = (email, password) => {

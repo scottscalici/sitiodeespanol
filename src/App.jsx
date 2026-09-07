@@ -39,7 +39,12 @@ import GramaticaSequencer from './admin/GramaticaSequencer';
 import CuriosidadesManager from './admin/CuriosidadesManager';
 import TareasSequencer from './admin/MasterDashboard/components/TareasSequencer';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
-
+import DestacadoManager from './admin/DestacadoManager';
+import VideosManager from './admin/VideosManager';
+import MusicaManager from './admin/MusicaManager';
+import MusicaEditor from './admin/MusicaEditor';
+import PrintMusica from './admin/PrintMusica';
+import MusicaEngine from './student/MusicaEngine';
 // 🚀 THE NEW BOUNCER COMPONENT
 // This wraps around any route you want to protect. If a student tries to enter, it kicks them back to the dashboard.
 const AdminRoute = ({ user, role, children }) => {
@@ -197,6 +202,26 @@ function App() {
                 </AdminRoute>
               }
             />
+<Route path="/admin-daily-plan-musica" element={<AdminRoute user={user} role={role}><MusicaManager /></AdminRoute>} />
+<Route path="/admin-musica-editor/:id" element={<AdminRoute user={user} role={role}><MusicaEditor /></AdminRoute>} />
+<Route path="/print-musica/:id" element={<AdminRoute user={user} role={role}><PrintMusica /></AdminRoute>} />
+<Route path="/musica/:id" element={<MusicaEngine />} />
+            <Route
+  path="/admin-daily-plan-destacado"
+  element={
+    <AdminRoute user={user} role={role}>
+      <DestacadoManager />
+    </AdminRoute>
+  }
+/>
+<Route
+  path="/admin-daily-plan-videos"
+  element={
+    <AdminRoute user={user} role={role}>
+      <VideosManager />
+    </AdminRoute>
+  }
+/>
             <Route
               path="/admin-secret-portal-senordle"
               element={

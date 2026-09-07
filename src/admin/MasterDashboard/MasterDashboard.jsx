@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js'; 
-import AIAssistant from './components/AIAssistant';
 import FormMusica from './components/FormMusica';
 import FormCultura from './components/FormCultura';
 import FormAtandoCabos from './components/FormAtandoCabos';

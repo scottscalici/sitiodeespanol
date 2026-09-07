@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'; // Added useEffect/useState
+import React, { useEffect, useState } from 'react';
 import { useGymData } from './hooks/useGymData';
-import { collection, query, where, getDocs } from 'firebase/firestore'; // Added Firestore tools
-import { db } from './firebase'; // Ensure path to your firebase.js is correct
-import { Link } from 'react-router-dom'; // Added for navigation
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
+import { Link } from 'react-router-dom';
+import { useAuth } from './AuthContext';
 
 // Components
 import Header from './components/Header';
@@ -16,30 +17,29 @@ import Recursos from './components/Recursos';
 import GamesSidebar from './components/GamesSidebar';
 import ActivityGrid from './components/ActivityGrid';
 
-const Dashboard = ({ user }) => {
-  // 1. Identify if the user is an admin
-  const isAdmin = user?.role === 'admin';
+const Dashboard = () => {
+  const { userData } = useAuth();
+  
+  // 1. Re-define isAdmin using the new userData from context
+  const isAdmin = userData?.role === 'admin';
 
-  // 2. Use state so the admin can toggle it on the fly
+  // 2. Set the course based on their profile, defaulting to s4 for admins
   const [activeCourse, setActiveCourse] = useState(
-    user?.course || (isAdmin ? 's4' : 's2')
+    isAdmin ? 's4' : (userData?.course || 's2')
   );
 
-  // 3. Feed the state variable into your hook instead of a static string
-  const { data, loading, liveDia, setLiveDia, course } =
-    useGymData(activeCourse);
+  // 3. Feed the state variable into your hook
+  const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse);
 
-  // 1. State for the Daily Music Mission
+  // 4. State for the Daily Music Mission
   const [dailySong, setDailySong] = useState(null);
 
-  // 2. Fetch the specific song for Today
+  // Fetch the specific song for Today
   useEffect(() => {
-    // Inside useEffect in Dashboard.jsx
     const fetchDailyMusic = async () => {
       if (!course || !liveDia) return;
 
       try {
-        // Query only by course (Firestore allows only one array-contains)
         const q = query(
           collection(db, 'musica'),
           where('course', 'array-contains', course)
@@ -51,7 +51,6 @@ const Dashboard = ({ user }) => {
           ...doc.data(),
         }));
 
-        // Filter for the specific day locally in React
         const matchedSong = allCourseSongs.find(
           (song) => song.dias && song.dias.includes(liveDia)
         );
@@ -125,7 +124,7 @@ const Dashboard = ({ user }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: LESSON CONTENT */}
           <div className="lg:col-span-2 space-y-8">
-            {/* 🎯 NEW: DAILY MUSIC MISSION CARD */}
+            {/* 🎯 DAILY MUSIC MISSION CARD */}
             {dailySong && (
               <Link
                 to={`/musica/${dailySong.id}`}
@@ -182,7 +181,6 @@ const Dashboard = ({ user }) => {
 
           {/* RIGHT: SIDEBAR */}
           <div className="space-y-6">
-            {/* Progress Bar and other sidebar elements remain the same */}
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">

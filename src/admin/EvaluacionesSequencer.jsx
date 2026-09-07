@@ -4,6 +4,7 @@ import { db } from '../firebase';
 
 const EvaluacionesSequencer = () => {
   const [schedule, setSchedule] = useState([]);
+  const [calendarMap, setCalendarMap] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -11,11 +12,36 @@ const EvaluacionesSequencer = () => {
   const MAX_DAYS = 85;
 
   useEffect(() => {
-    const fetchSchedule = async () => {
+    const fetchData = async () => {
       try {
+        // 1. Fetch Calendar Dates to group both A and B days
+        const configRef = doc(db, 'config', 'academic_year_2026_2027');
+        const configSnap = await getDoc(configRef);
+        const mapping = {};
+
+        if (configSnap.exists()) {
+          const configData = configSnap.data();
+          if (configData.map && Array.isArray(configData.map)) {
+            configData.map.forEach((item) => {
+              if (item.dia !== null && item.dia !== undefined && item.status === 'school') {
+                const dayNum = Number(item.dia);
+                if (!mapping[dayNum]) mapping[dayNum] = [];
+                
+                let formattedDate = item.fecha;
+                if (item.fecha && item.fecha.includes('-')) {
+                  const parts = item.fecha.split('-');
+                  if (parts.length === 3) formattedDate = `${parts[1]}/${parts[2]}`;
+                }
+                mapping[dayNum].push(`${formattedDate}${item.ciclo ? ` (${item.ciclo})` : ''}`);
+              }
+            });
+          }
+          setCalendarMap(mapping);
+        }
+
+        // 2. Fetch Evaluaciones Track
         const docRef = doc(db, 'curriculum_tracks', 'evaluaciones_master');
         const docSnap = await getDoc(docRef);
-
         const data = docSnap.exists() ? docSnap.data() : null;
 
         // Fallback hardcoded lists
@@ -96,10 +122,7 @@ const EvaluacionesSequencer = () => {
           { dia: 74, label: '9.1*' },
           { dia: 75, label: 'Nada' },
           { dia: 76, label: 'Nada' },
-          {
-            dia: 77,
-            label: '9.2* (completar hasta Nivel 2) y Futuro Y Condicional',
-          },
+          { dia: 77, label: '9.2* (completar hasta Nivel 2) y Futuro Y Condicional' },
           { dia: 78, label: 'Nada' },
           { dia: 79, label: 'Nada' },
           { dia: 80, label: 'Imperfecto de subjuntivo*' },
@@ -179,7 +202,6 @@ const EvaluacionesSequencer = () => {
           { dia: 70, label: 'Examen final' },
         ];
 
-        // Use Firestore data ONLY if it actually has items inside the arrays
         const rawS2 = data?.s2 && data.s2.length > 0 ? data.s2 : defaultS2;
         const rawS4 = data?.s4 && data.s4.length > 0 ? data.s4 : defaultS4;
 
@@ -204,13 +226,13 @@ const EvaluacionesSequencer = () => {
 
         setSchedule(combined);
       } catch (error) {
-        console.error('Error fetching evaluaciones:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSchedule();
+    fetchData();
   }, []);
 
   const handleInputChange = (dia, course, value) => {
@@ -222,16 +244,12 @@ const EvaluacionesSequencer = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Split the side-by-side UI rows back into the separate arrays your dashboard expects
       const payload = {
         s2: schedule.map((row) => ({ dia: row.dia, label: row.s2 })),
         s4: schedule.map((row) => ({ dia: row.dia, label: row.s4 })),
       };
 
-      await setDoc(
-        doc(db, 'curriculum_tracks', 'evaluaciones_master'),
-        payload
-      );
+      await setDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master'), payload);
       alert('¡Guardado exitosamente!');
     } catch (error) {
       console.error('Error saving to Firestore:', error);
@@ -252,7 +270,8 @@ const EvaluacionesSequencer = () => {
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Sticky Header so you can always hit save while scrolling */}
+        
+        {/* Sticky Header */}
         <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex justify-between items-center z-10 shadow-sm">
           <div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight">
@@ -273,55 +292,74 @@ const EvaluacionesSequencer = () => {
 
         {/* Spreadsheet Header */}
         <div className="grid grid-cols-12 gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500">
-          <div className="col-span-2 text-center">Día</div>
+          <div className="col-span-2 text-center">Día / Fecha</div>
           <div className="col-span-5 text-indigo-600">Español II (S2)</div>
           <div className="col-span-5 text-emerald-600">IB Español B (S4)</div>
         </div>
 
         {/* Spreadsheet Rows */}
-        <div className="divide-y divide-slate-100">
-          {schedule.map((row) => (
-            <div
-              key={row.dia}
-              className="grid grid-cols-12 gap-4 p-2 hover:bg-slate-50 transition-colors items-center"
-            >
-              <div className="col-span-2 text-center font-black text-slate-300 text-xl">
-                {row.dia}
-              </div>
+        <div className="divide-y divide-slate-100 pb-20">
+          {schedule.map((row) => {
+            const activeDates = calendarMap[row.dia] || [];
+            
+            return (
+              <div
+                key={row.dia}
+                className="grid grid-cols-12 gap-4 p-3 hover:bg-slate-50 transition-colors items-center"
+              >
+                
+                {/* Day & Dual-Date Column */}
+                <div className="col-span-2 text-center flex flex-col items-center justify-center">
+                  <span className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Día</span>
+                  <span className="font-black text-slate-700 text-2xl leading-none">{row.dia}</span>
+                  
+                  {/* Both A and B dates stack here */}
+                  <div className="flex flex-col gap-1 mt-2">
+                    {activeDates.length > 0 ? (
+                      activeDates.map((dateStr, idx) => (
+                        <span key={idx} className="block text-[9px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 whitespace-nowrap">
+                          {dateStr}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="block text-[9px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                        Sin fecha
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-              <div className="col-span-5">
-                <input
-                  type="text"
-                  value={row.s2}
-                  onChange={(e) =>
-                    handleInputChange(row.dia, 's2', e.target.value)
-                  }
-                  className={`w-full bg-transparent border-none focus:ring-2 focus:ring-indigo-500 rounded-md p-2 text-sm font-medium outline-none transition-all ${
-                    row.s2 !== 'Nada' && row.s2 !== ''
-                      ? 'text-indigo-900 bg-indigo-50'
-                      : 'text-slate-400'
-                  }`}
-                  placeholder="Nada"
-                />
-              </div>
+                <div className="col-span-5">
+                  <input
+                    type="text"
+                    value={row.s2}
+                    onChange={(e) => handleInputChange(row.dia, 's2', e.target.value)}
+                    className={`w-full bg-transparent border-none focus:ring-2 focus:ring-indigo-500 rounded-md p-2 text-sm font-medium outline-none transition-all ${
+                      row.s2 !== 'Nada' && row.s2 !== ''
+                        ? 'text-indigo-900 bg-indigo-50 border border-indigo-100'
+                        : 'text-slate-400 border border-transparent hover:border-slate-200'
+                    }`}
+                    placeholder="Nada"
+                  />
+                </div>
 
-              <div className="col-span-5">
-                <input
-                  type="text"
-                  value={row.s4}
-                  onChange={(e) =>
-                    handleInputChange(row.dia, 's4', e.target.value)
-                  }
-                  className={`w-full bg-transparent border-none focus:ring-2 focus:ring-emerald-500 rounded-md p-2 text-sm font-medium outline-none transition-all ${
-                    row.s4 !== 'Nada' && row.s4 !== ''
-                      ? 'text-emerald-900 bg-emerald-50'
-                      : 'text-slate-400'
-                  }`}
-                  placeholder="Nada"
-                />
+                <div className="col-span-5">
+                  <input
+                    type="text"
+                    value={row.s4}
+                    onChange={(e) => handleInputChange(row.dia, 's4', e.target.value)}
+                    className={`w-full bg-transparent border-none focus:ring-2 focus:ring-emerald-500 rounded-md p-2 text-sm font-medium outline-none transition-all ${
+                      row.s4 !== 'Nada' && row.s4 !== ''
+                        ? 'text-emerald-900 bg-emerald-50 border border-emerald-100'
+                        : 'text-slate-400 border border-transparent hover:border-slate-200'
+                    }`}
+                    placeholder="Nada"
+                  />
+                </div>
+
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
