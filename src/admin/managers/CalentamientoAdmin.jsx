@@ -8,18 +8,18 @@ export default function CalentamientoAdmin() {
   const [dia, setDia] = useState(26);
   const [course, setCourse] = useState('s2');
 
-  // Available groups and vocabulary loaded from Firestore
+  // Available groups and practices loaded from Firestore
   const [verbGroups, setVerbGroups] = useState([]);
+  const [savedPractices, setSavedPractices] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('');
   const [configBlocks, setConfigBlocks] = useState([]);
-
-  // Vocab selection
-  const [vocabItems, setVocabItems] = useState([]);
-  const [selectedVocabIds, setSelectedVocabIds] = useState([]);
 
   // Master verb map cache for preview & baking
   const [masterVerbsMap, setMasterVerbsMap] = useState({});
   const [previewQuestions, setPreviewQuestions] = useState([]);
+  
+  // State to track which preview card is being edited
+  const [editingPreviewIndex, setEditingPreviewIndex] = useState(null);
 
   // Verb Generator Advanced Controls
   const [includeVosotros, setIncludeVosotros] = useState(false);
@@ -48,9 +48,9 @@ export default function CalentamientoAdmin() {
         const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setVerbGroups(groups);
 
-        const vocabSnap = await getDocs(collection(db, 'vocabulary'));
-        const vocab = vocabSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setVocabItems(vocab);
+        const calsSnap = await getDocs(collection(db, 'calentamientos'));
+        const cals = calsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.dia - b.dia);
+        setSavedPractices(cals);
 
         const verbsSnap = await getDocs(collection(db, 'verbs'));
         const verbsMap = {};
@@ -66,6 +66,20 @@ export default function CalentamientoAdmin() {
     };
     fetchMetaData();
   }, []);
+
+  // --- LOADER ---
+  const loadPractice = (practiceId) => {
+    if (!practiceId) return;
+    const p = savedPractices.find(x => x.id === practiceId);
+    if (p) {
+      setCalId(p.id);
+      setTitle(p.title || '');
+      setDia(p.dia || 1);
+      setCourse(p.course || 's2');
+      setConfigBlocks(p.configBlocks || []);
+      setPreviewQuestions(p.bakedQuestions || []);
+    }
+  };
 
   const handleGroupSelect = (groupId) => {
     setSelectedGroup(groupId);
@@ -184,9 +198,11 @@ const generateQuestionsArray = () => {
         palabra: randomVerb.palabra,
         mostrar: randomVerb.palabra,
         tense: chosenTense,
+        rawSubject: rawSubject, // Keep the raw internal key so we can edit it later
         sujeto: finalSubject,
         traducción: finalEnglish,
-        forma: formAnswer
+        forma: formAnswer,
+        allowedVerbs: block.allowedVerbs // Attach the group's verbs so the dropdown knows its limits
       });
     }
   }
@@ -196,6 +212,43 @@ const generateQuestionsArray = () => {
   const handlePreview = () => {
     const generated = generateQuestionsArray();
     setPreviewQuestions(generated);
+    setEditingPreviewIndex(null); // Reset any open edits
+  };
+
+  // --- INLINE PREVIEW EDITOR ---
+  const handlePreviewEdit = (index, field, newValue) => {
+    const updated = [...previewQuestions];
+    const q = updated[index];
+    
+    let newRawSubject = q.rawSubject;
+    let newPalabra = q.palabra;
+
+    if (field === 'sujeto') newRawSubject = newValue;
+    if (field === 'palabra') newPalabra = newValue;
+
+    const verbData = masterVerbsMap[newPalabra];
+    if (!verbData) return;
+
+    // Recalculate target form and translation based on new selections
+    const tenseMap = verbData.tenses?.[q.tense] || {};
+    const subjectData = tenseMap[newRawSubject] || {};
+
+    const formAnswer = subjectData.target || '???';
+    const rawEnglish = subjectData.english || verbData.translations?.infinitivo?.english || '';
+
+    const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(newRawSubject, rawEnglish);
+
+    updated[index] = {
+      ...q,
+      palabra: newPalabra,
+      mostrar: newPalabra,
+      rawSubject: newRawSubject,
+      sujeto: finalSubject,
+      traducción: finalEnglish,
+      forma: formAnswer
+    };
+
+    setPreviewQuestions(updated);
   };
 
   // --- SHUFFLE PRESERVING QUESTION #1 ANCHOR ---
@@ -210,6 +263,7 @@ const generateQuestionsArray = () => {
     }
 
     setPreviewQuestions([anchor, ...rest]);
+    setEditingPreviewIndex(null);
   };
 
   // --- MOVE PREVIEW ITEM (Locking index 0) ---
@@ -224,6 +278,7 @@ const generateQuestionsArray = () => {
     updated[index] = updated[targetIndex];
     updated[targetIndex] = temp;
     setPreviewQuestions(updated);
+    setEditingPreviewIndex(null);
   };
 
   const handleSaveAndLockCalentamiento = async (e) => {
@@ -239,12 +294,8 @@ const generateQuestionsArray = () => {
         return;
       }
 
-      const selectedVocabData = vocabItems
-        .filter((v) => selectedVocabIds.includes(v.id))
-        .map((v) => ({
-          es: v.palabra || v.spanish,
-          en: v.english,
-        }));
+      // We don't need to save the massive 'allowedVerbs' array inside the final payload
+      const cleanQuestions = previewQuestions.map(({ allowedVerbs, ...rest }) => rest);
 
       const docRef = doc(db, 'calentamientos', calId);
       await setDoc(
@@ -255,15 +306,14 @@ const generateQuestionsArray = () => {
           dia: Number(dia),
           course,
           configBlocks,
-          bakedQuestions: previewQuestions,
-          vocab: selectedVocabData,
+          bakedQuestions: cleanQuestions,
           createdAt: new Date().toISOString(),
         },
         { merge: true }
       );
 
       alert(
-        '¡Calentamiento creado y preguntas fijadas exitosamente en Firestore!'
+        '¡Calentamiento de verbos fijado exitosamente en Firestore!'
       );
     } catch (error) {
       console.error('Error saving calentamiento:', error);
@@ -276,20 +326,45 @@ const generateQuestionsArray = () => {
   if (loadingMeta) {
     return (
       <div className="p-10 text-center font-bold text-slate-400">
-        Cargando grupos de verbos y vocabulario...
+        Cargando grupos de verbos...
       </div>
     );
   }
 
+  // Calculate live block verb count
+  const totalVerbsCount = configBlocks.reduce((sum, block) => sum + (Number(block.count) || 0), 0);
+
   return (
     <div className="max-w-6xl mx-auto p-6 font-sans pb-20">
+      
+      {/* NEW: TOP BAR FILE CABINET */}
+      <div className="bg-slate-900 p-4 rounded-2xl mb-6 shadow-sm border border-slate-700 flex justify-between items-center">
+        <div className="flex items-center gap-3 w-full max-w-lg">
+          <span className="text-white font-bold text-sm tracking-wider uppercase">Cargar Práctica:</span>
+          <select 
+            onChange={(e) => loadPractice(e.target.value)} 
+            className="flex-1 p-2 rounded-xl bg-slate-800 text-sky-400 font-bold border border-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          >
+            <option value="">-- Seleccionar Práctica Anterior --</option>
+            {savedPractices.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.course?.toUpperCase()} Día {p.dia}: {p.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
+          Para duplicar una práctica para otro día, cárgala aquí y luego cambia el "Día" y el "ID Documento" abajo antes de guardar.
+        </p>
+      </div>
+
       <div className="mb-6 border-b border-slate-200 pb-4">
         <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
-          Creador de Calentamientos con Vista Previa
+          Creador de Calentamientos (Verbos)
         </h1>
         <p className="text-slate-500 font-bold text-sm mt-1">
           Elige los grupos, ajusta las reglas de sujeto, previsualiza y
-          reorganiza antes de fijar.
+          reorganiza antes de fijar. El vocabulario es gestionado de manera automática e independiente.
         </p>
       </div>
 
@@ -367,11 +442,16 @@ const generateQuestionsArray = () => {
 
         {/* VERB GROUP SELECTION PANEL */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-          <h2 className="text-lg font-black text-slate-800 uppercase">
-            1. Configurar Bloques de Verbos y Tiempos
-          </h2>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-3">
+            <h2 className="text-lg font-black text-slate-800 uppercase">
+              1. Configurar Bloques de Verbos y Tiempos
+            </h2>
+            <span className="bg-sky-100 text-sky-800 font-black px-4 py-1.5 rounded-lg text-sm tracking-widest uppercase shadow-sm">
+              Total Proyectado: {totalVerbsCount} verbos
+            </span>
+          </div>
 
-          <div className="max-w-md">
+          <div className="max-w-md mt-4">
             <label className="block text-xs font-black text-slate-500 uppercase mb-1">
               Añadir Grupo desde la Base de Datos
             </label>
@@ -507,7 +587,7 @@ const generateQuestionsArray = () => {
           </div>
 
           {configBlocks.length > 0 && (
-            <div className="pt-2">
+            <div className="pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={handlePreview}
@@ -524,7 +604,7 @@ const generateQuestionsArray = () => {
           <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest">
-                Vista Previa de Preguntas Generadas ({previewQuestions.length})
+                Vista Previa de Preguntas ({previewQuestions.length})
               </h3>
               <button
                 type="button"
@@ -545,85 +625,85 @@ const generateQuestionsArray = () => {
                       : 'bg-slate-800 border-slate-700'
                   }`}
                 >
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mb-1">
-                    <span
-                      className={i === 0 ? 'text-amber-400 font-black' : ''}
-                    >
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mb-1 border-b border-slate-700/50 pb-1">
+                    <span className={i === 0 ? 'text-amber-400 font-black' : ''}>
                       #{i + 1} {i === 0 ? '(ANCLA UNIVERSAL)' : ''} • {q.tense}
                     </span>
-                    <div className="flex gap-1 items-center">
-                      <span className="text-sky-400 mr-2">{q.sujeto}</span>
+                    <div className="flex gap-2 items-center">
+                      {editingPreviewIndex !== i && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingPreviewIndex(i)}
+                          className="text-slate-400 hover:text-sky-400 transition-colors"
+                          title="Editar Sujeto/Verbo"
+                        >
+                          ✏️
+                        </button>
+                      )}
                       {i !== 0 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => movePreviewIndex(i, 'up')}
-                            className="text-slate-400 hover:text-white px-1"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => movePreviewIndex(i, 'down')}
-                            className="text-slate-400 hover:text-white px-1"
-                          >
-                            ▼
-                          </button>
-                        </>
+                        <div className="flex gap-1 border-l border-slate-700 pl-2">
+                          <button type="button" onClick={() => movePreviewIndex(i, 'up')} className="text-slate-500 hover:text-white">▲</button>
+                          <button type="button" onClick={() => movePreviewIndex(i, 'down')} className="text-slate-500 hover:text-white">▼</button>
+                        </div>
                       )}
                     </div>
                   </div>
-                  <p className="font-black text-white uppercase">{q.palabra}</p>
-                  <p className="text-slate-300 italic text-[11px]">
-                    {q.traducción}
-                  </p>
-                  <p className="text-emerald-400 font-mono font-bold mt-1">
-                    ➡ {q.forma}
-                  </p>
+
+                  {editingPreviewIndex === i ? (
+                    <div className="mt-2 space-y-2 bg-slate-950 p-2 rounded-lg border border-slate-700">
+                      <div className="flex justify-between gap-2">
+                        <select 
+                          value={q.rawSubject}
+                          onChange={(e) => handlePreviewEdit(i, 'sujeto', e.target.value)}
+                          className="w-1/2 p-1 bg-slate-800 text-sky-400 font-bold rounded outline-none border border-slate-600"
+                        >
+                          <option value="yo">yo</option>
+                          <option value="tú">tú</option>
+                          <option value="él_ella_ud">él / ella / Ud.</option>
+                          <option value="nosotros">nosotros</option>
+                          <option value="vosotros">vosotros</option>
+                          <option value="ellos_ellas_uds">ellos / ellas / Uds.</option>
+                        </select>
+
+                        <select
+                          value={q.palabra}
+                          onChange={(e) => handlePreviewEdit(i, 'palabra', e.target.value)}
+                          className="w-1/2 p-1 bg-slate-800 text-white font-black uppercase rounded outline-none border border-slate-600"
+                        >
+                          {q.allowedVerbs?.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingPreviewIndex(null)}
+                        className="w-full text-center bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold rounded p-1 text-[10px] uppercase tracking-wider"
+                      >
+                        ✔ Hecho
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-sky-400 mr-1 font-bold">{q.sujeto}</span>
+                        <p className="font-black text-white uppercase">{q.palabra}</p>
+                      </div>
+                      <p className="text-slate-400 italic text-[11px] mt-0.5">
+                        {q.traducción}
+                      </p>
+                      <p className="text-emerald-400 font-mono font-bold mt-1.5 bg-emerald-950/30 p-1.5 rounded-lg inline-block border border-emerald-900/50">
+                        ➡ {q.forma}
+                      </p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
             <p className="text-[10px] text-slate-400 italic">
               La pregunta #1 se mantiene anclada para asegurar la uniformidad de
-              la clase. Puedes mover o mezclar el resto antes de guardar.
+              la clase. Haz clic en ✏️ para alterar verbos específicos.
             </p>
           </div>
         )}
-
-        {/* VOCABULARY SELECTION PANEL */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-          <h2 className="text-lg font-black text-slate-800 uppercase">
-            2. Seleccionar Vocabulario (Estación de Vocab)
-          </h2>
-          <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 grid grid-cols-1 md:grid-cols-3 gap-2 bg-slate-50">
-            {vocabItems.map((vocab) => (
-              <label
-                key={vocab.id}
-                className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-100 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedVocabIds.includes(vocab.id)}
-                  onChange={(e) => {
-                    if (e.target.checked)
-                      setSelectedVocabIds([...selectedVocabIds, vocab.id]);
-                    else
-                      setSelectedVocabIds(
-                        selectedVocabIds.filter((id) => id !== vocab.id)
-                      );
-                  }}
-                  className="rounded text-sky-600"
-                />
-                <span className="truncate">
-                  {vocab.palabra || vocab.spanish} ({vocab.english})
-                </span>
-              </label>
-            ))}
-          </div>
-          <p className="text-xs font-bold text-sky-600">
-            Términos seleccionados: {selectedVocabIds.length}
-          </p>
-        </div>
 
         {/* SUBMIT */}
         <div className="flex justify-end">

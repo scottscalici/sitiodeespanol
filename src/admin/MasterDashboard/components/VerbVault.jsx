@@ -44,10 +44,10 @@ const VerbVault = () => {
     { id: 'imperfecto_progresivo', label: 'Imperfecto Progresivo' },
     { id: 'subjuntivo_presente', label: 'Presente de Subjuntivo' },
     { id: 'subjuntivo_imperfecto_ra', label: 'Imperfecto de Subjuntivo (-ra)' },
-    { id: 'subjuntivo_imperfecto_se', label: 'Subjuntivo Imperfecto de Subjuntivo (-se)' },
+    { id: 'subjuntivo_imperfecto_se', label: 'Subjuntivo Imperfecto (-se)' },
     { id: 'subjuntivo_perfecto', label: 'Pretérito Perfecto de Subjuntivo' },
-    { id: 'pluscuamperfecto_subjuntivo_ra', label: 'Pluscuamperfecto de Subjuntivo (hubiera)' },
-    { id: 'pluscuamperfecto_subjuntivo_se', label: 'Pluscuamperfecto de Subjuntivo (hubiese)' },
+    { id: 'pluscuamperfecto_subjuntivo_ra', label: 'Pluscuamperfecto Subjuntivo (hubiera)' },
+    { id: 'pluscuamperfecto_subjuntivo_se', label: 'Pluscuamperfecto Subjuntivo (hubiese)' },
     { id: 'imperativo_afirmativo', label: 'Mandatos (+)' },
     { id: 'imperativo_negativo', label: 'Mandatos (-)' }
   ];
@@ -79,12 +79,19 @@ const VerbVault = () => {
     fetchData();
   }, []);
 
-  // --- HELPER: Sorted Groups ---
+  // --- HELPER: Sorted & Categorized Groups ---
   const sortedGroups = [...groups].sort((a, b) => {
     const nameA = a.name || "";
     const nameB = b.name || "";
     return nameA.localeCompare(nameB);
   });
+
+  const categorizedGroups = AVAILABLE_TENSES.map(tense => ({
+    ...tense,
+    groups: sortedGroups.filter(g => g.tenses?.includes(tense.id))
+  })).filter(c => c.groups.length > 0);
+
+  const untaggedGroups = sortedGroups.filter(g => !g.tenses || g.tenses.length === 0);
 
   // --- LOGIC: GROUP BUILDER ---
   const startNewGroup = () => {
@@ -278,7 +285,7 @@ const VerbVault = () => {
             
             <input 
               type="text" 
-              placeholder="Filter verbs (e.g., 'ger')..." 
+              placeholder="Filter verbs (e.g., 'ger')...." 
               value={librarySearch}
               onChange={(e) => setLibrarySearch(e.target.value)}
               style={{...s.searchBar, width: '100%', marginBottom: '15px'}}
@@ -308,7 +315,18 @@ const VerbVault = () => {
                   <h2 style={{margin: 0, color: '#deff9a'}}>
                     {draftGroup.id ? "Editing Group" : "Building New Group"}
                   </h2>
-                  <button style={s.cancelBtn} onClick={() => setDraftGroup(null)}>Cancel</button>
+                  <div style={{display: 'flex', gap: '10px'}}>
+                    {/* NEW DUPLICATE BUTTON */}
+                    {draftGroup.id && (
+                      <button 
+                        style={s.duplicateBtn} 
+                        onClick={() => setDraftGroup({...draftGroup, id: null, name: `${draftGroup.name} (Copia)`})}
+                      >
+                        📄 Duplicate as New
+                      </button>
+                    )}
+                    <button style={s.cancelBtn} onClick={() => setDraftGroup(null)}>Cancel</button>
+                  </div>
                 </div>
                 
                 <div style={s.draftForm}>
@@ -365,19 +383,49 @@ const VerbVault = () => {
                   <h3 style={s.label}>Your Curated Groups</h3>
                   <button style={s.saveBtn} onClick={startNewGroup}>+ Create New Group</button>
                 </div>
-                <div style={s.groupGrid}>
-                  {sortedGroups.length > 0 ? sortedGroups.map(g => (
-                    <div key={g.id} onClick={() => setDraftGroup({...g})} style={{...s.groupCard, cursor: 'pointer'}}>
-                      <h4 style={{margin: '0 0 10px 0', color: '#deff9a'}}>{g.name}</h4>
-                      <div style={s.groupMeta}>
-                        <span>{g.verbIds?.length || 0} verbs</span>
-                        {g.tenses && g.tenses.length > 0 && (
-                          <span style={{marginLeft: '10px', color: '#888'}}>({g.tenses.length} Tenses)</span>
-                        )}
+                
+                {/* DYNAMIC CATEGORIZATION BY TENSE */}
+                <div style={{display: 'flex', flexDirection: 'column', gap: '30px'}}>
+                  
+                  {categorizedGroups.map(category => (
+                    <div key={category.id}>
+                      <h4 style={{color: '#deff9a', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '1px'}}>
+                        {category.label}
+                      </h4>
+                      <div style={s.groupGrid}>
+                        {category.groups.map(g => (
+                          <div key={g.id} onClick={() => setDraftGroup({...g})} style={{...s.groupCard, cursor: 'pointer'}}>
+                            <h4 style={{margin: '0 0 10px 0', color: '#fff'}}>{g.name}</h4>
+                            <div style={s.groupMeta}>
+                              <span>{g.verbIds?.length || 0} verbs</span>
+                            </div>
+                            <p style={s.hintText}>{g.hint ? `Hint: ${g.hint}` : 'No hint added.'}</p>
+                          </div>
+                        ))}
                       </div>
-                      <p style={s.hintText}>{g.hint ? `Hint: ${g.hint}` : 'No hint added.'}</p>
                     </div>
-                  )) : (
+                  ))}
+
+                  {/* UNTAGGED GROUPS FALLBACK */}
+                  {untaggedGroups.length > 0 && (
+                    <div>
+                      <h4 style={{color: '#f44', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '1px'}}>
+                        ⚠️ Uncategorized Groups (Needs Tense Tags)
+                      </h4>
+                      <div style={s.groupGrid}>
+                        {untaggedGroups.map(g => (
+                          <div key={g.id} onClick={() => setDraftGroup({...g})} style={{...s.groupCard, cursor: 'pointer', border: '1px solid #f44'}}>
+                            <h4 style={{margin: '0 0 10px 0', color: '#fff'}}>{g.name}</h4>
+                            <div style={s.groupMeta}>
+                              <span>{g.verbIds?.length || 0} verbs</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {groups.length === 0 && (
                     <div style={s.emptyState}>No groups yet. Click 'Create New Group' to start.</div>
                   )}
                 </div>
@@ -415,7 +463,6 @@ const VerbVault = () => {
             <div style={s.recipeList}>
               {recipeBlocks.map((block, idx) => {
                 
-                // NEW: Sort groups into Match vs Other for the select dropdown
                 const recommendedGroups = sortedGroups.filter(g => 
                   !g.tenses || g.tenses.length === 0 || g.tenses.includes(block.tense)
                 );
@@ -444,7 +491,6 @@ const VerbVault = () => {
                       <select value={block.groupId} onChange={e => updateRecipeBlock(block.id, 'groupId', e.target.value)} style={{...s.selectBox, width: '250px'}}>
                         <option value="">-- Select a Group --</option>
                         
-                        {/* The grouped options */}
                         {recommendedGroups.length > 0 && (
                           <optgroup label="✅ Target Tense Match">
                             {recommendedGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -550,6 +596,7 @@ const s = {
   inputLarge: { background: '#000', border: '1px solid #333', color: '#deff9a', padding: '10px', borderRadius: '4px', width: '200px' },
   selectBox: { background: '#000', border: '1px solid #333', color: '#deff9a', padding: '10px', borderRadius: '4px', width: '150px' },
   saveBtn: { background: '#deff9a', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', height: '40px' },
+  duplicateBtn: { background: 'none', color: '#fff', border: '1px solid #555', padding: '10px 15px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', height: '40px' },
   recipeArea: { background: '#0a0a0a', padding: '20px', borderRadius: '8px', border: '1px solid #222' },
   recipeList: { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' },
   recipeRow: { display: 'flex', gap: '15px', alignItems: 'flex-end', background: '#111', padding: '15px', borderRadius: '6px', border: '1px solid #333' },
@@ -579,7 +626,7 @@ const s = {
   addBtnActive: { background: 'none', border: 'none', color: '#deff9a', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' },
   addBtnDisabled: { background: 'none', border: 'none', color: '#444', cursor: 'not-allowed', fontSize: '12px' },
   mainPanel: { background: '#0a0a0a', padding: '20px', borderRadius: '8px', border: '1px solid #222' },
-  groupGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px', marginTop: '20px' },
+  groupGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px', marginTop: '10px' },
   groupCard: { background: '#111', padding: '15px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer' },
   groupMeta: { fontSize: '12px', color: '#666' },
   hintText: { fontSize: '12px', color: '#aaa', fontStyle: 'italic', marginTop: '10px' },

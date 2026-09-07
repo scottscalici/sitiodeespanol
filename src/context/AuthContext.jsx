@@ -8,7 +8,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { app, db } from './firebase';
+import { app, db } from '../firebase';
 
 const auth = getAuth(app);
 const AuthContext = createContext();

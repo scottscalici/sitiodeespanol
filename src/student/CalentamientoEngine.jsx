@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // 👈 Added this missing import
 import {
   collection,
   doc,
@@ -18,7 +19,7 @@ export default function CalentamientoEngine({
   onClose,
 }) {
   const { userData } = useAuth();
-
+  const navigate = useNavigate();
   const [warmupData, setWarmupData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +32,10 @@ export default function CalentamientoEngine({
   // Verb Module States
   const [verbInputs, setVerbInputs] = useState({});
   const [verbResults, setVerbResults] = useState({});
+  
+  // Diagnostic Tracking States
+  const [checkedOnce, setCheckedOnce] = useState({}); 
+  const [firstAttemptErrors, setFirstAttemptErrors] = useState([]);
 
   // Vocab Station States (New Flow)
   const [vocabPhase, setVocabPhase] = useState('preview'); // 'preview', 'match', 'done'
@@ -99,7 +104,8 @@ export default function CalentamientoEngine({
           alert(
             `Práctica no encontrada para el Día ${targetDiaNum} (${formattedCourse.toUpperCase()}).`
           );
-          onClose?.();
+          if (onClose) onClose();
+          else navigate('/');
         }
       } catch (err) {
         console.error('Error fetching warmup:', err);
@@ -109,7 +115,7 @@ export default function CalentamientoEngine({
     };
 
     fetchCombinedWarmup();
-  }, [targetDia, courseId, onClose]);
+  }, [targetDia, courseId, onClose, navigate]);
 
   // 2. Session Timer Interval
   useEffect(() => {
@@ -147,11 +153,13 @@ export default function CalentamientoEngine({
   const vocabPages = Math.ceil(bakedVocab.length / 10);
   const totalModules = verbPages + vocabPages + 1;
 
-  // Handle Verb Checking
+  // Handle Verb Checking (WITH DIAGNOSTIC ERROR TRACKING)
   const handleCheckVerbs = (pageIndex) => {
     const slice = bakedVerbs.slice((pageIndex - 1) * 5, pageIndex * 5);
     let allCorrect = true;
     const newResults = { ...verbResults };
+    const newCheckedOnce = { ...checkedOnce };
+    const newErrorsToLog = [];
 
     slice.forEach((v, idx) => {
       const globalIdx = (pageIndex - 1) * 5 + idx;
@@ -165,10 +173,33 @@ export default function CalentamientoEngine({
       } else {
         newResults[globalIdx] = 'incorrect';
         allCorrect = false;
+
+        // DIAGNOSTIC LOGIC: Only save if this is their very first time checking this specific question.
+        if (!newCheckedOnce[globalIdx]) {
+          newErrorsToLog.push({
+            index: globalIdx,
+            verb: v.palabra,
+            tense: v.tense,
+            subject: v.sujeto,
+            expected: expected,
+            studentInput: userVal || "(en blanco)",
+            timestamp: new Date().toISOString()
+          });
+        }
       }
+      
+      // Mark this question as having been checked at least once.
+      newCheckedOnce[globalIdx] = true;
     });
 
     setVerbResults(newResults);
+    setCheckedOnce(newCheckedOnce);
+    
+    // Add any new errors found during this check to our master list
+    if (newErrorsToLog.length > 0) {
+      setFirstAttemptErrors(prev => [...prev, ...newErrorsToLog]);
+    }
+
     setCompletedModules(Math.max(completedModules, pageIndex));
 
     if (allCorrect) {
@@ -251,6 +282,7 @@ export default function CalentamientoEngine({
           }
         }
 
+        // Save Grade AND Diagnostic Errors to Firestore
         await setDoc(
           userRef,
           {
@@ -267,6 +299,7 @@ export default function CalentamientoEngine({
                   completed: true,
                   grade: highestGrade,
                   rawScore: `${totalGrade.toFixed(1)}/5`,
+                  errors: firstAttemptErrors, // <-- Diagnostic tracking!
                   timestamp: new Date().toISOString(),
                 },
               },
@@ -285,7 +318,12 @@ export default function CalentamientoEngine({
       }
     }
 
-    onClose?.();
+    // Cleaned up routing logic
+    if (onClose) {
+      onClose(); // Used if rendered inside a popup/modal
+    } else {
+      navigate('/'); // Bounces them back to the student dashboard
+    }
   };
 
   return (
@@ -311,7 +349,10 @@ export default function CalentamientoEngine({
           </div>
         </div>
         <button
-          onClick={() => onClose?.()}
+          onClick={() => {
+            if (onClose) onClose();
+            else navigate('/');
+          }}
           className="text-slate-400 hover:text-white font-bold text-xl px-3 py-1 bg-slate-700 rounded-lg"
         >
           ✕

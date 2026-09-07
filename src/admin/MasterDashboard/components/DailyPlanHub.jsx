@@ -20,7 +20,10 @@ const DailyPlanHub = () => {
   const [allMusica, setAllMusica] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
   const [allCuriosidades, setAllCuriosidades] = useState([]);
-  const [allCalentamientos, setAllCalentamientos] = useState([]); // NEW: Calentamientos
+  
+  // NEW: Decoupled Calentamiento States
+  const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
+  const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
 
   const MAX_DAYS = 80;
 
@@ -51,7 +54,9 @@ const DailyPlanHub = () => {
         }
 
         // Fetch Sequences & Collections
-        const [tareasSnap, evalsSnap, gramSnap, destSnap, musSnap, vidSnap, curSnap, calSnap] = await Promise.all([
+        const [
+          tareasSnap, evalsSnap, gramSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap
+        ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
           getDoc(doc(db, 'curriculum_tracks', 'gramatica_master')),
@@ -59,7 +64,8 @@ const DailyPlanHub = () => {
           getDocs(collection(db, 'musica')),
           getDocs(collection(db, 'videos')),
           getDocs(collection(db, 'curiosidades')),
-          getDocs(collection(db, 'calentamientos')) // NEW
+          getDocs(collection(db, 'calentamientos')), // Verbs
+          getDocs(collection(db, 'dailyVocabWarmups')) // Vocab
         ]);
 
         if (tareasSnap.exists()) {
@@ -79,7 +85,8 @@ const DailyPlanHub = () => {
         setAllMusica(musSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllVideos(vidSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllCuriosidades(curSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllCalentamientos(calSnap.docs.map(d => ({ id: d.id, ...d.data() }))); // NEW
+        setAllCalentamientos(calSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       } catch (error) {
         console.error('Error loading Daily Hub data:', error);
@@ -100,8 +107,9 @@ const DailyPlanHub = () => {
   const activeMusica = allMusica.filter(m => m.dias && m.dias.includes(selectedDay));
   const activeVideos = allVideos.filter(v => Number(v.dia) === selectedDay);
   
-  // NEW: Filter Calentamientos by both Course and Day
-  const activeCalentamientos = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
+  // NEW: Filter BOTH Verbs and Vocab by Course and Day
+  const activeCalentamientosVerbs = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
+  const activeCalentamientosVocab = allVocabWarmups.filter(v => v.course === activeCourse && Number(v.dia) === selectedDay);
 
   const activeCuriosidades = allCuriosidades.filter(c => {
     if (activeCourse === 's2') return c.s2_dia === selectedDay;
@@ -127,7 +135,7 @@ const DailyPlanHub = () => {
           <span>Tareas S2: {tareasS2.length}</span>
           <span>Evals S2: {evaluacionesS2.length}</span>
           <span>Destacados: {allDestacados.length}</span>
-          <span>Calentamientos: {allCalentamientos.length}</span>
+          <span>Calentamientos (V/Voc): {allCalentamientos.length}/{allVocabWarmups.length}</span>
           <span>Música: {allMusica.length}</span>
           <span>Videos: {allVideos.length}</span>
           <span>Curiosidades: {allCuriosidades.length}</span>
@@ -215,29 +223,59 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
-            {/* Calentamiento (Verbos & Vocab) */}
+            {/* Calentamiento (Verbos & Vocab) - NOW DECOUPLED! */}
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <h2 className="font-black text-lg text-orange-400 flex items-center gap-2">⏱️ Calentamiento</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeCalentamientos.length}</span>
+                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">
+                    {activeCalentamientosVerbs.length + activeCalentamientosVocab.length}
+                  </span>
                 </div>
-                {/* NOTE: Ensure this link matches whatever path you gave CalentamientoAdmin.jsx in App.jsx */}
-                <Link to="/calentamiento" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Manager</Link>
+                {/* Two distinct quick links to managing each half of the Warmup */}
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link to="/admin-secret-portal-calentamiento" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Verbos</Link>
+                  <Link to="/admin-secret-portal-vocabvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Vocab</Link>
+                </div>
               </div>
+              
               <div className="space-y-4">
-                {activeCalentamientos.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin calentamiento asignado.</p>
+                {activeCalentamientosVerbs.length === 0 && activeCalentamientosVocab.length === 0 ? (
+                  <p className="text-neutral-500 text-sm italic">Sin calentamiento asignado para hoy.</p>
                 ) : (
-                  activeCalentamientos.map(cal => (
-                    <div key={cal.id} className="bg-neutral-950 p-4 rounded-xl border border-orange-900/30 flex flex-col gap-2">
-                      <h3 className="font-bold text-white text-md">{cal.title}</h3>
-                      <div className="flex gap-4 mt-2">
-                        <span className="text-xs font-mono text-orange-400"><span className="text-neutral-500">Verbos:</span> {cal.bakedQuestions?.length || 0}</span>
-                        <span className="text-xs font-mono text-sky-400"><span className="text-neutral-500">Vocab:</span> {cal.vocab?.length || 0}</span>
+                  <div className="bg-neutral-950 p-4 rounded-xl border border-orange-900/30 flex flex-col gap-4">
+                    
+                    {/* Render Verbs if they exist for this day */}
+                    {activeCalentamientosVerbs.map(cal => (
+                      <div key={`verb-${cal.id}`} className="flex justify-between items-center border-b border-neutral-800 pb-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-orange-500 bg-orange-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">
+                            Sección: Verbos
+                          </p>
+                          <h3 className="font-bold text-white text-md">{cal.title}</h3>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-mono text-neutral-500">{cal.bakedQuestions?.length || 0} Preguntas</span>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+
+                    {/* Render Vocab if it exists for this day */}
+                    {activeCalentamientosVocab.map(voc => (
+                      <div key={`voc-${voc.id}`} className="flex justify-between items-center">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">
+                            Sección: Vocabulario
+                          </p>
+                          <h3 className="font-bold text-white text-md">{voc.name}</h3>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-mono text-neutral-500">{voc.sequence?.length || 0} Términos</span>
+                        </div>
+                      </div>
+                    ))}
+                    
+                  </div>
                 )}
               </div>
             </div>
