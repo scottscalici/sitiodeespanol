@@ -1,68 +1,171 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-// 🔗 Your exact Google Sites links from the original code!
-const CALENDAR_LINKS = {
-  s2: "https://sites.google.com/view/srscalici/espa%C3%B1ol-2/evaluaciones",
-  s4: "https://sites.google.com/view/srscalici/ib-espa%C3%B1ol-ii/evaluaciones"
-};
+const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-const Evaluacion = ({ evals = {}, liveDia, course }) => {
-  const evalList = evals.courses?.[course] || [];
+  // Find today's evaluation
+  const todayEval = evals.find((e) => e.dia === liveDia);
+  const hasEvalToday = todayEval && todayEval.label && todayEval.label !== 'Nada';
 
-  const findEval = (d) => {
-    const found = evalList.find(e => e.dia == d);
-    return found ? found.label : "Nada";
+  // Filter out 'Nada' for the full calendar view
+  const actualEvals = evals.filter((e) => e.label && e.label !== 'Nada');
+
+  // Find the next 2 upcoming evaluations
+  const upcomingEvals = actualEvals
+    .filter((e) => e.dia > liveDia)
+    .slice(0, 2);
+
+  // Course Title mapping
+  const courseTitle = course === 's2' ? 'Español II' : 'IB Español II';
+
+  // Helper to determine the "time away" text (kept but made subtle)
+  const getUpcomingText = (evalDia) => {
+    const diff = evalDia - liveDia;
+    if (diff === 1) return 'la próxima clase';
+    if (diff === 2) return 'en 2 clases';
+    return `en ${diff} clases`;
   };
 
-  const currentEval = findEval(liveDia);
-  const nextEval1 = findEval(parseInt(liveDia) + 1);
-  const nextEval2 = findEval(parseInt(liveDia) + 2);
+  // Helper to match Día numbers to actual calendar dates for the modal
+  const getDatesForDia = (diaNum) => {
+    if (!cal || !Array.isArray(cal)) return '';
+    const matchingDays = cal.filter(c => c.dia === diaNum && c.status === 'school');
+    
+    if (matchingDays.length === 0) return 'Fecha TBD';
+    
+    return matchingDays.map(d => {
+      let formattedDate = d.fecha;
+      if (d.fecha && d.fecha.includes('-')) {
+        const parts = d.fecha.split('-');
+        if (parts.length === 3) formattedDate = `${parseInt(parts[1])}/${parseInt(parts[2])}`; // Removes leading zeros
+      }
+      return `${formattedDate}${d.ciclo ? ` (${d.ciclo})` : ''}`;
+    }).join(' & ');
+  };
 
   return (
-    <section className="bg-white rounded-xl border-l-[6px] border-indigo-500 p-6 shadow-sm border border-y-slate-200 border-r-slate-200">
-      <h2 className="font-bold text-xl mb-3 flex items-center gap-2 text-slate-800">
-        <span>📋</span> Evaluación
-      </h2>
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-[6px] border-l-rose-400 p-5 sm:p-6 relative">
       
-      <div className="text-lg text-indigo-700 font-bold italic mb-4">
-        {currentEval}
-      </div>
-      
-              
-      <div className="pt-4 border-t border-slate-100 flex-grow">
-        <h3 className="text-slate-900 font-bold text-sm mb-3 uppercase tracking-wide">
-          Próximas pruebas
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-xl text-rose-500 flex items-center gap-2">
+          <span>📋</span> Evaluación
         </h3>
-        <ul className="space-y-2 text-sm text-slate-600">
-          <li className="flex items-center gap-3">
-            <span className="font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded text-[10px] uppercase tracking-widest border border-slate-200">
-              Día {parseInt(liveDia) + 1}
-            </span> 
-            <span className={nextEval1 === "Nada" ? "italic opacity-60" : "font-medium"}>
-              {nextEval1}
-            </span>
-          </li>
-          <li className="flex items-center gap-3">
-            <span className="font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded text-[10px] uppercase tracking-widest border border-slate-200">
-              Día {parseInt(liveDia) + 2}
-            </span> 
-            <span className={nextEval2 === "Nada" ? "italic opacity-60" : "font-medium"}>
-              {nextEval2}
-            </span>
-          </li>
-        </ul>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors"
+          title="Ver calendario completo"
+        >
+          Calendario
+        </button>
       </div>
 
-      {/* 🚀 THE NEW CONSOLIDATED BUTTON */}
-      <a 
-        href={CALENDAR_LINKS[course] || "#"} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="mt-6 block w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-center py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest transition-colors border border-indigo-100"
-      >
-        Ver Calendario Completo ↗
-      </a>
-    </section>
+      {/* TODAY'S EVALUATION */}
+      <div className="mb-5">
+        {hasEvalToday ? (
+          <p className="text-slate-800 text-lg font-medium leading-tight">
+            {todayEval.label}
+          </p>
+        ) : (
+          <p className="text-slate-700 text-lg italic">
+            Nada
+          </p>
+        )}
+      </div>
+
+      {/* UPCOMING EVALUATIONS */}
+      {upcomingEvals.length > 0 && (
+        <>
+          <hr className="border-slate-100 my-4" />
+          <div>
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">
+              Próximas Pruebas
+            </h4>
+            <div className="space-y-1.5">
+              {upcomingEvals.map((upc, idx) => (
+                <p key={idx} className="text-slate-700 text-sm">
+                  <span className="font-black text-slate-800">Día {upc.dia}:</span> {upc.label}
+                  <span className="text-slate-400 italic text-xs ml-1.5">({getUpcomingText(upc.dia)})</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* FULL CALENDAR MODAL (Unchanged) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 p-5 flex justify-between items-center">
+              <div>
+                <h2 className="text-white font-black uppercase tracking-widest text-lg">
+                  Calendario de Evaluaciones
+                </h2>
+                <p className="text-indigo-400 font-bold text-xs uppercase tracking-widest mt-1">
+                  {courseTitle}
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white text-3xl font-bold leading-none p-2 -mr-2"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-3 bg-slate-50">
+              {actualEvals.length === 0 ? (
+                <p className="text-center text-slate-500 italic font-bold py-8">
+                  No hay evaluaciones programadas.
+                </p>
+              ) : (
+                actualEvals.map((item, idx) => {
+                  const isPast = item.dia < liveDia;
+                  const isToday = item.dia === liveDia;
+                  const datesStr = getDatesForDia(item.dia);
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
+                        isToday 
+                          ? 'bg-rose-50 border-rose-200 shadow-md transform scale-[1.02]' 
+                          : isPast 
+                            ? 'bg-white border-slate-200 opacity-60' 
+                            : 'bg-white border-slate-200 shadow-sm'
+                      }`}
+                    >
+                      <div className={`flex flex-col items-center justify-center min-w-[70px] px-2 py-2 rounded-lg shrink-0 ${
+                        isToday ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Día {item.dia}</span>
+                        <span className="text-[9px] font-bold leading-none text-center opacity-80">{datesStr}</span>
+                      </div>
+                      <div>
+                        {isToday && (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 block mb-0.5">
+                            HOY
+                          </span>
+                        )}
+                        <p className={`font-bold text-sm ${isToday ? 'text-rose-900' : 'text-slate-700'}`}>
+                          {item.label}
+                        </p>
+                      </div>
+                      {isPast && !isToday && (
+                        <div className="ml-auto text-emerald-500 text-xl font-bold" title="Completado">
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

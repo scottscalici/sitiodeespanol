@@ -3,25 +3,14 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const CONFIG = {
-  // 🔗 BATCH 1 & 2 REMOVED.
-  // What's left for Batch 3: Anuncios, Evals, Curiosidades, Apuntes, Extras, Practicas
-  ANUNCIOS:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/anuncios.json',
-  DICTIONARY:
-    'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt', // Keep dictionary external (it's a raw .txt file)
-  EVALS:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/evaluaciones.json',
-  CURIOSIDADES:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/curiosidades.json',
-  APUNTES:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/apuntes.json',
-  EXTRAS:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/extras_diarios.json',
-  PRACTICAS:
-    'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/practicas.json',
+  ANUNCIOS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/anuncios.json',
+  DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
+  APUNTES: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/apuntes.json',
+  EXTRAS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/extras_diarios.json',
+  PRACTICAS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/practicas.json',
 };
 
-// 🧹 THE NORMALIZATION ENGINE (Still untouched)
+// 🧹 THE NORMALIZATION ENGINE
 const normalizeActivities = (raw) => {
   let activities = [];
 
@@ -136,7 +125,6 @@ export const useGymData = (userCourse = 's2') => {
             .then((r) => (r.ok ? r.text() : ''))
             .catch(() => '');
 
-        // 1. Fetch Firestore Calendar
         const fetchCalendar = async () => {
           try {
             const calRef = doc(db, 'config', 'academic_year_2026_2027');
@@ -147,7 +135,6 @@ export const useGymData = (userCourse = 's2') => {
           }
         };
 
-        // 2. Fetch standard objects (Batch 1 style: { items: {...} })
         const fetchFirestoreCategory = async (collectionName) => {
           try {
             const snap = await getDocs(collection(db, collectionName));
@@ -161,7 +148,6 @@ export const useGymData = (userCourse = 's2') => {
           }
         };
 
-        // 3. NEW: Fetch arrays and package them with a specific root key (for Batch 2)
         const fetchFirestoreArray = async (collectionName, rootKey) => {
           try {
             const snap = await getDocs(collection(db, collectionName));
@@ -169,10 +155,30 @@ export const useGymData = (userCourse = 's2') => {
               id: doc.id,
               ...doc.data(),
             }));
-            // e.g. returns { tareas: [...] } or { eslabones: [...] }
             return rootKey ? { [rootKey]: itemsArray } : itemsArray;
           } catch (err) {
             return rootKey ? { [rootKey]: [] } : [];
+          }
+        };
+
+        const fetchEvalsMaster = async () => {
+          try {
+            const evalsRef = doc(db, 'curriculum_tracks', 'evaluaciones_master');
+            const evalsSnap = await getDoc(evalsRef);
+            return evalsSnap.exists() ? evalsSnap.data() : { s2: [], s4: [] };
+          } catch (err) {
+            return { s2: [], s4: [] };
+          }
+        };
+
+        // NEW: Fetch Estructura/Gramatica Master Document
+        const fetchGramaticaMaster = async () => {
+          try {
+            const gramRef = doc(db, 'curriculum_tracks', 'gramatica_master');
+            const gramSnap = await getDoc(gramRef);
+            return gramSnap.exists() ? gramSnap.data() : { s2: [], s4: [] };
+          } catch (err) {
+            return { s2: [], s4: [] };
           }
         };
 
@@ -180,54 +186,48 @@ export const useGymData = (userCourse = 's2') => {
         const [
           cal,
           dictText,
-          // 🔥 BATCH 3 (Still on GitHub)
           anuncios,
-          evals,
-          curios,
           apuntes,
           extras,
           practicas,
-          // 🔥 FIRESTORE BATCH 1
           musica,
           lectura,
           conversa,
           cultura,
           videos,
-          // 🔥 FIRESTORE BATCH 2
           tareas,
           vocab,
-          gramD,
           destacado,
           temas,
           atando,
           words,
+          evalsMaster,
+          curios,
+          gramaticaMaster // <--- New Fetcher Executed
         ] = await Promise.all([
           fetchCalendar(),
           safeFetchText(CONFIG.DICTIONARY),
 
-          // GitHub Fetches
           safeFetchJSON(CONFIG.ANUNCIOS),
-          safeFetchJSON(CONFIG.EVALS),
-          safeFetchJSON(CONFIG.CURIOSIDADES),
           safeFetchJSON(CONFIG.APUNTES),
           safeFetchJSON(CONFIG.EXTRAS),
           safeFetchJSON(CONFIG.PRACTICAS),
 
-          // Firestore Batch 1
           fetchFirestoreCategory('musica'),
           fetchFirestoreCategory('lectura'),
           fetchFirestoreCategory('conversaciones'),
           fetchFirestoreCategory('culture'),
-          fetchFirestoreArray('videos', 'daily_tags'), // Reused the new array fetcher!
+          fetchFirestoreArray('videos', 'daily_tags'),
 
-          // Firestore Batch 2
           fetchFirestoreArray('tareas_bundles', 'tareas'),
-          fetchFirestoreArray('vocab_bundles', 'bundles'), // Assumes vocab is structured with a root key
-          fetchFirestoreArray('grammar_sentences', 'sentences'),
+          fetchFirestoreArray('vocab_bundles', 'bundles'),
           fetchFirestoreArray('destacado_diario'),
           fetchFirestoreCategory('temas'),
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
           fetchFirestoreArray('juego_senordle', 'words'),
+          fetchEvalsMaster(),
+          fetchFirestoreArray('curiosidades'),
+          fetchGramaticaMaster() // <--- Added here
         ]);
 
         const validDictionary = dictText
@@ -267,12 +267,12 @@ export const useGymData = (userCourse = 's2') => {
           anuncios,
           words,
           dictionary: validDictionary,
-          evals,
+          evals: evalsMaster,
           curios,
+          estructura: gramaticaMaster, // <--- Passing the structure data to dashboard
           destacado,
           apuntes,
           temas,
-          gramD,
           atando,
           activities: allActivities,
         });

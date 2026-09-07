@@ -18,6 +18,7 @@ import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
 import TicoTalk from './student/TicoTalk';
 import WorkoutEngine from './student/WorkoutEngine';
+import GrammarNoteViewer from './student/GrammarNoteViewer';
 
 // ⚙️ GLOBAL UI COMPONENTS
 import ActivityPage from './components/ActivityPage';
@@ -141,8 +142,8 @@ function App() {
             <Route path="/music-info/:id" element={<MusicPage />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
-            <Route path="/calentamiento" element={<CalentamientoEngine targetDia={1} courseId="s2" />} />
-
+            <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
+            <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             {/* 🔴 SECURE ADMIN ROUTES */}
             <Route
               path="/admin-secret-portal"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // 👈 Added this missing import
+import { useNavigate, useParams } from 'react-router-dom'; // 👈 Added this missing import
 import {
   collection,
   doc,
@@ -12,12 +12,8 @@ import {
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 
-export default function CalentamientoEngine({
-  targetDia,
-  courseId,
-  warmupId,
-  onClose,
-}) {
+export default function CalentamientoEngine({ onClose }) {
+  const { courseId, targetDia } = useParams(); // 👈 Grabs course and day from the URL
   const { userData } = useAuth();
   const navigate = useNavigate();
   const [warmupData, setWarmupData] = useState(null);

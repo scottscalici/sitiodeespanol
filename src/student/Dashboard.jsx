@@ -16,6 +16,7 @@ import AITutor from '../components/AITutor';
 import Recursos from '../components/Recursos';
 import GamesSidebar from '../components/GamesSidebar';
 import ActivityGrid from '../components/ActivityGrid';
+import Estructura from '../components/Estructura';
 
 const Dashboard = () => {
   const { userData } = useAuth();
@@ -161,7 +162,41 @@ const Dashboard = () => {
               </Link>
             )}
 
-            <Evaluacion evals={data?.evals} liveDia={liveDia} course={course} />
+<Evaluacion 
+  evals={data?.evals?.[course] || []} 
+  liveDia={liveDia} 
+  course={course} 
+  cal={data?.cal} 
+/>
+
+            {/* ⏱️ NEW CALENTAMIENTO CARD */}
+            <Link
+  to={`/calentamiento/${course}/${liveDia}`}
+  className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+            >
+              <div className="absolute -right-10 -top-10 opacity-20 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 pointer-events-none">
+                <span className="text-[120px]">🔥</span>
+              </div>
+              <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner backdrop-blur-sm">
+                    ⏱️
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                      Calentamiento
+                    </h3>
+                    <p className="text-orange-100 font-bold text-xs tracking-widest uppercase mt-1">
+                      Práctica Diaria • Día {liveDia}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex w-full sm:w-auto items-center justify-center gap-2 text-white font-black uppercase tracking-widest text-xs bg-black/20 px-6 py-3 rounded-xl group-hover:bg-black/30 transition-colors">
+                  Iniciar Misión →
+                </div>
+              </div>
+            </Link>
+
             <ActivityGrid
               activities={data?.activities}
               liveDia={liveDia}
@@ -171,6 +206,10 @@ const Dashboard = () => {
               curiosidades={data?.curios}
               liveDia={liveDia}
               course={course}
+            />
+            <Estructura 
+              estructura={data?.estructura?.[course] || []} 
+              liveDia={liveDia} 
             />
             <Destacado
               destacado={data?.destacado}

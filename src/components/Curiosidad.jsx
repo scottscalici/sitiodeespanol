@@ -14,7 +14,7 @@ const Curiosidad = ({ curiosidades = [], liveDia, course }) => {
     <article className="bg-white rounded-xl border-l-[6px] border-indigo-500 p-6 shadow-sm border border-y-slate-200 border-r-slate-200 space-y-4">
       
       <h3 className="font-bold text-xs uppercase text-indigo-500 tracking-widest">
-        Curiosidad Día {liveDia}
+        Curiosidad {liveDia}
       </h3>
       
       <h2 className="text-2xl font-extrabold text-slate-900 leading-tight">
@@ -30,7 +30,7 @@ const Curiosidad = ({ curiosidades = [], liveDia, course }) => {
         />
       )}
       
-      {/* Only render the note if one actually exists */}
+      {/* Only render the note if one actually exists (Firestore empty strings evaluate to false here, which is perfect) */}
       {curiosidadDelDia.student_note && (
         <p className="italic text-sm text-slate-700 bg-indigo-50/50 p-4 rounded-lg border border-indigo-50">
           {curiosidadDelDia.student_note}
