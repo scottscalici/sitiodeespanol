@@ -170,7 +170,15 @@ export const useGymData = (userCourse = 's2') => {
             return { s2: [], s4: [] };
           }
         };
-
+        const fetchTareasMaster = async () => {
+          try {
+            const tareasRef = doc(db, 'curriculum_tracks', 'tareas_master');
+            const tareasSnap = await getDoc(tareasRef);
+            return tareasSnap.exists() ? tareasSnap.data() : { s2: [], s4: [] };
+          } catch (err) {
+            return { s2: [], s4: [] };
+          }
+        };
         // NEW: Fetch Estructura/Gramatica Master Document
         const fetchGramaticaMaster = async () => {
           try {
@@ -219,7 +227,7 @@ export const useGymData = (userCourse = 's2') => {
           fetchFirestoreCategory('culture'),
           fetchFirestoreArray('videos', 'daily_tags'),
 
-          fetchFirestoreArray('tareas_bundles', 'tareas'),
+          fetchTareasMaster(),
           fetchFirestoreArray('vocab_bundles', 'bundles'),
           fetchFirestoreArray('destacado_diario'),
           fetchFirestoreCategory('temas'),

@@ -13,39 +13,51 @@ const SenordlePage = () => {
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2'); 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   
-  // URL for the large dictionary (remains static for performance)
-  const dictUrl = "https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle/diccionario.json";
+// URL for the dictionaries (Base Spanish + Custom Class Vocab)
+const dictUrl1 = "https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle/diccionario.json";
+// Add your second dictionary URL here:
+const dictUrl2 = "https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle/diccionario_extra.json"; 
 
-  // EFFECT: Fetch the daily word from Firestore and the validation dictionary from GitHub
-  useEffect(() => {
-    const fetchGameData = async () => {
-      setLoading(true);
-      try {
-        // A. Get Target Word from Firestore based on sanitized ID
-        const docId = `${course}_${selectedDate}`;
-        const docRef = doc(db, "juego_senordle", docId);
-        const docSnap = await getDoc(docRef);
+// EFFECT: Fetch the daily word from Firestore and the validation dictionaries from GitHub
+useEffect(() => {
+  const fetchGameData = async () => {
+    setLoading(true);
+    try {
+      // A. Get Target Word from Firestore
+      const docId = `${course}_${selectedDate}`;
+      const docRef = doc(db, "juego_senordle", docId);
+      const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-          setTargetWord(docSnap.data().word.toUpperCase());
-        } else {
-          setTargetWord("LIBRO"); // Fallback
-        }
-
-        // B. Get Validation Dictionary (Static JSON)
-        const dictResponse = await fetch(dictUrl);
-        const dictData = await dictResponse.json();
-        setValidWords(dictData);
-
-        setLoading(false);
-      } catch (error) {
-        console.error("Error loading game data:", error);
-        setLoading(false);
+      if (docSnap.exists()) {
+        setTargetWord(docSnap.data().word.toUpperCase());
+      } else {
+        setTargetWord("LIBRO"); // Fallback
       }
-    };
 
-    fetchGameData();
-  }, [course, selectedDate]); // Refetch whenever date or course changes
+      // B. Get Validation Dictionaries (Using Promise.all to fetch both at the exact same time)
+      const [dictResponse1, dictResponse2] = await Promise.all([
+        fetch(dictUrl1).catch(() => ({ json: () => [] })), 
+        fetch(dictUrl2).catch(() => ({ json: () => [] }))
+      ]);
+
+      // Parse the JSON (Fallback to empty arrays if one fails)
+      const dictData1 = dictResponse1.ok ? await dictResponse1.json() : [];
+      const dictData2 = dictResponse2.ok ? await dictResponse2.json() : [];
+
+      // C. Combine, Convert to Uppercase (Crucial!), and Remove Duplicates
+      const combinedWords = [...dictData1, ...dictData2].map(word => word.toUpperCase());
+      const uniqueValidWords = [...new Set(combinedWords)]; // Set removes any duplicates
+
+      setValidWords(uniqueValidWords);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading game data:", error);
+      setLoading(false);
+    }
+  };
+
+  fetchGameData();
+}, [course, selectedDate]);
 
   // 🧠 2. STICKY SAVE: Save preferred course
   useEffect(() => {

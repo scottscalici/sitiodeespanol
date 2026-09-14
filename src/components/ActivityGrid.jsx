@@ -16,7 +16,8 @@ const ActivityGrid = ({ activities = [], liveDia, course }) => {
       <h2 className="text-slate-400 font-black text-xl uppercase tracking-widest mb-6">
         Actividades de Hoy
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 🛠️ THE FIX: Changed lg:grid-cols-4 to grid-cols-1 sm:grid-cols-2 gap-6 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {todaysActivities.map((act) => (
           <ActivityCard key={act.id} activity={act} />
         ))}
@@ -42,12 +43,10 @@ const ActivityCard = ({ activity }) => {
 
   const theme = getTheme(activity.type);
 
-  // 🚀 THIS IS THE MAGIC FIX! 
-  // It is now a <Link> using 'to=' instead of an <a> using 'href='
   return (
     <Link 
       to={`/actividad/${activity.type}/${activity.id}`} 
-      className={`bg-white rounded-xl border-l-[4px] ${theme.border} p-4 shadow-sm border border-y-slate-200 border-r-slate-200 hover:shadow-md transition-all hover:-translate-y-1 flex items-center gap-4`}
+      className={`bg-white rounded-xl border-l-[4px] ${theme.border} p-5 shadow-sm border border-y-slate-200 border-r-slate-200 hover:shadow-md transition-all hover:-translate-y-1 flex items-center gap-4`}
     >
       <div className={`w-14 h-14 flex-shrink-0 flex items-center justify-center rounded-lg ${theme.bg} overflow-hidden`}>
         {activity.img ? (
@@ -57,14 +56,14 @@ const ActivityCard = ({ activity }) => {
         )}
       </div>
       <div className="min-w-0 flex flex-col justify-center"> 
-        <h4 className={`text-[9px] font-black uppercase tracking-widest ${theme.color} mb-0.5 truncate`}>
+        <h4 className={`text-[9px] font-black uppercase tracking-widest ${theme.color} mb-1 truncate`}>
           {activity.tag || activity.type}
         </h4>
         <p className="text-slate-800 font-bold text-sm leading-tight line-clamp-2">
           {activity.title}
         </p>
         {activity.subtitle && (
-          <p className="text-[10px] font-medium text-slate-400 truncate mt-0.5">
+          <p className="text-[10px] font-bold text-slate-400 truncate mt-1">
             {activity.subtitle}
           </p>
         )}

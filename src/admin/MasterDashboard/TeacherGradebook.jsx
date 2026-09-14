@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
 
 export default function TeacherGradebook() {
   const [students, setStudents] = useState([]);
@@ -11,7 +12,9 @@ export default function TeacherGradebook() {
   const [selectedWarmupId, setSelectedWarmupId] = useState('');
   const [aggregatedErrors, setAggregatedErrors] = useState([]);
 
-  // Set this to the total number of pods in your curriculum for accurate percentages
+  // 🔑 Password Reset Modal State
+  const [resetModal, setResetModal] = useState(null); // { uid, email, newPassword, status }
+
   const TOTAL_COURSE_PODS = 20;
 
   useEffect(() => {
@@ -60,7 +63,6 @@ export default function TeacherGradebook() {
         }
       });
 
-      // Sort by the verb so identical mistakes cluster together
       errorList.sort((a, b) => a.verb.localeCompare(b.verb));
       setAggregatedErrors(errorList);
     } else {
@@ -68,7 +70,6 @@ export default function TeacherGradebook() {
     }
   }, [activeTab, selectedWarmupId, students]);
 
-  // Helper to extract a unique list of all warmup IDs students have attempted
   const getAvailableWarmupIds = () => {
     const ids = new Set();
     students.forEach((student) => {
@@ -79,6 +80,34 @@ export default function TeacherGradebook() {
     return Array.from(ids).sort();
   };
 
+  // 🚀 ADMIN PASSWORD OVERRIDE HANDLER
+// 🚀 ADMIN PASSWORD OVERRIDE HANDLER
+const handleResetPassword = async () => {
+  if (!resetModal.newPassword || resetModal.newPassword.length < 6) {
+    setResetModal({ ...resetModal, status: 'Error: Mínimo 6 caracteres' });
+    return;
+  }
+  
+  setResetModal({ ...resetModal, status: 'Actualizando en Firebase...' });
+  
+  try {
+    const functions = getFunctions(app); // 👈 Pass the main app instance here!
+    const adminResetPassword = httpsCallable(functions, 'adminResetPassword');
+    
+    await adminResetPassword({ 
+      uid: resetModal.uid, 
+      newPassword: resetModal.newPassword 
+    });
+    
+    setResetModal({ ...resetModal, status: '¡Éxito! Contraseña actualizada.' });
+    
+    // Auto-close after success
+    setTimeout(() => setResetModal(null), 2000);
+  } catch (error) {
+    console.error("Password reset error:", error);
+    setResetModal({ ...resetModal, status: 'Error: Verifica tu conexión o permisos.' });
+  }
+};
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
@@ -90,7 +119,7 @@ export default function TeacherGradebook() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-8 font-sans pb-20">
+    <div className="min-h-screen bg-slate-900 p-8 font-sans pb-20 relative">
       <header className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tight">
@@ -223,19 +252,20 @@ export default function TeacherGradebook() {
             <thead>
               <tr className="bg-slate-950/50 border-b border-slate-700 text-xs font-black text-slate-400 uppercase tracking-widest">
                 <th className="p-4 pl-6">Estudiante</th>
-                <th className="p-4">Puntos (Leaderboard)</th>
+                <th className="p-4">Puntos</th>
                 {activeTab === 'warmups' ? (
                   <th className="p-4">Últimos Calentamientos</th>
                 ) : (
                   <th className="p-4">Progreso de Pods</th>
                 )}
+                <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
               {students.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="3"
+                    colSpan="4"
                     className="p-8 text-center text-slate-500 font-bold"
                   >
                     No hay estudiantes registrados.
@@ -246,10 +276,8 @@ export default function TeacherGradebook() {
                   const warmups = student.progress?.warmups || {};
                   const warmupKeys = Object.keys(warmups);
 
-                  // Array Method Calculation for Learning Path
                   const completedPods = student.progress?.completedPods || [];
-                  const rawPercentage =
-                    (completedPods.length / TOTAL_COURSE_PODS) * 100;
+                  const rawPercentage = (completedPods.length / TOTAL_COURSE_PODS) * 100;
                   const podProgress = Math.min(Math.round(rawPercentage), 100);
 
                   return (
@@ -283,8 +311,7 @@ export default function TeacherGradebook() {
                                     {key}
                                   </p>
                                   <p className="text-sm font-black text-sky-400">
-                                    {warmups[key].rawScore ||
-                                      `${warmups[key].grade}%`}
+                                    {warmups[key].rawScore || `${warmups[key].grade}%`}
                                   </p>
                                 </div>
                               ))
@@ -298,8 +325,7 @@ export default function TeacherGradebook() {
                           <div className="w-full max-w-xs">
                             <div className="flex justify-between text-xs font-bold mb-1">
                               <span className="text-slate-400">
-                                {completedPods.length} / {TOTAL_COURSE_PODS}{' '}
-                                Pods
+                                {completedPods.length} / {TOTAL_COURSE_PODS} Pods
                               </span>
                               <span className="text-emerald-400">
                                 {podProgress}%
@@ -314,6 +340,23 @@ export default function TeacherGradebook() {
                           </div>
                         )}
                       </td>
+                      
+                      {/* 🔑 NEW PASSWORD RESET BUTTON */}
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => setResetModal({ 
+                            uid: student.uid, 
+                            email: student.email, 
+                            newPassword: '', 
+                            status: '' 
+                          })}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
+                          title="Forzar nueva contraseña"
+                        >
+                          <span>🔑</span> Reset
+                        </button>
+                      </td>
+
                     </tr>
                   );
                 })
@@ -321,6 +364,49 @@ export default function TeacherGradebook() {
             </tbody>
           </table>
         </main>
+      )}
+
+      {/* 🔐 PASSWORD OVERRIDE MODAL */}
+      {resetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-1 flex items-center gap-2">
+              <span>🔐</span> Forzar Contraseña
+            </h3>
+            <p className="text-xs text-slate-400 mb-6">
+              Estudiante: <span className="font-bold text-sky-400">{resetModal.email}</span>
+            </p>
+
+            <input
+              type="text"
+              placeholder="Nueva contraseña (mín. 6 caracteres)"
+              value={resetModal.newPassword}
+              onChange={(e) => setResetModal({ ...resetModal, newPassword: e.target.value, status: '' })}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white mb-4 font-mono focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+            />
+
+            {resetModal.status && (
+              <p className={`text-xs font-bold mb-4 ${resetModal.status.includes('Error') ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {resetModal.status}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3 border-t border-slate-700 pt-4 mt-2">
+              <button
+                onClick={() => setResetModal(null)}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white uppercase tracking-widest transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResetPassword}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
+              >
+                Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

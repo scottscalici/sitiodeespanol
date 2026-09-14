@@ -237,90 +237,105 @@ export default function CalentamientoEngine({ onClose }) {
     }
   };
 
-  // Final Grade Calculation & Point Awarding
-  const handleFinishSession = async () => {
-    setIsTimerRunning(false);
+ // Final Grade Calculation & Point Awarding
+ const handleFinishSession = async () => {
+  setIsTimerRunning(false);
 
-    const correctVerbs = Object.values(verbResults).filter(
-      (res) => res === 'correct'
-    ).length;
-    const verbAccuracy =
-      bakedVerbs.length > 0 ? correctVerbs / bakedVerbs.length : 1;
+  const correctVerbs = Object.values(verbResults).filter(
+    (res) => res === 'correct'
+  ).length;
+  const verbAccuracy =
+    bakedVerbs.length > 0 ? correctVerbs / bakedVerbs.length : 1;
 
-    const verbGradePoints = verbAccuracy * 4;
-    const vocabGradePoints = bakedVocab.length > 0 ? 1 : 0;
-    const totalGrade = verbGradePoints + vocabGradePoints;
-    const percentageGrade = (totalGrade / 5) * 100;
-    const pointsEarned = 20;
+  const verbGradePoints = verbAccuracy * 4;
+  const vocabGradePoints = bakedVocab.length > 0 ? 1 : 0;
+  const totalGrade = verbGradePoints + vocabGradePoints;
+  const percentageGrade = (totalGrade / 5) * 100;
+  const pointsEarned = 20;
 
-    if (userData && userData.uid) {
-      try {
-        const userRef = doc(db, 'users', userData.uid);
-        const snap = await getDoc(userRef);
+  if (userData && userData.uid) {
+    try {
+      const userRef = doc(db, 'users', userData.uid);
+      // We pull the ABSOLUTE FRESHEST data directly from the database
+      const snap = await getDoc(userRef);
 
-        let newTotal = pointsEarned;
-        let newMonthly = pointsEarned;
-        let newWeekly = pointsEarned;
-        let newDaily = pointsEarned;
-        let highestGrade = percentageGrade;
+      let newTotal = pointsEarned;
+      let newMonthly = pointsEarned;
+      let newWeekly = pointsEarned;
+      let newDaily = pointsEarned;
+      let existingGrade = -1;
 
-        if (snap.exists()) {
-          const data = snap.data();
-          newTotal += data.total_points || data.current_path_points || 0;
-          newMonthly += data.monthly_points || 0;
-          newWeekly += data.weekly_points || 0;
-          newDaily += data.daily_points || 0;
+      if (snap.exists()) {
+        const data = snap.data();
+        newTotal += data.total_points || data.current_path_points || 0;
+        newMonthly += data.monthly_points || 0;
+        newWeekly += data.weekly_points || 0;
+        newDaily += data.daily_points || 0;
 
-          const existingAttempt =
-            data.progress?.warmups?.[warmupData.docId]?.grade || 0;
-          if (existingAttempt > highestGrade) {
-            highestGrade = existingAttempt;
-          }
+        // Safely grab the previous best grade, if it exists
+        if (data.progress?.warmups?.[warmupData.docId]) {
+           existingGrade = data.progress.warmups[warmupData.docId].grade ?? -1;
         }
+      }
 
-        // Save Grade AND Diagnostic Errors to Firestore
-        await setDoc(
-          userRef,
-          {
-            total_points: newTotal,
-            current_path_points: newTotal,
-            monthly_points: newMonthly,
-            weekly_points: newWeekly,
-            daily_points: newDaily,
-            progress: {
-              ...userData.progress,
-              warmups: {
-                ...(userData.progress?.warmups || {}),
-                [warmupData.docId]: {
-                  completed: true,
-                  grade: highestGrade,
-                  rawScore: `${totalGrade.toFixed(1)}/5`,
-                  errors: firstAttemptErrors, // <-- Diagnostic tracking!
-                  timestamp: new Date().toISOString(),
-                },
-              },
+      const isNewHighScore = percentageGrade > existingGrade;
+
+      // 🔍 DIAGNOSTIC LOGS: Check your browser console when you hit Submit!
+      console.log("🏁 --- CALENTAMIENTO SAVE DIAGNOSTICS ---");
+      console.log("Warmup ID:", warmupData.docId);
+      console.log("Previous High Score:", existingGrade);
+      console.log("Just Scored:", percentageGrade);
+      console.log("Is New High Score?:", isNewHighScore);
+
+      // 1. ALWAYS award the XP Points for playing (The Game Payload)
+      const updatePayload = {
+        total_points: newTotal,
+        current_path_points: newTotal,
+        monthly_points: newMonthly,
+        weekly_points: newWeekly,
+        daily_points: newDaily,
+      };
+
+      // 2. ONLY attach the progress object if we beat the high score
+      if (isNewHighScore) {
+        console.log("📈 Saving new academic high score!");
+        // Native Deep Merge: We don't spread userData.progress anymore.
+        // Firestore 'merge: true' will automatically nest this without touching other warmups!
+        updatePayload.progress = {
+          warmups: {
+            [warmupData.docId]: {
+              completed: true,
+              grade: percentageGrade,
+              rawScore: `${totalGrade.toFixed(1)}/5`,
+              errors: firstAttemptErrors, 
+              timestamp: new Date().toISOString(),
             },
           },
-          { merge: true }
-        );
-
-        alert(
-          `¡Completado! Obtuviste ${totalGrade.toFixed(
-            1
-          )}/5 puntos académicos. (+${pointsEarned} puntos de juego).`
-        );
-      } catch (err) {
-        console.error('Error saving calentamiento points:', err);
+        };
+      } else {
+         console.log("🛡️ Score was lower. Keeping previous high score. Only saving XP.");
       }
-    }
 
-    // Cleaned up routing logic
-    if (onClose) {
-      onClose(); // Used if rendered inside a popup/modal
-    } else {
-      navigate('/'); // Bounces them back to the student dashboard
+      // Save to Firestore using merge:true
+      await setDoc(userRef, updatePayload, { merge: true });
+
+      alert(
+        `¡Completado! Obtuviste ${totalGrade.toFixed(
+          1
+        )}/5 puntos académicos. (+${pointsEarned} puntos de juego).`
+      );
+    } catch (err) {
+      console.error('Error saving calentamiento points:', err);
     }
-  };
+  }
+
+  // Cleaned up routing logic
+  if (onClose) {
+    onClose(); 
+  } else {
+    navigate('/'); 
+  }
+};
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">

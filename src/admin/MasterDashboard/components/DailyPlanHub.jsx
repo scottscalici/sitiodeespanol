@@ -16,12 +16,14 @@ const DailyPlanHub = () => {
   const [evaluacionesS4, setEvaluacionesS4] = useState([]);
   const [gramaticaS2, setGramaticaS2] = useState([]);
   const [gramaticaS4, setGramaticaS4] = useState([]);
+  const [vocabS2, setVocabS2] = useState({});
+  const [vocabS4, setVocabS4] = useState({});
   const [allDestacados, setAllDestacados] = useState([]);
   const [allMusica, setAllMusica] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
   const [allCuriosidades, setAllCuriosidades] = useState([]);
   
-  // NEW: Decoupled Calentamiento States
+  // Decoupled Calentamiento States
   const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
   const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
 
@@ -55,17 +57,18 @@ const DailyPlanHub = () => {
 
         // Fetch Sequences & Collections
         const [
-          tareasSnap, evalsSnap, gramSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap
+          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap
         ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
           getDoc(doc(db, 'curriculum_tracks', 'gramatica_master')),
+          getDoc(doc(db, 'curriculum_tracks', 'vocab_master')),
           getDocs(collection(db, 'destacado_diario')),
           getDocs(collection(db, 'musica')),
           getDocs(collection(db, 'videos')),
           getDocs(collection(db, 'curiosidades')),
-          getDocs(collection(db, 'calentamientos')), // Verbs
-          getDocs(collection(db, 'dailyVocabWarmups')) // Vocab
+          getDocs(collection(db, 'calentamientos')), 
+          getDocs(collection(db, 'dailyVocabWarmups'))
         ]);
 
         if (tareasSnap.exists()) {
@@ -79,6 +82,10 @@ const DailyPlanHub = () => {
         if (gramSnap.exists()) {
           setGramaticaS2(gramSnap.data().s2 || []);
           setGramaticaS4(gramSnap.data().s4 || []);
+        }
+        if (vocabMasterSnap.exists()) {
+          setVocabS2(vocabMasterSnap.data().s2 || {});
+          setVocabS4(vocabMasterSnap.data().s4 || {});
         }
 
         setAllDestacados(destSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -102,12 +109,12 @@ const DailyPlanHub = () => {
   const activeTareas = (activeCourse === 's2' ? tareasS2 : tareasS4).filter(t => t.day_assigned === selectedDay);
   const activeEvaluaciones = (activeCourse === 's2' ? evaluacionesS2 : evaluacionesS4).filter(e => e.dia === selectedDay && e.label && e.label !== 'Nada');
   const activeGramatica = (activeCourse === 's2' ? gramaticaS2 : gramaticaS4).filter(g => g.dia === selectedDay);
+  const activeVocabBundles = (activeCourse === 's2' ? vocabS2 : vocabS4)[selectedDay.toString()] || [];
   
   const activeDestacados = allDestacados.filter(d => Number(d.dia) === selectedDay);
   const activeMusica = allMusica.filter(m => m.dias && m.dias.includes(selectedDay));
   const activeVideos = allVideos.filter(v => Number(v.dia) === selectedDay);
   
-  // NEW: Filter BOTH Verbs and Vocab by Course and Day
   const activeCalentamientosVerbs = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
   const activeCalentamientosVocab = allVocabWarmups.filter(v => v.course === activeCourse && Number(v.dia) === selectedDay);
 
@@ -131,13 +138,12 @@ const DailyPlanHub = () => {
         {/* X-RAY DIAGNOSTIC BAR */}
         <div className="bg-neutral-900 border border-neutral-700 p-3 rounded-lg flex flex-wrap gap-4 text-[10px] font-mono uppercase tracking-widest text-neutral-400 items-center">
           <span className="font-bold text-amber-500">Diagnostic X-Ray:</span>
-          <span>Gramática S2: {gramaticaS2.length}</span>
-          <span>Tareas S2: {tareasS2.length}</span>
-          <span>Evals S2: {evaluacionesS2.length}</span>
+          <span>Gramática: {gramaticaS2.length}</span>
+          <span>Tareas: {tareasS2.length}</span>
+          <span>Evals: {evaluacionesS2.length}</span>
+          <span>Vocab Activo: {activeVocabBundles.length}</span>
           <span>Destacados: {allDestacados.length}</span>
           <span>Calentamientos (V/Voc): {allCalentamientos.length}/{allVocabWarmups.length}</span>
-          <span>Música: {allMusica.length}</span>
-          <span>Videos: {allVideos.length}</span>
           <span>Curiosidades: {allCuriosidades.length}</span>
         </div>
 
@@ -197,10 +203,9 @@ const DailyPlanHub = () => {
         {/* DASHBOARD GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* LEFT COLUMN: The Core Lesson */}
+          {/* LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Destacado Diario */}
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-rose-400 flex items-center gap-2">🔥 Destacado Diario</h2>
@@ -223,7 +228,6 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
-            {/* Calentamiento (Verbos & Vocab) - NOW DECOUPLED! */}
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -232,7 +236,6 @@ const DailyPlanHub = () => {
                     {activeCalentamientosVerbs.length + activeCalentamientosVocab.length}
                   </span>
                 </div>
-                {/* Two distinct quick links to managing each half of the Warmup */}
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link to="/admin-secret-portal-calentamiento" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Verbos</Link>
                   <Link to="/admin-secret-portal-vocabvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Vocab</Link>
@@ -244,14 +247,10 @@ const DailyPlanHub = () => {
                   <p className="text-neutral-500 text-sm italic">Sin calentamiento asignado para hoy.</p>
                 ) : (
                   <div className="bg-neutral-950 p-4 rounded-xl border border-orange-900/30 flex flex-col gap-4">
-                    
-                    {/* Render Verbs if they exist for this day */}
                     {activeCalentamientosVerbs.map(cal => (
                       <div key={`verb-${cal.id}`} className="flex justify-between items-center border-b border-neutral-800 pb-3">
                         <div>
-                          <p className="text-[10px] font-black uppercase text-orange-500 bg-orange-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">
-                            Sección: Verbos
-                          </p>
+                          <p className="text-[10px] font-black uppercase text-orange-500 bg-orange-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">Sección: Verbos</p>
                           <h3 className="font-bold text-white text-md">{cal.title}</h3>
                         </div>
                         <div className="text-right">
@@ -259,14 +258,10 @@ const DailyPlanHub = () => {
                         </div>
                       </div>
                     ))}
-
-                    {/* Render Vocab if it exists for this day */}
                     {activeCalentamientosVocab.map(voc => (
                       <div key={`voc-${voc.id}`} className="flex justify-between items-center">
                         <div>
-                          <p className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">
-                            Sección: Vocabulario
-                          </p>
+                          <p className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">Sección: Vocabulario</p>
                           <h3 className="font-bold text-white text-md">{voc.name}</h3>
                         </div>
                         <div className="text-right">
@@ -274,13 +269,11 @@ const DailyPlanHub = () => {
                         </div>
                       </div>
                     ))}
-                    
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Gramática */}
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm min-h-[150px] group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -309,12 +302,8 @@ const DailyPlanHub = () => {
                       )}
                       {(gram.enlaces || gram.recursos) && (
                         <div className="flex flex-wrap gap-4 mt-2 pt-3 border-t border-neutral-800">
-                          {gram.enlaces && (
-                            <p className="text-xs font-mono text-indigo-400"><span className="text-neutral-500">Enlaces:</span> {gram.enlaces}</p>
-                          )}
-                          {gram.recursos && (
-                            <p className="text-xs font-mono text-emerald-400"><span className="text-neutral-500">Recursos:</span> {gram.recursos}</p>
-                          )}
+                          {gram.enlaces && <p className="text-xs font-mono text-indigo-400"><span className="text-neutral-500">Enlaces:</span> {gram.enlaces}</p>}
+                          {gram.recursos && <p className="text-xs font-mono text-emerald-400"><span className="text-neutral-500">Recursos:</span> {gram.recursos}</p>}
                         </div>
                       )}
                     </div>
@@ -322,12 +311,14 @@ const DailyPlanHub = () => {
                 )}
               </div>
             </div>
-            
-            {/* Media (Música & Videos) */}
+
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-purple-400 flex items-center gap-2">🎧 Música & Videos</h2>
-                <Link to="/admin-daily-plan-videos" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Manager</Link>
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link to="/admin-daily-plan-musica" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎵 Música</Link>
+                  <Link to="/admin-daily-plan-videos" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎬 Videos</Link>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {activeMusica.map(m => (
@@ -355,13 +346,10 @@ const DailyPlanHub = () => {
                 )}
               </div>
             </div>
-
-          </div>
-
-          {/* RIGHT COLUMN: Tasks, Culture & Assessments */}
+            </div>
+          {/* RIGHT COLUMN */}
           <div className="space-y-6">
             
-            {/* Evaluaciones */}
             <div className="bg-amber-950/20 border border-amber-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-amber-900/50 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-amber-400 flex items-center gap-2">🎯 Evaluaciones</h2>
@@ -381,7 +369,32 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
-            {/* Curiosidades */}
+            {/* NEW: Vocabulario Activo Card */}
+            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">🧠 Vocabulario Activo</h2>
+                  <span className="bg-neutral-900 text-indigo-400 text-xs font-bold px-2 py-1 rounded border border-indigo-900/50">
+                    {activeVocabBundles.length}
+                  </span>
+                </div>
+                {/* Adjust this Link path to match your App.jsx routing for the Sequencer! */}
+                <Link to="/admin-vocab-sequencer" className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-700/50">⚙️ Sequencer</Link>
+              </div>
+              <div className="space-y-3">
+                {activeVocabBundles.length === 0 ? (
+                  <p className="text-indigo-900/50 text-xs italic font-bold">No hay vocabulario asignado.</p>
+                ) : (
+                  activeVocabBundles.map((bundleId, idx) => (
+                    <div key={idx} className="bg-neutral-900 border border-indigo-900/50 p-3 rounded-xl flex items-center gap-3">
+                      <span className="text-lg">📚</span>
+                      <p className="text-sm font-bold text-indigo-300 font-mono">{bundleId}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -411,7 +424,24 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
-            {/* Tareas */}
+{/* 📄 LECTURAS HUB CARD */}
+<div className="bg-cyan-950/20 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-cyan-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2"><span>📄</span> Lecturas IB</h2>
+                </div>
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link to="/admin-lecturas-editor" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">✍️ Editor</Link>
+                  <Link to="/admin-lecturas-sequencer" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">⚙️ Sequencer</Link>
+                </div>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-cyan-500/50 text-xs italic font-bold">
+                  Gestiona textos de examen Paper 1 y prográmalos por día de calendario.
+                </p>
+              </div>
+            </div>
+
             <div className="bg-neutral-950 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -436,6 +466,42 @@ const DailyPlanHub = () => {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+            {/* 🧰 RESOURCE HUB CARD */}
+            <div className="bg-sky-950/20 border border-sky-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-sky-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-sky-400 flex items-center gap-2">
+                    <span>🧰</span> Resource Hub Links
+                  </h2>
+                </div>
+                <Link to="/admin-resource-hub" className="opacity-0 group-hover:opacity-100 transition-opacity bg-sky-900/40 hover:bg-sky-900/80 text-sky-300 text-[10px] font-bold px-3 py-1.5 rounded border border-sky-700/50 uppercase tracking-widest">
+                  ⚙️ Manager
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-sky-500/50 text-xs italic font-bold">
+                  Administra los enlaces del panel (viajes de Costa Rica, tutorías y recursos de IB).
+                </p>
+              </div>
+            </div>
+            {/* Señordle & Arcade */}
+            <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">
+                    <span>🎮</span> Señordle
+                  </h2>
+                </div>
+                <Link to="/admin-daily-plan-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
+                  ⚙️ Programar
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-emerald-500/50 text-xs italic font-bold">
+                  Programa las palabras diarias por fecha de calendario.
+                </p>
               </div>
             </div>
 

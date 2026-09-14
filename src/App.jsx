@@ -19,6 +19,11 @@ import StudentLearningPath from './student/StudentLearningPath';
 import TicoTalk from './student/TicoTalk';
 import WorkoutEngine from './student/WorkoutEngine';
 import GrammarNoteViewer from './student/GrammarNoteViewer';
+import VocabPage from './student/VocabPage';
+import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
+import FotosAzarPage from './student/FotosAzarPage';
+import ResourceHubManager from './admin/managers/ResourceHubManager';
+
 
 // ⚙️ GLOBAL UI COMPONENTS
 import ActivityPage from './components/ActivityPage';
@@ -31,6 +36,9 @@ import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
 import TareasSequencer from './admin/MasterDashboard/components/TareasSequencer';
+import FormSenordle from './admin/MasterDashboard/components/FormSenordle';
+import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorPage'; // 👈 NEW ADMIN EDITOR
+import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
 
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
@@ -44,6 +52,7 @@ import VideosManager from './admin/managers/VideosManager';
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
 import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
+import VocabSequencer from './admin/sequencers/VocabSequencer';
 
 // 📦 LEGACY ADMIN UPLOADERS
 import AtandoCabosUploader from './admin/uploaders/AtandoCabosUploader';
@@ -118,16 +127,6 @@ function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        {/* Global Header */}
-        <header className="w-full max-w-6xl mx-auto flex justify-between items-center px-4 sm:px-6 pt-6 pb-2">
-          <h1 className="text-2xl font-black text-slate-800 tracking-tighter">
-            ESPAÑOL CON SEÑOR
-          </h1>
-          <div className="text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            SESIÓN: {user.email} | ROL: {role}
-          </div>
-        </header>
-
         <main className="w-full flex-grow">
           <Routes>
             {/* 🟢 PUBLIC STUDENT ROUTES */}
@@ -144,6 +143,11 @@ function App() {
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
+            <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
+            <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
+            <Route path="/fotos-azar" element={<FotosAzarPage />} />
+            
+
             {/* 🔴 SECURE ADMIN ROUTES */}
             <Route
               path="/admin-secret-portal"
@@ -194,6 +198,31 @@ function App() {
               }
             />
             <Route
+              path="/admin-vocab-sequencer"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <VocabSequencer />
+                </AdminRoute>
+              }
+            />
+            {/* 👈 NEW ADMIN LECTURAS ROUTES */}
+            <Route
+              path="/admin-lecturas-editor"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LecturaEditorPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-lecturas-sequencer"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LecturasSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
               path="/admin-secret-portal-master"
               element={
                 <AdminRoute user={user} role={role}>
@@ -217,6 +246,14 @@ function App() {
                 </AdminRoute>
               }
             />
+            <Route
+  path="/admin-resource-hub"
+  element={
+    <AdminRoute user={user} role={role}>
+      <ResourceHubManager />
+    </AdminRoute>
+  }
+/>
             <Route
               path="/print-musica/:id"
               element={
@@ -361,6 +398,7 @@ function App() {
                 </AdminRoute>
               }
             />
+            <Route path="/admin-daily-plan-senordle" element={<FormSenordle />} />
             <Route
               path="/test-firebase"
               element={
