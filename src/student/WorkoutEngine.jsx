@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, increment, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase'; // Make sure this path is correct for your structure
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
+import { PAIR_MAP, POOL_MAP } from '../utils/distractorConfig';
 
 export default function WorkoutEngine({ segment, history = [], podIndex = 0, onClose, onComplete }) {
   const { currentUser } = useAuth(); // Grabs the logged-in student
-  
+
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [masterPool, setMasterPool] = useState([]); 
+  const [masterPool, setMasterPool] = useState([]);
+
+  // Live verb lookup table for the smart distractor engine
+  const [verbsMap, setVerbsMap] = useState({});
+  const [verbsMapLoaded, setVerbsMapLoaded] = useState(false);
   
   // Tracking & Score State
   const [initialCount, setInitialCount] = useState(0);
@@ -34,6 +39,73 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   const [missedArticle, setMissedArticle] = useState(false);
 
   const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
+
+  // ========================================================================
+  // BANCO DE VERBOS (Para el motor de distractores inteligentes)
+  // ========================================================================
+  useEffect(() => {
+    const fetchVerbs = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'verbs'));
+        const map = {};
+        snap.forEach((d) => { map[d.id] = d.data(); });
+        setVerbsMap(map);
+      } catch (err) {
+        console.error('Error fetching verbs for distractor engine:', err);
+      } finally {
+        setVerbsMapLoaded(true);
+      }
+    };
+    fetchVerbs();
+  }, []);
+
+  // ========================================================================
+  // MOTOR DE DISTRACTORES INTELIGENTES (Sentence Bank)
+  // ========================================================================
+  const buildGrammarOptions = (target, answer, pool) => {
+    const meta = target.fullData || {};
+    const mode = meta.distractorMode;
+    const fallbackWords = ['para', 'por', 'ser', 'estar', 'a', 'de', 'en'];
+
+    const fillToFour = (base) => {
+      let options = [...base];
+      while (options.length < 4) {
+        const r = pool.length > 0
+          ? pool[Math.floor(Math.random() * pool.length)].label
+          : fallbackWords[Math.floor(Math.random() * fallbackWords.length)];
+        if (!options.includes(r)) options.push(r);
+      }
+      return options;
+    };
+
+    if ((mode === 'binary_verb' || mode === 'quad_verb') && meta.targetLemma && meta.targetTense && meta.targetSubject) {
+      const verbData = verbsMap[meta.targetLemma];
+      const pair = PAIR_MAP[meta.pairTag];
+      if (verbData && pair) {
+        const otherTense = pair.a === meta.targetTense ? pair.b : pair.a;
+        const counterpart = verbData.tenses?.[otherTense]?.[meta.targetSubject]?.target;
+        let options = [answer];
+        if (counterpart && counterpart !== answer) options.push(counterpart);
+
+        if (mode === 'binary_verb') {
+          return options.length === 2 ? shuffle(options) : shuffle(fillToFour(options).slice(0, 2));
+        }
+        return shuffle(fillToFour(options));
+      }
+    }
+
+    if (mode === 'fixed_pool' && meta.poolTag && POOL_MAP[meta.poolTag]) {
+      const poolWords = POOL_MAP[meta.poolTag].words.filter((w) => w !== answer);
+      let options = [answer];
+      while (options.length < 4 && poolWords.length > 0) {
+        const idx = Math.floor(Math.random() * poolWords.length);
+        options.push(poolWords.splice(idx, 1)[0]);
+      }
+      return shuffle(options);
+    }
+
+    return shuffle(fillToFour([answer]));
+  };
 
   // ========================================================================
   // LÓGICA DE CORRECCIÓN INTELIGENTE
@@ -141,8 +213,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   // EL GENERADOR 
   // ========================================================================
   useEffect(() => {
-    if (!segment) return;
-    
+    if (!segment || !verbsMapLoaded) return;
+
     let generatedQueue = [];
     const totalQs = segment.total_questions || 15;
     const concepts = segment.introduced_concepts || [];
@@ -191,15 +263,10 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
         
         if (match) {
           const answer = match[1];
-          let options = [answer];
-          let distractors = ["para", "por", "ser", "estar", "a", "de", "en"];
-          while (options.length < 4) {
-             const r = uniqueMasterPool.length > 0 ? uniqueMasterPool[Math.floor(Math.random() * uniqueMasterPool.length)].label : distractors[Math.floor(Math.random() * distractors.length)];
-             if (!options.includes(r)) options.push(r);
-          }
+          const options = buildGrammarOptions(target, answer, uniqueMasterPool);
           generatedQueue.push({
             id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(bracketRegex, '________'), engTrans: engTrans,
-            options: shuffle(options), correctAnswer: answer, topic: target.tags || 'Gramática'
+            options: options, correctAnswer: answer, topic: target.tags || 'Gramática'
           });
         } else {
           let wordBank = shuffle([...spaSentence.replace(/[.,!?¿¡]/g, '').split(' '), "el", "no", "a"]);
@@ -259,8 +326,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       }
     }
     setQuestions(generatedQueue);
-    setInitialCount(generatedQueue.length); 
-  }, [segment, history]);
+    setInitialCount(generatedQueue.length);
+  }, [segment, history, verbsMapLoaded]);
 
   // ========================================================================
   // RECONOCIMIENTO DE VOZ (SPEECH TO TEXT)

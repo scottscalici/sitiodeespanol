@@ -486,6 +486,25 @@ const DailyPlanHub = () => {
                 </p>
               </div>
             </div>
+            {/* 🧩 LEARNING PATH & SENTENCE BANK */}
+            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
+                    <span>🧩</span> Dominios (Learning Path)
+                  </h2>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to="/admin-secret-portal-learning-path" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  🧱 Pod Creator
+                </Link>
+                <Link to="/admin-secret-portal-sentences" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  ✍️ Sentence Manager
+                </Link>
+              </div>
+            </div>
+
             {/* Señordle & Arcade */}
             <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">

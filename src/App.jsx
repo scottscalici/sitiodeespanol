@@ -43,6 +43,7 @@ import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequen
 
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import ConectoresManager from './admin/managers/ConectoresManager';
+import SentenceManager from './admin/managers/SentenceManager';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
@@ -406,6 +407,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ConectoresManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-sentences"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SentenceManager />
                 </AdminRoute>
               }
             />
