@@ -10,6 +10,7 @@ import Dashboard from './student/Dashboard';
 import MusicaEngine from './student/MusicaEngine';
 import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
+import ConectoresEngine from './student/ConectoresEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
 import MusicPage from './student/MusicPage';
@@ -41,6 +42,7 @@ import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorP
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
 
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import ConectoresManager from './admin/managers/ConectoresManager';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
@@ -142,6 +144,7 @@ function App() {
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
+            <Route path="/practica/conectores" element={<ConectoresEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
@@ -395,6 +398,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-conectores"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ConectoresManager />
                 </AdminRoute>
               }
             />
