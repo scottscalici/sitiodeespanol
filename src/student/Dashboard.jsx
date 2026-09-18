@@ -14,6 +14,7 @@ import GamesSidebar from '../components/GamesSidebar';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
+import Anuncios from '../components/Anuncios';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
 import LecturaCard from '../components/LecturaCard'; 
@@ -131,19 +132,7 @@ const Dashboard = () => {
   );
 
   // --- UTILITY FILTERING ---
-  const activeAnuncios = (data?.anuncios || []).filter(a => {
-    const hasContent = (a.title && a.title !== "Información") || 
-                       (a.titulo && a.titulo !== "Información") || 
-                       (a.mensaje && a.mensaje.trim() !== "") ||
-                       (a.body && a.body.trim() !== "");
-    if (!hasContent) return false;
-
-    const matchCourse = !a.course || a.course === course || (Array.isArray(a.course) && a.course.includes(course));
-    const matchDia = a.dias ? a.dias.includes(liveDia) : (a.dia ? Number(a.dia) === liveDia : true);
-    return matchCourse && matchDia;
-  });
-
-  const activeDestacados = (data?.destacado || []).filter(d => 
+  const activeDestacados = (data?.destacado || []).filter(d =>
     Number(d.dia) === liveDia && (!d.course || d.course === course || (Array.isArray(d.course) && d.course.includes(course)))
   );
 
@@ -167,10 +156,8 @@ const Dashboard = () => {
           <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
         </div>
             
-        {/* 📢 UTILITY: ANUNCIOS */}
-        {activeAnuncios.length > 0 && (
-          <UtilityCard type="anuncio" data={activeAnuncios} />
-        )}
+        {/* 📢 ANUNCIOS */}
+        <Anuncios anuncios={data?.anuncios} cal={data?.cal} liveDia={liveDia} course={course} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: LESSON CONTENT */}
