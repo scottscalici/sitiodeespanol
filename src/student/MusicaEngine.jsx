@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useAuth } from '../context/AuthContext';
-import { awardPoints } from '../utils/pointsHelper';
 
 const normalize = (str) =>
   (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -17,7 +15,6 @@ const getBlankAnswers = (letras) => {
 const MusicaEngine = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
 
   const [song, setSong] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +23,6 @@ const MusicaEngine = () => {
   // Store student answers
   const [clozeAnswers, setClozeAnswers] = useState({});
   const [compAnswers, setCompAnswers] = useState({});
-  const pointsAwardedRef = useRef(false);
 
   useEffect(() => {
     const fetchSong = async () => {
@@ -58,26 +54,17 @@ const MusicaEngine = () => {
     setCompAnswers(prev => ({ ...prev, [index]: value }));
   };
 
-  const handleSubmit = async () => {
+  const handleCheck = () => {
     const blankAnswers = getBlankAnswers(song?.letras);
     const correctCount = blankAnswers.filter(
       (ans, i) => normalize(clozeAnswers[i]) === normalize(ans)
     ).length;
 
-    if (currentUser && !pointsAwardedRef.current) {
-      pointsAwardedRef.current = true;
-      try {
-        await awardPoints(currentUser.uid, song?.totalPoints || 0);
-      } catch (error) {
-        console.error('Error awarding music points:', error);
-      }
+    if (blankAnswers.length > 0) {
+      alert(`Completaste ${correctCount}/${blankAnswers.length} espacios correctamente. ¡Sigue practicando!`);
+    } else {
+      alert('¡Buen trabajo repasando la canción!');
     }
-
-    const scoreMsg = blankAnswers.length > 0
-      ? `Completaste ${correctCount}/${blankAnswers.length} espacios correctamente. `
-      : '';
-    alert(`${scoreMsg}¡Respuestas enviadas! (+${song?.totalPoints || 0} puntos)`);
-    navigate('/');
   };
 
   // --- THE DIGITAL CLOZE ENGINE ---
@@ -274,13 +261,13 @@ const MusicaEngine = () => {
           </div>
         )}
 
-        {/* SUBMIT BUTTON */}
+        {/* CHECK BUTTON */}
         <div className="flex justify-end">
           <button
-            onClick={handleSubmit}
+            onClick={handleCheck}
             className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 cursor-pointer"
           >
-            Enviar Respuestas →
+            Revisar Respuestas →
           </button>
         </div>
 

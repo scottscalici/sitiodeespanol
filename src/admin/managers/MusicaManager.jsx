@@ -115,7 +115,6 @@ const MusicaManager = () => {
         course: [],
         dias: [],
         imagen: '',
-        totalPoints: 20,
         youtube_url: '',
         spotify_url: '',
         letras: '',
