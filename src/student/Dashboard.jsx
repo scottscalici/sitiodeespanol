@@ -248,19 +248,45 @@ const Dashboard = () => {
               />
             ))}
 
-            {/* 🎯 DAILY MUSIC MISSION CARD */}
+            {/* 🎯 DAILY MUSIC MISSION CARD — SPOTIFY WIDGET STYLE */}
             {dailySong && (
-              <Link to={`/musica/${dailySong.id}`} className="group relative block overflow-hidden rounded-2xl bg-slate-900 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1">
-                <div className="absolute inset-0 opacity-40">
-                  <img src={dailySong.imagen} alt={dailySong.titulo} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent"></div>
+              <Link
+                to={`/musica/${dailySong.id}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-800 to-slate-900 p-5 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                {/* Spotify-style icon badge, top right */}
+                <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700">
+                    <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.3 14.4a.6.6 0 01-.83.2c-2.27-1.39-5.13-1.7-8.5-.93a.6.6 0 11-.27-1.17c3.69-.84 6.86-.48 9.4 1.07a.6.6 0 01.2.83zm1.2-2.72a.75.75 0 01-1.03.25c-2.6-1.6-6.56-2.06-9.63-1.13a.75.75 0 11-.44-1.44c3.51-1.07 7.87-.55 10.85 1.29a.75.75 0 01.25 1.03zm.1-2.83C14.9 9.06 9.9 8.88 6.98 9.77a.9.9 0 11-.53-1.72c3.35-1.02 8.9-.8 12.4 1.28a.9.9 0 11-.92 1.55z"/>
+                  </svg>
                 </div>
-                <div className="relative p-8 flex flex-col items-start justify-end min-h-[240px]">
-                  <span className="mb-2 rounded-full bg-indigo-500 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">Misión de Música: Día {liveDia}</span>
-                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{dailySong.titulo}</h2>
-                  <p className="text-lg italic text-slate-300">{dailySong.artista}</p>
-                  <div className="mt-4 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
-                    <span className="bg-white/10 px-4 py-2 rounded-lg text-white group-hover:bg-indigo-500 transition-colors">Empezar →</span>
+
+                <div className="flex items-center gap-4">
+                  {/* Album Art */}
+                  <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden shadow-lg bg-purple-950">
+                    {dailySong.imagen && (
+                      <img src={dailySong.imagen} alt={dailySong.titulo} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+
+                  {/* Track Info */}
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[9px] font-black uppercase tracking-widest text-purple-300 mb-1">Misión de Música: Día {liveDia}</span>
+                    <h2 className="text-lg font-black text-white truncate">{dailySong.titulo}</h2>
+                    <p className="text-sm text-purple-200 truncate">{dailySong.artista}</p>
+                  </div>
+                </div>
+
+                {/* Fake "Now Playing" Progress Bar */}
+                <div className="mt-5 flex items-center gap-3">
+                  <div className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                    <div className="h-full w-1/4 rounded-full bg-white/70 group-hover:bg-white transition-colors"></div>
+                  </div>
+                  <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">Escuchar</span>
+                  <div className="w-9 h-9 shrink-0 rounded-full bg-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700 ml-0.5">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
                   </div>
                 </div>
               </Link>
