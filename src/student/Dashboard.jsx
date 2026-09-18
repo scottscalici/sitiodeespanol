@@ -14,11 +14,11 @@ import GamesSidebar from '../components/GamesSidebar';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
-import Anuncios from '../components/Anuncios';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
-import LecturaCard from '../components/LecturaCard'; 
+import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
+import Anuncios from '../components/Anuncios';
 
 const Dashboard = () => {
   const { userData } = useAuth();
@@ -75,7 +75,7 @@ const Dashboard = () => {
       try {
         const lecturasRef = doc(db, 'curriculum_tracks', 'lecturas_master');
         const snap = await getDoc(lecturasRef);
-        
+
         if (snap.exists()) {
           const masterData = snap.data();
           const courseData = masterData[course] || {};
@@ -93,10 +93,10 @@ const Dashboard = () => {
 
   // --- CALCULATE MAX DAY SAFELY ---
   const maxAllowedDay = useMemo(() => {
-    const todayStr = new Date().toLocaleDateString('en-CA'); 
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
-    let maxDay = liveDia || 1; 
-    
+    let maxDay = liveDia || 1;
+
     if (data?.cal && data.cal.length > 0) {
       const validPastDays = data.cal.filter(dayObj => {
         if (dayObj.fecha > todayStr) return false;
@@ -150,44 +150,26 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-slate-50/50">
       <div className="w-full max-w-6xl mx-auto space-y-8 pb-24 pt-6 px-4 sm:px-6">
-        
+
         {/* HEADER */}
         <div className="space-y-4">
           <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
         </div>
-            
+
         {/* 📢 ANUNCIOS */}
         <Anuncios anuncios={data?.anuncios} cal={data?.cal} liveDia={liveDia} course={course} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: LESSON CONTENT */}
           <div className="lg:col-span-2 space-y-8">
-            
-            {/* 🎯 DAILY MUSIC MISSION CARD */}
-            {dailySong && (
-              <Link to={`/musica/${dailySong.id}`} className="group relative block overflow-hidden rounded-2xl bg-slate-900 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1">
-                <div className="absolute inset-0 opacity-40">
-                  <img src={dailySong.imagen} alt={dailySong.titulo} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent"></div>
-                </div>
-                <div className="relative p-8 flex flex-col items-start justify-end min-h-[240px]">
-                  <span className="mb-2 rounded-full bg-indigo-500 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">Misión de Música: Día {liveDia}</span>
-                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{dailySong.titulo}</h2>
-                  <p className="text-lg italic text-slate-300">{dailySong.artista}</p>
-                  <div className="mt-4 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
-                    <span>🎯 {dailySong.totalPoints} Puntos de Comprensión</span>
-                    <span className="bg-white/10 px-4 py-2 rounded-lg text-white group-hover:bg-indigo-500 transition-colors">Empezar →</span>
-                  </div>
-                </div>
-              </Link>
-            )}
 
+            {/* 🎯 EVALUACIÓN */}
             <Evaluacion evals={data?.evals?.[course] || []} liveDia={liveDia} course={course} cal={data?.cal} />
 
             {/* ⏱️ CALENTAMIENTO CARD */}
             <Link to={`/calentamiento/${course}/${liveDia}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
               <div className="flex flex-col sm:flex-row items-stretch">
-                
+
                 {/* Left Banner / Icon Area */}
                 <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-orange-500 to-amber-500 relative flex items-center justify-center shrink-0">
                   <span className="text-5xl drop-shadow-md">🔥</span>
@@ -213,13 +195,61 @@ const Dashboard = () => {
 
               </div>
             </Link>
- {/* 💡 CURIOSIDAD */}
- <Curiosidad curiosidades={activeCuriosidades} />
+
+            {/* 💡 CURIOSIDAD */}
+            <Curiosidad curiosidades={activeCuriosidades} />
+
+            {/* 🏗️ ESTRUCTURA */}
+            <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
+
+            {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+              <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
+                <span>✍️</span> Oraciones de Práctica/Ejemplo
+              </h3>
+              <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
+              <Link to={`/practica/oraciones/${course}/${liveDia}`} className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
+                Practicar →
+              </Link>
+            </div>
+
+            {/* 🗣️ CONVERSACIÓN (próximamente) */}
+
+            {/* 📄 LECTURAS (DYNAMIC READING CARDS) */}
+            {activeLecturas.map(lecturaId => (
+              <LecturaCard
+                key={lecturaId}
+                lecturaId={lecturaId}
+                title="Comprensión de Lectura"
+                testId="IB Paper 1"
+                textId="A"
+              />
+            ))}
+
+            {/* 🎯 DAILY MUSIC MISSION CARD */}
+            {dailySong && (
+              <Link to={`/musica/${dailySong.id}`} className="group relative block overflow-hidden rounded-2xl bg-slate-900 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1">
+                <div className="absolute inset-0 opacity-40">
+                  <img src={dailySong.imagen} alt={dailySong.titulo} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent"></div>
+                </div>
+                <div className="relative p-8 flex flex-col items-start justify-end min-h-[240px]">
+                  <span className="mb-2 rounded-full bg-indigo-500 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">Misión de Música: Día {liveDia}</span>
+                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{dailySong.titulo}</h2>
+                  <p className="text-lg italic text-slate-300">{dailySong.artista}</p>
+                  <div className="mt-4 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
+                    <span>🎯 {dailySong.totalPoints} Puntos de Comprensión</span>
+                    <span className="bg-white/10 px-4 py-2 rounded-lg text-white group-hover:bg-indigo-500 transition-colors">Empezar →</span>
+                  </div>
+                </div>
+              </Link>
+            )}
+
             {/* 📖 VOCABULARY CARDS */}
             {activeVocabBundles.map(bundleId => (
               <Link key={bundleId} to={`/vocabulario/${bundleId}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
                 <div className="flex flex-col sm:flex-row items-stretch">
-                  
+
                   {/* Left Banner / Icon Area */}
                   <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center shrink-0">
                     <span className="text-5xl drop-shadow-md">🧠</span>
@@ -246,25 +276,11 @@ const Dashboard = () => {
                 </div>
               </Link>
             ))}
-            {/* 📄 LECTURAS (DYNAMIC READING CARDS) */}
-            {activeLecturas.map(lecturaId => (
-              <LecturaCard 
-                key={lecturaId} 
-                lecturaId={lecturaId} 
-                title="Comprensión de Lectura" 
-                testId="IB Paper 1" 
-                textId="A" 
-              />
-            ))}
 
             <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
-            <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
-            
-           
-            
-           
- {/* 🔥 DESTACADO */}
- <Destacado destacado={activeDestacados} />
+
+            {/* 🔥 DESTACADO */}
+            <Destacado destacado={activeDestacados} />
           </div>
 
           {/* RIGHT: SIDEBAR */}
@@ -273,18 +289,8 @@ const Dashboard = () => {
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}
               <ResourceHub course={course} />
-              
-              <Countdown course={course} />
 
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
-                  <span>✍️</span> Oraciones de Práctica
-                </h3>
-                <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
-                <Link to={`/practica/oraciones/${course}/${liveDia}`} className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
-                  Practicar →
-                </Link>
-              </div>
+              <Countdown course={course} />
 
               <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                 <h3 className="font-bold text-[11px] mb-4 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
