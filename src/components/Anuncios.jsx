@@ -18,60 +18,46 @@ const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
   return (
     <div className="space-y-4">
       {activeAnuncios.map((note, idx) => {
-        // Default styling (Indigo / Anuncio)
-        let accentColor = 'border-indigo-500';
-        let labelColor = 'text-indigo-600';
-        let icon = '📢';
-        let titleText = 'Anuncio';
+        // Default styling (Blue / Anuncio)
+        let containerClass = "bg-white border-indigo-500 border-l-[6px]";
+        let titleColor = "text-indigo-600";
+        let icon = "📢";
+        let titleText = "Anuncio";
 
         // Override styling if it's a warning or trip
         if (note.type === 'warning') {
-          accentColor = 'border-red-500';
-          labelColor = 'text-red-600';
-          icon = '⚠️';
-          titleText = 'Importante';
+          containerClass = "bg-red-50 border-red-500 border-l-[6px]";
+          titleColor = "text-red-700";
+          icon = "⚠️";
+          titleText = "Importante";
         } else if (note.type === 'trip') {
-          accentColor = 'border-emerald-500';
-          labelColor = 'text-emerald-600';
-          icon = '✈️';
-          titleText = 'Viaje';
+          containerClass = "bg-emerald-50 border-emerald-500 border-l-[6px]";
+          titleColor = "text-emerald-700";
+          icon = "✈️";
+          titleText = "Viaje";
         }
 
         return (
-          <div
-            key={idx}
-            className={`bg-white border border-slate-200 ${accentColor} border-l-[6px] rounded-2xl shadow-sm p-5 flex items-start gap-4 transition-all hover:shadow-md hover:-translate-y-0.5`}
-          >
-            <div className="shrink-0">
+          <div key={idx} className={`${containerClass} p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-start gap-4 transition-transform hover:scale-[1.01]`}>
+            <div className="flex-shrink-0">
               {note.thumbnail ? (
-                <img
-                  src={note.thumbnail}
-                  alt=""
-                  className="w-16 h-16 object-cover rounded-xl border border-slate-200 shadow-sm bg-slate-50"
-                />
+                <img src={note.thumbnail} alt="thumbnail" className="w-32 h-32 object-cover rounded-lg border border-slate-200 shadow-sm" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl">
-                  {icon}
-                </div>
+                <div className="text-3xl">{icon}</div>
               )}
             </div>
-
-            <div className="flex-1 min-w-0">
-              <h4 className={`font-black text-[10px] uppercase tracking-widest ${labelColor}`}>
-                {icon} {titleText}
+            
+            <div className="flex-grow">
+              <h4 className={`font-bold text-[10px] uppercase tracking-widest mb-1 opacity-80 ${titleColor}`}>
+                {titleText}
               </h4>
-              <p className="text-slate-800 font-bold text-sm leading-snug mt-1 mb-3">
+              <p className="text-slate-800 font-bold text-sm leading-snug mb-2">
                 {note.text}
               </p>
-
+              
               {note.link && (
-                <a
-                  href={note.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white font-black text-[11px] px-4 py-2 rounded-lg uppercase tracking-wider transition-colors shadow-sm"
-                >
-                  Ver Detalles →
+                <a href={note.link} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-white/50 border hover:bg-white px-3 py-1.5 rounded transition-colors ${titleColor}`}>
+                  <span>Ver Detalles</span> ↗
                 </a>
               )}
             </div>
