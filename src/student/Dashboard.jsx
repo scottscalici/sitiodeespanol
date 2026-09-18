@@ -275,7 +275,17 @@ const Dashboard = () => {
               <ResourceHub course={course} />
               
               <Countdown course={course} />
-              
+
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
+                  <span>✍️</span> Oraciones de Práctica
+                </h3>
+                <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
+                <Link to="/practica/oraciones" className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
+                  Practicar →
+                </Link>
+              </div>
+
               <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                 <h3 className="font-bold text-[11px] mb-4 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
                   <span>📝</span> Tareas de Referencia

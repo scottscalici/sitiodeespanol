@@ -424,6 +424,25 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
+            {/* ✍️ ORACIONES DE PRÁCTICA CARD */}
+            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">
+                    <span>✍️</span> Oraciones de Práctica
+                  </h2>
+                </div>
+                <Link to="/admin-secret-portal-oraciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-3 py-1.5 rounded border border-teal-700/50 uppercase tracking-widest">
+                  ⚙️ Editar
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-teal-500/50 text-xs italic font-bold">
+                  Oraciones con espacios en blanco para practicar vocabulario y gramática.
+                </p>
+              </div>
+            </div>
+
             {/* 📢 ANUNCIOS CARD */}
             <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
