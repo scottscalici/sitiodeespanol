@@ -260,7 +260,6 @@ const Dashboard = () => {
                   <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{dailySong.titulo}</h2>
                   <p className="text-lg italic text-slate-300">{dailySong.artista}</p>
                   <div className="mt-4 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
-                    <span>🎯 {dailySong.totalPoints} Puntos de Comprensión</span>
                     <span className="bg-white/10 px-4 py-2 rounded-lg text-white group-hover:bg-indigo-500 transition-colors">Empezar →</span>
                   </div>
                 </div>
