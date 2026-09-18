@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   doc, collection, onSnapshot, updateDoc, getDoc, addDoc,
@@ -28,6 +28,7 @@ const ImpostorRoomPage = () => {
   const [revealed, setRevealed] = useState(false);
   const [clueText, setClueText] = useState('');
   const [error, setError] = useState('');
+  const scoredRoundRef = useRef(0);
 
   const roomRef = doc(db, 'impostor_rooms', roomCode);
 
@@ -168,8 +169,9 @@ const ImpostorRoomPage = () => {
           const roomData = roomSnap.data();
           if (roomData.gameState !== 'voting') return;
 
-          const playerRefs = players.map((p) => doc(db, 'impostor_rooms', roomCode, 'players', p.id));
-          const playerSnaps = await Promise.all(playerRefs.map((ref) => tx.get(ref)));
+          const playerSnaps = await Promise.all(
+            players.map((p) => tx.get(doc(db, 'impostor_rooms', roomCode, 'players', p.id)))
+          );
 
           const votes = {};
           playerSnaps.forEach((snap) => {
@@ -197,23 +199,10 @@ const ImpostorRoomPage = () => {
           }
           const gameWon = wasImpostor && remainingImpostorIds.length === 0;
 
-          if (roomData.lastScoredRound < roomData.round) {
-            playerRefs.forEach((ref) => {
-              tx.update(doc(db, 'users', ref.id), {
-                total_points: increment(POINTS_PER_ROUND),
-                current_path_points: increment(POINTS_PER_ROUND),
-                monthly_points: increment(POINTS_PER_ROUND),
-                weekly_points: increment(POINTS_PER_ROUND),
-                daily_points: increment(POINTS_PER_ROUND),
-              });
-            });
-          }
-
           const accusedPlayer = players.find((p) => p.id === accusedId);
           tx.update(roomRef, {
             gameState: gameWon ? 'gameover' : 'reveal',
             remainingImpostorIds,
-            lastScoredRound: roomData.round,
             lastResult: {
               accusedId,
               accusedName: accusedPlayer?.name || '???',
@@ -231,6 +220,23 @@ const ImpostorRoomPage = () => {
     resolve();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players, room?.gameState]);
+
+  // Each player awards their own points once a round resolves (avoids writing to other users' docs)
+  useEffect(() => {
+    if (!currentUser || !room) return;
+    if (room.gameState !== 'reveal' && room.gameState !== 'gameover') return;
+    if (room.round <= scoredRoundRef.current) return;
+    scoredRoundRef.current = room.round;
+
+    updateDoc(doc(db, 'users', currentUser.uid), {
+      total_points: increment(POINTS_PER_ROUND),
+      current_path_points: increment(POINTS_PER_ROUND),
+      monthly_points: increment(POINTS_PER_ROUND),
+      weekly_points: increment(POINTS_PER_ROUND),
+      daily_points: increment(POINTS_PER_ROUND),
+    }).catch((err) => console.error('Error awarding Impostor points:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, room?.gameState, room?.round]);
 
   const nextRound = async () => {
     if (!isHost) return;
@@ -274,9 +280,9 @@ const ImpostorRoomPage = () => {
         impostorIds: [],
         remainingImpostorIds: [],
         usedThemes: [],
-        lastScoredRound: 0,
         lastResult: null,
       });
+      scoredRoundRef.current = 0;
       await Promise.all(players.map((p) => updateDoc(doc(db, 'impostor_rooms', roomCode, 'players', p.id), {
         role: null,
         isReady: false,

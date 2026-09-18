@@ -56,7 +56,6 @@ const ImpostorLobbyPage = () => {
         impostorIds: [],
         remainingImpostorIds: [],
         usedThemes: [],
-        lastScoredRound: 0,
         lastResult: null,
         createdAt: new Date().toISOString(),
       });
