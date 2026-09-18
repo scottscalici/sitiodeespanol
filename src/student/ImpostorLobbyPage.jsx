@@ -22,7 +22,9 @@ const ImpostorLobbyPage = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const playerName = userData ? `${userData.firstName} ${userData.lastName}` : 'Jugador';
+  const playerName = userData?.firstName
+    ? `${userData.firstName} ${userData.lastName}`
+    : (currentUser?.email?.split('@')[0] || 'Jugador');
 
   const handleCreateRoom = async () => {
     if (!currentUser) return;
