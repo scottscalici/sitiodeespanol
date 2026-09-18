@@ -139,7 +139,7 @@ export default function SampleSentencesManager() {
 
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-              Oraciones ({lines.length}) — marca la respuesta con [[doble corchete]]
+              Oraciones ({lines.length}) — para práctica, marca la respuesta con [[doble corchete]]. Sin corchetes, la oración se muestra como ejemplo (sin espacio en blanco).
             </label>
             <textarea
               value={linesText}
@@ -152,11 +152,11 @@ export default function SampleSentencesManager() {
               {lines.map((line, i) => {
                 const { display, answer } = parseBlankSentence(line);
                 return (
-                  <p key={i} className={`text-xs ${answer ? 'text-slate-400' : 'text-rose-400'}`}>
+                  <p key={i} className="text-xs text-slate-400">
                     {answer ? (
                       <>{display} <span className="text-emerald-400 font-bold">({answer})</span></>
                     ) : (
-                      <>⚠️ Falta [[respuesta]]: {line}</>
+                      <><span className="text-sky-400 font-bold">(ejemplo)</span> {line}</>
                     )}
                   </p>
                 );

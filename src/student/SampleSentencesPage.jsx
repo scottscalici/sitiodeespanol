@@ -34,7 +34,7 @@ const SampleSentencesPage = () => {
           if (matches) matchingLines.push(...(set.lines || []));
         });
 
-        setSentences(matchingLines.map(parseBlankSentence).filter((s) => s.answer));
+        setSentences(matchingLines.map(parseBlankSentence));
       } catch (error) {
         console.error('Error loading sample sentences:', error);
       } finally {
@@ -81,6 +81,14 @@ const SampleSentencesPage = () => {
         ) : (
           <div className="space-y-4">
             {sentences.map((sentence, index) => {
+              if (!sentence.answer) {
+                return (
+                  <div key={index} className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5">
+                    <p className="text-slate-300 leading-relaxed italic">{sentence.display}</p>
+                  </div>
+                );
+              }
+
               const [before, after] = sentence.display.split('_____');
               const result = results[index];
 
