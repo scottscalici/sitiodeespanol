@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
 import { doc, getDoc, collection, getDocs, query, where, updateDoc, increment } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import PointsIndicator from '../components/PointsIndicator';
 
 const EslabonesFinales = () => {
   const { currentUser } = useAuth();
   const [currentGame, setCurrentGame] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pointsFlash, setPointsFlash] = useState(null);
 
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2');
@@ -49,7 +51,8 @@ const EslabonesFinales = () => {
       monthly_points: increment(points),
       weekly_points: increment(points),
       daily_points: increment(points),
-    }).catch((err) => console.error('Error saving Eslabones points:', err));
+    }).then(() => setPointsFlash({ amount: points }))
+      .catch((err) => console.error('Error saving Eslabones points:', err));
   }, [gameWon, currentGame, wrongGuesses, currentUser]);
 
   // EFFECT: Fetch Today's Chain from Firestore
@@ -128,6 +131,7 @@ const EslabonesFinales = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 flex flex-col items-center">
+      <PointsIndicator flash={pointsFlash} />
       
       {/* Header Controls */}
       <div className="w-full max-w-xl flex justify-between items-center mb-8 relative z-10">

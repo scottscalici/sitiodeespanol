@@ -4,6 +4,7 @@ import { db } from '../firebase'; // Ensure your firebase config is imported
 import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Senordle from '../components/Senordle';
+import PointsIndicator from '../components/PointsIndicator';
 
 // Points by try number (index 0 = 1st try). A failed 6th try falls back to the 10-point floor.
 const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
@@ -17,6 +18,7 @@ const SenordlePage = () => {
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2'); 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [pointsFlash, setPointsFlash] = useState(null);
   
 // URL for the dictionaries (Base Spanish + Custom Class Vocab)
 const dictUrl1 = "https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle/diccionario.json";
@@ -80,6 +82,7 @@ useEffect(() => {
         weekly_points: increment(points),
         daily_points: increment(points),
       });
+      setPointsFlash({ amount: points });
     } catch (error) {
       console.error('Error saving Señordle points:', error);
     }
@@ -105,6 +108,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-slate-900 py-8 px-4 font-sans">
+      <PointsIndicator flash={pointsFlash} />
       <div className="max-w-2xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-12">
           <Link to="/recreo" className="text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-full font-bold transition-all text-sm flex items-center gap-2">

@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import PointsIndicator from '../components/PointsIndicator';
 
 const POINTS_PER_ROUND = 10;
 
@@ -28,6 +29,7 @@ const ImpostorRoomPage = () => {
   const [revealed, setRevealed] = useState(false);
   const [clueText, setClueText] = useState('');
   const [error, setError] = useState('');
+  const [pointsFlash, setPointsFlash] = useState(null);
   const scoredRoundRef = useRef(0);
 
   const roomRef = doc(db, 'impostor_rooms', roomCode);
@@ -234,7 +236,8 @@ const ImpostorRoomPage = () => {
       monthly_points: increment(POINTS_PER_ROUND),
       weekly_points: increment(POINTS_PER_ROUND),
       daily_points: increment(POINTS_PER_ROUND),
-    }).catch((err) => console.error('Error awarding Impostor points:', err));
+    }).then(() => setPointsFlash({ amount: POINTS_PER_ROUND }))
+      .catch((err) => console.error('Error awarding Impostor points:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, room?.gameState, room?.round]);
 
@@ -308,6 +311,7 @@ const ImpostorRoomPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-8 font-sans">
+      <PointsIndicator flash={pointsFlash} />
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <Link to="/recreo" className="text-slate-400 hover:text-white text-sm font-bold flex items-center gap-2">← Arcade</Link>
