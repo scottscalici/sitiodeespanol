@@ -145,7 +145,7 @@ function App() {
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
             <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
-            <Route path="/practica/oraciones" element={<SampleSentencesPage />} />
+            <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/music-info/:id" element={<MusicPage />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />

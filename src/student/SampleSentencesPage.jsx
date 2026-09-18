@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { Link, useParams } from 'react-router-dom';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { parseBlankSentence } from '../utils/sentenceBlanks';
@@ -9,9 +9,9 @@ const normalize = (str) =>
   (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 
 const SampleSentencesPage = () => {
+  const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
   const isAdmin = userData?.role === 'admin';
-  const course = userData?.course || 's2';
 
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,10 +22,19 @@ const SampleSentencesPage = () => {
   useEffect(() => {
     const fetchSentences = async () => {
       try {
-        const docRef = doc(db, 'config', 'sample_sentences');
-        const docSnap = await getDoc(docRef);
-        const lines = docSnap.exists() ? docSnap.data()[course] || [] : [];
-        setSentences(lines.map(parseBlankSentence).filter((s) => s.answer));
+        const snap = await getDocs(collection(db, 'sentence_sets'));
+        const targetDiaNum = Number(targetDia);
+        const matchingLines = [];
+
+        snap.forEach((docSnap) => {
+          const set = docSnap.data();
+          const matches = (set.assignments || []).some(
+            (a) => a.course === courseId && Number(a.dia) === targetDiaNum
+          );
+          if (matches) matchingLines.push(...(set.lines || []));
+        });
+
+        setSentences(matchingLines.map(parseBlankSentence).filter((s) => s.answer));
       } catch (error) {
         console.error('Error loading sample sentences:', error);
       } finally {
@@ -33,7 +42,7 @@ const SampleSentencesPage = () => {
       }
     };
     fetchSentences();
-  }, [course]);
+  }, [courseId, targetDia]);
 
   const handleCheck = (index) => {
     const sentence = sentences[index];
@@ -62,11 +71,13 @@ const SampleSentencesPage = () => {
 
         <div className="text-center">
           <h1 className="text-3xl font-black uppercase tracking-tight">Oraciones de Práctica</h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Completa cada oración</p>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
+            {courseId?.toUpperCase()} · Día {targetDia}
+          </p>
         </div>
 
         {sentences.length === 0 ? (
-          <p className="text-center text-slate-500 font-bold">No hay oraciones disponibles todavía.</p>
+          <p className="text-center text-slate-500 font-bold">No hay oraciones disponibles para hoy.</p>
         ) : (
           <div className="space-y-4">
             {sentences.map((sentence, index) => {
