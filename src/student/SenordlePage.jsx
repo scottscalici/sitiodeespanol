@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is imported
-import { doc, getDoc } from 'firebase/firestore'; 
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import Senordle from '../components/Senordle';
 
+// Points by try number (index 0 = 1st try). A failed 6th try falls back to the 10-point floor.
+const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
+
 const SenordlePage = () => {
+  const { currentUser } = useAuth();
   const [targetWord, setTargetWord] = useState("LIBRO");
   const [validWords, setValidWords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +68,22 @@ useEffect(() => {
   useEffect(() => {
     localStorage.setItem('preferredCourse', course);
   }, [course]);
+
+  const handleGameEnd = async (tries, won) => {
+    if (!currentUser) return;
+    const points = won ? (SENORDLE_POINTS_BY_TRY[tries - 1] ?? 10) : 10;
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        total_points: increment(points),
+        current_path_points: increment(points),
+        monthly_points: increment(points),
+        weekly_points: increment(points),
+        daily_points: increment(points),
+      });
+    } catch (error) {
+      console.error('Error saving Señordle points:', error);
+    }
+  };
 
   const getArchiveDates = () => {
     const dates = [];
@@ -128,11 +149,12 @@ useEffect(() => {
             {selectedDate === new Date().toLocaleDateString('en-CA') ? "Desafío Diario" : "Archivo Histórico"}
           </p>
           
-          <Senordle 
-            key={`${selectedDate}-${course}`} 
-            gameId={`${course}-${selectedDate}`} 
-            targetWord={targetWord} 
-            validWords={validWords} 
+          <Senordle
+            key={`${selectedDate}-${course}`}
+            gameId={`${course}-${selectedDate}`}
+            targetWord={targetWord}
+            validWords={validWords}
+            onGameEnd={handleGameEnd}
           />
         </div>
       </div>

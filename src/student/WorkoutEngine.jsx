@@ -14,6 +14,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
   // Tracking & Score State
   const [initialCount, setInitialCount] = useState(0);
+  const [initialRegularCount, setInitialRegularCount] = useState(0);
+  const [initialSentenceCount, setInitialSentenceCount] = useState(0);
   const [retries, setRetries] = useState(0);
   const [attempts, setAttempts] = useState(0);
 
@@ -56,7 +58,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   const handleTimeUp = () => {
     const finalScore = Math.round((currentIndex / (initialCount || 1)) * 100);
     alert(`¡Tiempo! ⏱️ Lograste completar ${currentIndex} de ${initialCount} preguntas.`);
-    onComplete(segment.id, finalScore, initialCount);
+    onComplete(segment.id, finalScore, initialCount, initialRegularCount, initialSentenceCount);
   };
 
   const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
@@ -316,7 +318,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               generatedQueue.push({
                   id: `q_rev_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans,
                   options: shuffle([...correctWords, ...getWordDistractors(2, correctWords)]),
-                  correctAnswer: spaSentence.replace(/[.,!?¿¡]/g, '').trim(), topic: `Repaso: ${revConcept.label}`
+                  correctAnswer: spaSentence.replace(/[.,!?¿¡]/g, '').trim(), topic: `Repaso: ${revConcept.label}`,
+                  _pointCategory: 'regular'
               });
               continue;
           }
@@ -346,7 +349,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                       id: `q_${i}`, type: 'conjugate',
                       subject: cleanDisplay.replace(infinitive, '________'),
                       infinitive: infinitive, tense: 'Gramática', engTrans: engTrans,
-                      correctAnswer: targetVerb, topic: 'Gramática (Velocidad)', isVerb: true
+                      correctAnswer: targetVerb, topic: 'Gramática (Velocidad)', isVerb: true,
+                      _pointCategory: 'sentence'
                   });
               } else {
                   let correctWords = cleanDisplay.split(' ');
@@ -355,20 +359,21 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                       id: `q_${i}`, type: 'sentence_builder_complex',
                       prompt: engTrans, engTrans: engTrans, options: wordBank,
                       correctSyntax: cleanDisplay.trim(), targetVerb: targetVerb, infinitive: infinitive,
-                      correctAnswer: cleanCorrect.trim(), topic: target.tags || 'Gramática (Ordena y Conjuga)', isVerb: true
+                      correctAnswer: cleanCorrect.trim(), topic: target.tags || 'Gramática (Ordena y Conjuga)', isVerb: true,
+                      _pointCategory: 'sentence'
                   });
               }
           } else if (onePartMatch && !isSpeedRound) {
               const answer = onePartMatch[1];
               const options = await buildGrammarOptions(target, answer, getWordDistractors);
-              generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática' });
+              generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
           } else {
               let cleanDisplay = spaSentence.replace(/[.,!?¿¡]/g, '').trim();
               if (isSpeedRound) {
-                  generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Gramática (Velocidad)' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Gramática (Velocidad)', _pointCategory: 'sentence' });
               } else {
                   let correctWords = cleanDisplay.split(' ');
-                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getWordDistractors(2, correctWords)]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getWordDistractors(2, correctWords)]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               }
           }
         }
@@ -447,7 +452,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                     if (pairs.length >= 2) {
                         generatedQueue.push({
                             id: `q_${i}`, type: 'matching', topic: `Conecta las Conjugaciones: ${randomTenseKey.replace(/_/g, ' ')}`,
-                            pairs: pairs, esOptions: shuffle(pairs.map(p=>p.es)), enOptions: shuffle(pairs.map(p=>p.en)), isVerb: true
+                            pairs: pairs, esOptions: shuffle(pairs.map(p=>p.es)), enOptions: shuffle(pairs.map(p=>p.en)), isVerb: true,
+                            _pointCategory: 'regular'
                         });
                         continue;
                     }
@@ -459,13 +465,13 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                      for (let s of otherSubjects) {
                          if (options.length < 4 && tenseData[s]?.target) options.push(tenseData[s].target);
                      }
-                     generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true });
+                     generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 } else if (format === 'listen_verb') {
-                     generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true });
+                     generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 } else if (format === 'speak_verb') {
-                     generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true });
+                     generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 } else {
-                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true });
+                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 }
                 continue;
               }
@@ -493,21 +499,23 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           if (format === 'matching') {
             const matchPool = shuffle([...uniqueMasterPool]).slice(0, 5);
-            generatedQueue.push({ id: `q_${i}`, type: 'matching', topic: 'Vocabulario (Conecta las palabras)', pairs: matchPool.map(c => ({ es: c.label.trim(), en: (getEnglishTrans(c) || "Translation").trim() })), esOptions: shuffle(matchPool.map(c => c.label.trim())), enOptions: shuffle(matchPool.map(c => (getEnglishTrans(c) || "Translation").trim())) });
+            generatedQueue.push({ id: `q_${i}`, type: 'matching', topic: 'Vocabulario (Conecta las palabras)', pairs: matchPool.map(c => ({ es: c.label.trim(), en: (getEnglishTrans(c) || "Translation").trim() })), esOptions: shuffle(matchPool.map(c => c.label.trim())), enOptions: shuffle(matchPool.map(c => (getEnglishTrans(c) || "Translation").trim())), _pointCategory: 'regular' });
           } else if (format === 'mc') {
             let options = [spaWord, ...getWordDistractors(3, [spaWord])];
-            generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaWord, topic: target.tags || 'Vocabulario' });
+            generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaWord, topic: target.tags || 'Vocabulario', _pointCategory: 'regular' });
           } else if (format === 'listen') {
-            generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Comprensión Auditiva' });
+            generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Comprensión Auditiva', _pointCategory: 'regular' });
           } else if (format === 'speak') {
-            generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Pronunciación' });
+            generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Pronunciación', _pointCategory: 'regular' });
           } else {
-            generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Escritura' });
+            generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Escritura', _pointCategory: 'regular' });
           }
         }
       }
       setQuestions(generatedQueue);
       setInitialCount(generatedQueue.length);
+      setInitialSentenceCount(generatedQueue.filter((q) => q._pointCategory === 'sentence').length);
+      setInitialRegularCount(generatedQueue.filter((q) => q._pointCategory !== 'sentence').length);
       setIsGenerating(false);
     };
 
@@ -652,7 +660,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       resetInteractiveState(nextQ.complexPhaseFallback || 'build');
     } else {
       const finalScore = Math.round((initialCount / (initialCount + retries)) * 100);
-      onComplete(segment.id, finalScore, initialCount);
+      onComplete(segment.id, finalScore, initialCount, initialRegularCount, initialSentenceCount);
     }
   };
 

@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
-import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, updateDoc, increment } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 
 const AtandoCabosPage = () => {
+  const { currentUser } = useAuth();
   const [currentGame, setCurrentGame] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2');
-  
+
   const [shuffledWords, setShuffledWords] = useState([]);
   const [selectedWords, setSelectedWords] = useState([]);
   const [solvedCategories, setSolvedCategories] = useState([]);
   const [mistakesLeft, setMistakesLeft] = useState(4);
   const [isShaking, setIsShaking] = useState(false);
+  const pointsAwardedRef = useRef(false);
 
   const solvedColors = [
     "bg-[#f9df6d] text-slate-900", // Yellow
@@ -33,8 +36,29 @@ const AtandoCabosPage = () => {
       setSolvedCategories([]);
       setMistakesLeft(4);
       setIsShaking(false);
+      pointsAwardedRef.current = false;
     }
   };
+
+  // 🏆 POINTS: 5 per solved category + 1 bonus per unused mistake (max 4), 10-point floor
+  useEffect(() => {
+    if (!currentGame || pointsAwardedRef.current || !currentUser) return;
+    const won = solvedCategories.length === 4;
+    const lost = mistakesLeft === 0 && !won;
+    if (!won && !lost) return;
+
+    pointsAwardedRef.current = true;
+    const bonus = Math.min(mistakesLeft, 4);
+    const points = Math.max(10, solvedCategories.length * 5 + bonus);
+
+    updateDoc(doc(db, 'users', currentUser.uid), {
+      total_points: increment(points),
+      current_path_points: increment(points),
+      monthly_points: increment(points),
+      weekly_points: increment(points),
+      daily_points: increment(points),
+    }).catch((err) => console.error('Error saving Atando Cabos points:', err));
+  }, [solvedCategories, mistakesLeft, currentGame, currentUser]);
 
   // EFFECT: Fetch Today's Puzzle from Firestore
   useEffect(() => {
