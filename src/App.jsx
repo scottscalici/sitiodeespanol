@@ -24,6 +24,8 @@ import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROU
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
 import ConectoresEngine from './student/ConectoresEngine';
+import ImpostorLobbyPage from './student/ImpostorLobbyPage';
+import ImpostorRoomPage from './student/ImpostorRoomPage';
 
 
 // ⚙️ GLOBAL UI COMPONENTS
@@ -43,6 +45,7 @@ import FormEslabones from './admin/MasterDashboard/components/FormEslabones';
 import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorPage'; // 👈 NEW ADMIN EDITOR
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
 import ConectoresManager from './admin/managers/ConectoresManager';
+import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
@@ -138,6 +141,8 @@ function App() {
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
+            <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
+            <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/music-info/:id" element={<MusicPage />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
@@ -310,6 +315,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <FormEslabones />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-impostor-themes"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ImpostorThemesManager />
                 </AdminRoute>
               }
             />
