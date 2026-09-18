@@ -186,33 +186,30 @@ const Dashboard = () => {
             {/* 🎯 EVALUACIÓN */}
             <Evaluacion evals={data?.evals?.[course] || []} liveDia={liveDia} course={course} cal={data?.cal} />
 
-            {/* ⏱️ CALENTAMIENTO CARD */}
-            <Link to={`/calentamiento/${course}/${liveDia}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-              <div className="flex flex-col sm:flex-row items-stretch">
+            {/* ⏱️ CALENTAMIENTO CARD — WORKOUT-APP STYLE */}
+            <Link
+              to={`/calentamiento/${course}/${liveDia}`}
+              className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+            >
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
-                {/* Left Banner / Icon Area */}
-                <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-orange-500 to-amber-500 relative flex items-center justify-center shrink-0">
-                  <span className="text-5xl drop-shadow-md">🔥</span>
-                  <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-amber-300 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow">
-                    Práctica Diaria
-                  </span>
+              <div className="flex items-center gap-4">
+                {/* Flame Badge */}
+                <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                  <span className="text-3xl drop-shadow">🔥</span>
                 </div>
 
-                {/* Right Content & Action */}
-                <div className="p-5 flex flex-col justify-between flex-1 gap-4">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Rutina del Día</span>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mt-0.5">Calentamiento</h3>
-                    <p className="text-slate-500 text-xs font-medium mt-1">Accede a la práctica para practicar los verbos programados y repasar el vocabulario para el Día {liveDia}.</p>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <span className="bg-slate-900 group-hover:bg-orange-600 text-white font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-block">
-                      Iniciar Misión →
-                    </span>
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[9px] font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
+                  <p className="text-orange-50/90 text-xs font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
                 </div>
+              </div>
 
+              <div className="mt-5 flex justify-end">
+                <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                  Iniciar Misión <span>→</span>
+                </span>
               </div>
             </Link>
 
@@ -292,34 +289,36 @@ const Dashboard = () => {
               </Link>
             )}
 
-            {/* 📖 VOCABULARY CARDS */}
+            {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE */}
             {activeVocabBundles.map(bundleId => (
-              <Link key={bundleId} to={`/vocabulario/${bundleId}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-                <div className="flex flex-col sm:flex-row items-stretch">
+              <Link
+                key={bundleId}
+                to={`/vocabulario/${bundleId}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
-                  {/* Left Banner / Icon Area */}
-                  <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center shrink-0">
-                    <span className="text-5xl drop-shadow-md">🧠</span>
-                    <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-indigo-300 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow">
-                      Vocabulario Activo
-                    </span>
-                  </div>
-
-                  {/* Right Content & Action */}
-                  <div className="p-5 flex flex-col justify-between flex-1 gap-4">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Conjunto Asignado</span>
-                      <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mt-0.5 font-mono">{bundleId.replace(/_/g, ' ')}</h3>
-                      <p className="text-slate-500 text-xs font-medium mt-1">Domina los términos y estructuras clave de esta unidad.</p>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <span className="bg-slate-900 group-hover:bg-indigo-600 text-white font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-block">
-                        Estudiar →
-                      </span>
+                <div className="flex items-center gap-5">
+                  {/* Layered Flashcard Deck Visual */}
+                  <div className="relative w-16 h-16 shrink-0">
+                    <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
+                    <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
+                    <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner">
+                      <span className="text-2xl drop-shadow">🧠</span>
                     </div>
                   </div>
 
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[9px] font-black uppercase tracking-widest text-indigo-200 mb-1">Conjunto Asignado</span>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
+                    <p className="text-indigo-100/80 text-xs font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-indigo-700 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                    Estudiar <span>→</span>
+                  </span>
                 </div>
               </Link>
             ))}
