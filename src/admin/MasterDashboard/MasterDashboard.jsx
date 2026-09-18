@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase.js'; 
+import { db } from '../../firebase.js';
 import FormMusica from './components/FormMusica';
 import FormCultura from './components/FormCultura';
-import FormAtandoCabos from './components/FormAtandoCabos';
 import FormConversaciones from './components/FormConversaciones';
 import FormAnuncios from './components/FormAnuncios';
-import FormLecturas from './components/FormLecturas'; 
+import FormLecturas from './components/FormLecturas';
 import CalendarManager from './components/CalendarManager';
-import FormDestacadoDiario from './components/FormDestacadoDiario'; 
+import FormDestacadoDiario from './components/FormDestacadoDiario';
 import FormTemas from './components/FormTemas';
 import FormVideos from './components/FormVideos';
 import FormLearningPath from '../FormLearningPath/FormLearningPath';
@@ -27,7 +26,7 @@ export default function MasterDashboard() {
       const querySnapshot = await getDocs(collection(db, coleccionActual));
       const items = [];
       querySnapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() }); 
+        items.push({ id: doc.id, ...doc.data() });
       });
       setListaActividades(items);
     } catch (error) {
@@ -41,17 +40,17 @@ export default function MasterDashboard() {
 
   const handleCreateNew = () => {
     const base = {
-      id: "", 
+      id: "",
       titulo: "",
       subtitulo: "",
       imagen: "",
-      isNew: true 
+      isNew: true
     };
 
     if (coleccionActual === "lectura") {
       setActividad({
         ...base,
-        test_id: "", 
+        test_id: "",
         text_id: "",
         paragraphs: [],
         question_sections: [],
@@ -92,7 +91,7 @@ export default function MasterDashboard() {
             musica: "#1e3a8a", conversacion: "#dc2626", cultura: "#1e3a8a",
             lectura: "#1e3a8a", tareas: "#dc2626", destacado: "#0f172a",
             pruebas: "#0f172a", estructura: "#475569", extras: "#0f172a",
-            video: "#1e3a8a", senordle: "#1e3a8a" 
+            video: "#1e3a8a", senordle: "#1e3a8a"
           }
         }
       });
@@ -141,12 +140,12 @@ export default function MasterDashboard() {
     const file = event.target.files[0];
     if (!file) return;
     setIsUploading(true);
-  
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const jsonData = JSON.parse(e.target.result);
-  
+
         // --- DETECTAR FORMATO BUNDLE IB ---
         if (jsonData.worksheet) {
           const worksheetTitle = jsonData.worksheet.title;
@@ -155,23 +154,23 @@ export default function MasterDashboard() {
               titulo: textObj.title,
               subtitulo: worksheetTitle,
               text_id: textObj.text_id || "",
-              test_id: jsonData.worksheet.test_id || "", 
+              test_id: jsonData.worksheet.test_id || "",
               type: "ib_paper_2",
               paragraphs: textObj.paragraphs || [],
-              question_sections: textObj.question_sections || [], 
+              question_sections: textObj.question_sections || [],
               dias: [],
               isNew: false
             };
-  
+
             const docId = `${worksheetTitle}-${textObj.text_id}`
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/(^-|-$)/g, '');
-  
+
             await setDoc(doc(db, "lectura", docId), convertedData, { merge: true });
           }
           alert(`Se han convertido y subido ${jsonData.worksheet.texts.length} textos con éxito.`);
-        } 
+        }
         // --- DETECTAR FORMATO DESTACADO DIARIO (Array) ---
         else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].dia !== undefined) {
           let count = 0;
@@ -204,7 +203,7 @@ export default function MasterDashboard() {
             const docId = video.id;
             const dataToSave = {
               ...video,
-              titulo: video.title || docId, 
+              titulo: video.title || docId,
               isNew: false
             };
             await setDoc(doc(db, "videos", docId), dataToSave, { merge: true });
@@ -216,7 +215,7 @@ export default function MasterDashboard() {
         else {
           alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Destacado Diario, Temas, o Videos.");
         }
-        
+
         fetchData();
       } catch (error) {
         console.error("Error en carga:", error);
@@ -311,13 +310,12 @@ export default function MasterDashboard() {
           <option value="musica">Música</option>
           <option value="culture">Cultura</option>
           <option value="lectura">Lectura</option>
-          <option value="juego_atandocabos">Atando Cabos</option>
           <option value="anuncios">Anuncios</option>
           <option value="calendario">📅 Calendario</option>
           <option value="destacado_diario">🌟 Destacado Diario</option>
           <option value="temas">🎨 Temas (Themes)</option>
           <option value="videos">🎬 Videos</option>
-          <option value="learning_path">🛤️ Ruta de Aprendizaje</option> 
+          <option value="learning_path">🛤️ Ruta de Aprendizaje</option>
           </select>
 
         {/* CHANGE THIS LINE: */}
@@ -349,19 +347,19 @@ export default function MasterDashboard() {
                 return (a.dia || 0) - (b.dia || 0);
               }
               // Otherwise, leave the original fetch order
-              return 0; 
+              return 0;
             })
             .map((item) => (
-            <button 
-              key={item.id} 
-              onClick={() => setActividad(item)} 
-              style={{ 
-                textAlign: 'left', 
-                padding: '10px', 
-                cursor: 'pointer', 
-                border: '1px solid #ddd', 
-                borderRadius: '4px', 
-                backgroundColor: 'white' 
+            <button
+              key={item.id}
+              onClick={() => setActividad(item)}
+              style={{
+                textAlign: 'left',
+                padding: '10px',
+                cursor: 'pointer',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: 'white'
               }}
             >
               <strong>
@@ -378,8 +376,7 @@ export default function MasterDashboard() {
       </div>
 
       <div style={{ width: '70%', padding: coleccionActual === "learning_path" ? '0' : '2rem', overflowY: 'auto' }}>
-        {coleccionActual !== "learning_path" && <AIAssistant coleccionActual={coleccionActual} />}
-        {coleccionActual === "learning_path" ? (
+               {coleccionActual === "learning_path" ? (
           <FormLearningPath />
         ) : coleccionActual === "calendario" ? (
           <CalendarManager />
@@ -399,7 +396,6 @@ export default function MasterDashboard() {
             {coleccionActual === "conversations" && <FormConversaciones actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "musica" && <FormMusica actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "culture" && <FormCultura actividad={actividad} handleChange={handleChange} />}
-            {coleccionActual === "juego_atandocabos" && <FormAtandoCabos actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "anuncios" && <FormAnuncios actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "lectura" && <FormLecturas actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "destacado_diario" && <FormDestacadoDiario actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}

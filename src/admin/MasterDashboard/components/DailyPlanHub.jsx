@@ -510,16 +510,24 @@ const DailyPlanHub = () => {
               <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">
-                    <span>🎮</span> Señordle
+                    <span>🎮</span> Arcade Diario
                   </h2>
                 </div>
                 <Link to="/admin-daily-plan-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
-                  ⚙️ Programar
+                  ⚙️ Señordle
+                </Link>
+              </div>
+              <div className="flex gap-2 mb-3">
+                <Link to="/admin-daily-plan-atandocabos" className="flex-1 text-center bg-fuchsia-900/40 hover:bg-fuchsia-900/80 text-fuchsia-300 text-[10px] font-bold px-2 py-2 rounded border border-fuchsia-700/50 uppercase tracking-widest">
+                  🧶 Atando Cabos
+                </Link>
+                <Link to="/admin-daily-plan-eslabones" className="flex-1 text-center bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-2 rounded border border-cyan-700/50 uppercase tracking-widest">
+                  🔗 Eslabones
                 </Link>
               </div>
               <div className="text-center py-2">
                 <p className="text-emerald-500/50 text-xs italic font-bold">
-                  Programa las palabras diarias por fecha de calendario.
+                  Programa los juegos diarios por fecha de calendario.
                 </p>
               </div>
             </div>
