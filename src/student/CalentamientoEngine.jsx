@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
+import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 
 export default function CalentamientoEngine({ onClose }) {
   const { courseId, targetDia } = useParams(); // 👈 Grabs course and day from the URL
@@ -259,6 +260,9 @@ export default function CalentamientoEngine({ onClose }) {
       // We pull the ABSOLUTE FRESHEST data directly from the database
       const snap = await getDoc(userRef);
 
+      const weekKey = getWeekKey();
+      const monthKey = getMonthKey();
+
       let newTotal = pointsEarned;
       let newMonthly = pointsEarned;
       let newWeekly = pointsEarned;
@@ -268,8 +272,8 @@ export default function CalentamientoEngine({ onClose }) {
       if (snap.exists()) {
         const data = snap.data();
         newTotal += data.total_points || data.current_path_points || 0;
-        newMonthly += data.monthly_points || 0;
-        newWeekly += data.weekly_points || 0;
+        if (data.monthKey === monthKey) newMonthly += data.monthly_points || 0;
+        if (data.weekKey === weekKey) newWeekly += data.weekly_points || 0;
         newDaily += data.daily_points || 0;
 
         // Safely grab the previous best grade, if it exists
@@ -294,6 +298,8 @@ export default function CalentamientoEngine({ onClose }) {
         monthly_points: newMonthly,
         weekly_points: newWeekly,
         daily_points: newDaily,
+        weekKey,
+        monthKey,
       };
 
       // 2. ONLY attach the progress object if we beat the high score

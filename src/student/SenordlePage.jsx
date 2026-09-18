@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is imported
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import Senordle from '../components/Senordle';
 import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
 
 // Points by try number (index 0 = 1st try). A failed 6th try falls back to the 10-point floor.
 const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
@@ -75,13 +76,7 @@ useEffect(() => {
     if (!currentUser) return;
     const points = won ? (SENORDLE_POINTS_BY_TRY[tries - 1] ?? 10) : 10;
     try {
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        total_points: increment(points),
-        current_path_points: increment(points),
-        monthly_points: increment(points),
-        weekly_points: increment(points),
-        daily_points: increment(points),
-      });
+      await awardPoints(currentUser.uid, points);
       setPointsFlash({ amount: points });
     } catch (error) {
       console.error('Error saving Señordle points:', error);

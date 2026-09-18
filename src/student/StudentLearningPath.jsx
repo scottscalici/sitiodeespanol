@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
+import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 
 // The base ID for the current unit
 const BASE_PATH_ID = 's2_descubre2_preliminar';
@@ -339,6 +340,9 @@ export default function StudentLearningPath() {
                 const userRef = doc(db, 'users', userData.uid);
                 const snap = await getDoc(userRef);
 
+                const weekKey = getWeekKey();
+                const monthKey = getMonthKey();
+
                 let newTotal = totalPointsEarned;
                 let newMonthly = totalPointsEarned;
                 let newWeekly = totalPointsEarned;
@@ -348,8 +352,8 @@ export default function StudentLearningPath() {
                 if (snap.exists()) {
                    const data = snap.data();
                    newTotal += (data.total_points || data.current_path_points || 0);
-                   newMonthly += (data.monthly_points || 0);
-                   newWeekly += (data.weekly_points || 0);
+                   if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
+                   if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
                    newDaily += (data.daily_points || 0);
                    newPathPoints += (data.progress?.[currentPathId]?.path_points || 0);
                 }
@@ -360,6 +364,8 @@ export default function StudentLearningPath() {
                   monthly_points: newMonthly,
                   weekly_points: newWeekly,
                   daily_points: newDaily,
+                  weekKey,
+                  monthKey,
                   progress: {
                     [currentPathId]: {
                       path_points: newPathPoints,

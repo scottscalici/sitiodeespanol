@@ -7,6 +7,7 @@ import {
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
 
 const POINTS_PER_ROUND = 10;
 
@@ -230,13 +231,8 @@ const ImpostorRoomPage = () => {
     if (room.round <= scoredRoundRef.current) return;
     scoredRoundRef.current = room.round;
 
-    updateDoc(doc(db, 'users', currentUser.uid), {
-      total_points: increment(POINTS_PER_ROUND),
-      current_path_points: increment(POINTS_PER_ROUND),
-      monthly_points: increment(POINTS_PER_ROUND),
-      weekly_points: increment(POINTS_PER_ROUND),
-      daily_points: increment(POINTS_PER_ROUND),
-    }).then(() => setPointsFlash({ amount: POINTS_PER_ROUND }))
+    awardPoints(currentUser.uid, POINTS_PER_ROUND)
+      .then(() => setPointsFlash({ amount: POINTS_PER_ROUND }))
       .catch((err) => console.error('Error awarding Impostor points:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, room?.gameState, room?.round]);

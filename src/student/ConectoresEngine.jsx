@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { awardPoints } from '../utils/pointsHelper';
 
 const ROUND_SIZE = 10;
 const POINTS_PER_ROUND = 5;
@@ -100,14 +101,7 @@ export default function ConectoresEngine({ onClose }) {
 
       if (currentUser?.uid) {
         try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          await updateDoc(userRef, {
-            total_points: increment(POINTS_PER_ROUND),
-            current_path_points: increment(POINTS_PER_ROUND),
-            monthly_points: increment(POINTS_PER_ROUND),
-            weekly_points: increment(POINTS_PER_ROUND),
-            daily_points: increment(POINTS_PER_ROUND),
-          });
+          await awardPoints(currentUser.uid, POINTS_PER_ROUND);
         } catch (err) {
           console.error('Error saving conectores points:', err);
         }

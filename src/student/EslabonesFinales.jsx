@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
-import { doc, getDoc, collection, getDocs, query, where, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
 
 const EslabonesFinales = () => {
   const { currentUser } = useAuth();
@@ -45,13 +46,8 @@ const EslabonesFinales = () => {
     const wordsCount = Math.max((currentGame.chain?.length || 1) - 1, 0);
     const points = Math.max(10, wordsCount * 5 - wrongGuesses * 2);
 
-    updateDoc(doc(db, 'users', currentUser.uid), {
-      total_points: increment(points),
-      current_path_points: increment(points),
-      monthly_points: increment(points),
-      weekly_points: increment(points),
-      daily_points: increment(points),
-    }).then(() => setPointsFlash({ amount: points }))
+    awardPoints(currentUser.uid, points)
+      .then(() => setPointsFlash({ amount: points }))
       .catch((err) => console.error('Error saving Eslabones points:', err));
   }, [gameWon, currentGame, wrongGuesses, currentUser]);
 
