@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import FormMusica from './components/FormMusica';
 import FormCultura from './components/FormCultura';
 import FormConversaciones from './components/FormConversaciones';
 import FormAnuncios from './components/FormAnuncios';
@@ -13,7 +12,7 @@ import FormTemas from './components/FormTemas';
 import FormVideos from './components/FormVideos';
 import FormLearningPath from '../FormLearningPath/FormLearningPath';
 const VALID_COLLECTIONS = [
-  "conversations", "musica", "culture", "lectura", "anuncios",
+  "conversations", "culture", "lectura", "anuncios",
   "calendario", "destacado_diario", "temas", "videos", "learning_path",
 ];
 
@@ -317,7 +316,6 @@ export default function MasterDashboard() {
         <h3>Collection:</h3>
         <select value={coleccionActual} onChange={(e) => {setColeccionActual(e.target.value); setActividad(null);}} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>
           <option value="conversations">Conversaciones</option>
-          <option value="musica">Música</option>
           <option value="culture">Cultura</option>
           <option value="lectura">Lectura</option>
           <option value="anuncios">Anuncios</option>
@@ -404,7 +402,6 @@ export default function MasterDashboard() {
               <input name="titulo" value={actividad.titulo || ""} onChange={handleChange} style={{ padding: '8px' }} />
             </div>
             {coleccionActual === "conversations" && <FormConversaciones actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
-            {coleccionActual === "musica" && <FormMusica actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "culture" && <FormCultura actividad={actividad} handleChange={handleChange} />}
             {coleccionActual === "anuncios" && <FormAnuncios actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "lectura" && <FormLecturas actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}

@@ -12,7 +12,6 @@ import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
-import MusicPage from './student/MusicPage';
 import RecreoHub from './student/RecreoHub';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
@@ -66,7 +65,6 @@ import SentenceManager from './admin/managers/SentenceManager';
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
 import DestacadoUploader from './admin/uploaders/DestacadoUploader';
-import MusicUploader from './admin/uploaders/MusicUploader';
 import SenordleUploader from './admin/uploaders/SenordleUploader';
 import TieredCulturaUploader from './admin/uploaders/TieredCulturaUploader';
 import VerbUploader from './admin/uploaders/VerbUploader';
@@ -147,7 +145,6 @@ function App() {
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
-            <Route path="/music-info/:id" element={<MusicPage />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
@@ -159,14 +156,6 @@ function App() {
 
 
             {/* 🔴 SECURE ADMIN ROUTES */}
-            <Route
-              path="/admin-secret-portal"
-              element={
-                <AdminRoute user={user} role={role}>
-                  <MusicUploader />
-                </AdminRoute>
-              }
-            />
             <Route
               path="/admin-secret-portal-vocab"
               element={

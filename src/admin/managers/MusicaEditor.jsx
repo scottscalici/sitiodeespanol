@@ -13,6 +13,10 @@ const MusicaEditor = () => {
   const [song, setSong] = useState({
     titulo: '',
     artista: '',
+    course: [],
+    dias: [],
+    imagen: '',
+    totalPoints: 20,
     youtube_url: '',
     spotify_url: '',
     letras: '',
@@ -29,6 +33,10 @@ const MusicaEditor = () => {
           setSong({
             titulo: data.titulo || '',
             artista: data.artista || '',
+            course: data.course || [],
+            dias: data.dias || [],
+            imagen: data.imagen || '',
+            totalPoints: data.totalPoints ?? 20,
             youtube_url: data.youtube_url || '',
             spotify_url: data.spotify_url || '',
             letras: data.letras || '',
@@ -46,6 +54,20 @@ const MusicaEditor = () => {
 
   const handleInputChange = (field, value) => {
     setSong(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDiasChange = (value) => {
+    const arr = value.split(',').map((d) => parseInt(d.trim(), 10)).filter((d) => !isNaN(d));
+    setSong(prev => ({ ...prev, dias: arr }));
+  };
+
+  const toggleCourse = (courseId) => {
+    setSong(prev => ({
+      ...prev,
+      course: prev.course.includes(courseId)
+        ? prev.course.filter((c) => c !== courseId)
+        : [...prev.course, courseId],
+    }));
   };
 
   // --- COMPREHENSION QUESTIONS BUILDER ---
@@ -164,6 +186,43 @@ const MusicaEditor = () => {
                 <div>
                   <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Artista</label>
                   <input type="text" value={song.artista} onChange={(e) => handleInputChange('artista', e.target.value)} className="w-full p-2.5 rounded-lg border border-slate-300 font-bold text-slate-800" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Curso</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleCourse('s2')}
+                      className={`flex-1 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all ${song.course.includes('s2') ? 'bg-sky-600 text-white' : 'bg-white border border-slate-300 text-slate-500'}`}
+                    >
+                      S2
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleCourse('s4')}
+                      className={`flex-1 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all ${song.course.includes('s4') ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-300 text-slate-500'}`}
+                    >
+                      S4
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Días (separados por coma)</label>
+                  <input type="text" value={song.dias.join(', ')} onChange={(e) => handleDiasChange(e.target.value)} placeholder="ej: 58, 59" className="w-full p-2.5 rounded-lg border border-slate-300 font-bold text-slate-800" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Imagen de Portada (URL)</label>
+                  <input type="text" value={song.imagen} onChange={(e) => handleInputChange('imagen', e.target.value)} placeholder="https://..." className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs text-slate-600" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Puntos Totales</label>
+                  <input type="number" value={song.totalPoints} onChange={(e) => handleInputChange('totalPoints', parseInt(e.target.value, 10) || 0)} className="w-full p-2.5 rounded-lg border border-slate-300 font-bold text-slate-800" />
                 </div>
               </div>
             </div>

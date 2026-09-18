@@ -1,12 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../context/AuthContext';
+import { awardPoints } from '../utils/pointsHelper';
+
+const normalize = (str) =>
+  (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+const getBlankAnswers = (letras) => {
+  if (!letras || typeof letras !== 'string') return [];
+  const matches = letras.match(/\[(.*?)\]/g) || [];
+  return matches.map((m) => m.slice(1, -1));
+};
 
 const MusicaEngine = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+  const { currentUser } = useAuth();
+
   const [song, setSong] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -14,6 +26,7 @@ const MusicaEngine = () => {
   // Store student answers
   const [clozeAnswers, setClozeAnswers] = useState({});
   const [compAnswers, setCompAnswers] = useState({});
+  const pointsAwardedRef = useRef(false);
 
   useEffect(() => {
     const fetchSong = async () => {
@@ -45,23 +58,33 @@ const MusicaEngine = () => {
     setCompAnswers(prev => ({ ...prev, [index]: value }));
   };
 
-  const handleSubmit = () => {
-    console.log("Cloze Answers:", clozeAnswers);
-    console.log("Comprehension Answers:", compAnswers);
-    alert("¡Respuestas enviadas al Señor Scalici!");
-    navigate('/'); 
+  const handleSubmit = async () => {
+    const blankAnswers = getBlankAnswers(song?.letras);
+    const correctCount = blankAnswers.filter(
+      (ans, i) => normalize(clozeAnswers[i]) === normalize(ans)
+    ).length;
+
+    if (currentUser && !pointsAwardedRef.current) {
+      pointsAwardedRef.current = true;
+      try {
+        await awardPoints(currentUser.uid, song?.totalPoints || 0);
+      } catch (error) {
+        console.error('Error awarding music points:', error);
+      }
+    }
+
+    const scoreMsg = blankAnswers.length > 0
+      ? `Completaste ${correctCount}/${blankAnswers.length} espacios correctamente. `
+      : '';
+    alert(`${scoreMsg}¡Respuestas enviadas! (+${song?.totalPoints || 0} puntos)`);
+    navigate('/');
   };
 
   // --- THE DIGITAL CLOZE ENGINE ---
-  // --- THE DIGITAL CLOZE ENGINE (Safe for strings or objects) ---
   const renderInteractiveLyrics = (letras) => {
-    if (!letras) return null;
-    
-    // Extract text safely whether letras is a string or an object (e.g. { texto: "..." })
-    const textContent = typeof letras === 'string' ? letras : (letras.texto || letras.lyrics || '');
-    if (!textContent || typeof textContent !== 'string') return null;
+    if (!letras || typeof letras !== 'string') return null;
 
-    const parts = textContent.split(/(\[.*?\])/g);
+    const parts = letras.split(/(\[.*?\])/g);
     let blankCounter = 0;
 
     return (
@@ -163,9 +186,9 @@ const MusicaEngine = () => {
               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
                 Misión de Música
               </span>
-              {song.tags && song.tags.map((tag, i) => (
+              {song.course && song.course.map((c, i) => (
                 <span key={i} className="bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {tag}
+                  {c.toUpperCase()}
                 </span>
               ))}
             </div>
