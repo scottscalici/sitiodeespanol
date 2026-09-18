@@ -424,6 +424,25 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
+            {/* 📢 ANUNCIOS CARD */}
+            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
+                    <span>📢</span> Anuncios
+                  </h2>
+                </div>
+                <Link to="/admin-secret-portal-master?tipo=anuncios" className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-3 py-1.5 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  ⚙️ Editar
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-indigo-500/50 text-xs italic font-bold">
+                  Administra los anuncios del panel (rango de fechas, cursos, enlaces).
+                </p>
+              </div>
+            </div>
+
 {/* 📄 LECTURAS HUB CARD */}
 <div className="bg-cyan-950/20 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-cyan-900/50 pb-3 mb-4 flex justify-between items-center">

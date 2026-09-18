@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import FormMusica from './components/FormMusica';
@@ -11,8 +12,17 @@ import FormDestacadoDiario from './components/FormDestacadoDiario';
 import FormTemas from './components/FormTemas';
 import FormVideos from './components/FormVideos';
 import FormLearningPath from '../FormLearningPath/FormLearningPath';
+const VALID_COLLECTIONS = [
+  "conversations", "musica", "culture", "lectura", "anuncios",
+  "calendario", "destacado_diario", "temas", "videos", "learning_path",
+];
+
 export default function MasterDashboard() {
-  const [coleccionActual, setColeccionActual] = useState("conversaciones");
+  const [searchParams] = useSearchParams();
+  const requestedType = searchParams.get('tipo');
+  const [coleccionActual, setColeccionActual] = useState(
+    VALID_COLLECTIONS.includes(requestedType) ? requestedType : "conversaciones"
+  );
   const [listaActividades, setListaActividades] = useState([]);
   const [actividad, setActividad] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
