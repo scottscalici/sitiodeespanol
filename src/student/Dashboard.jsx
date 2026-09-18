@@ -29,6 +29,7 @@ const Dashboard = () => {
   const [dailySong, setDailySong] = useState(null);
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
   const [activeLecturas, setActiveLecturas] = useState([]);
+  const [hasSentences, setHasSentences] = useState(false);
 
   // Fetch Music
   useEffect(() => {
@@ -89,6 +90,25 @@ const Dashboard = () => {
       }
     };
     fetchLecturasSequence();
+  }, [course, liveDia]);
+
+  // Check for Sentence Sets scheduled for today
+  useEffect(() => {
+    const checkSentenceSets = async () => {
+      if (!course || !liveDia) return;
+      try {
+        const snap = await getDocs(collection(db, 'sentence_sets'));
+        const matches = snap.docs.some((docSnap) =>
+          (docSnap.data().assignments || []).some(
+            (a) => a.course === course && Number(a.dia) === Number(liveDia)
+          )
+        );
+        setHasSentences(matches);
+      } catch (error) {
+        console.error('Error checking sentence sets:', error);
+      }
+    };
+    checkSentenceSets();
   }, [course, liveDia]);
 
   // --- CALCULATE MAX DAY SAFELY ---
@@ -203,15 +223,17 @@ const Dashboard = () => {
             <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
 
             {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
-                <span>✍️</span> Oraciones de Práctica/Ejemplo
-              </h3>
-              <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
-              <Link to={`/practica/oraciones/${course}/${liveDia}`} className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
-                Practicar →
-              </Link>
-            </div>
+            {hasSentences && (
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
+                  <span>✍️</span> Oraciones de Práctica/Ejemplo
+                </h3>
+                <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
+                <Link to={`/practica/oraciones/${course}/${liveDia}`} className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
+                  Practicar →
+                </Link>
+              </div>
+            )}
 
             {/* 🗣️ CONVERSACIÓN (próximamente) */}
 
