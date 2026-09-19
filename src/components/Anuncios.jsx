@@ -41,19 +41,22 @@ const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
         }
 
         return (
-          <div key={idx} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} p-6 shadow-xl`}>
+          <div key={idx} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} shadow-xl flex items-stretch`}>
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                {note.thumbnail ? (
-                  <img src={note.thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl drop-shadow">{icon}</span>
-                )}
-              </div>
+            {/* Image Column — stretches to the card's full height */}
+            <div className="w-28 sm:w-40 shrink-0 bg-white/10">
+              {note.thumbnail ? (
+                <img src={note.thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-4xl drop-shadow">{icon}</span>
+                </div>
+              )}
+            </div>
 
-              <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 p-6 flex flex-col justify-between gap-4">
+              <div>
                 <span className={`block text-xs font-black uppercase tracking-widest mb-1 ${pillTextClass}`}>
                   {titleText}
                 </span>
@@ -61,20 +64,20 @@ const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
                   {note.text}
                 </p>
               </div>
-            </div>
 
-            {note.link && (
-              <div className="mt-5 flex justify-end">
-                <a
-                  href={note.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`bg-white/15 group-hover:bg-white text-white ${ctaHoverTextClass} font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2`}
-                >
-                  Ver Detalles <span>↗</span>
-                </a>
-              </div>
-            )}
+              {note.link && (
+                <div className="flex justify-end">
+                  <a
+                    href={note.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`bg-white/15 group-hover:bg-white text-white ${ctaHoverTextClass} font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2`}
+                  >
+                    Ver Detalles <span>↗</span>
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
