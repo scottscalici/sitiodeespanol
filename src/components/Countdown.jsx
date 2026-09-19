@@ -5,7 +5,7 @@ const Countdown = ({ course }) => {
   if (course !== 's4') return null;
 
   const [timeLeft, setTimeLeft] = useState({ days: '--', hrs: '--' });
-  const targetDate = new Date("2026-05-13T12:05:00");
+  const targetDate = new Date("2027-03-08T07:20:00");
 
   useEffect(() => {
     const updateTimer = () => {
@@ -41,7 +41,7 @@ const Countdown = ({ course }) => {
         </div>
       </div>
 
-      <p className="text-[10px] uppercase font-bold text-indigo-300 mt-4 tracking-widest">13 de Mayo</p>
+      <p className="text-[10px] uppercase font-bold text-indigo-300 mt-4 tracking-widest">8 de Marzo</p>
     </div>
   );
 };
