@@ -3,10 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
+const normalize = (str) =>
+  (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+const getBlankAnswers = (letras) => {
+  if (!letras || typeof letras !== 'string') return [];
+  const matches = letras.match(/\[(.*?)\]/g) || [];
+  return matches.map((m) => m.slice(1, -1));
+};
+
 const MusicaEngine = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [song, setSong] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -45,23 +54,24 @@ const MusicaEngine = () => {
     setCompAnswers(prev => ({ ...prev, [index]: value }));
   };
 
-  const handleSubmit = () => {
-    console.log("Cloze Answers:", clozeAnswers);
-    console.log("Comprehension Answers:", compAnswers);
-    alert("¡Respuestas enviadas al Señor Scalici!");
-    navigate('/'); 
+  const handleCheck = () => {
+    const blankAnswers = getBlankAnswers(song?.letras);
+    const correctCount = blankAnswers.filter(
+      (ans, i) => normalize(clozeAnswers[i]) === normalize(ans)
+    ).length;
+
+    if (blankAnswers.length > 0) {
+      alert(`Completaste ${correctCount}/${blankAnswers.length} espacios correctamente. ¡Sigue practicando!`);
+    } else {
+      alert('¡Buen trabajo repasando la canción!');
+    }
   };
 
   // --- THE DIGITAL CLOZE ENGINE ---
-  // --- THE DIGITAL CLOZE ENGINE (Safe for strings or objects) ---
   const renderInteractiveLyrics = (letras) => {
-    if (!letras) return null;
-    
-    // Extract text safely whether letras is a string or an object (e.g. { texto: "..." })
-    const textContent = typeof letras === 'string' ? letras : (letras.texto || letras.lyrics || '');
-    if (!textContent || typeof textContent !== 'string') return null;
+    if (!letras || typeof letras !== 'string') return null;
 
-    const parts = textContent.split(/(\[.*?\])/g);
+    const parts = letras.split(/(\[.*?\])/g);
     let blankCounter = 0;
 
     return (
@@ -94,6 +104,12 @@ const MusicaEngine = () => {
     return match ? match[1] : null;
   };
 
+  const getSpotifyId = (url) => {
+    if (!url) return null;
+    const match = url.match(/track\/([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-slate-950 flex items-center justify-center font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Cargando Misión de Música...</div>;
   }
@@ -113,6 +129,7 @@ const MusicaEngine = () => {
   }
 
   const ytId = getYouTubeId(song.youtube_url);
+  const spotId = getSpotifyId(song.spotify_url);
   const albumImage = song.imagen || song.img;
 
   return (
@@ -163,9 +180,9 @@ const MusicaEngine = () => {
               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
                 Misión de Música
               </span>
-              {song.tags && song.tags.map((tag, i) => (
+              {song.course && song.course.map((c, i) => (
                 <span key={i} className="bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {tag}
+                  {c.toUpperCase()}
                 </span>
               ))}
             </div>
@@ -179,75 +196,79 @@ const MusicaEngine = () => {
           </div>
         </div>
 
-        {/* CONTENT GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* LEFT COLUMN: MEDIA & COMPREHENSION (5 Cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            
-            {/* YouTube Video Container */}
+        {/* MEDIA ROW: VIDEO + SPOTIFY */}
+        {(ytId || spotId) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {ytId && (
               <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-2xl border border-neutral-800 bg-black">
-                <iframe 
-                  width="100%" 
-                  height="100%" 
-                  src={`https://www.youtube.com/embed/${ytId}`} 
-                  title="YouTube" 
-                  frameBorder="0" 
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src={`https://www.youtube.com/embed/${ytId}`}
+                  title="YouTube"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 ></iframe>
               </div>
             )}
 
-            {/* Comprehension Questions */}
-            {song.preguntas && song.preguntas.length > 0 && (
-              <div className="bg-neutral-900/80 border border-neutral-800 p-6 rounded-2xl shadow-xl space-y-6">
-                <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center gap-2 border-b border-neutral-800 pb-3">
-                  <span>🤔</span> Preguntas de Comprensión
-                </h3>
-                <div className="space-y-6">
-                  {song.preguntas.map((p, idx) => (
-                    <div key={idx} className="space-y-2">
-                      <p className="font-bold text-sm text-slate-200">{idx + 1}. {p.q}</p>
-                      <textarea
-                        value={compAnswers[idx] || ''}
-                        onChange={(e) => handleCompChange(idx, e.target.value)}
-                        placeholder="Escribe tu respuesta aquí..."
-                        className="w-full p-3 rounded-xl border border-neutral-800 bg-neutral-950 text-white outline-none focus:border-amber-500 resize-none h-24 text-xs font-medium transition-colors"
-                      />
-                    </div>
-                  ))}
-                </div>
+            {spotId && (
+              <div className="w-full rounded-2xl overflow-hidden shadow-2xl border border-neutral-800 flex items-center bg-neutral-900">
+                <iframe
+                  src={`https://open.spotify.com/embed/track/${spotId}`}
+                  width="100%"
+                  height="152"
+                  frameBorder="0"
+                  allowtransparency="true"
+                  allow="encrypted-media"
+                ></iframe>
               </div>
             )}
           </div>
+        )}
 
-          {/* RIGHT COLUMN: INTERACTIVE CLOZE LYRICS (7 Cols) */}
-          <div className="lg:col-span-7">
-            <div className="bg-neutral-900/80 border border-neutral-800 p-6 sm:p-8 rounded-2xl shadow-xl h-full flex flex-col justify-between space-y-6">
-              <div>
-                <h3 className="font-black text-emerald-400 uppercase tracking-widest text-xs border-b border-neutral-800 pb-3 mb-6 flex items-center justify-between">
-                  <span className="flex items-center gap-2"><span>📝</span> Completa las Letras</span>
-                  <span className="text-[10px] text-neutral-500 font-mono">Modo Interactivo</span>
-                </h3>
-                <div className="bg-neutral-950/60 p-6 rounded-2xl border border-neutral-800/80">
-                  {renderInteractiveLyrics(song.letras)}
+        {/* INTERACTIVE CLOZE LYRICS — FULL WIDTH */}
+        <div className="bg-neutral-900/80 border border-neutral-800 p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
+          <h3 className="font-black text-emerald-400 uppercase tracking-widest text-xs border-b border-neutral-800 pb-3 flex items-center justify-between">
+            <span className="flex items-center gap-2"><span>📝</span> Completa las Letras</span>
+            <span className="text-[10px] text-neutral-500 font-mono">Modo Interactivo</span>
+          </h3>
+          <div className="bg-neutral-950/60 p-6 sm:p-8 rounded-2xl border border-neutral-800/80">
+            {renderInteractiveLyrics(song.letras)}
+          </div>
+        </div>
+
+        {/* COMPREHENSION QUESTIONS — FULL WIDTH */}
+        {song.preguntas && song.preguntas.length > 0 && (
+          <div className="bg-neutral-900/80 border border-neutral-800 p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
+            <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center gap-2 border-b border-neutral-800 pb-3">
+              <span>🤔</span> Preguntas de Comprensión
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {song.preguntas.map((p, idx) => (
+                <div key={idx} className="space-y-2">
+                  <p className="font-bold text-sm text-slate-200">{idx + 1}. {p.q}</p>
+                  <textarea
+                    value={compAnswers[idx] || ''}
+                    onChange={(e) => handleCompChange(idx, e.target.value)}
+                    placeholder="Escribe tu respuesta aquí..."
+                    className="w-full p-3 rounded-xl border border-neutral-800 bg-neutral-950 text-white outline-none focus:border-amber-500 resize-none h-24 text-xs font-medium transition-colors"
+                  />
                 </div>
-              </div>
-
-              {/* SUBMIT BUTTON */}
-              <div className="pt-6 border-t border-neutral-800 flex justify-end">
-                <button 
-                  onClick={handleSubmit}
-                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 cursor-pointer"
-                >
-                  Enviar Respuestas →
-                </button>
-              </div>
+              ))}
             </div>
           </div>
+        )}
 
+        {/* CHECK BUTTON */}
+        <div className="flex justify-end">
+          <button
+            onClick={handleCheck}
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95 cursor-pointer"
+          >
+            Revisar Respuestas →
+          </button>
         </div>
 
       </div>

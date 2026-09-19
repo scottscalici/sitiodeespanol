@@ -61,25 +61,33 @@ export default function GrammarNoteViewer() {
           )}
         </div>
 
-        {/* CONTENT CARD */}
-        <div className="bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl">
+        {/* CONTENT CARD (NOW A BRIGHT, CLEAN "PAPER" BACKGROUND) */}
+        <div className="bg-white border border-slate-200 p-8 md:p-12 rounded-2xl shadow-xl">
           {noteData ? (
             <div>
-              <h1 className="text-3xl font-black text-white uppercase tracking-tight mb-6 pb-4 border-b border-slate-700">
+              <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-6 pb-4 border-b border-slate-200">
                 {noteData.title}
               </h1>
 
-              {/* RAW HTML RENDERING CONTAINER */}
+              {/* TABLE & CODE FORCING STYLES */}
+              <style>{`
+                .grammar-doc table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+                .grammar-doc th { background: #f8fafc; color: #0f172a !important; font-weight: 900; padding: 12px; border: 2px solid #cbd5e1; }
+                .grammar-doc td { padding: 12px; border: 1px solid #e2e8f0; color: #334155 !important; font-weight: 500; }
+                .grammar-doc code { background: #f0f9ff; color: #0284c7 !important; font-weight: 800; padding: 3px 6px; border-radius: 4px; }
+              `}</style>
+
+              {/* RAW HTML RENDERING CONTAINER (Removed prose-invert) */}
               <div 
-                className="prose prose-invert max-w-none text-slate-300 leading-relaxed space-y-4"
+                className="grammar-doc prose max-w-none text-slate-700 leading-relaxed space-y-4"
                 dangerouslySetInnerHTML={{ __html: noteData.htmlContent }}
               />
             </div>
           ) : (
             <div className="text-center py-16">
-              <p className="text-xl font-bold text-rose-400 mb-2">Nota no encontrada</p>
-              <p className="text-sm text-slate-400">
-                Asegúrate de que el documento en la colección <code className="text-sky-400">grammar_pages</code> coincida con el enlace.
+              <p className="text-xl font-bold text-rose-500 mb-2">Nota no encontrada</p>
+              <p className="text-sm text-slate-500">
+                Asegúrate de que el documento en la colección <code className="text-sky-600 bg-sky-50 px-1 rounded">grammar_pages</code> coincida con el enlace.
               </p>
             </div>
           )}

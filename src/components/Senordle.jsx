@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const Senordle = ({ targetWord = "PLAYA", gameId = "today", validWords = [] }) => {
+const Senordle = ({ targetWord = "PLAYA", gameId = "today", validWords = [], onGameEnd }) => {
   const SAVE_KEY = `senordle_progress_${gameId}`;
   const safeTarget = targetWord.toUpperCase();
 
@@ -70,6 +70,7 @@ useEffect(() => {
     if (isWin || isLoss) {
       setGameOver(true);
       setTimeout(() => alert(isWin ? "¡Excelente! Pura Vida." : `La palabra era: ${safeTarget}`), 300);
+      if (onGameEnd) onGameEnd(currentRow + 1, isWin);
     }
 
     const nextRow = currentRow + 1;

@@ -44,16 +44,18 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-[6px] border-l-rose-400 p-5 sm:p-6 relative">
-      
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600 via-pink-700 to-slate-900 p-6 shadow-xl">
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-xl text-rose-500 flex items-center gap-2">
-          <span>📋</span> Evaluación
+      <div className="flex justify-between items-center mb-5">
+        <h3 className="font-black text-2xl text-white flex items-center gap-2.5">
+          <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0">📋</span>
+          Evaluación
         </h3>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors"
+          className="text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors shrink-0"
           title="Ver calendario completo"
         >
           Calendario
@@ -62,12 +64,13 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
 
       {/* TODAY'S EVALUATION */}
       <div className="mb-5">
+        <span className="block text-xs font-black uppercase tracking-widest text-rose-200 mb-1">Hoy · Día {liveDia}</span>
         {hasEvalToday ? (
-          <p className="text-slate-800 text-lg font-medium leading-tight">
+          <p className="text-white text-lg font-bold leading-tight">
             {todayEval.label}
           </p>
         ) : (
-          <p className="text-slate-700 text-lg italic">
+          <p className="text-rose-100/70 text-lg italic">
             Nada
           </p>
         )}
@@ -76,16 +79,16 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
       {/* UPCOMING EVALUATIONS */}
       {upcomingEvals.length > 0 && (
         <>
-          <hr className="border-slate-100 my-4" />
+          <hr className="border-white/15 my-4" />
           <div>
-            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">
+            <h4 className="text-xs font-black text-rose-200 uppercase tracking-widest mb-2">
               Próximas Pruebas
             </h4>
             <div className="space-y-1.5">
               {upcomingEvals.map((upc, idx) => (
-                <p key={idx} className="text-slate-700 text-sm">
-                  <span className="font-black text-slate-800">Día {upc.dia}:</span> {upc.label}
-                  <span className="text-slate-400 italic text-xs ml-1.5">({getUpcomingText(upc.dia)})</span>
+                <p key={idx} className="text-rose-50 text-sm">
+                  <span className="font-black text-white">Día {upc.dia}:</span> {upc.label}
+                  <span className="text-rose-200/70 italic text-xs ml-1.5">({getUpcomingText(upc.dia)})</span>
                 </p>
               ))}
             </div>

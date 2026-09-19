@@ -1,20 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
 
 const AtandoCabosPage = () => {
+  const { currentUser } = useAuth();
   const [currentGame, setCurrentGame] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [pointsFlash, setPointsFlash] = useState(null);
+
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2');
-  
+
   const [shuffledWords, setShuffledWords] = useState([]);
   const [selectedWords, setSelectedWords] = useState([]);
   const [solvedCategories, setSolvedCategories] = useState([]);
   const [mistakesLeft, setMistakesLeft] = useState(4);
   const [isShaking, setIsShaking] = useState(false);
+  const pointsAwardedRef = useRef(false);
 
   const solvedColors = [
     "bg-[#f9df6d] text-slate-900", // Yellow
@@ -33,8 +39,25 @@ const AtandoCabosPage = () => {
       setSolvedCategories([]);
       setMistakesLeft(4);
       setIsShaking(false);
+      pointsAwardedRef.current = false;
     }
   };
+
+  // 🏆 POINTS: 5 per solved category + 1 bonus per unused mistake (max 4), 10-point floor
+  useEffect(() => {
+    if (!currentGame || pointsAwardedRef.current || !currentUser) return;
+    const won = solvedCategories.length === 4;
+    const lost = mistakesLeft === 0 && !won;
+    if (!won && !lost) return;
+
+    pointsAwardedRef.current = true;
+    const bonus = Math.min(mistakesLeft, 4);
+    const points = Math.max(10, solvedCategories.length * 5 + bonus);
+
+    awardPoints(currentUser.uid, points)
+      .then(() => setPointsFlash({ amount: points }))
+      .catch((err) => console.error('Error saving Atando Cabos points:', err));
+  }, [solvedCategories, mistakesLeft, currentGame, currentUser]);
 
   // EFFECT: Fetch Today's Puzzle from Firestore
   useEffect(() => {
@@ -134,6 +157,7 @@ const AtandoCabosPage = () => {
   return (
     <div className="min-h-screen bg-slate-900 font-sans p-4 md:p-8 flex flex-col items-center">
       {/* Background Glow */}
+      <PointsIndicator flash={pointsFlash} />
       <div className="fixed top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-fuchsia-600/10 rounded-full blur-[100px] pointer-events-none"></div>
 
       <div className="w-full max-w-2xl flex justify-between items-center mb-12 relative z-10">

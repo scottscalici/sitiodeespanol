@@ -424,6 +424,43 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
+ {/* ✍️ ORACIONES DE PRÁCTICA CARD */}
+ <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">
+                    <span>✍️</span> Oraciones de Práctica
+                  </h2>
+                </div>
+                <Link to="/admin-secret-portal-oraciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-3 py-1.5 rounded border border-teal-700/50 uppercase tracking-widest">
+                  ⚙️ Editar
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-teal-500/50 text-xs italic font-bold">
+                  Oraciones con espacios en blanco para practicar vocabulario y gramática.
+                </p>
+              </div>
+            </div>
+
+            {/* 📢 ANUNCIOS CARD */}
+            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
+                    <span>📢</span> Anuncios
+                  </h2>
+                </div>
+                <Link to="/admin-secret-portal-master?tipo=anuncios" className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-3 py-1.5 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  ⚙️ Editar
+                </Link>
+              </div>
+              <div className="text-center py-2">
+                <p className="text-indigo-500/50 text-xs italic font-bold">
+                  Administra los anuncios del panel (rango de fechas, cursos, enlaces).
+                </p>
+              </div>
+            </div>
 {/* 📄 LECTURAS HUB CARD */}
 <div className="bg-cyan-950/20 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-cyan-900/50 pb-3 mb-4 flex justify-between items-center">
@@ -486,25 +523,54 @@ const DailyPlanHub = () => {
                 </p>
               </div>
             </div>
+            {/* 🧩 LEARNING PATH & SENTENCE BANK */}
+            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
+                    <span>🧩</span> Dominios (Learning Path)
+                  </h2>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to="/admin-secret-portal-learning-path" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  🧱 Pod Creator
+                </Link>
+                <Link to="/admin-secret-portal-sentences" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  ✍️ Sentence Manager
+                </Link>
+              </div>
+            </div>
+
             {/* Señordle & Arcade */}
             <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">
-                    <span>🎮</span> Señordle
+                    <span>🎮</span> Arcade Diario
                   </h2>
                 </div>
                 <Link to="/admin-daily-plan-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
-                  ⚙️ Programar
+                  ⚙️ Señordle
+                </Link>
+              </div>
+              <div className="flex gap-2 mb-3">
+                <Link to="/admin-daily-plan-atandocabos" className="flex-1 text-center bg-fuchsia-900/40 hover:bg-fuchsia-900/80 text-fuchsia-300 text-[10px] font-bold px-2 py-2 rounded border border-fuchsia-700/50 uppercase tracking-widest">
+                  🧶 Atando Cabos
+                </Link>
+                <Link to="/admin-daily-plan-eslabones" className="flex-1 text-center bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-2 rounded border border-cyan-700/50 uppercase tracking-widest">
+                  🔗 Eslabones
+                </Link>
+                <Link to="/admin-secret-portal-impostor-themes" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  🎭 Impostor
                 </Link>
               </div>
               <div className="text-center py-2">
                 <p className="text-emerald-500/50 text-xs italic font-bold">
-                  Programa las palabras diarias por fecha de calendario.
+                  Programa los juegos diarios por fecha de calendario.
                 </p>
               </div>
             </div>
-
           </div>
         </div>
       </div>

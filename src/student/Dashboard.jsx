@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import Evaluacion from '../components/Evaluacion';
 import Countdown from '../components/Countdown';
-import AITutor from '../components/AITutor';
 import GamesSidebar from '../components/GamesSidebar';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
@@ -18,6 +17,7 @@ import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
 import LecturaCard from '../components/LecturaCard'; 
 import ResourceHub from '../components/ResourceHub';
+import Anuncios from '../components/Anuncios';
 
 const Dashboard = () => {
   const { userData } = useAuth();
@@ -89,7 +89,25 @@ const Dashboard = () => {
     };
     fetchLecturasSequence();
   }, [course, liveDia]);
-
+    // Check for Sentence Sets scheduled for today
+    useEffect(() => {
+      const checkSentenceSets = async () => {
+        if (!course || !liveDia) return;
+        try {
+          const snap = await getDocs(collection(db, 'sentence_sets'));
+          const matches = snap.docs.some((docSnap) =>
+            (docSnap.data().assignments || []).some(
+              (a) => a.course === course && Number(a.dia) === Number(liveDia)
+            )
+          );
+          setHasSentences(matches);
+        } catch (error) {
+          console.error('Error checking sentence sets:', error);
+        }
+      };
+      checkSentenceSets();
+    }, [course, liveDia]);
+  const [hasSentences, setHasSentences] = useState(false);
   // --- CALCULATE MAX DAY SAFELY ---
   const maxAllowedDay = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-CA'); 
@@ -130,19 +148,7 @@ const Dashboard = () => {
     (t) => t.day_assigned <= liveDia && t.day_due >= liveDia
   );
 
-  // --- UTILITY FILTERING ---
-  const activeAnuncios = (data?.anuncios || []).filter(a => {
-    const hasContent = (a.title && a.title !== "Información") || 
-                       (a.titulo && a.titulo !== "Información") || 
-                       (a.mensaje && a.mensaje.trim() !== "") ||
-                       (a.body && a.body.trim() !== "");
-    if (!hasContent) return false;
-
-    const matchCourse = !a.course || a.course === course || (Array.isArray(a.course) && a.course.includes(course));
-    const matchDia = a.dias ? a.dias.includes(liveDia) : (a.dia ? Number(a.dia) === liveDia : true);
-    return matchCourse && matchDia;
-  });
-
+ 
   const activeDestacados = (data?.destacado || []).filter(d => 
     Number(d.dia) === liveDia && (!d.course || d.course === course || (Array.isArray(d.course) && d.course.includes(course)))
   );
@@ -167,98 +173,78 @@ const Dashboard = () => {
           <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
         </div>
             
-        {/* 📢 UTILITY: ANUNCIOS */}
-        {activeAnuncios.length > 0 && (
-          <UtilityCard type="anuncio" data={activeAnuncios} />
-        )}
+        {/* 📢 ANUNCIOS */}
+        <Anuncios anuncios={data?.anuncios} cal={data?.cal} liveDia={liveDia} course={course} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: LESSON CONTENT */}
           <div className="lg:col-span-2 space-y-8">
-            
-            {/* 🎯 DAILY MUSIC MISSION CARD */}
-            {dailySong && (
-              <Link to={`/musica/${dailySong.id}`} className="group relative block overflow-hidden rounded-2xl bg-slate-900 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1">
-                <div className="absolute inset-0 opacity-40">
-                  <img src={dailySong.imagen} alt={dailySong.titulo} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent"></div>
+
+            {/* 🎯 EVALUACIÓN */}
+            <Evaluacion evals={data?.evals?.[course] || []} liveDia={liveDia} course={course} cal={data?.cal} />
+
+            {/* ⏱️ CALENTAMIENTO CARD — WORKOUT-APP STYLE */}
+            <Link
+              to={`/calentamiento/${course}/${liveDia}`}
+              className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+            >
+              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+              <div className="flex items-center gap-4">
+                {/* Flame Badge */}
+                <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                  <span className="text-3xl drop-shadow">🔥</span>
                 </div>
-                <div className="relative p-8 flex flex-col items-start justify-end min-h-[240px]">
-                  <span className="mb-2 rounded-full bg-indigo-500 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">Misión de Música: Día {liveDia}</span>
-                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{dailySong.titulo}</h2>
-                  <p className="text-lg italic text-slate-300">{dailySong.artista}</p>
-                  <div className="mt-4 flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-indigo-400">
-                    <span>🎯 {dailySong.totalPoints} Puntos de Comprensión</span>
-                    <span className="bg-white/10 px-4 py-2 rounded-lg text-white group-hover:bg-indigo-500 transition-colors">Empezar →</span>
+                <div className="min-w-0 flex-1">
+                  <span className="block text-xs font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
+                  <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end">
+                <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                  Iniciar Misión <span>→</span>
+                </span>
+              </div>
+            </Link>
+
+            {/* 💡 CURIOSIDAD */}
+            <Curiosidad curiosidades={activeCuriosidades} />
+
+            {/* 🏗️ ESTRUCTURA */}
+            <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
+
+                        {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
+                        {hasSentences && (
+              <Link
+                to={`/practica/oraciones/${course}/${liveDia}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span className="text-3xl drop-shadow">✍️</span>
                   </div>
+
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-sky-100 mb-1">Día {liveDia}</span>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Oraciones</h3>
+                    <p className="text-sky-50/90 text-sm font-medium mt-1 line-clamp-2">Completa oraciones con las palabras que faltan.</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-sky-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                    Practicar <span>→</span>
+                  </span>
                 </div>
               </Link>
             )}
 
-            <Evaluacion evals={data?.evals?.[course] || []} liveDia={liveDia} course={course} cal={data?.cal} />
+            {/* 🗣️ CONVERSACIÓN (próximamente) */}
 
-            {/* ⏱️ CALENTAMIENTO CARD */}
-            <Link to={`/calentamiento/${course}/${liveDia}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-              <div className="flex flex-col sm:flex-row items-stretch">
-                
-                {/* Left Banner / Icon Area */}
-                <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-orange-500 to-amber-500 relative flex items-center justify-center shrink-0">
-                  <span className="text-5xl drop-shadow-md">🔥</span>
-                  <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-amber-300 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow">
-                    Práctica Diaria
-                  </span>
-                </div>
-
-                {/* Right Content & Action */}
-                <div className="p-5 flex flex-col justify-between flex-1 gap-4">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">Rutina del Día</span>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mt-0.5">Calentamiento</h3>
-                    <p className="text-slate-500 text-xs font-medium mt-1">Accede a la práctica para practicar los verbos programados y repasar el vocabulario para el Día {liveDia}.</p>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <span className="bg-slate-900 group-hover:bg-orange-600 text-white font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-block">
-                      Iniciar Misión →
-                    </span>
-                  </div>
-                </div>
-
-              </div>
-            </Link>
- {/* 💡 CURIOSIDAD */}
- <Curiosidad curiosidades={activeCuriosidades} />
-            {/* 📖 VOCABULARY CARDS */}
-            {activeVocabBundles.map(bundleId => (
-              <Link key={bundleId} to={`/vocabulario/${bundleId}`} className="group relative block overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-                <div className="flex flex-col sm:flex-row items-stretch">
-                  
-                  {/* Left Banner / Icon Area */}
-                  <div className="sm:w-56 h-32 sm:h-auto bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center shrink-0">
-                    <span className="text-5xl drop-shadow-md">🧠</span>
-                    <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-indigo-300 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md shadow">
-                      Vocabulario Activo
-                    </span>
-                  </div>
-
-                  {/* Right Content & Action */}
-                  <div className="p-5 flex flex-col justify-between flex-1 gap-4">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Conjunto Asignado</span>
-                      <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter mt-0.5 font-mono">{bundleId.replace(/_/g, ' ')}</h3>
-                      <p className="text-slate-500 text-xs font-medium mt-1">Domina los términos y estructuras clave de esta unidad.</p>
-                    </div>
-
-                    <div className="flex justify-end">
-                      <span className="bg-slate-900 group-hover:bg-indigo-600 text-white font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-block">
-                        Estudiar →
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-              </Link>
-            ))}
             {/* 📄 LECTURAS (DYNAMIC READING CARDS) */}
             {activeLecturas.map(lecturaId => (
               <LecturaCard 
@@ -270,14 +256,85 @@ const Dashboard = () => {
               />
             ))}
 
+            {/* 🎯 DAILY MUSIC MISSION CARD — SPOTIFY WIDGET STYLE */}
+            {dailySong && (
+              <Link
+                to={`/musica/${dailySong.id}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-800 to-slate-900 p-5 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                {/* Spotify-style icon badge, top right */}
+                <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700">
+                    <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.3 14.4a.6.6 0 01-.83.2c-2.27-1.39-5.13-1.7-8.5-.93a.6.6 0 11-.27-1.17c3.69-.84 6.86-.48 9.4 1.07a.6.6 0 01.2.83zm1.2-2.72a.75.75 0 01-1.03.25c-2.6-1.6-6.56-2.06-9.63-1.13a.75.75 0 11-.44-1.44c3.51-1.07 7.87-.55 10.85 1.29a.75.75 0 01.25 1.03zm.1-2.83C14.9 9.06 9.9 8.88 6.98 9.77a.9.9 0 11-.53-1.72c3.35-1.02 8.9-.8 12.4 1.28a.9.9 0 11-.92 1.55z"/>
+                  </svg>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {/* Album Art */}
+                  <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden shadow-lg bg-purple-950">
+                    {dailySong.imagen && (
+                      <img src={dailySong.imagen} alt={dailySong.titulo} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+
+                             {/* Track Info */}
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-purple-300 mb-1">Misión de Música: Día {liveDia}</span>
+                    <h2 className="text-xl font-black text-white truncate">{dailySong.titulo}</h2>
+                    <p className="text-base text-purple-200 truncate">{dailySong.artista}</p>
+                  </div>
+                </div>
+
+                {/* Fake "Now Playing" Progress Bar */}
+                <div className="mt-5 flex items-center gap-3">
+                  <div className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                    <div className="h-full w-1/4 rounded-full bg-white/70 group-hover:bg-white transition-colors"></div>
+                  </div>
+                  <span className="text-xs font-bold text-purple-300 uppercase tracking-widest">Escuchar</span>
+                  <div className="w-9 h-9 shrink-0 rounded-full bg-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700 ml-0.5">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+              </Link>
+            )}
+            {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE */}
+            {activeVocabBundles.map(bundleId => (
+              <Link
+                key={bundleId}
+                to={`/vocabulario/${bundleId}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-center gap-5">
+                  {/* Layered Flashcard Deck Visual */}
+                  <div className="relative w-16 h-16 shrink-0">
+                    <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
+                    <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
+                    <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner">
+                      <span className="text-2xl drop-shadow">🧠</span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Conjunto Asignado</span>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
+                    <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                  </span>
+                </div>
+              </Link>
+            ))}
+
             <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
-            <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
-            
-           
-            
-           
- {/* 🔥 DESTACADO */}
- <Destacado destacado={activeDestacados} />
+
+            {/* 🔥 DESTACADO */}
+            <Destacado destacado={activeDestacados} />
           </div>
 
           {/* RIGHT: SIDEBAR */}
@@ -288,7 +345,7 @@ const Dashboard = () => {
               <ResourceHub course={course} />
               
               <Countdown course={course} />
-              
+
               <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                 <h3 className="font-bold text-[11px] mb-4 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
                   <span>📝</span> Tareas de Referencia
@@ -306,7 +363,7 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
-              <AITutor temas={data?.temas} />
+
             </div>
           </div>
         </div>

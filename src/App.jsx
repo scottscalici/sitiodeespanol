@@ -12,7 +12,6 @@ import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
-import MusicPage from './student/MusicPage';
 import RecreoHub from './student/RecreoHub';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
@@ -23,6 +22,10 @@ import VocabPage from './student/VocabPage';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
+import ConectoresEngine from './student/ConectoresEngine';
+import ImpostorLobbyPage from './student/ImpostorLobbyPage';
+import ImpostorRoomPage from './student/ImpostorRoomPage';
+import SampleSentencesPage from './student/SampleSentencesPage';
 
 
 // ⚙️ GLOBAL UI COMPONENTS
@@ -37,9 +40,12 @@ import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
 import TareasSequencer from './admin/MasterDashboard/components/TareasSequencer';
 import FormSenordle from './admin/MasterDashboard/components/FormSenordle';
+import FormAtandoCabos from './admin/MasterDashboard/components/FormAtandoCabos';
+import FormEslabones from './admin/MasterDashboard/components/FormEslabones';
 import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorPage'; // 👈 NEW ADMIN EDITOR
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
-
+import ConectoresManager from './admin/managers/ConectoresManager';
+import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
@@ -47,20 +53,20 @@ import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
 import PrintMusica from './admin/managers/PrintMusica';
 import VideosManager from './admin/managers/VideosManager';
+import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
 import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
-
+import SentenceManager from './admin/managers/SentenceManager';
 // 📦 LEGACY ADMIN UPLOADERS
 import AtandoCabosUploader from './admin/uploaders/AtandoCabosUploader';
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
 import DestacadoUploader from './admin/uploaders/DestacadoUploader';
 import EslabonesUploader from './admin/uploaders/EslabonesUploader';
-import MusicUploader from './admin/uploaders/MusicUploader';
 import SenordleUploader from './admin/uploaders/SenordleUploader';
 import TieredCulturaUploader from './admin/uploaders/TieredCulturaUploader';
 import VerbUploader from './admin/uploaders/VerbUploader';
@@ -137,8 +143,9 @@ function App() {
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
+            <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
+            <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
-            <Route path="/music-info/:id" element={<MusicPage />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
@@ -146,18 +153,12 @@ function App() {
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
             <Route path="/fotos-azar" element={<FotosAzarPage />} />
-            
+            <Route path="/practica/conectores" element={<ConectoresEngine />} /> 
+            <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
+
 
             {/* 🔴 SECURE ADMIN ROUTES */}
-            <Route
-              path="/admin-secret-portal"
-              element={
-                <AdminRoute user={user} role={role}>
-                  <MusicUploader />
-                </AdminRoute>
-              }
-            />
-            <Route
+                        <Route
               path="/admin-secret-portal-vocab"
               element={
                 <AdminRoute user={user} role={role}>
@@ -254,6 +255,23 @@ function App() {
     </AdminRoute>
   }
 />
+<Route
+              path="/admin-secret-portal-oraciones"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SampleSentencesManager />
+                </AdminRoute>
+              }
+            />
+<Route
+  path="/admin-secret-portal-conectores"
+  element={
+    <AdminRoute user={user} role={role}>
+      <ConectoresManager />
+    </AdminRoute>
+  }
+/>
+
             <Route
               path="/print-musica/:id"
               element={
@@ -283,6 +301,30 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SenordleUploader />
+                </AdminRoute>
+              }
+            />
+                        <Route
+              path="/admin-daily-plan-atandocabos"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <FormAtandoCabos />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-eslabones"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <FormEslabones />
+                </AdminRoute>
+              }
+            />
+                        <Route
+              path="/admin-secret-portal-impostor-themes"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ImpostorThemesManager />
                 </AdminRoute>
               }
             />
@@ -342,6 +384,14 @@ function App() {
                 </AdminRoute>
               }
             />
+            <Route
+  path="/admin-secret-portal-sentences"
+  element={
+    <AdminRoute user={user} role={role}>
+      <SentenceManager />
+    </AdminRoute>
+  }
+/>
             <Route
               path="/admin-secret-portal-grades"
               element={

@@ -3,7 +3,7 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const CONFIG = {
-  ANUNCIOS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/anuncios.json',
+
   DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
   APUNTES: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/apuntes.json',
   EXTRAS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/extras_diarios.json',
@@ -216,7 +216,7 @@ export const useGymData = (userCourse = 's2') => {
           fetchCalendar(),
           safeFetchText(CONFIG.DICTIONARY),
 
-          safeFetchJSON(CONFIG.ANUNCIOS),
+          fetchFirestoreArray('anuncios'),
           safeFetchJSON(CONFIG.APUNTES),
           safeFetchJSON(CONFIG.EXTRAS),
           safeFetchJSON(CONFIG.PRACTICAS),

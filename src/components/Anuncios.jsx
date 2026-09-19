@@ -19,46 +19,63 @@ const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
     <div className="space-y-4">
       {activeAnuncios.map((note, idx) => {
         // Default styling (Blue / Anuncio)
-        let containerClass = "bg-white border-indigo-500 border-l-[6px]";
-        let titleColor = "text-indigo-600";
+        let gradientClass = "from-indigo-600 via-blue-700 to-slate-900";
+        let pillTextClass = "text-indigo-200";
+        let ctaHoverTextClass = "group-hover:text-indigo-700";
         let icon = "📢";
         let titleText = "Anuncio";
 
         // Override styling if it's a warning or trip
         if (note.type === 'warning') {
-          containerClass = "bg-red-50 border-red-500 border-l-[6px]";
-          titleColor = "text-red-700";
+          gradientClass = "from-red-600 via-rose-700 to-slate-900";
+          pillTextClass = "text-red-200";
+          ctaHoverTextClass = "group-hover:text-red-700";
           icon = "⚠️";
           titleText = "Importante";
         } else if (note.type === 'trip') {
-          containerClass = "bg-emerald-50 border-emerald-500 border-l-[6px]";
-          titleColor = "text-emerald-700";
+          gradientClass = "from-emerald-600 via-teal-700 to-slate-900";
+          pillTextClass = "text-emerald-200";
+          ctaHoverTextClass = "group-hover:text-emerald-700";
           icon = "✈️";
           titleText = "Viaje";
         }
 
         return (
-          <div key={idx} className={`${containerClass} p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-start gap-4 transition-transform hover:scale-[1.01]`}>
-            <div className="flex-shrink-0">
+          <div key={idx} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} shadow-xl flex items-stretch`}>
+            <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            {/* Image Column — stretches to the card's full height */}
+            <div className="w-28 sm:w-40 shrink-0 bg-white/10">
               {note.thumbnail ? (
-                <img src={note.thumbnail} alt="thumbnail" className="w-32 h-32 object-cover rounded-lg border border-slate-200 shadow-sm" />
+                <img src={note.thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
               ) : (
-                <div className="text-3xl">{icon}</div>
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-4xl drop-shadow">{icon}</span>
+                </div>
               )}
             </div>
-            
-            <div className="flex-grow">
-              <h4 className={`font-bold text-[10px] uppercase tracking-widest mb-1 opacity-80 ${titleColor}`}>
-                {titleText}
-              </h4>
-              <p className="text-slate-800 font-bold text-sm leading-snug mb-2">
-                {note.text}
-              </p>
-              
+
+            <div className="min-w-0 flex-1 p-6 flex flex-col justify-between gap-4">
+              <div>
+                <span className={`block text-xs font-black uppercase tracking-widest mb-1 ${pillTextClass}`}>
+                  {titleText}
+                </span>
+                <p className="text-white font-bold text-base leading-snug">
+                  {note.text}
+                </p>
+              </div>
+
               {note.link && (
-                <a href={note.link} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-white/50 border hover:bg-white px-3 py-1.5 rounded transition-colors ${titleColor}`}>
-                  <span>Ver Detalles</span> ↗
-                </a>
+                <div className="flex justify-end">
+                  <a
+                    href={note.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`bg-white/15 group-hover:bg-white text-white ${ctaHoverTextClass} font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2`}
+                  >
+                    Ver Detalles <span>↗</span>
+                  </a>
+                </div>
               )}
             </div>
           </div>

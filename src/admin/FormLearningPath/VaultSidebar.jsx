@@ -22,6 +22,12 @@ export default function VaultSidebar({
   setSelectedVerbFilter,
   availableVerbTenses,
   handleCreateGrammar,
+  selectedGrammarChapter,
+  setSelectedGrammarChapter,
+  selectedGrammarTag,
+  setSelectedGrammarTag,
+  availableGrammarChapters,
+  availableGrammarTags,
 }) {
   const [newGrammarText, setNewGrammarText] = useState('');
   const [newGrammarTopic, setNewGrammarTopic] = useState('');
@@ -148,13 +154,32 @@ export default function VaultSidebar({
             </div>
           </div>
         ) : (
-          <div className="mt-2">
+          <div className="mt-2 space-y-2">
             <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
-              Grammar Builder
+              Sentence Bank Filters
             </p>
-            <p className="text-xs text-slate-300">
-              Create new target sentences directly for this path.
-            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={selectedGrammarChapter}
+                onChange={(e) => setSelectedGrammarChapter(e.target.value)}
+                className="w-full p-1.5 rounded bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+              >
+                <option value="all">Todos los Capítulos</option>
+                {availableGrammarChapters.map((c) => (
+                  <option key={c} value={c}>Cap. {c}</option>
+                ))}
+              </select>
+              <select
+                value={selectedGrammarTag}
+                onChange={(e) => setSelectedGrammarTag(e.target.value)}
+                className="w-full p-1.5 rounded bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+              >
+                <option value="all">Todas las Etiquetas</option>
+                {availableGrammarTags.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
       </div>

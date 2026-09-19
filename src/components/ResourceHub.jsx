@@ -42,21 +42,25 @@ export default function ResourceHub({ course = 's2' }) {
   const courseDisplayName = currentCourse === 's4' ? 'Español 4 / IB' : 'Español II';
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all">
+    <div className="rounded-2xl shadow-sm overflow-hidden transition-all bg-white">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+        className="group relative w-full p-5 flex items-center justify-between overflow-hidden bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 hover:brightness-110 transition-all cursor-pointer text-left shadow-xl"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🧰</span>
+        <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="relative flex items-center gap-4">
+          <div className="w-11 h-11 shrink-0 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner">
+            🧰
+          </div>
           <div>
-            <h3 className="font-black text-xs text-slate-700 uppercase tracking-widest">
+            <h3 className="font-black text-sm text-white uppercase tracking-widest">
               Panel de Recursos ({courseDisplayName})
             </h3>
-            <p className="text-[10px] text-slate-400 font-medium">Trip details, support links & course materials</p>
+            <p className="text-xs text-violet-200 font-medium">Trip details, support links & course materials</p>
           </div>
         </div>
-        <span className={`transform transition-transform duration-300 text-slate-400 font-bold ${isOpen ? 'rotate-180' : ''}`}>
+        <span className={`relative transform transition-transform duration-300 text-white font-bold ${isOpen ? 'rotate-180' : ''}`}>
           ▼
         </span>
       </button>
@@ -74,14 +78,14 @@ export default function ResourceHub({ course = 's2' }) {
                 const isExternal = link.url && link.url.startsWith('http');
 
                 return (
-                  <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col sm:flex-row items-stretch group hover:shadow-md transition-all">
-                    
-                    {/* Left Banner Image */}
-                    <div className="sm:w-56 h-32 sm:h-auto bg-slate-100 overflow-hidden relative border-b sm:border-b-0 sm:border-r border-slate-100 flex items-center justify-center shrink-0">
+                  <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col group hover:shadow-md transition-all">
+
+                    {/* Banner Image */}
+                    <div className="w-full h-32 bg-slate-100 overflow-hidden relative border-b border-slate-100 flex items-center justify-center shrink-0">
                       {imgUrl ? (
-                        <img 
-                          src={imgUrl} 
-                          alt={link.title} 
+                        <img
+                          src={imgUrl}
+                          alt={link.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           onError={(e) => {
                             e.target.style.display = 'none';
@@ -93,24 +97,22 @@ export default function ResourceHub({ course = 's2' }) {
                       )}
                     </div>
 
-                    {/* Right Content (Strictly renders link.title) */}
-                    <div className="p-4 sm:p-5 flex flex-col justify-between flex-1 gap-4">
-                      
-                      <h4 className="font-black text-slate-800 text-lg leading-snug">
+                    {/* Content (Strictly renders link.title) */}
+                    <div className="p-4 flex flex-col gap-3">
+
+                      <h4 className="font-black text-slate-800 text-sm leading-snug">
                         {link.title || 'Sin título'}
                       </h4>
 
-                      <div className="flex justify-end">
-                        <a 
-                          href={link.url || '#'}
-                          target={isExternal ? "_blank" : "_self"}
-                          rel={isExternal ? "noopener noreferrer" : ""}
-                          className="bg-slate-900 hover:bg-cyan-600 text-white font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-block"
-                        >
-                          {isExternal ? 'Abrir Enlace ↗' : 'Ver Detalles →'}
-                        </a>
-                      </div>
-                      
+                      <a
+                        href={link.url || '#'}
+                        target={isExternal ? "_blank" : "_self"}
+                        rel={isExternal ? "noopener noreferrer" : ""}
+                        className="bg-slate-900 hover:bg-cyan-600 text-white font-black text-xs px-4 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm w-full"
+                      >
+                        {isExternal ? 'Abrir Enlace ↗' : 'Ver Detalles →'}
+                      </a>
+
                     </div>
 
                   </div>

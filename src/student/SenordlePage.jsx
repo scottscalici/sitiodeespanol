@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is imported
-import { doc, getDoc } from 'firebase/firestore'; 
+import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import Senordle from '../components/Senordle';
+import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
+const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
 
 const SenordlePage = () => {
+  const { currentUser } = useAuth();
   const [targetWord, setTargetWord] = useState("LIBRO");
   const [validWords, setValidWords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +17,7 @@ const SenordlePage = () => {
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2'); 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
-  
+  const [pointsFlash, setPointsFlash] = useState(null);                
 // URL for the dictionaries (Base Spanish + Custom Class Vocab)
 const dictUrl1 = "https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle/diccionario.json";
 // Add your second dictionary URL here:
@@ -64,6 +69,17 @@ useEffect(() => {
     localStorage.setItem('preferredCourse', course);
   }, [course]);
 
+  const handleGameEnd = async (tries, won) => {
+    if (!currentUser) return;
+    const points = won ? (SENORDLE_POINTS_BY_TRY[tries - 1] ?? 10) : 10;
+    try {
+      await awardPoints(currentUser.uid, points);
+      setPointsFlash({ amount: points });
+    } catch (error) {
+      console.error('Error saving Señordle points:', error);
+    }
+  };
+
   const getArchiveDates = () => {
     const dates = [];
     for (let i = 0; i < 15; i++) {
@@ -84,8 +100,9 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-slate-900 py-8 px-4 font-sans">
+      <PointsIndicator flash={pointsFlash} />
       <div className="max-w-2xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-12">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-12">
           <Link to="/recreo" className="text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-full font-bold transition-all text-sm flex items-center gap-2">
             ← Arcade
           </Link>
@@ -128,11 +145,12 @@ useEffect(() => {
             {selectedDate === new Date().toLocaleDateString('en-CA') ? "Desafío Diario" : "Archivo Histórico"}
           </p>
           
-          <Senordle 
-            key={`${selectedDate}-${course}`} 
-            gameId={`${course}-${selectedDate}`} 
-            targetWord={targetWord} 
-            validWords={validWords} 
+          <Senordle
+            key={`${selectedDate}-${course}`}
+            gameId={`${course}-${selectedDate}`}
+            targetWord={targetWord}
+            validWords={validWords}
+            onGameEnd={handleGameEnd}
           />
         </div>
       </div>

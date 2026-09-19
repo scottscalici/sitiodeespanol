@@ -5,7 +5,7 @@ const Countdown = ({ course }) => {
   if (course !== 's4') return null;
 
   const [timeLeft, setTimeLeft] = useState({ days: '--', hrs: '--' });
-  const targetDate = new Date("2026-05-13T12:05:00");
+  const targetDate = new Date("2027-03-08T07:20:00");
 
   useEffect(() => {
     const updateTimer = () => {
@@ -23,15 +23,25 @@ const Countdown = ({ course }) => {
   }, []);
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border-t-8 border-slate-200 text-center">
-      <h3 className="font-bold text-lg mb-2 text-slate-800 uppercase tracking-wide flex justify-center items-center gap-2">
-        <span>⏳</span> Examen IB
-      </h3>
-      <div className="flex justify-center gap-6 text-slate-600 my-4">
-        <div><span className="text-4xl font-black block text-indigo-600">{timeLeft.days}</span><span className="text-xs font-bold uppercase tracking-widest text-slate-400">Días</span></div>
-        <div><span className="text-4xl font-black block text-indigo-600">{timeLeft.hrs}</span><span className="text-xs font-bold uppercase tracking-widest text-slate-400">Hrs</span></div>
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-700 to-slate-900 p-6 shadow-xl text-center">
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <span className="inline-flex items-center gap-1.5 bg-white/10 text-indigo-200 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-5">
+        <span>⏳</span> Evaluación interna
+      </span>
+
+      <div className="flex justify-center gap-3">
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-3 min-w-[76px] shadow-inner">
+          <span className="text-4xl font-black block text-white tabular-nums">{timeLeft.days}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Días</span>
+        </div>
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl px-5 py-3 min-w-[76px] shadow-inner">
+          <span className="text-4xl font-black block text-white tabular-nums">{timeLeft.hrs}</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Hrs</span>
+        </div>
       </div>
-      <p className="text-[10px] uppercase font-bold text-slate-400">13 DE MAYO</p>
+
+      <p className="text-[10px] uppercase font-bold text-indigo-300 mt-4 tracking-widest">13 de Mayo</p>
     </div>
   );
 };

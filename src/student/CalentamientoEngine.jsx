@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom'; // 👈 Added this missing import
+import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   collection,
   doc,
@@ -11,9 +12,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
+import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 
 export default function CalentamientoEngine({ onClose }) {
-  const { courseId, targetDia } = useParams(); // 👈 Grabs course and day from the URL
+  const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
   const navigate = useNavigate();
   const [warmupData, setWarmupData] = useState(null);
@@ -33,7 +35,7 @@ export default function CalentamientoEngine({ onClose }) {
   const [checkedOnce, setCheckedOnce] = useState({}); 
   const [firstAttemptErrors, setFirstAttemptErrors] = useState([]);
 
-  // Vocab Station States (New Flow)
+  // Vocab Station States
   const [vocabPhase, setVocabPhase] = useState('preview'); // 'preview', 'match', 'done'
   const [shuffledEngAnswers, setShuffledEngAnswers] = useState([]);
   const [selectedSpanishCard, setSelectedSpanishCard] = useState(null);
@@ -149,6 +151,9 @@ export default function CalentamientoEngine({ onClose }) {
   const vocabPages = Math.ceil(bakedVocab.length / 10);
   const totalModules = verbPages + vocabPages + 1;
 
+  // --- Check if the student has already completed this warmup before ---
+  const hasCompletedBefore = userData?.progress?.warmups?.[warmupData.docId]?.completed;
+
   // Handle Verb Checking (WITH DIAGNOSTIC ERROR TRACKING)
   const handleCheckVerbs = (pageIndex) => {
     const slice = bakedVerbs.slice((pageIndex - 1) * 5, pageIndex * 5);
@@ -237,105 +242,105 @@ export default function CalentamientoEngine({ onClose }) {
     }
   };
 
- // Final Grade Calculation & Point Awarding
- const handleFinishSession = async () => {
-  setIsTimerRunning(false);
+  // Final Grade Calculation & Point Awarding
+  const handleFinishSession = async () => {
+    setIsTimerRunning(false);
 
-  const correctVerbs = Object.values(verbResults).filter(
-    (res) => res === 'correct'
-  ).length;
-  const verbAccuracy =
-    bakedVerbs.length > 0 ? correctVerbs / bakedVerbs.length : 1;
+    const correctVerbs = Object.values(verbResults).filter(
+      (res) => res === 'correct'
+    ).length;
+    const verbAccuracy =
+      bakedVerbs.length > 0 ? correctVerbs / bakedVerbs.length : 1;
 
-  const verbGradePoints = verbAccuracy * 4;
-  const vocabGradePoints = bakedVocab.length > 0 ? 1 : 0;
-  const totalGrade = verbGradePoints + vocabGradePoints;
-  const percentageGrade = (totalGrade / 5) * 100;
-  const pointsEarned = 20;
+    const verbGradePoints = verbAccuracy * 4;
+    const vocabGradePoints = bakedVocab.length > 0 ? 1 : 0;
+    const totalGrade = verbGradePoints + vocabGradePoints;
+    const percentageGrade = (totalGrade / 5) * 100;
+    const pointsEarned = 20;
 
-  if (userData && userData.uid) {
-    try {
-      const userRef = doc(db, 'users', userData.uid);
-      // We pull the ABSOLUTE FRESHEST data directly from the database
-      const snap = await getDoc(userRef);
+    if (userData && userData.uid) {
+      try {
+        const userRef = doc(db, 'users', userData.uid);
+        // We pull the ABSOLUTE FRESHEST data directly from the database
+        const snap = await getDoc(userRef);
 
-      let newTotal = pointsEarned;
-      let newMonthly = pointsEarned;
-      let newWeekly = pointsEarned;
-      let newDaily = pointsEarned;
-      let existingGrade = -1;
+        const weekKey = getWeekKey();
+        const monthKey = getMonthKey();
 
-      if (snap.exists()) {
-        const data = snap.data();
-        newTotal += data.total_points || data.current_path_points || 0;
-        newMonthly += data.monthly_points || 0;
-        newWeekly += data.weekly_points || 0;
-        newDaily += data.daily_points || 0;
+        let newTotal = pointsEarned;
+        let newMonthly = pointsEarned;
+        let newWeekly = pointsEarned;
+        let newDaily = pointsEarned;
+        let existingGrade = -1;
 
-        // Safely grab the previous best grade, if it exists
-        if (data.progress?.warmups?.[warmupData.docId]) {
-           existingGrade = data.progress.warmups[warmupData.docId].grade ?? -1;
+        if (snap.exists()) {
+          const data = snap.data();
+          newTotal += data.total_points || data.current_path_points || 0;
+          if (data.monthKey === monthKey) newMonthly += data.monthly_points || 0;
+          if (data.weekKey === weekKey) newWeekly += data.weekly_points || 0;
+          newDaily += data.daily_points || 0;
+
+          // Safely grab the previous best grade, if it exists
+          if (data.progress?.warmups?.[warmupData.docId]) {
+             existingGrade = data.progress.warmups[warmupData.docId].grade ?? -1;
+          }
         }
-      }
 
-      const isNewHighScore = percentageGrade > existingGrade;
+        const isNewHighScore = percentageGrade > existingGrade;
 
-      // 🔍 DIAGNOSTIC LOGS: Check your browser console when you hit Submit!
-      console.log("🏁 --- CALENTAMIENTO SAVE DIAGNOSTICS ---");
-      console.log("Warmup ID:", warmupData.docId);
-      console.log("Previous High Score:", existingGrade);
-      console.log("Just Scored:", percentageGrade);
-      console.log("Is New High Score?:", isNewHighScore);
+        console.log("🏁 --- CALENTAMIENTO SAVE DIAGNOSTICS ---");
+        console.log("Warmup ID:", warmupData.docId);
+        console.log("Previous High Score:", existingGrade);
+        console.log("Just Scored:", percentageGrade);
+        console.log("Is New High Score?:", isNewHighScore);
 
-      // 1. ALWAYS award the XP Points for playing (The Game Payload)
-      const updatePayload = {
-        total_points: newTotal,
-        current_path_points: newTotal,
-        monthly_points: newMonthly,
-        weekly_points: newWeekly,
-        daily_points: newDaily,
-      };
-
-      // 2. ONLY attach the progress object if we beat the high score
-      if (isNewHighScore) {
-        console.log("📈 Saving new academic high score!");
-        // Native Deep Merge: We don't spread userData.progress anymore.
-        // Firestore 'merge: true' will automatically nest this without touching other warmups!
-        updatePayload.progress = {
-          warmups: {
-            [warmupData.docId]: {
-              completed: true,
-              grade: percentageGrade,
-              rawScore: `${totalGrade.toFixed(1)}/5`,
-              errors: firstAttemptErrors, 
-              timestamp: new Date().toISOString(),
-            },
-          },
+        // 1. ALWAYS award the XP Points for playing
+        const updatePayload = {
+          total_points: newTotal,
+          current_path_points: newTotal,
+          monthly_points: newMonthly,
+          weekly_points: newWeekly,
+          daily_points: newDaily,
+          weekKey,
+          monthKey,
         };
-      } else {
-         console.log("🛡️ Score was lower. Keeping previous high score. Only saving XP.");
+
+        // 2. ONLY attach the progress object if we beat the high score
+        if (isNewHighScore) {
+          console.log("📈 Saving new academic high score!");
+          updatePayload.progress = {
+            warmups: {
+              [warmupData.docId]: {
+                completed: true,
+                grade: percentageGrade,
+                rawScore: `${totalGrade.toFixed(1)}/5`,
+                errors: firstAttemptErrors, 
+                timestamp: new Date().toISOString(),
+              },
+            },
+          };
+        } else {
+           console.log("🛡️ Score was lower. Keeping previous high score. Only saving XP.");
+        }
+
+        await setDoc(userRef, updatePayload, { merge: true });
+
+        alert(
+          `¡Completado! Obtuviste ${totalGrade.toFixed(
+            1
+          )}/5 puntos académicos. (+${pointsEarned} puntos de juego).`
+        );
+      } catch (err) {
+        console.error('Error saving calentamiento points:', err);
       }
-
-      // Save to Firestore using merge:true
-      await setDoc(userRef, updatePayload, { merge: true });
-
-      alert(
-        `¡Completado! Obtuviste ${totalGrade.toFixed(
-          1
-        )}/5 puntos académicos. (+${pointsEarned} puntos de juego).`
-      );
-    } catch (err) {
-      console.error('Error saving calentamiento points:', err);
     }
-  }
 
-  // Cleaned up routing logic
-  if (onClose) {
-    onClose(); 
-  } else {
-    navigate('/'); 
-  }
-};
+    if (onClose) {
+      onClose(); 
+    } else {
+      navigate('/'); 
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">
@@ -488,12 +493,25 @@ export default function CalentamientoEngine({ onClose }) {
                         </div>
                       ))}
                     </div>
-                    <button
-                      onClick={() => handleStartVocabMatch(slice)}
-                      className="px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-xl uppercase tracking-widest shadow-md transition-all"
-                    >
-                      Emparejar Ahora
-                    </button>
+                    
+                    <div className="flex flex-col items-center gap-4">
+                      <button
+                        onClick={() => handleStartVocabMatch(slice)}
+                        className="px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-xl uppercase tracking-widest shadow-md transition-all"
+                      >
+                        Emparejar Ahora
+                      </button>
+
+                      {/* 🚀 NEW: SKIP BUTTON IF ALREADY COMPLETED */}
+                      {hasCompletedBefore && (
+                        <button
+                          onClick={() => setCurrentModule(totalModules)}
+                          className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl uppercase tracking-widest text-xs transition-all border border-slate-600"
+                        >
+                          Saltar Vocabulario (Ya Completado) ⏭️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -30,6 +30,11 @@ export default function FormLearningPath() {
   const [selectedVerbFilter, setSelectedVerbFilter] = useState('ALL');
   const [availableVerbTenses, setAvailableVerbTenses] = useState([]);
   const [vaultGrammar, setVaultGrammar] = useState([]);
+  const [allGrammarList, setAllGrammarList] = useState([]);
+  const [selectedGrammarChapter, setSelectedGrammarChapter] = useState('all');
+  const [selectedGrammarTag, setSelectedGrammarTag] = useState('all');
+  const [availableGrammarChapters, setAvailableGrammarChapters] = useState([]);
+  const [availableGrammarTags, setAvailableGrammarTags] = useState([]);
 
   // --- POD BUILDER STATE ---
   const [pods, setPods] = useState([
@@ -320,17 +325,35 @@ export default function FormLearningPath() {
       combined.forEach(item => item.tenses?.forEach(t => tensesSet.add(t)));
       setAvailableVerbTenses(Array.from(tensesSet));
 
-      const grammarSnap = await getDocs(collection(db, 'grammar_sentences'));
+      const grammarSnap = await getDocs(collection(db, 'sentence_bank'));
       const grammarList = [];
       grammarSnap.forEach(doc => grammarList.push({ id: doc.id, ...doc.data() }));
-      setVaultGrammar(grammarList.length > 0 ? grammarList.map(g => ({ id: g.id, label: g.spanish || g.sentence, tags: g.topic || 'Gramática', fullData: g })) : []);
+      const mappedGrammar = grammarList.map(g => ({
+        id: g.id,
+        label: g.spanish || g.sentence,
+        tags: (g.grammarTags && g.grammarTags[0]) || 'Gramática',
+        chapterId: g.chapterId || '',
+        grammarTags: g.grammarTags || [],
+        fullData: g
+      }));
+      setAllGrammarList(mappedGrammar);
+      setVaultGrammar(mappedGrammar);
+      setAvailableGrammarChapters([...new Set(mappedGrammar.map(g => g.chapterId).filter(Boolean))].sort());
+      setAvailableGrammarTags([...new Set(mappedGrammar.flatMap(g => g.grammarTags))].sort());
     } catch (err) {}
   };
 
   useEffect(() => { fetchExistingPaths(); fetchVerbsAndGrammar(); }, []);
   useEffect(() => { fetchAllChapters(); }, [selectedBook]);
   useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook]);
-  
+
+  useEffect(() => {
+    let filtered = allGrammarList;
+    if (selectedGrammarChapter !== 'all') filtered = filtered.filter(g => g.chapterId === selectedGrammarChapter);
+    if (selectedGrammarTag !== 'all') filtered = filtered.filter(g => g.grammarTags.includes(selectedGrammarTag));
+    setVaultGrammar(filtered);
+  }, [selectedGrammarChapter, selectedGrammarTag, allGrammarList]);
+
   useEffect(() => {
     if (selectedVerbFilter === 'ALL') setVaultVerbs(allVerbsList);
     else setVaultVerbs(allVerbsList.filter(item => item.tenses?.includes(selectedVerbFilter)));
@@ -356,10 +379,23 @@ export default function FormLearningPath() {
 
   const handleCreateGrammar = async (sentence, topic) => {
     try {
-      const payload = { sentence: sentence, spanish: sentence, topic: topic || 'General', created_at: new Date().toISOString() };
-      const docRef = await addDoc(collection(db, 'grammar_sentences'), payload);
-      const newItem = { id: docRef.id, label: sentence, tags: topic || 'General', fullData: payload };
-      setVaultGrammar([newItem, ...vaultGrammar]);
+      const grammarTags = topic ? [topic] : [];
+      const payload = {
+        spanish: sentence,
+        english: '',
+        chapterId: selectedChapter || '',
+        grammarTags,
+        distractorMode: 'none',
+        pairTag: '',
+        poolTag: '',
+        targetLemma: '',
+        targetTense: '',
+        targetSubject: '',
+        createdAt: new Date().toISOString(),
+      };
+      const docRef = await addDoc(collection(db, 'sentence_bank'), payload);
+      const newItem = { id: docRef.id, label: sentence, tags: topic || 'Gramática', chapterId: payload.chapterId, grammarTags, fullData: payload };
+      setAllGrammarList([newItem, ...allGrammarList]);
     } catch (err) {
       console.error("Error creating grammar sentence:", err);
       alert("Failed to create sentence.");
@@ -375,7 +411,10 @@ export default function FormLearningPath() {
         availableChapters={availableChapters} vaultVocab={vaultVocab} vaultVerbs={vaultVerbs} vaultGrammar={vaultGrammar}
         isLoadingVault={isLoadingVault} onAssignItem={handleAssignItem} pods={pods}
         selectedVerbFilter={selectedVerbFilter} setSelectedVerbFilter={setSelectedVerbFilter} availableVerbTenses={availableVerbTenses}
-        handleCreateGrammar={handleCreateGrammar} 
+        handleCreateGrammar={handleCreateGrammar}
+        selectedGrammarChapter={selectedGrammarChapter} setSelectedGrammarChapter={setSelectedGrammarChapter}
+        selectedGrammarTag={selectedGrammarTag} setSelectedGrammarTag={setSelectedGrammarTag}
+        availableGrammarChapters={availableGrammarChapters} availableGrammarTags={availableGrammarTags}
       />
 
       <PathBuilder 

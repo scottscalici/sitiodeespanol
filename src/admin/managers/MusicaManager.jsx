@@ -76,7 +76,7 @@ const MusicaManager = () => {
                            .filter(d => !isNaN(d));
           return { ...item, [field]: arr };
         }
-        if (field === 'tags') {
+        if (field === 'course') {
           const arr = value.split(',').map(t => t.trim()).filter(t => t !== '');
           return { ...item, [field]: arr };
         }
@@ -112,8 +112,13 @@ const MusicaManager = () => {
       const newDoc = await addDoc(collection(db, 'musica'), {
         titulo: 'Nueva Canción',
         artista: '',
+        course: [],
         dias: [],
-        tags: [],
+        imagen: '',
+        youtube_url: '',
+        spotify_url: '',
+        letras: '',
+        preguntas: [],
         createdAt: new Date().toISOString()
       });
       navigate(`/admin-musica-editor/${newDoc.id}`);
@@ -129,7 +134,7 @@ const MusicaManager = () => {
 
   const displayedItems = items.filter(item => {
     if (activeFilter === 'all') return true;
-    return item.tags && item.tags.includes(activeFilter);
+    return item.course && item.course.includes(activeFilter);
   });
 
   return (
@@ -188,7 +193,7 @@ const MusicaManager = () => {
           <div className="col-span-2 text-center">Días / Fechas</div>
           <div className="col-span-3">Título de la Canción</div>
           <div className="col-span-3">Artista</div>
-          <div className="col-span-2">Tags (s2, s4, cultura)</div>
+          <div className="col-span-2">Curso (s2, s4)</div>
           <div className="col-span-2 text-center">Acciones</div>
         </div>
 
@@ -253,10 +258,10 @@ const MusicaManager = () => {
                 </div>
 
                 <div className="col-span-2">
-                  <input 
-                    type="text" 
-                    value={item.tags?.join(', ') || ''}
-                    onChange={(e) => handleInputChange(item.id, 'tags', e.target.value)}
+                  <input
+                    type="text"
+                    value={item.course?.join(', ') || ''}
+                    onChange={(e) => handleInputChange(item.id, 'course', e.target.value)}
                     className="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:ring-1 focus:ring-sky-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-600"
                     placeholder="s2, s4"
                   />

@@ -2,21 +2,28 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+import PointsIndicator from '../components/PointsIndicator';
+import { awardPoints } from '../utils/pointsHelper';
 
 const EslabonesFinales = () => {
+  const { currentUser } = useAuth();
   const [currentGame, setCurrentGame] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [pointsFlash, setPointsFlash] = useState(null);
+
   // 🧠 1. STICKY START: Persist S2 or S4 selection
   const [course, setCourse] = useState(localStorage.getItem('preferredCourse') || 's2');
-  
+
   const [currentIndex, setCurrentIndex] = useState(1);
   const [revealedCount, setRevealedCount] = useState(1);
   const [inputValue, setInputValue] = useState("");
   const [isError, setIsError] = useState(false);
   const [gameWon, setGameWon] = useState(false);
+  const [wrongGuesses, setWrongGuesses] = useState(0);
 
   const inputRef = useRef(null);
+  const pointsAwardedRef = useRef(false);
 
   // Helper to reset game state for a new puzzle
   const initializeGame = (puzzle) => {
@@ -26,8 +33,23 @@ const EslabonesFinales = () => {
       setRevealedCount(1);
       setInputValue("");
       setGameWon(false);
+      setWrongGuesses(0);
+      pointsAwardedRef.current = false;
     }
   };
+
+  // 🏆 POINTS: 5 per word in the chain, minus 2 per hint (wrong guess) used, 10-point floor
+  useEffect(() => {
+    if (!currentGame || !gameWon || pointsAwardedRef.current || !currentUser) return;
+    pointsAwardedRef.current = true;
+
+    const wordsCount = Math.max((currentGame.chain?.length || 1) - 1, 0);
+    const points = Math.max(10, wordsCount * 5 - wrongGuesses * 2);
+
+    awardPoints(currentUser.uid, points)
+      .then(() => setPointsFlash({ amount: points }))
+      .catch((err) => console.error('Error saving Eslabones points:', err));
+  }, [gameWon, currentGame, wrongGuesses, currentUser]);
 
   // EFFECT: Fetch Today's Chain from Firestore
   useEffect(() => {
@@ -90,6 +112,7 @@ const EslabonesFinales = () => {
     } else {
       setIsError(true);
       setInputValue("");
+      setWrongGuesses((prev) => prev + 1);
       // Add a letter hint if they fail
       if (revealedCount < chain[currentIndex].length) setRevealedCount(revealedCount + 1);
       setTimeout(() => setIsError(false), 500);
@@ -104,7 +127,8 @@ const EslabonesFinales = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 flex flex-col items-center">
-      
+      <PointsIndicator flash={pointsFlash} />
+
       {/* Header Controls */}
       <div className="w-full max-w-xl flex justify-between items-center mb-8 relative z-10">
         <Link to="/recreo" className="bg-slate-800 border border-slate-700 px-4 py-2 rounded-full font-bold text-xs text-white hover:bg-slate-700 transition-colors">

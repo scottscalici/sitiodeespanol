@@ -1,5 +1,4 @@
 import React from 'react';
-
 export default function FormAnuncios({ actividad, setActividad, handleChange }) {
 
   // Helper to handle the courses array (comma-separated)

@@ -21,9 +21,9 @@ export default function PathBuilder({
   handleLoadPath,
   selectedExistingPathId,
   setSelectedExistingPathId,
-  handleTogglePod, // NEW
-  handleMovePod, // NEW
-  handleMoveSegment // NEW
+  handleTogglePod, 
+  handleMovePod, 
+  handleMoveSegment 
 }) {
   return (
     <div className="w-2/3 overflow-y-auto p-8 bg-slate-100">
@@ -62,14 +62,20 @@ export default function PathBuilder({
               <span className="px-2.5 py-0.5 text-xs font-black bg-blue-100 text-blue-800 rounded-md uppercase tracking-wider">
                 {course.toUpperCase()} Course
               </span>
-              <input 
-                type="text"
-                value={pathId}
-                onChange={(e) => setPathId(e.target.value)}
-                className="text-xs font-mono text-slate-400 bg-transparent border-b border-slate-300 focus:outline-none focus:border-blue-500"
-                placeholder="path_slug_id"
-              />
+              <div className="flex flex-col">
+                <input 
+                  type="text"
+                  value={pathId}
+                  onChange={(e) => setPathId(e.target.value)}
+                  className="text-xs font-mono text-slate-400 bg-transparent border-b border-slate-300 focus:outline-none focus:border-blue-500"
+                  placeholder="s2_descubre2_ch8_vocab"
+                />
+              </div>
             </div>
+            <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mb-2">
+              Sufijos: <span className="text-indigo-500">_vocab</span> | <span className="text-emerald-500">_verbs</span> | <span className="text-amber-500">_practical</span>
+            </p>
+            
             <input 
               type="text"
               value={pathTitle}
@@ -107,15 +113,12 @@ export default function PathBuilder({
             {/* Pod Header Bar */}
             <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
               <div className="flex items-center gap-3">
-                
-                {/* Expand/Collapse Toggle */}
                 <button 
                   onClick={() => handleTogglePod(podIndex)}
                   className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                 >
                   {pod.isExpanded ? '▼' : '▶'}
                 </button>
-
                 <span className="bg-blue-600 px-3 py-1 rounded-lg text-xs font-black tracking-wider">
                   POD {podIndex + 1}
                 </span>
@@ -132,114 +135,52 @@ export default function PathBuilder({
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Pod Reorder Buttons */}
                 <div className="flex flex-col gap-0.5 mr-2">
-                  <button 
-                    onClick={() => handleMovePod(podIndex, 'up')}
-                    disabled={podIndex === 0}
-                    className="text-[10px] bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 px-2 rounded-t transition-colors"
-                  >▲</button>
-                  <button 
-                    onClick={() => handleMovePod(podIndex, 'down')}
-                    disabled={podIndex === pods.length - 1}
-                    className="text-[10px] bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 px-2 rounded-b transition-colors"
-                  >▼</button>
+                  <button onClick={() => handleMovePod(podIndex, 'up')} disabled={podIndex === 0} className="text-[10px] bg-slate-800 hover:bg-slate-700 px-2 rounded-t transition-colors disabled:opacity-30">▲</button>
+                  <button onClick={() => handleMovePod(podIndex, 'down')} disabled={podIndex === pods.length - 1} className="text-[10px] bg-slate-800 hover:bg-slate-700 px-2 rounded-b transition-colors disabled:opacity-30">▼</button>
                 </div>
-
-                <button 
-                  onClick={() => handleAddSegment(podIndex)}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg font-bold transition-all"
-                >
+                <button onClick={() => handleAddSegment(podIndex)} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg font-bold transition-all">
                   + Add Segment ({pod.segments.length})
                 </button>
                 {pods.length > 1 && (
-                  <button 
-                    onClick={() => handleDeletePod(podIndex)}
-                    title="Delete Pod"
-                    className="text-xs bg-red-900/40 hover:bg-red-600 text-red-300 hover:text-white border border-red-700/50 p-1.5 rounded-lg transition-all"
-                  >
-                    🗑️
-                  </button>
+                  <button onClick={() => handleDeletePod(podIndex)} className="text-xs bg-red-900/40 hover:bg-red-600 text-red-300 hover:text-white border border-red-700/50 p-1.5 rounded-lg transition-all">🗑️</button>
                 )}
               </div>
             </div>
 
-            {/* Segments Container (Collapsible) */}
+            {/* Segments Container */}
             {pod.isExpanded && (
               <div className="p-6 bg-slate-50 space-y-5">
                 {pod.segments.map((seg, segIndex) => {
                   const isActive = activeSegmentId === seg.id;
-
                   return (
-                    <div 
-                      key={seg.id} 
-                      onClick={() => setActiveSegmentId(seg.id)}
-                      className={`bg-white border-2 rounded-xl p-5 shadow-sm transition-all cursor-pointer relative ${
-                        isActive ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
+                    <div key={seg.id} onClick={() => setActiveSegmentId(seg.id)} className={`bg-white border-2 rounded-xl p-5 shadow-sm transition-all cursor-pointer relative ${isActive ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300'}`}>
                       
-                      {/* Segment Header & Controls */}
                       <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
-                          <span className={`w-6 h-6 rounded-full font-black text-xs flex items-center justify-center border ${
-                            isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}>
+                          <span className={`w-6 h-6 rounded-full font-black text-xs flex items-center justify-center border ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                             {segIndex + 1}
                           </span>
                           <h4 className="font-bold text-slate-800">Segment {segIndex + 1}</h4>
-                          {isActive && (
-                            <span className="text-[10px] bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded-full uppercase">
-                              Active Target 🎯
-                            </span>
-                          )}
+                          {isActive && <span className="text-[10px] bg-blue-100 text-blue-700 font-black px-2 py-0.5 rounded-full uppercase">Active Target 🎯</span>}
                         </div>
-
                         <div className="flex items-center gap-3">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            {seg.total_questions} Questions Total
-                          </span>
-                          
-                          {/* Segment Reorder Buttons */}
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{seg.total_questions} Questions Total</span>
                           <div className="flex gap-1 ml-2 mr-2">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleMoveSegment(podIndex, segIndex, 'up'); }}
-                              disabled={segIndex === 0}
-                              className="text-xs bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 px-2 py-1 rounded"
-                            >▲</button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleMoveSegment(podIndex, segIndex, 'down'); }}
-                              disabled={segIndex === pod.segments.length - 1}
-                              className="text-xs bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 px-2 py-1 rounded"
-                            >▼</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleMoveSegment(podIndex, segIndex, 'up'); }} disabled={segIndex === 0} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded disabled:opacity-30">▲</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleMoveSegment(podIndex, segIndex, 'down'); }} disabled={segIndex === pod.segments.length - 1} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded disabled:opacity-30">▼</button>
                           </div>
-
                           {pod.segments.length > 1 && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSegment(podIndex, segIndex);
-                              }}
-                              title="Delete Segment"
-                              className="text-slate-400 hover:text-red-600 font-bold p-1 transition-colors"
-                            >
-                              🗑️
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteSegment(podIndex, segIndex); }} className="text-slate-400 hover:text-red-600 font-bold p-1 transition-colors">🗑️</button>
                           )}
                         </div>
                       </div>
 
-                      {/* Question Count & Presets */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4" onClick={(e) => e.stopPropagation()}>
                         <div>
                           <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Total Qs</label>
-                          <input 
-                            type="number" 
-                            value={seg.total_questions} 
-                            onChange={(e) => {
-                              const copy = [...pods];
-                              copy[podIndex].segments[segIndex].total_questions = Number(e.target.value);
-                              setPods(copy);
+                          <input type="number" value={seg.total_questions} onChange={(e) => {
+                              const copy = [...pods]; copy[podIndex].segments[segIndex].total_questions = Number(e.target.value); setPods(copy);
                             }}
                             className="w-full border border-slate-200 rounded-lg p-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" 
                           />
@@ -247,148 +188,114 @@ export default function PathBuilder({
 
                         <div className="md:col-span-2">
                           <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Ratio Preset</label>
-                          <select 
-                            value={seg.preset}
-                            onChange={(e) => {
-                              const copy = [...pods];
-                              copy[podIndex].segments[segIndex].preset = e.target.value;
+                          <select value={seg.preset} onChange={(e) => {
+                              const copy = [...pods]; copy[podIndex].segments[segIndex].preset = e.target.value;
+                              if (e.target.value === 'speed_round' && !seg.timeLimit) copy[podIndex].segments[segIndex].timeLimit = 60;
                               setPods(copy);
                             }}
                             className="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
                           >
                             <option value="100_vocab">100% Vocab</option>
                             <option value="100_verbs">100% Verbs (Conjugation Focus)</option>
-                            <option value="100_grammar">100% Grammar (Syntax & Pinned Sentences)</option>
-                            <option value="balanced_spiral">Balanced Spiral (50 Vocab / 30 Verb / 20 Grammar)</option>
+                            <option value="100_grammar">100% Grammar (Syntax)</option>
+                            <option value="balanced_spiral">Balanced Spiral (50/30/20)</option>
                             <option value="custom">Custom Mix</option>
+                            <option value="speed_round">🔥 Speed Round (Boss Battle)</option>
                           </select>
                         </div>
 
-                        {/* CUSTOM RATIO INPUTS (Only shows if 'custom' is selected) */}
+                        {/* 🚀 NEW: TARGET TENSE DROPDOWN */}
+                        <div>
+                          <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Verb Tense</label>
+                          <select value={seg.targetTense || 'ALL'} onChange={(e) => {
+                              const copy = [...pods]; copy[podIndex].segments[segIndex].targetTense = e.target.value; setPods(copy);
+                            }}
+                            className="w-full border border-emerald-200 rounded-lg p-2 text-sm font-semibold bg-emerald-50 text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                          >
+                            <option value="ALL">Mix All Tenses</option>
+                            <option value="presente">Presente</option>
+                            <option value="pretérito">Pretérito</option>
+                            <option value="imperfecto">Imperfecto</option>
+                            <option value="futuro">Futuro</option>
+                            <option value="condicional">Condicional</option>
+                            <option value="presente_progresivo">Progresivo</option>
+                            <option value="imperativo_afirmativo">Mandatos (+)</option>
+                            <option value="imperativo_negativo">Mandatos (-)</option>
+                            <option value="subjuntivo_presente">Subjuntivo</option>
+                          </select>
+                        </div>
+
+                        {seg.preset === 'speed_round' && (
+                          <div className="md:col-span-4 bg-rose-50/50 p-3 rounded-lg border border-rose-100 mt-1">
+                            <label className="block text-[9px] font-black text-rose-800 uppercase mb-1">Time Limit (Seconds)</label>
+                            <input type="number" value={seg.timeLimit || 60} onChange={(e) => {
+                                const copy = [...pods]; copy[podIndex].segments[segIndex].timeLimit = Number(e.target.value); setPods(copy);
+                              }}
+                              className="w-full max-w-xs border border-rose-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-rose-500 outline-none bg-white" 
+                            />
+                          </div>
+                        )}
+
                         {seg.preset === 'custom' && (
-                          <div className="md:col-span-3 grid grid-cols-3 gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100 mt-1">
-                            <div>
-                              <label className="block text-[9px] font-black text-blue-800 uppercase mb-1">Vocab %</label>
-                              <input 
-                                type="number" 
-                                value={seg.custom_ratios?.vocab || 0}
-                                onChange={(e) => {
-                                  const copy = [...pods];
-                                  copy[podIndex].segments[segIndex].custom_ratios = { ...seg.custom_ratios, vocab: Number(e.target.value) };
-                                  setPods(copy);
-                                }}
-                                className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[9px] font-black text-blue-800 uppercase mb-1">Verb %</label>
-                              <input 
-                                type="number" 
-                                value={seg.custom_ratios?.verb || 0}
-                                onChange={(e) => {
-                                  const copy = [...pods];
-                                  copy[podIndex].segments[segIndex].custom_ratios = { ...seg.custom_ratios, verb: Number(e.target.value) };
-                                  setPods(copy);
-                                }}
-                                className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[9px] font-black text-blue-800 uppercase mb-1">Grammar %</label>
-                              <input 
-                                type="number" 
-                                value={seg.custom_ratios?.grammar || 0}
-                                onChange={(e) => {
-                                  const copy = [...pods];
-                                  copy[podIndex].segments[segIndex].custom_ratios = { ...seg.custom_ratios, grammar: Number(e.target.value) };
-                                  setPods(copy);
-                                }}
-                                className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
-                              />
-                            </div>
+                          <div className="md:col-span-4 grid grid-cols-3 gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100 mt-1">
+                            {['vocab', 'verb', 'grammar'].map(type => (
+                              <div key={type}>
+                                <label className="block text-[9px] font-black text-blue-800 uppercase mb-1 capitalize">{type} %</label>
+                                <input type="number" value={seg.custom_ratios?.[type] || 0} onChange={(e) => {
+                                    const copy = [...pods]; copy[podIndex].segments[segIndex].custom_ratios = { ...seg.custom_ratios, [type]: Number(e.target.value) }; setPods(copy);
+                                  }}
+                                  className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
+                                />
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
 
-                      {/* Modalities */}
                       <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                         <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5">Permitted Modalities</label>
                         <div className="flex flex-wrap gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                           {['read', 'write', 'listen', 'speak'].map((mod) => (
                             <label key={mod} className="text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer capitalize">
-                              <input 
-                                type="checkbox" 
-                                checked={seg.modalities[mod]} 
-                                onChange={(e) => {
-                                  const copy = [...pods];
-                                  copy[podIndex].segments[segIndex].modalities[mod] = e.target.checked;
-                                  setPods(copy);
-                                }}
-                                className="w-4 h-4 text-blue-600 rounded" 
-                              />
+                              <input type="checkbox" checked={seg.modalities[mod]} onChange={(e) => {
+                                  const copy = [...pods]; copy[podIndex].segments[segIndex].modalities[mod] = e.target.checked; setPods(copy);
+                                }} className="w-4 h-4 text-blue-600 rounded" />
                               {mod === 'read' ? '📖 Read' : mod === 'write' ? '✍️ Write' : mod === 'listen' ? '🎧 Listen' : '🗣️ Speak'}
                             </label>
                           ))}
                         </div>
                       </div>
 
-                      {/* Dropzones with Assigned Chips */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
                         <div className="border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/50 min-h-[110px] flex flex-col justify-between">
                           <div>
-                            <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1">
-                              <span>📦</span> Introduced Vocab & Verbs ({seg.introduced_concepts.length})
-                            </p>
+                            <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1"><span>📦</span> Introduced Vocab & Verbs ({seg.introduced_concepts.length})</p>
                             <div className="flex flex-wrap gap-1.5">
                               {seg.introduced_concepts.map((concept, cIdx) => (
                                 <span key={cIdx} className="bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-sm flex items-center gap-1.5">
                                   {concept.label} {concept.isGroup && `(${concept.verbIds?.length || 0})`}
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(podIndex, segIndex, 'introduced_concepts', cIdx);
-                                    }}
-                                    className="text-blue-400 hover:text-red-500 font-bold ml-1"
-                                  >
-                                    ×
-                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleRemoveItem(podIndex, segIndex, 'introduced_concepts', cIdx); }} className="text-blue-400 hover:text-red-500 font-bold ml-1">×</button>
                                 </span>
                               ))}
-                              {seg.introduced_concepts.length === 0 && (
-                                <p className="text-blue-400 text-[10px] italic">Click items in vault to assign here</p>
-                              )}
+                              {seg.introduced_concepts.length === 0 && <p className="text-blue-400 text-[10px] italic">Click items in vault to assign here</p>}
                             </div>
                           </div>
                         </div>
 
                         <div className="border-2 border-dashed border-purple-200 rounded-xl p-4 bg-purple-50/50 min-h-[110px] flex flex-col justify-between">
                           <div>
-                            <p className="text-purple-900 text-xs font-bold mb-2 flex items-center gap-1">
-                              <span>📌</span> Pinned Sentences ({seg.pinned_sentences.length})
-                            </p>
+                            <p className="text-purple-900 text-xs font-bold mb-2 flex items-center gap-1"><span>📌</span> Pinned Sentences ({seg.pinned_sentences.length})</p>
                             <div className="flex flex-wrap gap-1.5">
                               {seg.pinned_sentences.map((sent, sIdx) => (
                                 <span key={sIdx} className="bg-white text-purple-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-purple-200 shadow-sm flex items-center gap-1.5">
                                   {sent.label}
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveItem(podIndex, segIndex, 'pinned_sentences', sIdx);
-                                    }}
-                                    className="text-purple-400 hover:text-red-500 font-bold ml-1"
-                                  >
-                                    ×
-                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleRemoveItem(podIndex, segIndex, 'pinned_sentences', sIdx); }} className="text-purple-400 hover:text-red-500 font-bold ml-1">×</button>
                                 </span>
                               ))}
-                              {seg.pinned_sentences.length === 0 && (
-                                <p className="text-purple-400 text-[10px] italic">Click grammar sentences to pin here</p>
-                              )}
+                              {seg.pinned_sentences.length === 0 && <p className="text-purple-400 text-[10px] italic">Click grammar sentences to pin here</p>}
                             </div>
                           </div>
                         </div>
-
                       </div>
 
                     </div>
@@ -399,7 +306,6 @@ export default function PathBuilder({
           </div>
         ))}
       </div>
-
     </div>
   );
 }

@@ -1,8 +1,13 @@
 import React from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
+  const { userData } = useAuth();
+  const totalPoints = userData?.total_points || 0;
+  const weeklyPoints = userData?.weekly_points || 0;
+  const monthlyPoints = userData?.monthly_points || 0;
   const badgeText = course === 's2' ? 'ESPAÑOL II' : 'IB ESPAÑOL';
 
   const formatSpanishDate = (dateStr) => {
@@ -34,7 +39,8 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   }
 
   return (
-    <header className="bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c] rounded-xl p-8 text-white flex justify-between items-center shadow-lg">
+    <header className="bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c] rounded-xl p-8 text-white shadow-lg flex flex-col gap-6">
+      <div className="flex justify-between items-center">
       <div className="flex flex-col gap-1">
         <h1
           className="text-5xl font-black tracking-tight uppercase"
@@ -95,6 +101,28 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           </button>
         </div>
 
+      </div>
+      </div>
+
+      {/* PUNTOS: all-time is the headline number, weekly/monthly are secondary */}
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6 border-t border-white/10 pt-5">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">⭐</span>
+          <div>
+            <p className="text-3xl sm:text-4xl font-black leading-none">{totalPoints}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mt-0.5">Puntos Totales</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
+          <span className="text-lg font-black">{weeklyPoints}</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">Esta Semana</span>
+        </div>
+
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
+          <span className="text-lg font-black">{monthlyPoints}</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">Este Mes</span>
+        </div>
       </div>
     </header>
   );

@@ -12,7 +12,7 @@ const Curiosidad = ({ curiosidades = [] }) => {
         return (
           <article 
             key={item.id || idx}
-            className="bg-white rounded-2xl border-l-[6px] border-l-sky-500 p-6 sm:p-8 shadow-sm border border-y-slate-200 border-r-slate-200"
+            className="bg-sky-50/40 rounded-2xl border-2 border-sky-200 p-6 sm:p-8 shadow-sm"
           >
             {/* Header */}
             <h3 className="font-black text-[10px] uppercase text-sky-500 tracking-widest mb-3">
@@ -26,7 +26,7 @@ const Curiosidad = ({ curiosidades = [] }) => {
             
             {/* Image */}
             {(item.img || item.imagen || item.image_url) && (
-              <div className="mb-5 rounded-xl overflow-hidden border border-slate-100 bg-slate-50 p-1.5 shadow-sm">
+              <div className="mb-5 rounded-xl overflow-hidden border border-sky-100 bg-white p-1.5 shadow-sm">
                 <img 
                   src={item.img || item.imagen || item.image_url} 
                   alt={item.title}
