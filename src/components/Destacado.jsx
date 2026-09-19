@@ -39,7 +39,7 @@ const Destacado = ({ destacado = [] }) => {
           >
             {/* Main Cover Image */}
             {(item.image_url || item.img || item.imagen) && (
-              <div className="w-full h-48 sm:h-64 overflow-hidden bg-slate-100">
+              <div className="w-full h-40 sm:h-48 overflow-hidden bg-slate-100">
                 <img 
                   src={item.image_url || item.img || item.imagen} 
                   alt={loc} 

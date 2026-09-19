@@ -26,11 +26,11 @@ const Curiosidad = ({ curiosidades = [] }) => {
             
             {/* Image */}
             {(item.img || item.imagen || item.image_url) && (
-              <div className="mb-5 rounded-xl overflow-hidden border border-slate-100 bg-slate-50 p-1.5 shadow-sm">
-                <img 
-                  src={item.img || item.imagen || item.image_url} 
+              <div className="mb-5 rounded-xl overflow-hidden border border-slate-100 shadow-sm h-48 sm:h-56">
+                <img
+                  src={item.img || item.imagen || item.image_url}
                   alt={item.title}
-                  className="rounded-lg max-h-72 object-contain w-full" 
+                  className="w-full h-full object-cover"
                 />
               </div>
             )}
