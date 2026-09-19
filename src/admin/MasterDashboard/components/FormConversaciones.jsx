@@ -46,12 +46,29 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
     });
   };
 
+  // Helper for 'enlaces' (repeatable {texto, url} links)
+  const handleEnlaceChange = (index, field, value) => {
+    const newEnlaces = [...(actividad.enlaces || [])];
+    newEnlaces[index] = { ...newEnlaces[index], [field]: value };
+    setActividad({ ...actividad, enlaces: newEnlaces });
+  };
+  const handleAddEnlace = () => {
+    setActividad({ ...actividad, enlaces: [...(actividad.enlaces || []), { texto: "", url: "" }] });
+  };
+  const handleRemoveEnlace = (index) => {
+    setActividad({ ...actividad, enlaces: (actividad.enlaces || []).filter((_, i) => i !== index) });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* --- CLASIFICACIÓN --- */}
       <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f8f9fa' }}>
         <h4 style={{ margin: '0 0 15px 0' }}>Clasificación</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
+          <label>Imagen (URL)</label>
+          <input name="imagen" value={actividad.imagen || ""} onChange={handleChange} placeholder="https://..." style={{ padding: '8px' }} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
           <label>Subtítulo / Tema general</label>
           <input name="subtitulo" value={actividad.subtitulo || ""} onChange={handleChange} style={{ padding: '8px' }} />
@@ -68,6 +85,11 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
           </div>
         </div>
 
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px' }}>
+          <label>Etiquetas / Temas (separados por coma)</label>
+          <input value={(actividad.etiquetas || []).join(", ")} onChange={(e) => handleStringArrayChange('etiquetas', e)} placeholder="ej: Identidades, Tecnología" style={{ padding: '8px' }} />
+        </div>
+
         <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <label>Courses (separados por coma)</label>
@@ -78,6 +100,22 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
             <input value={(actividad.dias || []).join(", ")} onChange={handleDiasChange} placeholder="ej: 58, 59" style={{ padding: '8px' }} />
           </div>
         </div>
+      </div>
+
+      {/* --- ENLACES --- */}
+      <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f8f9fa' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <h4 style={{ margin: 0 }}>Enlaces de Apoyo</h4>
+          <button type="button" onClick={handleAddEnlace} style={{ padding: '6px 12px', cursor: 'pointer' }}>+ Añadir Enlace</button>
+        </div>
+        {(actividad.enlaces || []).length === 0 && <p style={{ fontSize: '12px', color: '#666' }}>Sin enlaces.</p>}
+        {(actividad.enlaces || []).map((enlace, index) => (
+          <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+            <input value={enlace.texto || ""} onChange={(e) => handleEnlaceChange(index, 'texto', e.target.value)} placeholder="Texto del botón" style={{ padding: '8px', flex: 1 }} />
+            <input value={enlace.url || ""} onChange={(e) => handleEnlaceChange(index, 'url', e.target.value)} placeholder="https://..." style={{ padding: '8px', flex: 2 }} />
+            <button type="button" onClick={() => handleRemoveEnlace(index)} style={{ padding: '8px', cursor: 'pointer' }}>✕</button>
+          </div>
+        ))}
       </div>
 
       {/* --- TIEMPOS & NOTAS --- */}

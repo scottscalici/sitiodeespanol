@@ -12,7 +12,7 @@ import FormTemas from './components/FormTemas';
 import FormVideos from './components/FormVideos';
 import FormLearningPath from '../FormLearningPath/FormLearningPath';
 const VALID_COLLECTIONS = [
-  "conversations", "culture", "lectura", "anuncios",
+  "conversaciones", "culture", "lectura", "anuncios",
   "calendario", "destacado_diario", "temas", "videos", "learning_path",
 ];
 
@@ -65,9 +65,19 @@ export default function MasterDashboard() {
         question_sections: [],
         type: "ib_paper_2"
       });
-    } else if (coleccionActual === "conversations") {
+    } else if (coleccionActual === "conversaciones") {
       setActividad({
         ...base,
+        etiquetas: [],
+        enlaces: [],
+        courses: [],
+        dias: [],
+        prep_seconds: 600,
+        presentation_segments: "",
+        notas: { type: "bullets", bullets: 10, pregunta: false },
+        escenario: "",
+        instrucciones: ["", ""],
+        modelo: "",
         extracto: "",
         preguntas: { "1": [], "2": [], "3": [] },
         activity_type: "oral_ia"
@@ -220,9 +230,34 @@ export default function MasterDashboard() {
           }
           alert(`¡Éxito! Se han migrado ${count} videos a la base de datos.`);
         }
+        // --- DETECTAR FORMATO CONVERSACIONES (items map, ej: planes/conversaciones.json) ---
+        else if (jsonData.items && typeof jsonData.items === 'object' && !Array.isArray(jsonData.items)) {
+          let count = 0;
+          for (const [docId, lesson] of Object.entries(jsonData.items)) {
+            const dataToSave = {
+              titulo: lesson.titulo || docId,
+              imagen: lesson.imagen || "",
+              etiquetas: lesson.etiquetas || [],
+              enlaces: lesson.enlaces || [],
+              courses: lesson.courses || [],
+              dias: lesson.dias || [],
+              prep_seconds: lesson.prep_seconds ?? 600,
+              presentation_segments: lesson.presentation_segments || "",
+              notas: lesson.notas || { type: "bullets", bullets: 10, pregunta: false },
+              escenario: lesson.escenario || "",
+              instrucciones: lesson.instrucciones || [],
+              modelo: lesson.modelo || "",
+              preguntas: lesson.preguntas || { "1": [], "2": [], "3": [] },
+              isNew: false
+            };
+            await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });
+            count++;
+          }
+          alert(`¡Éxito! Se han importado ${count} lecciones de conversación.`);
+        }
         // --- SI NO RECONOCE NINGÚN FORMATO ---
         else {
-          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Destacado Diario, Temas, o Videos.");
+          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Destacado Diario, Temas, Videos, o Conversaciones (items).");
         }
 
         fetchData();
@@ -256,11 +291,14 @@ export default function MasterDashboard() {
           titulo: headerInfo || rawTitle,
           subtitulo: rawTitle,
           imagen: imageSrc,
+          etiquetas: ["IA Prep"],
+          enlaces: [],
           extracto: extractoText,
           pdf_url: pdfLink,
           activity_type: "oral_ia",
           prep_seconds: 1200,
           presentation_segments: "240",
+          notas: { type: "bullets", bullets: 10, pregunta: false },
           preguntas: { "1": questionsArr },
           tag: "IA Prep",
           courses: ["s4", "IB"],
@@ -268,7 +306,7 @@ export default function MasterDashboard() {
         };
 
         const docId = rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        await setDoc(doc(db, "conversations", docId), dataToSave, { merge: true });
+        await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });
         alert(`Imported IA Prep: ${dataToSave.titulo}`);
         fetchData();
       } catch (error) { alert("IA Prep Parser Error."); }
@@ -315,7 +353,7 @@ export default function MasterDashboard() {
       <div style={{ width: '30%', borderRight: '1px solid #ccc', padding: '1rem', overflowY: 'auto', backgroundColor: '#f9f9f9' }}>
         <h3>Collection:</h3>
         <select value={coleccionActual} onChange={(e) => {setColeccionActual(e.target.value); setActividad(null);}} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>
-          <option value="conversations">Conversaciones</option>
+          <option value="conversaciones">Conversaciones</option>
           <option value="culture">Cultura</option>
           <option value="lectura">Lectura</option>
           <option value="anuncios">Anuncios</option>
@@ -401,7 +439,7 @@ export default function MasterDashboard() {
               <label>Title</label>
               <input name="titulo" value={actividad.titulo || ""} onChange={handleChange} style={{ padding: '8px' }} />
             </div>
-            {coleccionActual === "conversations" && <FormConversaciones actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
+            {coleccionActual === "conversaciones" && <FormConversaciones actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "culture" && <FormCultura actividad={actividad} handleChange={handleChange} />}
             {coleccionActual === "anuncios" && <FormAnuncios actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
             {coleccionActual === "lectura" && <FormLecturas actividad={actividad} setActividad={setActividad} handleChange={handleChange} />}
