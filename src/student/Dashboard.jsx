@@ -200,14 +200,14 @@ const Dashboard = () => {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <span className="block text-[9px] font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
-                  <p className="text-orange-50/90 text-xs font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
+                  <span className="block text-xs font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
+                  <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
                 </div>
               </div>
 
               <div className="mt-5 flex justify-end">
-                <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
                   Iniciar Misión <span>→</span>
                 </span>
               </div>
@@ -219,17 +219,32 @@ const Dashboard = () => {
             {/* 🏗️ ESTRUCTURA */}
             <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
 
-            {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO */}
+            {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
             {hasSentences && (
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-[11px] mb-2 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
-                  <span>✍️</span> Oraciones de Práctica/Ejemplo
-                </h3>
-                <p className="text-xs text-slate-400 mb-3">Completa oraciones con las palabras que faltan.</p>
-                <Link to={`/practica/oraciones/${course}/${liveDia}`} className="block text-center bg-slate-900 hover:bg-teal-600 text-white font-black text-[11px] px-4 py-2.5 rounded-lg uppercase tracking-wider transition-colors">
-                  Practicar →
-                </Link>
-              </div>
+              <Link
+                to={`/practica/oraciones/${course}/${liveDia}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span className="text-3xl drop-shadow">✍️</span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-sky-100 mb-1">Día {liveDia}</span>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Oraciones</h3>
+                    <p className="text-sky-50/90 text-sm font-medium mt-1 line-clamp-2">Completa oraciones con las palabras que faltan.</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-sky-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                    Practicar <span>→</span>
+                  </span>
+                </div>
+              </Link>
             )}
 
             {/* 🗣️ CONVERSACIÓN (próximamente) */}
@@ -268,9 +283,9 @@ const Dashboard = () => {
 
                   {/* Track Info */}
                   <div className="min-w-0 flex-1">
-                    <span className="block text-[9px] font-black uppercase tracking-widest text-purple-300 mb-1">Misión de Música: Día {liveDia}</span>
-                    <h2 className="text-lg font-black text-white truncate">{dailySong.titulo}</h2>
-                    <p className="text-sm text-purple-200 truncate">{dailySong.artista}</p>
+                    <span className="block text-xs font-black uppercase tracking-widest text-purple-300 mb-1">Misión de Música: Día {liveDia}</span>
+                    <h2 className="text-xl font-black text-white truncate">{dailySong.titulo}</h2>
+                    <p className="text-base text-purple-200 truncate">{dailySong.artista}</p>
                   </div>
                 </div>
 
@@ -279,7 +294,7 @@ const Dashboard = () => {
                   <div className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
                     <div className="h-full w-1/4 rounded-full bg-white/70 group-hover:bg-white transition-colors"></div>
                   </div>
-                  <span className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">Escuchar</span>
+                  <span className="text-xs font-bold text-purple-300 uppercase tracking-widest">Escuchar</span>
                   <div className="w-9 h-9 shrink-0 rounded-full bg-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                     <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700 ml-0.5">
                       <path d="M8 5v14l11-7z" />
@@ -309,14 +324,14 @@ const Dashboard = () => {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <span className="block text-[9px] font-black uppercase tracking-widest text-emerald-200 mb-1">Conjunto Asignado</span>
-                    <h3 className="text-lg font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
-                    <p className="text-emerald-100/80 text-xs font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
+                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Conjunto Asignado</span>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
+                    <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
                   </div>
                 </div>
 
                 <div className="mt-5 flex justify-end">
-                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
                     Estudiar <span>→</span>
                   </span>
                 </div>
