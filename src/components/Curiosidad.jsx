@@ -10,9 +10,9 @@ const Curiosidad = ({ curiosidades = [] }) => {
         const activeDay = item.s2_dia || item.s4_dia || item.ib_dia || item.dia || '';
 
         return (
-          <article 
+          <article
             key={item.id || idx}
-            className="bg-white rounded-2xl border-l-[6px] border-l-sky-500 p-6 sm:p-8 shadow-sm border border-y-slate-200 border-r-slate-200"
+            className="bg-sky-50/40 rounded-2xl border-2 border-sky-200 p-6 sm:p-8 shadow-sm"
           >
             {/* Header */}
             <h3 className="font-black text-[10px] uppercase text-sky-500 tracking-widest mb-3">
@@ -26,11 +26,11 @@ const Curiosidad = ({ curiosidades = [] }) => {
             
             {/* Image */}
             {(item.img || item.imagen || item.image_url) && (
-              <div className="mb-5 rounded-xl overflow-hidden border border-slate-100 shadow-sm h-48 sm:h-56">
+              <div className="mb-5 rounded-xl overflow-hidden border border-sky-100 bg-white p-1.5 shadow-sm">
                 <img
                   src={item.img || item.imagen || item.image_url}
                   alt={item.title}
-                  className="w-full h-full object-cover"
+                  className="rounded-lg max-h-72 object-contain w-full"
                 />
               </div>
             )}
