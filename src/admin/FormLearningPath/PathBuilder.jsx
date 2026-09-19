@@ -21,10 +21,17 @@ export default function PathBuilder({
   handleLoadPath,
   selectedExistingPathId,
   setSelectedExistingPathId,
-  handleTogglePod, 
-  handleMovePod, 
-  handleMoveSegment 
+  handleTogglePod,
+  handleMovePod,
+  handleMoveSegment,
+  activeBranch,
+  onBranchChange,
 }) {
+  const BRANCH_TABS = [
+    { id: 'vocab', label: 'Vocabulario', activeClass: 'bg-indigo-600 text-white' },
+    { id: 'verbs', label: 'Verbos', activeClass: 'bg-emerald-600 text-white' },
+    { id: 'practical', label: 'Aplicación', activeClass: 'bg-amber-500 text-white' },
+  ];
   return (
     <div className="w-2/3 overflow-y-auto p-8 bg-slate-100">
       
@@ -63,20 +70,32 @@ export default function PathBuilder({
                 {course.toUpperCase()} Course
               </span>
               <div className="flex flex-col">
-                <input 
+                <input
                   type="text"
                   value={pathId}
                   onChange={(e) => setPathId(e.target.value)}
                   className="text-xs font-mono text-slate-400 bg-transparent border-b border-slate-300 focus:outline-none focus:border-blue-500"
-                  placeholder="s2_descubre2_ch8_vocab"
+                  placeholder="s2_descubre2_ch8"
                 />
               </div>
             </div>
-            <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mb-2">
-              Sufijos: <span className="text-indigo-500">_vocab</span> | <span className="text-emerald-500">_verbs</span> | <span className="text-amber-500">_practical</span>
-            </p>
-            
-            <input 
+
+            <div className="flex gap-1.5 mb-2">
+              {BRANCH_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onBranchChange(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    activeBranch === tab.id ? tab.activeClass : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <input
               type="text"
               value={pathTitle}
               onChange={(e) => setPathTitle(e.target.value)}

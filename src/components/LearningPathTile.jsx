@@ -1,19 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchLearningPathTotalPods, getLearningPathSummary } from '../utils/learningPathProgress';
+import { fetchUnitTotalPods, getUnitSummary, getCurrentDominioTask } from '../utils/learningPathProgress';
 
-const LearningPathTile = () => {
+const LearningPathTile = ({ liveDia, courseTasks = [] }) => {
   const { userData } = useAuth();
   const [totalPods, setTotalPods] = useState(0);
 
-  useEffect(() => {
-    fetchLearningPathTotalPods()
-      .then(setTotalPods)
-      .catch((error) => console.error('Error fetching learning path totals:', error));
-  }, []);
+  const currentTask = getCurrentDominioTask(courseTasks, liveDia);
+  const currentPathId = currentTask?.path_id;
 
-  const { completedPods, percent } = getLearningPathSummary(userData?.progress, totalPods);
+  useEffect(() => {
+    if (!currentPathId) return;
+    fetchUnitTotalPods(currentPathId)
+      .then(setTotalPods)
+      .catch((error) => console.error('Error fetching unit totals:', error));
+  }, [currentPathId]);
+
+  // Nothing assigned yet for this course today — same pattern as other day-gated dashboard cards.
+  if (!currentTask) return null;
+
+  const { completedPods, percent } = getUnitSummary(userData?.progress, currentTask.path_id, totalPods);
 
   return (
     <Link
@@ -26,7 +33,10 @@ const LearningPathTile = () => {
         <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 uppercase tracking-widest text-lg mb-1">
           Ruta de Aprendizaje
         </h3>
-        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-4">
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">
+          {currentTask.titulo || currentTask.path_id}
+        </p>
+        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4">
           {completedPods} / {totalPods} Pods Completados
         </p>
 

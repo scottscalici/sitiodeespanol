@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
-import { fetchLearningPathTotalPods, getLearningPathSummary } from '../../utils/learningPathProgress';
+import { fetchUnitTotalPods, getUnitSummary, getAssignedDominioTasks } from '../../utils/learningPathProgress';
 
 export default function TeacherGradebook() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('gradebook'); // 'gradebook' or 'diagnostics'
-  const [totalPods, setTotalPods] = useState(0);
+  const [unitColumns, setUnitColumns] = useState([]); // [{ path_id, titulo, day_due, courses: Set }]
+  const [unitTotals, setUnitTotals] = useState({}); // { [path_id]: totalPods }
 
   // Diagnostic specific states
   const [selectedWarmupId, setSelectedWarmupId] = useState('');
@@ -37,10 +38,51 @@ export default function TeacherGradebook() {
       }
     };
 
+    const fetchLearningPathColumns = async () => {
+      try {
+        const [calSnap, tareasSnap] = await Promise.all([
+          getDoc(doc(db, 'config', 'academic_year_2026_2027')),
+          getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
+        ]);
+
+        const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const pastEntries = calendarArray.filter((c) => c.fecha && c.fecha <= todayStr && c.dia != null);
+        const liveDia = pastEntries.length > 0
+          ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
+          : 1;
+
+        const tareasData = tareasSnap.exists() ? tareasSnap.data() : {};
+        const columnsByPathId = {};
+        ['s2', 's4'].forEach((courseId) => {
+          const assigned = getAssignedDominioTasks(tareasData[courseId] || [], liveDia);
+          assigned.forEach((task) => {
+            if (!columnsByPathId[task.path_id]) {
+              columnsByPathId[task.path_id] = {
+                path_id: task.path_id,
+                titulo: task.titulo,
+                day_due: task.day_due,
+                courses: new Set(),
+              };
+            }
+            columnsByPathId[task.path_id].courses.add(courseId);
+          });
+        });
+
+        const columns = Object.values(columnsByPathId);
+        setUnitColumns(columns);
+
+        const totalsEntries = await Promise.all(
+          columns.map(async (col) => [col.path_id, await fetchUnitTotalPods(col.path_id)])
+        );
+        setUnitTotals(Object.fromEntries(totalsEntries));
+      } catch (error) {
+        console.error('Error fetching learning path columns:', error);
+      }
+    };
+
     fetchStudents();
-    fetchLearningPathTotalPods()
-      .then(setTotalPods)
-      .catch((error) => console.error('Error fetching learning path totals:', error));
+    fetchLearningPathColumns();
   }, []);
 
   // --- DIAGNOSTIC AGGREGATION LOGIC ---
@@ -249,7 +291,12 @@ const handleResetPassword = async () => {
                 {getAvailableWarmupIds().map((warmupId) => (
                   <th key={warmupId} className="p-4 whitespace-nowrap">{warmupId}</th>
                 ))}
-                <th className="p-4 whitespace-nowrap text-emerald-400">Learning Path</th>
+                {unitColumns.map((col) => (
+                  <th key={col.path_id} className="p-4 whitespace-nowrap text-emerald-400">
+                    <span className="block">{col.titulo || col.path_id}</span>
+                    <span className="block text-[9px] font-mono text-emerald-600 normal-case">Vence: Día {col.day_due}</span>
+                  </th>
+                ))}
                 <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
@@ -257,7 +304,7 @@ const handleResetPassword = async () => {
               {students.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={getAvailableWarmupIds().length + 4}
+                    colSpan={getAvailableWarmupIds().length + unitColumns.length + 3}
                     className="p-8 text-center text-slate-500 font-bold"
                   >
                     No hay estudiantes registrados.
@@ -266,7 +313,6 @@ const handleResetPassword = async () => {
               ) : (
                 students.map((student) => {
                   const warmups = student.progress?.warmups || {};
-                  const { completedPods, percent, letterGrade } = getLearningPathSummary(student.progress, totalPods);
 
                   return (
                     <tr
@@ -303,24 +349,32 @@ const handleResetPassword = async () => {
                         );
                       })}
 
-                      <td className="p-4">
-                        <div className="w-full max-w-xs">
-                          <div className="flex justify-between text-xs font-bold mb-1">
-                            <span className="text-slate-400">
-                              {completedPods} / {totalPods} Pods
-                            </span>
-                            <span className="text-emerald-400">
-                              {percent}% ({letterGrade})
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-900 rounded-full h-2.5 border border-slate-700 overflow-hidden">
-                            <div
-                              className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
-                              style={{ width: `${percent}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </td>
+                      {unitColumns.map((col) => {
+                        if (!col.courses.has(student.course)) {
+                          return <td key={col.path_id} className="p-4"><span className="text-slate-600 font-bold">—</span></td>;
+                        }
+                        const { completedPods, percent, letterGrade } = getUnitSummary(student.progress, col.path_id, unitTotals[col.path_id] || 0);
+                        return (
+                          <td key={col.path_id} className="p-4">
+                            <div className="w-full max-w-xs">
+                              <div className="flex justify-between text-xs font-bold mb-1">
+                                <span className="text-slate-400">
+                                  {completedPods} / {unitTotals[col.path_id] || 0} Pods
+                                </span>
+                                <span className="text-emerald-400">
+                                  {percent}% ({letterGrade})
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-900 rounded-full h-2.5 border border-slate-700 overflow-hidden">
+                                <div
+                                  className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${percent}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                        );
+                      })}
 
                       {/* 🔑 NEW PASSWORD RESET BUTTON */}
                       <td className="p-4 text-center">

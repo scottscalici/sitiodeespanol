@@ -1,77 +1,95 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
-
-// The base ID for the current unit
-const BASE_PATH_ID = 's2_descubre2_preliminar';
+import { getAssignedDominioTasks } from '../utils/learningPathProgress';
 
 // Configuration for the 3 distinct branches
 const BRANCHES = [
-  { id: 'vocab', label: 'Vocabulario', icon: '📖', theme: 'indigo', suffix: '_vocab' },
-  { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald', suffix: '_verbs' },
-  { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber', suffix: '_practical' }
+  { id: 'vocab', label: 'Vocabulario', icon: '📖', theme: 'indigo' },
+  { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald' },
+  { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber' }
 ];
 
 export default function StudentLearningPath() {
   const { userData } = useAuth();
   const isAdmin = userData?.role === 'admin';
+  const course = userData?.course || 's2';
 
   // --- STATE ---
   const [activeBranch, setActiveBranch] = useState('vocab');
-  const [branchData, setBranchData] = useState({});
+  const [liveDia, setLiveDia] = useState(1);
+  const [assignedTasks, setAssignedTasks] = useState([]);
+  const [selectedPathId, setSelectedPathId] = useState('');
+  const [unitData, setUnitData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeWorkoutSegment, setActiveWorkoutSegment] = useState(null);
 
-  // --- 1. FETCH ALL 3 BRANCHES ONCE ---
+  // --- 1. FIND EVERY DOMINIO UNIT ASSIGNED TO THIS STUDENT'S COURSE SO FAR ---
   useEffect(() => {
-    const fetchAllPaths = async () => {
+    const fetchAssignments = async () => {
       setIsLoading(true);
-      const newBranchData = {};
-
       try {
-        await Promise.all(
-          BRANCHES.map(async (branch) => {
-            const fullPathId = `${BASE_PATH_ID}${branch.suffix}`;
-            const docRef = doc(db, 'learning_paths', fullPathId);
-            const docSnap = await getDoc(docRef);
+        const [calSnap, tareasSnap] = await Promise.all([
+          getDoc(doc(db, 'config', 'academic_year_2026_2027')),
+          getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
+        ]);
 
-            if (docSnap.exists()) {
-              newBranchData[branch.id] = docSnap.data();
-            } else {
-              // Store empty state if the teacher hasn't built this branch yet
-              newBranchData[branch.id] = { title: `Ruta de ${branch.label}`, pods: [] };
-            }
-          })
-        );
-        setBranchData(newBranchData);
+        const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const pastEntries = calendarArray.filter((c) => c.fecha && c.fecha <= todayStr && c.dia != null);
+        const currentDay = pastEntries.length > 0
+          ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
+          : 1;
+        setLiveDia(currentDay);
+
+        const tareasData = tareasSnap.exists() ? tareasSnap.data() : {};
+        const assigned = getAssignedDominioTasks(tareasData[course] || [], currentDay);
+        setAssignedTasks(assigned);
+        setSelectedPathId((prev) => prev || assigned[0]?.path_id || '');
       } catch (error) {
-        console.error('Error fetching paths:', error);
+        console.error('Error fetching assigned units:', error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    fetchAllPaths();
-  }, []);
+    fetchAssignments();
+  }, [course]);
+
+  // --- 2. LOAD THE SELECTED UNIT'S DOCUMENT ---
+  useEffect(() => {
+    if (!selectedPathId) {
+      setUnitData(null);
+      return;
+    }
+    const fetchUnit = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'learning_paths', selectedPathId));
+        setUnitData(snap.exists() ? snap.data() : { title: 'Unidad', branches: {} });
+      } catch (error) {
+        console.error('Error fetching unit:', error);
+      }
+    };
+    fetchUnit();
+  }, [selectedPathId]);
 
   // --- DYNAMIC DATA FOR ACTIVE BRANCH ---
-  const currentPathId = `${BASE_PATH_ID}_${activeBranch}`;
   const currentBranchConfig = BRANCHES.find(b => b.id === activeBranch);
-  const pathTitle = branchData[activeBranch]?.title || 'Cargando...';
-  const pods = branchData[activeBranch]?.pods || [];
+  const pods = unitData?.branches?.[activeBranch]?.pods || [];
 
-  // --- PROGRESS SYNC (Derived from live userData) ---
-  const activePodIndex = userData?.progress?.[currentPathId]?.podIndex || 0;
-  const activeSegmentIndex = userData?.progress?.[currentPathId]?.segmentIndex || 0;
+  // --- PROGRESS SYNC (Derived from live userData, nested under unit -> branch) ---
+  const unitProgress = userData?.progress?.[selectedPathId];
+  const activePodIndex = unitProgress?.[activeBranch]?.podIndex || 0;
+  const activeSegmentIndex = unitProgress?.[activeBranch]?.segmentIndex || 0;
 
   // --- DYNAMIC COLOR DICTIONARIES ---
   const themeColors = {
     emerald: { bg: 'bg-emerald-50', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400', tabHover: 'hover:bg-emerald-100', tabActive: 'bg-emerald-600 text-white shadow-md' },
     amber: { bg: 'bg-amber-50', active: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-900', border: 'border-amber-200', line: 'bg-amber-400', tabHover: 'hover:bg-amber-100', tabActive: 'bg-amber-500 text-white shadow-md' },
     indigo: { bg: 'bg-indigo-50', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400', tabHover: 'hover:bg-indigo-100', tabActive: 'bg-indigo-600 text-white shadow-md' },
-    rose: { bg: 'bg-rose-50', active: 'bg-rose-600', ring: 'ring-rose-500', text: 'text-rose-800', border: 'border-rose-200', line: 'bg-rose-400', tabHover: 'hover:bg-rose-100', tabActive: 'bg-rose-600 text-white shadow-md' },
   };
   const theme = themeColors[currentBranchConfig.theme] || themeColors.emerald;
 
@@ -96,15 +114,26 @@ export default function StudentLearningPath() {
 
   // Extract all time brackets safely from the live user profile
   const allTimePoints = userData?.total_points || userData?.current_path_points || 0;
-  const monthlyPoints = userData?.monthly_points || 0;
-  const weeklyPoints = userData?.weekly_points || 0;
   const dailyPoints = userData?.daily_points || 0;
-  const pathPoints = userData?.progress?.[currentPathId]?.path_points || 0;
+  const pathPoints = unitProgress?.[activeBranch]?.path_points || 0;
+
+  const selectedTask = assignedTasks.find((t) => t.path_id === selectedPathId);
+  const isPastDue = selectedTask && Number(selectedTask.day_due) < liveDia;
 
   if (isLoading) {
     return (
       <div className={`min-h-screen bg-slate-50 flex items-center justify-center`}>
         <div className="text-xl font-bold text-slate-500 animate-pulse">Preparando las rutas...</div>
+      </div>
+    );
+  }
+
+  if (assignedTasks.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center gap-3">
+        <span className="text-5xl">🗺️</span>
+        <h1 className="text-xl font-black text-slate-800">Todavía no hay unidades asignadas</h1>
+        <p className="text-slate-500 font-medium max-w-sm">Cuando tu profesor asigne una unidad de Learning Path, aparecerá aquí.</p>
       </div>
     );
   }
@@ -116,9 +145,28 @@ export default function StudentLearningPath() {
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 shadow-sm">
         <div className="max-w-3xl mx-auto flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-2">
-            <h1 className="text-xl font-black text-slate-800">
-              Ruta de Aprendizaje {isAdmin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full ml-2 align-middle">ADMIN</span>}
-            </h1>
+            <div>
+              <h1 className="text-xl font-black text-slate-800 flex items-center flex-wrap gap-2">
+                {unitData?.title || 'Ruta de Aprendizaje'}
+                {isAdmin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full align-middle">ADMIN</span>}
+                {isPastDue && <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full align-middle">Vencido — Día {selectedTask.day_due}</span>}
+              </h1>
+
+              {/* UNIT SELECTOR — every unit assigned so far, due date doesn't gate access */}
+              {assignedTasks.length > 1 && (
+                <select
+                  value={selectedPathId}
+                  onChange={(e) => { setSelectedPathId(e.target.value); setActiveBranch('vocab'); }}
+                  className="mt-1 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
+                >
+                  {assignedTasks.map((task) => (
+                    <option key={task.path_id} value={task.path_id}>
+                      {task.titulo || task.path_id} {Number(task.day_due) < liveDia ? '(Vencido)' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
 
             {/* GAMIFICATION PILLS */}
             <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
@@ -328,14 +376,10 @@ export default function StudentLearningPath() {
                 newPodIdx = activePodIndex + 1;
                 newSegIdx = 0;
               }
-
-              // Only update local state if we aren't relying strictly on the snapshot reload
-              // setActivePodIndex(newPodIdx);
-              // setActiveSegmentIndex(newSegIdx);
             }
 
-            // --- 3. MULTI-BRACKET FIRESTORE SAVE ---
-            if (userData && userData.uid) {
+            // --- 3. MULTI-BRACKET FIRESTORE SAVE (nested under this unit -> this branch) ---
+            if (userData && userData.uid && selectedPathId) {
               try {
                 const userRef = doc(db, 'users', userData.uid);
                 const snap = await getDoc(userRef);
@@ -355,7 +399,7 @@ export default function StudentLearningPath() {
                    if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
                    if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
                    newDaily += (data.daily_points || 0);
-                   newPathPoints += (data.progress?.[currentPathId]?.path_points || 0);
+                   newPathPoints += (data.progress?.[selectedPathId]?.[activeBranch]?.path_points || 0);
                 }
 
                 await setDoc(userRef, {
@@ -367,10 +411,12 @@ export default function StudentLearningPath() {
                   weekKey,
                   monthKey,
                   progress: {
-                    [currentPathId]: {
-                      path_points: newPathPoints,
-                      podIndex: newPodIdx,
-                      segmentIndex: newSegIdx
+                    [selectedPathId]: {
+                      [activeBranch]: {
+                        path_points: newPathPoints,
+                        podIndex: newPodIdx,
+                        segmentIndex: newSegIdx
+                      }
                     }
                   }
                 }, { merge: true });

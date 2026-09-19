@@ -347,7 +347,7 @@ const Dashboard = () => {
           {/* RIGHT: SIDEBAR */}
           <div className="space-y-6">
             <GamesSidebar />
-            <LearningPathTile />
+            <LearningPathTile liveDia={liveDia} courseTasks={safeTareas} />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}
               <ResourceHub course={course} />

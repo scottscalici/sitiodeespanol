@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../../firebase'; 
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { db } from '../../../firebase';
 
 const TASK_TYPES = [
   "Dominio", 
@@ -24,6 +24,7 @@ const TareasSequencer = () => {
   const [loading, setLoading] = useState(true);
   const [calendarMap, setCalendarMap] = useState({});
   const [debugStatus, setDebugStatus] = useState("Cargando calendario...");
+  const [learningUnits, setLearningUnits] = useState([]);
 
   const MAX_DAYS = 80;
 
@@ -40,7 +41,13 @@ const TareasSequencer = () => {
           setTareasS4(data.s4 || []);
         }
 
-        // 2. Fetch 2026-2027 Academic Calendar from config collection
+        // 2. Fetch existing Learning Path units, for the Dominio task picker
+        const unitsSnap = await getDocs(collection(db, 'learning_paths'));
+        const units = [];
+        unitsSnap.forEach((d) => units.push({ id: d.id, ...d.data() }));
+        setLearningUnits(units);
+
+        // 3. Fetch 2026-2027 Academic Calendar from config collection
         const configRef = doc(db, 'config', 'academic_year_2026_2027');
         const configSnap = await getDoc(configRef);
         
@@ -105,7 +112,8 @@ const TareasSequencer = () => {
       day_due: dayNum + 1,
       tipo: "Dominio",
       titulo: "Nueva tarea",
-      notas_opcionales: ""
+      notas_opcionales: "",
+      path_id: ""
     };
 
     const updated = [...activeTasks, newTask];
@@ -276,13 +284,33 @@ const TareasSequencer = () => {
                                 <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block">Due Day</span>
                                 <span className="text-[10px] font-mono text-emerald-400">📅 {dueCalendarDates}</span>
                               </div>
-                              <input 
-                                type="number" 
-                                value={task.day_due} 
+                              <input
+                                type="number"
+                                value={task.day_due}
                                 onChange={(e) => handleTaskChange(globalIndex, 'day_due', e.target.value)}
                                 className="w-14 bg-black border border-neutral-700 text-cyan-400 text-center font-black rounded-md p-1.5 text-xs outline-none"
                               />
                             </div>
+
+                            {task.tipo === 'Dominio' && (
+                              <div className="md:col-span-12">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-amber-400 mb-1 block">Unidad de Learning Path</span>
+                                <select
+                                  value={task.path_id || ''}
+                                  onChange={(e) => handleTaskChange(globalIndex, 'path_id', e.target.value)}
+                                  className="w-full bg-neutral-900 border border-amber-900/50 focus:border-amber-400 text-amber-300 rounded-lg p-2 text-xs font-bold outline-none"
+                                >
+                                  <option value="">-- Selecciona una unidad --</option>
+                                  {learningUnits
+                                    .filter((unit) => unit.course === activeCourse)
+                                    .map((unit) => (
+                                      <option key={unit.id} value={unit.id}>
+                                        {unit.title || unit.id} ({unit.id})
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                            )}
                           </div>
 
                         </div>
