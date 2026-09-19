@@ -21,6 +21,7 @@ const DailyPlanHub = () => {
   const [allDestacados, setAllDestacados] = useState([]);
   const [allMusica, setAllMusica] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
+  const [allConversaciones, setAllConversaciones] = useState([]);
   const [allCuriosidades, setAllCuriosidades] = useState([]);
   
   // Decoupled Calentamiento States
@@ -57,7 +58,7 @@ const DailyPlanHub = () => {
 
         // Fetch Sequences & Collections
         const [
-          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap
+          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap
         ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
@@ -67,8 +68,9 @@ const DailyPlanHub = () => {
           getDocs(collection(db, 'musica')),
           getDocs(collection(db, 'videos')),
           getDocs(collection(db, 'curiosidades')),
-          getDocs(collection(db, 'calentamientos')), 
-          getDocs(collection(db, 'dailyVocabWarmups'))
+          getDocs(collection(db, 'calentamientos')),
+          getDocs(collection(db, 'dailyVocabWarmups')),
+          getDocs(collection(db, 'conversaciones'))
         ]);
 
         if (tareasSnap.exists()) {
@@ -94,6 +96,7 @@ const DailyPlanHub = () => {
         setAllCuriosidades(curSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllCalentamientos(calSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAllConversaciones(convSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       } catch (error) {
         console.error('Error loading Daily Hub data:', error);
@@ -124,6 +127,10 @@ const DailyPlanHub = () => {
     return false;
   });
 
+  const activeConversaciones = allConversaciones.filter(c =>
+    (c.courses || []).includes(activeCourse) && (c.dias || []).includes(selectedDay)
+  );
+
   const dateStrings = calendarMap[selectedDay] || [];
   const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Date TBD';
 
@@ -145,6 +152,7 @@ const DailyPlanHub = () => {
           <span>Destacados: {allDestacados.length}</span>
           <span>Calentamientos (V/Voc): {allCalentamientos.length}/{allVocabWarmups.length}</span>
           <span>Curiosidades: {allCuriosidades.length}</span>
+          <span>Conversaciones: {allConversaciones.length}</span>
         </div>
 
         {/* HEADER & CONTROLS */}
@@ -343,6 +351,35 @@ const DailyPlanHub = () => {
                 ))}
                 {activeMusica.length === 0 && activeVideos.length === 0 && (
                   <p className="text-neutral-500 text-sm italic col-span-2">Sin multimedia asignada.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">🗣️ Conversación</h2>
+                  <span className="bg-neutral-900 text-teal-400 text-xs font-bold px-2 py-1 rounded border border-teal-900/50">
+                    {activeConversaciones.length}
+                  </span>
+                </div>
+                <Link to="/admin-secret-portal-master?tipo=conversaciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
+              </div>
+              <div className="space-y-3">
+                {activeConversaciones.length === 0 ? (
+                  <p className="text-teal-900/50 text-xs italic font-bold">Sin conversación asignada para hoy.</p>
+                ) : (
+                  activeConversaciones.map(conv => (
+                    <div key={conv.id} className="bg-neutral-950 p-3 rounded-xl border border-teal-900/30 flex gap-3 items-center">
+                      <div className="w-12 h-12 bg-teal-900/20 rounded flex items-center justify-center shrink-0 overflow-hidden">
+                        {conv.imagen ? <img src={conv.imagen} alt={conv.titulo} className="w-full h-full object-cover" /> : '🗣️'}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-white">{conv.titulo}</p>
+                        <p className="text-[10px] text-teal-400 uppercase tracking-widest">{conv.subtitulo || conv.tag}</p>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
