@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useGymData } from '../hooks/useGymData';
-import Eslabones from './Eslabones'; 
+import { useAuth } from '../context/AuthContext';
+import Eslabones from './Eslabones';
 
 const ActivityPage = () => {
   const { type, id } = useParams();
@@ -265,30 +266,374 @@ const VideoLayout = ({ activity }) => {
 };
 
 // --- LAYOUT: CONVERSACIÓN 🗣️ ---
+const formatConvTime = (s) => {
+  const sign = s < 0 ? '-' : '';
+  const abs = Math.abs(s);
+  const m = Math.floor(abs / 60);
+  const sec = abs % 60;
+  return `${sign}${m}:${sec.toString().padStart(2, '0')}`;
+};
+
+const pickRandomQuestion = (pool) => pool[Math.floor(Math.random() * pool.length)];
+
 const ConversacionLayout = ({ activity }) => {
   const { raw } = activity;
+  const { userData } = useAuth();
+  const isS4 = userData?.course === 's4';
+
+  const baseSegments = (raw.presentation_segments || '')
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n) && n > 0);
+  const basePrep = raw.prep_seconds ?? 0;
+  const isOpenFormat = basePrep === 0 && baseSegments.length === 0;
+
+  const [simMode, setSimMode] = useState(false);
+  const prepSeconds = simMode ? 900 : basePrep;
+  const segments = simMode ? [240] : baseSegments;
+
+  const [phase, setPhase] = useState(isOpenFormat ? 'end' : 'idle'); // idle -> prep -> waitToSpeak -> speak -> end
+  const [seconds, setSeconds] = useState(prepSeconds);
+  const [segIndex, setSegIndex] = useState(0);
+  const intervalRef = useRef(null);
+
+  useEffect(() => () => clearInterval(intervalRef.current), []);
+
+  const clearTimer = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+  };
+
+  const startPrep = () => {
+    clearTimer();
+    setPhase('prep');
+    setSeconds(prepSeconds);
+    intervalRef.current = setInterval(() => {
+      setSeconds((prev) => {
+        if (prev <= 1) {
+          clearTimer();
+          setPhase('waitToSpeak');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const startSpeak = () => {
+    clearTimer();
+    setSegIndex(0);
+    setPhase('speak');
+    setSeconds(segments[0] ?? 0);
+    intervalRef.current = setInterval(() => {
+      setSeconds((prev) => prev - 1);
+    }, 1000);
+  };
+
+  const nextSegment = () => {
+    const next = segIndex + 1;
+    if (next < segments.length) {
+      setSegIndex(next);
+      setSeconds(segments[next]);
+    } else {
+      clearTimer();
+      setPhase('end');
+    }
+  };
+
+  const resetAll = () => {
+    clearTimer();
+    setSimMode(false);
+    setPhase(isOpenFormat ? 'end' : 'idle');
+    setSeconds(basePrep);
+    setSegIndex(0);
+  };
+
+  const startSimulacion = () => {
+    setSimMode(true);
+    clearTimer();
+    setPhase('prep');
+    setSeconds(900);
+    intervalRef.current = setInterval(() => {
+      setSeconds((prev) => {
+        if (prev <= 1) {
+          clearTimer();
+          setPhase('waitToSpeak');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const spoken = phase === 'speak' ? (segments[segIndex] ?? 0) - seconds : 0;
+  const isOvertime = phase === 'speak' && seconds < 0;
+  const isOnTarget = phase === 'speak' && spoken >= 180 && seconds >= 0;
+
+  // Notes (ephemeral — never persisted to Firestore, matching the original design)
+  const notasConfig = raw.notas || { type: 'block', bullets: 10, pregunta: false };
+  const [bulletNotes, setBulletNotes] = useState(
+    Array(notasConfig.bullets || 10).fill('')
+  );
+  const [blockNotes, setBlockNotes] = useState('');
+  const [tuPregunta, setTuPregunta] = useState('');
+
+  const updateBullet = (i, value) => {
+    setBulletNotes((prev) => {
+      const next = [...prev];
+      next[i] = value;
+      return next;
+    });
+  };
+
+  // Question zone
+  const [activeLevel, setActiveLevel] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState('');
+
+  const askQuestion = (level) => {
+    const pool = raw.preguntas?.[level] || [];
+    if (pool.length === 0) return;
+    const q = pickRandomQuestion(pool);
+    setActiveLevel(level);
+    setCurrentQuestion(q);
+  };
+
+  const hasPromptBox = raw.escenario || (raw.instrucciones || []).some((i) => i) || raw.modelo;
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-       <div className="md:flex border-b border-slate-100 bg-slate-50/50">
-        <div className="md:w-1/3 shrink-0">
-          <img src={activity.img} alt={activity.title} className="w-full h-48 md:h-full object-cover" />
-        </div>
+      <div className="md:flex border-b border-slate-100 bg-slate-50/50">
+        {activity.img && (
+          <div className="md:w-1/3 shrink-0">
+            <img src={activity.img} alt={activity.title} className="w-full h-48 md:h-full object-cover" />
+          </div>
+        )}
         <div className="p-6 md:p-8 flex flex-col justify-center">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">{activity.subtitle}</h4>
+          {activity.subtitle && (
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">{activity.subtitle}</h4>
+          )}
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 leading-tight">{activity.title}</h1>
+          {(raw.etiquetas || []).length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {raw.etiquetas.map((tag, i) => (
+                <span key={i} className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-      <div className="p-6 md:p-8">
-        {raw.preguntas && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {['1', '2', '3'].map(lvl => raw.preguntas[lvl] && (
-              <div key={lvl} className={`rounded-xl p-5 border ${lvl === '1' ? 'bg-emerald-50 border-emerald-100' : lvl === '2' ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100'}`}>
-                 <h4 className="font-black uppercase text-[10px] tracking-widest mb-4 border-b border-slate-200 pb-2">Nivel {lvl}</h4>
-                 <ul className="space-y-3">
-                   {raw.preguntas[lvl].map((q, i) => <li key={i} className="text-sm font-medium leading-snug">{q}</li>)}
-                 </ul>
+
+      <div className="p-6 md:p-8 flex flex-col gap-6">
+        {/* Literary excerpt, when present */}
+        {raw.extracto && (
+          <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-6">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-3">Extracto</h4>
+            <p className="text-slate-700 leading-relaxed whitespace-pre-wrap font-serif">{raw.extracto}</p>
+          </div>
+        )}
+
+        {/* Escenario / Instrucciones / Modelo */}
+        {hasPromptBox && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 flex flex-col gap-4">
+            {raw.escenario && (
+              <div>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Escenario</h4>
+                <p className="text-slate-700 font-medium leading-relaxed">{raw.escenario}</p>
               </div>
+            )}
+            {(raw.instrucciones || []).filter(Boolean).length > 0 && (
+              <div>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Instrucciones</h4>
+                <ul className="list-disc list-inside space-y-1">
+                  {raw.instrucciones.filter(Boolean).map((instr, i) => (
+                    <li key={i} className="text-slate-700 font-medium">{instr}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {raw.modelo && (
+              <div>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Modelo de Respuesta</h4>
+                <p className="text-slate-700 italic leading-relaxed">{raw.modelo}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Enlaces de apoyo */}
+        {(raw.enlaces || []).filter((e) => e.url).length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {raw.enlaces.filter((e) => e.url).map((enlace, i) => (
+              <a
+                key={i}
+                href={enlace.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-black uppercase tracking-widest text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-full shadow-sm transition-colors"
+              >
+                {enlace.texto || 'Enlace'} ↗
+              </a>
             ))}
+          </div>
+        )}
+
+        {/* Timer engine */}
+        {!isOpenFormat && (
+          <div className="bg-slate-900 rounded-xl p-8 text-center flex flex-col items-center gap-4">
+            {isS4 && phase === 'idle' && !simMode && (
+              <button
+                onClick={startSimulacion}
+                className="self-end text-[10px] font-black uppercase tracking-widest text-rose-300 bg-rose-900/40 border border-rose-500/40 px-3 py-1 rounded-full hover:bg-rose-900/70 transition-colors"
+              >
+                Simulación (Condiciones de Examen)
+              </button>
+            )}
+
+            {phase === 'idle' && (
+              <>
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Preparación: {formatConvTime(prepSeconds)}</p>
+                <button
+                  onClick={startPrep}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-sm px-8 py-4 rounded-xl transition-colors"
+                >
+                  Comenzar Preparación
+                </button>
+              </>
+            )}
+
+            {phase === 'prep' && (
+              <>
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Preparando...</p>
+                <p className="text-white text-6xl font-black tabular-nums">{formatConvTime(seconds)}</p>
+              </>
+            )}
+
+            {phase === 'waitToSpeak' && (
+              <>
+                <p className="text-emerald-400 text-lg font-black uppercase tracking-widest animate-pulse">¡Listo Para Hablar!</p>
+                <button
+                  onClick={startSpeak}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-sm px-8 py-4 rounded-xl transition-colors"
+                >
+                  Comenzar a Hablar
+                </button>
+              </>
+            )}
+
+            {phase === 'speak' && (
+              <>
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">
+                  Segmento {segIndex + 1} de {segments.length}
+                </p>
+                <p
+                  className={`text-6xl font-black tabular-nums ${
+                    isOvertime ? 'text-rose-500' : isOnTarget ? 'text-emerald-400' : 'text-white'
+                  }`}
+                >
+                  {formatConvTime(seconds)}
+                </p>
+                {isOvertime && <p className="text-rose-400 text-xs font-black uppercase tracking-widest">Tiempo Extra</p>}
+                <button
+                  onClick={nextSegment}
+                  className="bg-white hover:bg-slate-200 text-slate-900 font-black uppercase tracking-widest text-sm px-8 py-4 rounded-xl transition-colors"
+                >
+                  {segIndex + 1 < segments.length ? 'Siguiente Segmento' : 'Terminar'}
+                </button>
+              </>
+            )}
+
+            {phase === 'end' && (
+              <p className="text-emerald-400 text-lg font-black uppercase tracking-widest">Presentación Terminada</p>
+            )}
+
+            {phase !== 'idle' && (
+              <button
+                onClick={resetAll}
+                className="text-slate-500 hover:text-slate-300 text-[10px] font-bold uppercase tracking-widest transition-colors"
+              >
+                Reiniciar
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Notes area */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Tus Notas</h4>
+          {notasConfig.type === 'bullets' ? (
+            <div className="flex flex-col gap-2">
+              {bulletNotes.map((val, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 w-5 text-right">{i + 1}.</span>
+                  <input
+                    value={val}
+                    onChange={(e) => updateBullet(i, e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              value={blockNotes}
+              onChange={(e) => setBlockNotes(e.target.value)}
+              className="w-full min-h-[160px] px-3 py-2 rounded-lg border border-slate-200 text-sm"
+              placeholder="Escribe tus notas aquí..."
+            />
+          )}
+          {notasConfig.pregunta && (
+            <div className="mt-4">
+              <label className="text-xs font-bold text-slate-500 block mb-1">Tu Pregunta</label>
+              <input
+                value={tuPregunta}
+                onChange={(e) => setTuPregunta(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Question zone */}
+        {phase === 'end' && raw.preguntas && (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              {['1', '2', '3'].map(
+                (lvl) =>
+                  (raw.preguntas[lvl] || []).length > 0 && (
+                    <button
+                      key={lvl}
+                      onClick={() => askQuestion(lvl)}
+                      className={`rounded-xl p-4 border text-center font-black uppercase text-xs tracking-widest transition-colors ${
+                        activeLevel === lvl
+                          ? lvl === '1'
+                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                            : lvl === '2'
+                            ? 'bg-amber-500 border-amber-500 text-white'
+                            : 'bg-rose-500 border-rose-500 text-white'
+                          : lvl === '1'
+                          ? 'bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100'
+                          : lvl === '2'
+                          ? 'bg-amber-50 border-amber-100 text-amber-700 hover:bg-amber-100'
+                          : 'bg-rose-50 border-rose-100 text-rose-700 hover:bg-rose-100'
+                      }`}
+                    >
+                      Nivel {lvl}
+                    </button>
+                  )
+              )}
+            </div>
+            {currentQuestion && (
+              <div className="bg-slate-800 rounded-xl p-6 text-center">
+                <p className="text-white text-lg font-bold leading-relaxed">{currentQuestion}</p>
+                <button
+                  onClick={() => askQuestion(activeLevel)}
+                  className="mt-4 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors"
+                >
+                  🔄 Otra Pregunta
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
