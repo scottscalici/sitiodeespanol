@@ -42,21 +42,25 @@ export default function ResourceHub({ course = 's2' }) {
   const courseDisplayName = currentCourse === 's4' ? 'Español 4 / IB' : 'Español II';
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all">
-      <button 
+    <div className="rounded-2xl shadow-sm overflow-hidden transition-all bg-white">
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-5 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+        className="group relative w-full p-5 flex items-center justify-between overflow-hidden bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 hover:brightness-110 transition-all cursor-pointer text-left shadow-xl"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🧰</span>
+        <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="relative flex items-center gap-4">
+          <div className="w-11 h-11 shrink-0 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner">
+            🧰
+          </div>
           <div>
-            <h3 className="font-black text-xs text-slate-700 uppercase tracking-widest">
+            <h3 className="font-black text-sm text-white uppercase tracking-widest">
               Panel de Recursos ({courseDisplayName})
             </h3>
-            <p className="text-[10px] text-slate-400 font-medium">Trip details, support links & course materials</p>
+            <p className="text-xs text-violet-200 font-medium">Trip details, support links & course materials</p>
           </div>
         </div>
-        <span className={`transform transition-transform duration-300 text-slate-400 font-bold ${isOpen ? 'rotate-180' : ''}`}>
+        <span className={`relative transform transition-transform duration-300 text-white font-bold ${isOpen ? 'rotate-180' : ''}`}>
           ▼
         </span>
       </button>
