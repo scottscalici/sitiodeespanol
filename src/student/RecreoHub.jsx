@@ -93,15 +93,15 @@ const RecreoHub = () => {
               EXPLORAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
-
-          {/* 5. IMPOSTOR */}
-          <Link to="/juegos/impostor" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.3)] hover:-translate-y-2 overflow-hidden">
+                    {/* 5. IMPOSTOR */}
+                    <Link to="/juegos/impostor" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.3)] hover:-translate-y-2 overflow-hidden">
             <div className="absolute top-4 right-4 z-20 bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-500/50">
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl bg-slate-900">
-              <span className="text-6xl">🎭</span>
-            </div>
+            <img src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png" 
+                 alt="Impostor" 
+                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+               />
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Impostor</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra al impostor en tu mesa. Juega en grupo, en vivo, en español.</p>
             <div className="text-indigo-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">

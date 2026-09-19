@@ -27,7 +27,7 @@ const Countdown = ({ course }) => {
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
 
       <span className="inline-flex items-center gap-1.5 bg-white/10 text-indigo-200 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-5">
-        <span>⏳</span> Examen IB
+        <span>⏳</span> Evaluación interna
       </span>
 
       <div className="flex justify-center gap-3">
