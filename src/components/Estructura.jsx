@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
@@ -8,6 +8,21 @@ const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_'
 const Estructura = ({ estructura = [], liveDia }) => {
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
   const [linkTitles, setLinkTitles] = useState({});
+  const [allPages, setAllPages] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+
+  // Fetch every grammar page once, so Recursos categories can be expanded into their pages
+  useEffect(() => {
+    const fetchAllPages = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'grammar_pages'));
+        setAllPages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      } catch (error) {
+        console.error('Error fetching grammar pages:', error);
+      }
+    };
+    fetchAllPages();
+  }, []);
 
   useEffect(() => {
     const allIds = new Set();
@@ -111,9 +126,14 @@ const Estructura = ({ estructura = [], liveDia }) => {
                         Recursos
                       </span>
                       {recursosArr.map((recurso, i) => (
-                        <span key={i} className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setActiveCategory(recurso)}
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                        >
                           {recurso}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -125,6 +145,52 @@ const Estructura = ({ estructura = [], liveDia }) => {
           );
         })}
       </div>
+
+      {/* RECURSOS CATEGORY POPUP */}
+      {activeCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="bg-slate-900 p-5 flex justify-between items-center">
+              <h2 className="text-white font-black uppercase tracking-widest text-sm">
+                {activeCategory}
+              </h2>
+              <button
+                onClick={() => setActiveCategory(null)}
+                className="text-slate-400 hover:text-white text-3xl font-bold leading-none p-2 -mr-2"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-2 bg-slate-50">
+              {(() => {
+                const pagesInCategory = allPages.filter(
+                  (page) => (page.category || '').toLowerCase() === activeCategory.toLowerCase()
+                );
+
+                if (pagesInCategory.length === 0) {
+                  return (
+                    <p className="text-center text-slate-400 italic font-bold py-8">
+                      No hay páginas en esta categoría todavía.
+                    </p>
+                  );
+                }
+
+                return pagesInCategory.map((page) => (
+                  <Link
+                    key={page.id}
+                    to={`/gramatica/${encodeURIComponent(page.id)}`}
+                    onClick={() => setActiveCategory(null)}
+                    className="block bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 p-4 rounded-xl shadow-sm transition-colors font-bold text-slate-800 text-sm"
+                  >
+                    {page.title || page.id}
+                  </Link>
+                ));
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
