@@ -10,6 +10,7 @@ import Header from '../components/Header';
 import Evaluacion from '../components/Evaluacion';
 import Countdown from '../components/Countdown';
 import GamesSidebar from '../components/GamesSidebar';
+import LearningPathTile from '../components/LearningPathTile';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
@@ -346,6 +347,7 @@ const Dashboard = () => {
           {/* RIGHT: SIDEBAR */}
           <div className="space-y-6">
             <GamesSidebar />
+            <LearningPathTile />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}
               <ResourceHub course={course} />
