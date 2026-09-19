@@ -294,7 +294,7 @@ const Dashboard = () => {
               <Link
                 key={bundleId}
                 to={`/vocabulario/${bundleId}`}
-                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
               >
                 <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -309,14 +309,14 @@ const Dashboard = () => {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <span className="block text-[9px] font-black uppercase tracking-widest text-indigo-200 mb-1">Conjunto Asignado</span>
+                    <span className="block text-[9px] font-black uppercase tracking-widest text-emerald-200 mb-1">Conjunto Asignado</span>
                     <h3 className="text-lg font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
-                    <p className="text-indigo-100/80 text-xs font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
+                    <p className="text-emerald-100/80 text-xs font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
                   </div>
                 </div>
 
                 <div className="mt-5 flex justify-end">
-                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-indigo-700 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-xs px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
                     Estudiar <span>→</span>
                   </span>
                 </div>
