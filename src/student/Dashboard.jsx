@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import Evaluacion from '../components/Evaluacion';
 import Countdown from '../components/Countdown';
-import AITutor from '../components/AITutor';
 import GamesSidebar from '../components/GamesSidebar';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
@@ -370,7 +369,6 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
-              <AITutor temas={data?.temas} />
             </div>
           </div>
         </div>
