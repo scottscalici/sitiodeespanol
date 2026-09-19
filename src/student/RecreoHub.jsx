@@ -109,6 +109,21 @@ const RecreoHub = () => {
             </div>
           </Link>
 
+          {/* 6. SÍLABAS */}
+          <Link to="/juegos/silabas" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-teal-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(20,184,166,0.3)] hover:-translate-y-2 overflow-hidden">
+            <div className="absolute top-4 right-4 z-20 bg-teal-500/20 text-teal-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-teal-500/50">
+              Nuevo
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl bg-slate-900/60">
+              <span className="text-6xl">🔤</span>
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-teal-400 transition-colors">Sílabas</h2>
+            <p className="text-slate-400 text-sm font-medium mb-8">Reconstruye palabras uniendo las sílabas correctas en orden.</p>
+            <div className="text-teal-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
+            </div>
+          </Link>
+
         </div>
       </div>
     </div>

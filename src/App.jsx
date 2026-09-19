@@ -26,6 +26,7 @@ import ConectoresEngine from './student/ConectoresEngine';
 import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
 import SampleSentencesPage from './student/SampleSentencesPage';
+import SilabasPage from './student/SilabasPage';
 
 
 // ⚙️ GLOBAL UI COMPONENTS
@@ -48,6 +49,7 @@ import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
@@ -143,6 +145,7 @@ function App() {
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
             <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
+            <Route path="/juegos/silabas" element={<SilabasPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/student-learning-path" element={<StudentLearningPath />} />
@@ -427,6 +430,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-silabas"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SilabasAdmin />
                 </AdminRoute>
               }
             />
