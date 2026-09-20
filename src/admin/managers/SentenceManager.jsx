@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, doc, getDocs, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
+import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { AVAILABLE_TENSES, SUBJECTS, PAIR_MAP, POOL_MAP, DISTRACTOR_MODES } from '../../utils/distractorConfig';
 
 const BLANK_EXAMPLE = 'Yo [[fui]] a la tienda ayer.';
@@ -36,8 +37,8 @@ export default function SentenceManager() {
   const fetchSentences = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'sentence_bank'));
-      setSentences(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      // Shared cache — FormLearningPath also reads sentence_bank in full.
+      setSentences(await getCachedCollection('sentence_bank'));
     } catch (err) {
       console.error('Error fetching sentence bank:', err);
     } finally {
@@ -135,6 +136,7 @@ export default function SentenceManager() {
         setStatus('✅ Oración actualizada.');
       }
 
+      invalidateCollectionCache('sentence_bank');
       cancelEdit();
       await fetchSentences();
     } catch (err) {
@@ -149,6 +151,7 @@ export default function SentenceManager() {
     if (!window.confirm('¿Eliminar esta oración permanentemente?')) return;
     try {
       await deleteDoc(doc(db, 'sentence_bank', id));
+      invalidateCollectionCache('sentence_bank');
       setSentences((prev) => prev.filter((s) => s.id !== id));
       if (editingId === id) cancelEdit();
     } catch (err) {

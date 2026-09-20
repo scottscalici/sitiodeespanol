@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js';
-import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 
 // --- SLUG HELPERS (shared by bulk importer + single-word editor) ---
 const slugifyBook = (textbook) => (textbook || 'unknown_book').replace(/\s+/g, '_').toLowerCase();
@@ -137,19 +138,21 @@ const VocabVault = () => {
   const [replaceTextbook, setReplaceTextbook] = useState("");
   const [replaceSection, setReplaceSection] = useState("all");
 
-  // Load Data
+  // Load Data — shared cache means repeat visits (and other admin tools
+  // reading the same collections) skip the re-download until something
+  // actually changes.
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const vocabSnap = await getDocs(collection(db, "vocabulary"));
-      setFullVocab(vocabSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      
-      const pathsSnap = await getDocs(collection(db, "vocabPaths"));
-      setSavedPaths(pathsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const [vocab, paths, warmups] = await Promise.all([
+        getCachedCollection("vocabulary"),
+        getCachedCollection("vocabPaths"),
+        getCachedCollection("dailyVocabWarmups"),
+      ]);
+      setFullVocab(vocab);
+      setSavedPaths(paths);
+      setSavedWarmups([...warmups].sort((a, b) => a.dia - b.dia));
 
-      const warmupsSnap = await getDocs(collection(db, "dailyVocabWarmups"));
-      setSavedWarmups(warmupsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => a.dia - b.dia));
-      
       setIsLoading(false);
     } catch (err) {
       console.error("Database error:", err);
@@ -227,6 +230,7 @@ const VocabVault = () => {
           });
         }
       }
+      invalidateCollectionCache("vocab_bundles");
       alert("✅ Chapter Bundles successfully published!");
       setUploadStatus('');
     } catch (err) {
@@ -245,7 +249,8 @@ const VocabVault = () => {
         await setDoc(doc(db, "vocabulary", docId), { ...item, lastUpdated: serverTimestamp() });
       }
       setJsonInput('');
-      await fetchData(); 
+      invalidateCollectionCache("vocabulary");
+      await fetchData();
       setUploadStatus('✅ Library updated.');
     } catch (error) { setUploadStatus('❌ Error: Invalid JSON'); }
   };
@@ -329,12 +334,14 @@ const VocabVault = () => {
         }
         updatedData.id = newId;
         await setDoc(doc(db, "vocabulary", newId), updatedData);
+        invalidateCollectionCache("vocabulary");
         setFullVocab(prev => [...prev.filter(w => w.id !== newId), { ...updatedData, id: newId }]);
         setEditingWord(null);
         alert("Word created!");
       } else {
         const docRef = doc(db, "vocabulary", editingWord.id);
         await updateDoc(docRef, updatedData);
+        invalidateCollectionCache("vocabulary");
         setFullVocab(fullVocab.map(w => w.id === editingWord.id ? { ...updatedData, id: editingWord.id } : w));
         setEditingWord(null);
         alert("Updated successfully!");
@@ -346,6 +353,7 @@ const VocabVault = () => {
     if (!window.confirm("Delete this word permanently? This cannot be undone.")) return;
     try {
       await deleteDoc(doc(db, "vocabulary", wordId));
+      invalidateCollectionCache("vocabulary");
       setFullVocab(prev => prev.filter(w => w.id !== wordId));
       setEditingWord(null);
     } catch (e) { alert("Error deleting."); }
@@ -371,6 +379,7 @@ const VocabVault = () => {
         const up = results.find(r => r.id === w.id);
         return up ? { ...w, metadata: up.updatedMetadata } : w;
       }));
+      invalidateCollectionCache("vocabulary");
       setSelectedWords([]); setBulkTextbook(""); setBulkSection("");
       alert(`Updated ${results.length} words!`);
     } catch (e) { alert("Error bulk updating."); }
@@ -396,6 +405,7 @@ const VocabVault = () => {
     if (!editingPath.name) return alert("Give the path a name.");
     try {
       await setDoc(doc(db, "vocabPaths", editingPath.id), { name: editingPath.name, steps: editingPath.steps, lastUpdated: serverTimestamp() });
+      invalidateCollectionCache("vocabPaths");
       const updatedPaths = savedPaths.filter(p => p.id !== editingPath.id);
       setSavedPaths([...updatedPaths, editingPath]);
       setEditingPath(null);
@@ -509,7 +519,8 @@ const VocabVault = () => {
         await addDoc(collection(db, "dailyVocabWarmups"), warmupPayload);
         alert(`Saved Día ${diaNumber} (${courseTag.toUpperCase()})!`);
       }
-      await fetchData(); 
+      invalidateCollectionCache("dailyVocabWarmups");
+      await fetchData();
     } catch (e) {
       console.error(e);
       alert("Error saving practice.");

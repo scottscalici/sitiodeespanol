@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 
 export default function CalentamientoAdmin() {
   const [calId, setCalId] = useState('cal_s2_d26');
@@ -44,18 +45,20 @@ export default function CalentamientoAdmin() {
   useEffect(() => {
     const fetchMetaData = async () => {
       try {
-        const groupsSnap = await getDocs(collection(db, 'verbGroups'));
-        const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Shared cache — verbGroups/verbs are also read by VerbVault and
+        // FormLearningPath, so repeat visits (and those other tools) skip
+        // the re-download.
+        const [groups, cals, verbsArray] = await Promise.all([
+          getCachedCollection('verbGroups'),
+          getCachedCollection('calentamientos'),
+          getCachedCollection('verbs'),
+        ]);
         setVerbGroups(groups);
+        setSavedPractices([...cals].sort((a, b) => a.dia - b.dia));
 
-        const calsSnap = await getDocs(collection(db, 'calentamientos'));
-        const cals = calsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.dia - b.dia);
-        setSavedPractices(cals);
-
-        const verbsSnap = await getDocs(collection(db, 'verbs'));
         const verbsMap = {};
-        verbsSnap.forEach((d) => {
-          verbsMap[d.id] = d.data();
+        verbsArray.forEach((v) => {
+          verbsMap[v.id] = v;
         });
         setMasterVerbsMap(verbsMap);
       } catch (err) {
@@ -311,6 +314,7 @@ const generateQuestionsArray = () => {
         },
         { merge: true }
       );
+      invalidateCollectionCache('calentamientos');
 
       alert(
         '¡Calentamiento de verbos fijado exitosamente en Firestore!'

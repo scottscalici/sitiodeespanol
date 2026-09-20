@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getCachedCollection } from '../utils/firestoreCache';
 
 const CONFIG = {
   DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
@@ -134,12 +135,16 @@ export const useGymData = (userCourse = 's2') => {
           }
         };
 
+        // Shared cache — several admin tools (VocabSequencer, FormLearningPath)
+        // also read vocab_bundles in full, and this hook itself re-runs on
+        // every Dashboard mount, so caching cuts both cross-tool duplication
+        // and repeat-visit re-fetches within the same browser session.
         const fetchFirestoreCategory = async (collectionName) => {
           try {
-            const snap = await getDocs(collection(db, collectionName));
+            const docs = await getCachedCollection(collectionName);
             const items = {};
-            snap.forEach((doc) => {
-              items[doc.id] = doc.data();
+            docs.forEach((d) => {
+              items[d.id] = d;
             });
             return { items };
           } catch (err) {
@@ -149,11 +154,7 @@ export const useGymData = (userCourse = 's2') => {
 
         const fetchFirestoreArray = async (collectionName, rootKey) => {
           try {
-            const snap = await getDocs(collection(db, collectionName));
-            const itemsArray = snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }));
+            const itemsArray = await getCachedCollection(collectionName);
             return rootKey ? { [rootKey]: itemsArray } : itemsArray;
           } catch (err) {
             return rootKey ? { [rootKey]: [] } : [];

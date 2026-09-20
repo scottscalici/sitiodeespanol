@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getCachedCollection } from '../../../utils/firestoreCache';
 import { db } from '../../../firebase';
 
 const TASK_TYPES = [
@@ -42,10 +43,9 @@ const TareasSequencer = () => {
           setTareasS4(data.s4 || []);
         }
 
-        // 2. Fetch existing Learning Path units, for the Dominio task picker
-        const unitsSnap = await getDocs(collection(db, 'learning_paths'));
-        const units = [];
-        unitsSnap.forEach((d) => units.push({ id: d.id, ...d.data() }));
+        // 2. Fetch existing Learning Path units, for the Dominio task picker.
+        // Shared cache — FormLearningPath also reads learning_paths in full.
+        const units = await getCachedCollection('learning_paths');
         setLearningUnits(units);
 
         // 3. Fetch 2026-2027 Academic Calendar from config collection

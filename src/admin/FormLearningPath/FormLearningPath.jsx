@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
-import { collection, getDocs, doc, setDoc, getDoc, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, addDoc } from 'firebase/firestore';
+import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 
 export default function FormLearningPath() {
   const [course, setCourse] = useState('s2');
@@ -129,6 +130,7 @@ export default function FormLearningPath() {
         updated_at: new Date().toISOString(),
         branches,
       }, { merge: true });
+      invalidateCollectionCache('learning_paths');
 
       setMigrationStatus(`✅ Migrado a "${LEGACY_BASE_ID}" (${totalPods} pods). Los 3 documentos antiguos no se borraron — puedes eliminarlos manualmente cuando confirmes que todo funciona.`);
       fetchExistingPaths();
@@ -143,9 +145,9 @@ export default function FormLearningPath() {
   // =========================================================
   const fetchExistingPaths = async () => {
     try {
-      const snap = await getDocs(collection(db, 'learning_paths'));
-      const paths = [];
-      snap.forEach(d => paths.push({ id: d.id, ...d.data() }));
+      // Shared cache — TareasSequencer also reads learning_paths for its
+      // Dominio-tarea picker, so this dedupes with that tool too.
+      const paths = await getCachedCollection('learning_paths');
       setExistingPaths(paths);
     } catch (err) { console.error("Error fetching paths:", err); }
   };
@@ -330,13 +332,14 @@ export default function FormLearningPath() {
 
   const fetchAllChapters = async () => {
     try {
-      const snap = await getDocs(collection(db, 'vocab_bundles'));
+      // Shared cache — VocabSequencer and the student useGymData hook also
+      // read vocab_bundles in full.
+      const bundles = await getCachedCollection('vocab_bundles');
       const booksSet = new Set();
       const chaptersSet = new Set();
-      
-      snap.forEach(d => { 
-        const data = d.data();
-        const bookName = guessBookName(data, d.id);
+
+      bundles.forEach(data => {
+        const bookName = guessBookName(data, data.id);
         booksSet.add(bookName);
         
         if (bookName === selectedBook && data.chapter) {
@@ -362,13 +365,12 @@ export default function FormLearningPath() {
     setIsLoadingVault(true);
     try {
       let targetData = null;
-      const snap = await getDocs(collection(db, 'vocab_bundles'));
-      
-      snap.forEach(d => { 
-        const data = d.data();
-        const bookName = guessBookName(data, d.id);
+      const bundles = await getCachedCollection('vocab_bundles');
+
+      bundles.forEach(data => {
+        const bookName = guessBookName(data, data.id);
         if (bookName === selectedBook && data.chapter === selectedChapter) {
-           targetData = data; 
+           targetData = data;
         }
       });
 
@@ -393,19 +395,16 @@ export default function FormLearningPath() {
 
   const fetchVerbsAndGrammar = async () => {
     try {
-      const groupSnap = await getDocs(collection(db, 'verbGroups'));
-      const groupList = [];
-      groupSnap.forEach(doc => {
-        const data = doc.data();
-        groupList.push({ id: doc.id, label: data.name || doc.id, tags: data.tenses?.[0] || 'Cluster', tenses: data.tenses || [], verbIds: data.verbIds || [], isGroup: true, fullData: data });
-      });
+      // Shared cache — verbGroups/verbs are also read by VerbVault and
+      // CalentamientoAdmin; sentence_bank is also read by SentenceManager.
+      const [groups, verbs, grammarList] = await Promise.all([
+        getCachedCollection('verbGroups'),
+        getCachedCollection('verbs'),
+        getCachedCollection('sentence_bank'),
+      ]);
 
-      const verbSnap = await getDocs(collection(db, 'verbs'));
-      const verbList = [];
-      verbSnap.forEach(doc => {
-        const data = doc.data();
-        verbList.push({ id: doc.id, label: data.infinitive || doc.id, tags: data.tense || data.type || 'Verbo', tenses: [data.tense, data.type].filter(Boolean), isGroup: false, fullData: data });
-      });
+      const groupList = groups.map(data => ({ id: data.id, label: data.name || data.id, tags: data.tenses?.[0] || 'Cluster', tenses: data.tenses || [], verbIds: data.verbIds || [], isGroup: true, fullData: data }));
+      const verbList = verbs.map(data => ({ id: data.id, label: data.infinitive || data.id, tags: data.tense || data.type || 'Verbo', tenses: [data.tense, data.type].filter(Boolean), isGroup: false, fullData: data }));
 
       const combined = [...groupList, ...verbList];
       setAllVerbsList(combined);
@@ -415,9 +414,6 @@ export default function FormLearningPath() {
       combined.forEach(item => item.tenses?.forEach(t => tensesSet.add(t)));
       setAvailableVerbTenses(Array.from(tensesSet));
 
-      const grammarSnap = await getDocs(collection(db, 'sentence_bank'));
-      const grammarList = [];
-      grammarSnap.forEach(doc => grammarList.push({ id: doc.id, ...doc.data() }));
       const mappedGrammar = grammarList.map(g => ({
         id: g.id,
         label: g.spanish || g.sentence,
@@ -468,6 +464,7 @@ export default function FormLearningPath() {
       };
       const totalPods = BRANCHES.reduce((sum, b) => sum + podsByBranch[b].length, 0);
       await setDoc(doc(db, 'learning_paths', pathId), { path_id: pathId, title: pathTitle, course, textbook: selectedBook, chapter: selectedChapter, total_pods: totalPods, updated_at: new Date().toISOString(), branches }, { merge: true });
+      invalidateCollectionCache('learning_paths');
       alert("🎉 Saved!"); fetchExistingPaths();
     } catch (err) {}
     setIsSaving(false);
@@ -490,6 +487,7 @@ export default function FormLearningPath() {
         createdAt: new Date().toISOString(),
       };
       const docRef = await addDoc(collection(db, 'sentence_bank'), payload);
+      invalidateCollectionCache('sentence_bank');
       const newItem = { id: docRef.id, label: sentence, tags: topic || 'Gramática', chapterId: payload.chapterId, grammarTags, fullData: payload };
       setAllGrammarList([newItem, ...allGrammarList]);
     } catch (err) {

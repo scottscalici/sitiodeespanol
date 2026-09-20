@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { getCachedCollection } from '../../utils/firestoreCache';
 
 const VocabSequencer = () => {
   const [course, setCourse] = useState('s2');
@@ -33,13 +34,13 @@ const VocabSequencer = () => {
           });
         }
 
-        // Fetch bundle options (e.g., descubre_2_ch8)
-        const bundlesRef = collection(db, 'vocab_bundles');
-        const bundlesSnap = await getDocs(bundlesRef);
-        const loadedBundles = bundlesSnap.docs.map(d => ({
+        // Fetch bundle options (e.g., descubre_2_ch8). Shared cache —
+        // FormLearningPath and useGymData also read vocab_bundles in full.
+        const bundles = await getCachedCollection('vocab_bundles');
+        const loadedBundles = bundles.map(d => ({
           id: d.id,
-          textbook: d.data().textbook || 'Libro',
-          chapter: d.data().chapter || '?'
+          textbook: d.textbook || 'Libro',
+          chapter: d.chapter || '?'
         }));
         
         // Sort bundles alphabetically for the checklist

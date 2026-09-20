@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js'; 
-import { collection, addDoc, getDocs, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 
 const VerbVault = () => {
   const [activeTab, setActiveTab] = useState('curate'); 
@@ -52,17 +53,18 @@ const VerbVault = () => {
     { id: 'imperativo_negativo', label: 'Mandatos (-)' }
   ];
 
-  // Load EVERYTHING from Firestore on mount
+  // Load EVERYTHING from Firestore on mount — shared cache means repeat
+  // visits (and other admin tools reading verbs/verbGroups, like
+  // FormLearningPath and CalentamientoAdmin) skip the re-download.
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const verbSnapshot = await getDocs(collection(db, "verbs"));
-        const verbData = verbSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const groupSnapshot = await getDocs(collection(db, "verbGroups"));
-        const groupData = groupSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const [verbData, groupData] = await Promise.all([
+          getCachedCollection("verbs"),
+          getCachedCollection("verbGroups"),
+        ]);
 
-        setFullLibrary(verbData); 
+        setFullLibrary(verbData);
         setGroups(groupData);
         
         if (groupData.length > 0) {
@@ -124,13 +126,14 @@ const VerbVault = () => {
     try {
       if (draftGroup.id) {
         const docRef = doc(db, "verbGroups", draftGroup.id);
-        const { id, ...dataToSave } = draftGroup; 
+        const { id, ...dataToSave } = draftGroup;
         await updateDoc(docRef, dataToSave);
-        
+        invalidateCollectionCache("verbGroups");
         setGroups(groups.map(g => g.id === draftGroup.id ? { id: draftGroup.id, ...dataToSave } : g));
         alert("Group updated successfully!");
       } else {
         const docRef = await addDoc(collection(db, "verbGroups"), draftGroup);
+        invalidateCollectionCache("verbGroups");
         const newGroupWithId = { id: docRef.id, ...draftGroup };
         setGroups([...groups, newGroupWithId]);
         alert("New group created successfully!");
@@ -255,6 +258,7 @@ const VerbVault = () => {
         sequence: sequence,
         createdAt: serverTimestamp()
       });
+      invalidateCollectionCache("dailyWarmups");
       alert(`Día ${diaNumber} Saved!`);
     } catch (e) { 
       console.error(e); 
