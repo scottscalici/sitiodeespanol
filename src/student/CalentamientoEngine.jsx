@@ -189,6 +189,10 @@ export default function CalentamientoEngine({ onClose }) {
   const vocabPages = Math.ceil(bakedVocab.length / 10);
   const totalModules = verbPages + vocabPages + 1;
 
+  // Admins reviewing content shouldn't have to actually answer/match
+  // anything to click through a warmup — see the header's skip button.
+  const isAdmin = userData?.role === 'admin';
+
   // --- Check if the student has already completed this warmup before ---
   const hasCompletedBefore = !!userData?.progress?.warmups?.[warmupData?.docId]?.completed;
 
@@ -548,15 +552,26 @@ export default function CalentamientoEngine({ onClose }) {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            if (onClose) onClose();
-            else navigate('/');
-          }}
-          className="text-slate-400 hover:text-white font-bold text-xl px-3 py-1 bg-slate-700 rounded-lg"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && currentModule < totalModules && (
+            <button
+              onClick={() => setCurrentModule((m) => Math.min(m + 1, totalModules))}
+              className="text-amber-300 hover:text-amber-200 font-black text-xs uppercase tracking-widest px-3 py-2 bg-amber-950/50 border border-amber-800 rounded-lg"
+              title="Saltar al siguiente módulo sin responder (solo admin)"
+            >
+              ⏭️ Admin: Saltar
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (onClose) onClose();
+              else navigate('/');
+            }}
+            className="text-slate-400 hover:text-white font-bold text-xl px-3 py-1 bg-slate-700 rounded-lg"
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       {/* MODULE CONTAINER */}
