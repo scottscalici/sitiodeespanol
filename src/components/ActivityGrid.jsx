@@ -54,7 +54,7 @@ const ActivityCard = ({ activity }) => {
         {activity.img ? (
           <img src={activity.img} alt={activity.title} className="w-full h-full object-cover opacity-90" />
         ) : (
-          <span className="text-2xl">{theme.icon}</span>
+          <span className="text-2xl">{activity.icon || theme.icon}</span>
         )}
       </div>
       <div className="min-w-0 flex flex-col justify-center"> 

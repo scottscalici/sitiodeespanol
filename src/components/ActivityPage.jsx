@@ -47,9 +47,10 @@ const ActivityPage = () => {
         {type === 'musica' && <MusicaLayout activity={activityData} />}
         {type === 'lectura' && <LecturaLayout activity={activityData} />}
         {type === 'cultura' && <CulturaLayout activity={activityData} />}
+        {type === 'practica' && <PracticaLayout activity={activityData} />}
 
         {/* Fallback for anything else we haven't built yet */}
-        {type !== 'conversacion' && type !== 'eslabones' && type !== 'video' && type !== 'musica' && type !== 'lectura' && type !== 'cultura' && (
+        {type !== 'conversacion' && type !== 'eslabones' && type !== 'video' && type !== 'musica' && type !== 'lectura' && type !== 'cultura' && type !== 'practica' && (
           <DefaultLayout activity={activityData} />
         )}
 
@@ -642,6 +643,59 @@ const ConversacionLayout = ({ activity }) => {
 };
 
 // --- LAYOUT: DEFAULT (Fallback) ⚠️ ---
+// IB exam-style practice: one or more levels (HL/NM/etc), each with a set of
+// texts that link out to their (externally-hosted) reading pages.
+const PracticaLayout = ({ activity }) => {
+  const levels = activity.raw?.levels || [];
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
+      <div className="p-8 md:p-10">
+        <div className="mb-8 border-b border-slate-100 pb-8">
+          <span className="text-[10px] font-black uppercase tracking-widest text-white bg-indigo-600 px-3 py-1 rounded-full mb-3 inline-block">
+            Práctica IB
+          </span>
+          <h1 className="text-4xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+            {activity.icon && <span>{activity.icon}</span>}
+            {activity.title}
+          </h1>
+        </div>
+
+        {levels.length === 0 ? (
+          <p className="text-slate-500 font-medium">Esta práctica todavía no tiene textos asignados.</p>
+        ) : (
+          <div className="space-y-8">
+            {levels.map((level, lIdx) => (
+              <div key={lIdx}>
+                <h2 className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-3">
+                  {level.level_name}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(level.texts || []).map((text, tIdx) => (
+                    <a
+                      key={tIdx}
+                      href={text.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl p-5 transition-all"
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">{text.label}</span>
+                      <p className="text-slate-800 font-bold mt-1 group-hover:text-indigo-700">{text.title}</p>
+                      <span className="text-xs font-bold text-slate-400 mt-2 inline-flex items-center gap-1">
+                        Abrir texto ↗
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DefaultLayout = ({ activity }) => (
   <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
     <h1 className="text-3xl font-black text-slate-800 mb-2">{activity.title}</h1>

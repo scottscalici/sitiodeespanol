@@ -80,6 +80,7 @@ const normalizeActivities = (raw) => {
         subtitle: 'Práctica IB',
         url: null,
         img: null,
+        icon: item.icon,
         tag: 'Práctica',
         s2_dias: item.courses?.includes('s2') ? item.dias || [] : [],
         s4_dias: item.courses?.includes('s4') ? item.dias || [] : [],
