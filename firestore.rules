@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPER FUNCTIONS ---
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isLoggedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- CONFIG & NOTES ---
+    match /config/{document=**} {
+      allow read: if true;
+      allow write: if true; // Allows calendar edits from the unauthenticated admin portal
+    }
+
+    match /configNotes/{document=**} {
+      allow read, write: if true;
+    }
+
+    // --- USER REGISTRATION & PROFILES ---
+    match /users/{userId} {
+      allow read: if true; // Allows admin scheduler to read student names/emails without login
+
+      // Only the account owner can create their own profile doc, and can only
+      // grant themselves the 'admin' role if their auth email is the site owner's.
+      // Everyone else (including anonymous guests, if they ever write here) may
+      // only self-assign 'student'.
+      allow create: if isLoggedIn()
+                    && request.auth.uid == userId
+                    && (
+                      request.resource.data.role == 'student'
+                      || (request.resource.data.role == 'admin'
+                          && request.auth.token.email == 'scott.scalici@uticak12.org')
+                    );
+
+      // Owners may update their own doc but cannot change their own role.
+      // Admins may update anyone's doc, including role changes (e.g. promoting a TA).
+      allow update: if isLoggedIn()
+                    && (
+                      isAdmin()
+                      || (request.auth.uid == userId
+                          && request.resource.data.role == resource.data.role)
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // If your app uses a separate 'students' collection:
+    match /students/{document=**} {
+      allow read, write: if true;
+    }
+
+    // --- MEETING SCHEDULER & ADMIN PORTAL ---
+    match /bookings/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /scheduler_settings/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /scheduler_overrides/{document=**} {
+      allow read, write: if true;
+    }
+
+    // --- PROTECTED STUDENT DATA & GRADES ---
+    // Doc ID (and any subcollections under it) keyed by the student's own auth uid.
+    // Owner can read/write their own record; admins (teachers) can read/write any.
+    match /studentData/{userId}/{document=**} {
+      allow read, write: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- THE MASTER CATCH-ALL (Curriculum & Other Apps) ---
+    match /{document=**} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
