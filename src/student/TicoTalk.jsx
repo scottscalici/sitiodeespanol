@@ -225,8 +225,8 @@ const renderIframe = (videoObj) => {
             <p className="text-slate-400 text-sm">Intenta de nuevo en un momento.</p>
           </div>
         ) : (
-          <div className="w-full h-full relative" 
-               onTouchStart={handleTouchStart} 
+          <div className="w-full h-full relative touch-none"
+               onTouchStart={handleTouchStart}
                onTouchEnd={handleTouchEnd}
                onClick={handleVideoTap}>
             
