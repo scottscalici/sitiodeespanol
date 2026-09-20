@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
@@ -86,11 +86,22 @@ export default function StudentLearningPath() {
   // --- DYNAMIC DATA FOR ACTIVE BRANCH ---
   const currentBranchConfig = BRANCHES.find(b => b.id === activeBranch);
   const pods = unitData?.branches?.[activeBranch]?.pods || [];
+  const currentPodRef = useRef(null);
 
   // --- PROGRESS SYNC (Derived from live userData, nested under unit -> branch) ---
   const unitProgress = userData?.progress?.[selectedPathId];
   const activePodIndex = unitProgress?.[activeBranch]?.podIndex || 0;
   const activeSegmentIndex = unitProgress?.[activeBranch]?.segmentIndex || 0;
+
+  // --- LAND ON CURRENT PROGRESS INSTEAD OF THE TOP OF THE PATH ---
+  useEffect(() => {
+    if (pods.length === 0) return;
+    // A short delay lets the flex-col-reverse layout settle before measuring position.
+    const t = setTimeout(() => {
+      currentPodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [pods.length, activeBranch, activePodIndex]);
 
   // --- DYNAMIC COLOR DICTIONARIES ---
   const themeColors = {
@@ -243,7 +254,11 @@ export default function StudentLearningPath() {
             const isCurrentPod = pIdx === activePodIndex;
 
             return (
-              <div key={pod.id} className="relative flex flex-col flex-col-reverse items-center">
+              <div
+                key={pod.id}
+                ref={isCurrentPod ? currentPodRef : null}
+                className="relative flex flex-col flex-col-reverse items-center"
+              >
                 <div className={`w-full max-w-md flex flex-col-reverse gap-4 relative z-10 ${isLocked ? 'opacity-50' : ''}`}>
                   {isLocked && (
                     <div className="absolute inset-0 z-20 backdrop-blur-[2px] bg-white/30 flex items-center justify-center rounded-2xl">
