@@ -307,17 +307,20 @@ export default function CalentamientoEngine({ onClose }) {
   };
 
   // Vocab is already done for the day (from a prior verb-set redo) — skip
-  // straight past every vocab page without requiring a click.
+  // straight past every vocab page without requiring a click. Gated on the
+  // "at session start" ref rather than the live hasCompletedVocabBefore, so
+  // finishing vocab JUST NOW in this session doesn't retroactively yank the
+  // student off their own "¡Módulo Completado!" screen once the write lands.
   useEffect(() => {
     if (
       warmupData &&
-      hasCompletedVocabBefore &&
+      vocabSkippedAtStartRef.current &&
       currentModule > verbPages &&
       currentModule <= totalModules - 1
     ) {
       setCurrentModule(totalModules);
     }
-  }, [currentModule, hasCompletedVocabBefore, verbPages, totalModules, warmupData]);
+  }, [currentModule, verbPages, totalModules, warmupData]);
 
   // Vocab Flow: Start Match
   const handleStartVocabMatch = (slice) => {
