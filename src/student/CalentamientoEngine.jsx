@@ -258,7 +258,8 @@ export default function CalentamientoEngine({ onClose }) {
     const percentageGrade = (totalGrade / 5) * 100;
     const pointsEarned = 20;
 
-    if (userData && userData.uid) {
+    // Admins testing content shouldn't rack up scores meant for students.
+    if (userData && userData.uid && userData.role !== 'admin') {
       try {
         const userRef = doc(db, 'users', userData.uid);
         // We pull the ABSOLUTE FRESHEST data directly from the database

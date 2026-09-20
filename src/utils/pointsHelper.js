@@ -24,6 +24,9 @@ export const awardPoints = async (uid, points) => {
     const snap = await tx.get(userRef);
     const data = snap.exists() ? snap.data() : {};
 
+    // Admins testing content shouldn't rack up scores meant for students.
+    if (data.role === 'admin') return;
+
     const weeklyPoints = data.weekKey === weekKey ? (data.weekly_points || 0) + points : points;
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
 

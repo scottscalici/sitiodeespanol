@@ -386,7 +386,9 @@ export default function StudentLearningPath() {
             }
 
             // --- 3. MULTI-BRACKET FIRESTORE SAVE (nested under this unit -> this branch) ---
-            if (userData && userData.uid && selectedPathId) {
+            // Admins can freely browse/test any pod already (see isLocked below) and
+            // shouldn't rack up scores or progress meant for students.
+            if (!isAdmin && userData && userData.uid && selectedPathId) {
               try {
                 const userRef = doc(db, 'users', userData.uid);
                 const snap = await getDoc(userRef);
