@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -42,6 +42,11 @@ export default function CalentamientoEngine({ onClose }) {
   const [selectedSpanishCard, setSelectedSpanishCard] = useState(null);
   const [matchedPairs, setMatchedPairs] = useState([]);
 
+  // Final-score auto-save tracking (fires once, no manual click required)
+  const autoSavedRef = useRef(false);
+  const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const [pointsAwarded, setPointsAwarded] = useState(null);
+
   // Reset Vocab States when moving to a new module
   useEffect(() => {
     setVocabPhase('preview');
@@ -59,6 +64,7 @@ export default function CalentamientoEngine({ onClose }) {
         let verbsData = null;
         let vocabData = null;
         let mainDocId = null;
+        let vocabDocId = null;
 
         const formattedCourse = String(courseId).toLowerCase();
         const targetDiaNum = Number(targetDia);
@@ -87,6 +93,7 @@ export default function CalentamientoEngine({ onClose }) {
 
         if (!vocabSnap.empty) {
           vocabData = vocabSnap.docs[0].data();
+          vocabDocId = vocabSnap.docs[0].id;
         }
 
         if (verbsData || vocabData) {
@@ -95,6 +102,9 @@ export default function CalentamientoEngine({ onClose }) {
             course: formattedCourse,
             title: verbsData?.title || vocabData?.name || `Día ${targetDiaNum}`,
             docId: mainDocId || 'combined_warmup',
+            // Vocab is shared across verb-set redos for the same day, so its
+            // own completion is tracked by this id, not the verb doc's id.
+            vocabDocId: vocabDocId || `${formattedCourse}_dia${targetDiaNum}_vocab`,
             bakedQuestions: verbsData?.bakedQuestions || [],
             sequence: vocabData?.sequence || [],
           });
@@ -159,27 +169,25 @@ export default function CalentamientoEngine({ onClose }) {
       .padStart(2, '0')}`;
   };
 
-  if (loading || !warmupData) {
-    return (
-      <div className="p-10 text-center font-bold text-slate-400 animate-pulse">
-        Cargando Calentamiento...
-      </div>
-    );
-  }
-
-  const bakedVerbs = warmupData.bakedQuestions || [];
-  const bakedVocab = warmupData.sequence || [];
+  const bakedVerbs = warmupData?.bakedQuestions || [];
+  const bakedVocab = warmupData?.sequence || [];
 
   const verbPages = Math.ceil(bakedVerbs.length / 5);
   const vocabPages = Math.ceil(bakedVocab.length / 10);
   const totalModules = verbPages + vocabPages + 1;
 
   // --- Check if the student has already completed this warmup before ---
-  const hasCompletedBefore = userData?.progress?.warmups?.[warmupData.docId]?.completed;
+  const hasCompletedBefore = !!userData?.progress?.warmups?.[warmupData?.docId]?.completed;
+
+  // --- Vocab is shared across verb-set redos for the same day: once it's
+  // done, it stays done regardless of which verb set is active. ---
+  const hasCompletedVocabBefore = !!userData?.progress?.vocab_completed?.[warmupData?.vocabDocId];
 
   // Save partial progress at natural checkpoints, so it survives an
   // accidental close/refresh. Admins aren't tracked (they don't earn grades).
-  const saveDraft = async (snapshot) => {
+  // vocabDone permanently marks this day's vocab as complete, independent of
+  // whichever verb set is active, so a redo with new verbs can skip it.
+  const saveDraft = async (snapshot, { vocabDone = false } = {}) => {
     if (!userData || !userData.uid || userData.role === 'admin' || !warmupData?.docId) return;
     try {
       const userRef = doc(db, 'users', userData.uid);
@@ -193,6 +201,9 @@ export default function CalentamientoEngine({ onClose }) {
                 savedAt: new Date().toISOString(),
               },
             },
+            ...(vocabDone && warmupData.vocabDocId
+              ? { vocab_completed: { [warmupData.vocabDocId]: true } }
+              : {}),
           },
         },
         { merge: true }
@@ -274,6 +285,19 @@ export default function CalentamientoEngine({ onClose }) {
     }
   };
 
+  // Vocab is already done for the day (from a prior verb-set redo) — skip
+  // straight past every vocab page without requiring a click.
+  useEffect(() => {
+    if (
+      warmupData &&
+      hasCompletedVocabBefore &&
+      currentModule > verbPages &&
+      currentModule <= totalModules - 1
+    ) {
+      setCurrentModule(totalModules);
+    }
+  }, [currentModule, hasCompletedVocabBefore, verbPages, totalModules, warmupData]);
+
   // Vocab Flow: Start Match
   const handleStartVocabMatch = (slice) => {
     // Shuffle english answers exactly once
@@ -300,14 +324,17 @@ export default function CalentamientoEngine({ onClose }) {
         setVocabPhase('done');
         setCompletedModules(newCompletedModules);
 
-        saveDraft({
-          verbInputs,
-          verbResults,
-          checkedOnce,
-          firstAttemptErrors,
-          completedModules: newCompletedModules,
-          currentModule,
-        });
+        saveDraft(
+          {
+            verbInputs,
+            verbResults,
+            checkedOnce,
+            firstAttemptErrors,
+            completedModules: newCompletedModules,
+            currentModule,
+          },
+          { vocabDone: vocabPageIndex === vocabPages }
+        );
       }
     } else {
       alert('Incorrecto, intenta de nuevo.');
@@ -315,9 +342,12 @@ export default function CalentamientoEngine({ onClose }) {
     }
   };
 
-  // Final Grade Calculation & Point Awarding
+  // Final Grade Calculation & Point Awarding — fires automatically the
+  // instant the student reaches the final screen (see auto-save effect
+  // below), so nothing is lost if they close before clicking anything.
   const handleFinishSession = async () => {
     setIsTimerRunning(false);
+    setSaveState('saving');
 
     const correctVerbs = Object.values(verbResults).filter(
       (res) => res === 'correct'
@@ -329,7 +359,11 @@ export default function CalentamientoEngine({ onClose }) {
     const vocabGradePoints = bakedVocab.length > 0 ? 1 : 0;
     const totalGrade = verbGradePoints + vocabGradePoints;
     const percentageGrade = (totalGrade / 5) * 100;
-    const pointsEarned = 20;
+    // Only the first time this exact verb set (docId) is completed earns
+    // game points — redoing it can't be farmed for more. A fresh verb set
+    // (a new docId, e.g. via the admin's "replace verbs" tool) starts clean.
+    const pointsEarned = hasCompletedBefore ? 0 : 20;
+    setPointsAwarded(pointsEarned);
 
     // Admins testing content shouldn't rack up scores meant for students.
     if (userData && userData.uid && userData.role !== 'admin') {
@@ -406,23 +440,43 @@ export default function CalentamientoEngine({ onClose }) {
         }
 
         await setDoc(userRef, updatePayload, { merge: true });
-
-        alert(
-          `¡Completado! Obtuviste ${totalGrade.toFixed(
-            1
-          )}/5 puntos académicos. (+${pointsEarned} puntos de juego).`
-        );
+        setSaveState('saved');
       } catch (err) {
         console.error('Error saving calentamiento points:', err);
+        setSaveState('error');
       }
-    }
-
-    if (onClose) {
-      onClose(); 
     } else {
-      navigate('/'); 
+      setSaveState('saved');
     }
   };
+
+  // Just navigates away — the score is already auto-saved by the time this
+  // screen is showing (see the auto-save effect below).
+  const handleReturnHome = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      navigate('/');
+    }
+  };
+
+  // Auto-save the score the instant the final screen is reached — no click
+  // required, so closing the tab here can't lose an already-finished session.
+  useEffect(() => {
+    if (warmupData && currentModule === totalModules && !autoSavedRef.current) {
+      autoSavedRef.current = true;
+      handleFinishSession();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentModule, warmupData, totalModules]);
+
+  if (loading || !warmupData) {
+    return (
+      <div className="p-10 text-center font-bold text-slate-400 animate-pulse">
+        Cargando Calentamiento...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">
@@ -584,8 +638,8 @@ export default function CalentamientoEngine({ onClose }) {
                         Emparejar Ahora
                       </button>
 
-                      {/* 🚀 NEW: SKIP BUTTON IF ALREADY COMPLETED */}
-                      {hasCompletedBefore && (
+                      {/* 🚀 NEW: SKIP BUTTON IF VOCAB ALREADY COMPLETED TODAY */}
+                      {hasCompletedVocabBefore && (
                         <button
                           onClick={() => setCurrentModule(totalModules)}
                           className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl uppercase tracking-widest text-xs transition-all border border-slate-600"
@@ -729,16 +783,33 @@ export default function CalentamientoEngine({ onClose }) {
               <p className="text-xs font-bold text-amber-500 uppercase mb-1">
                 Recompensa Obtenida:
               </p>
-              <p className="text-2xl font-black text-amber-400">
-                🏆 +20 Puntos
-              </p>
+              {pointsAwarded === 0 ? (
+                <>
+                  <p className="text-lg font-black text-slate-400">
+                    Ya ganaste tus puntos la primera vez
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+                    Tu nota académica se sigue guardando si mejoras tu récord
+                  </p>
+                </>
+              ) : (
+                <p className="text-2xl font-black text-amber-400">
+                  🏆 +{pointsAwarded ?? 20} Puntos
+                </p>
+              )}
             </div>
 
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              {saveState === 'saving' && '💾 Guardando tu progreso...'}
+              {saveState === 'saved' && '✅ Progreso guardado automáticamente'}
+              {saveState === 'error' && '⚠️ Hubo un problema guardando. Intenta de nuevo antes de salir.'}
+            </p>
+
             <button
-              onClick={handleFinishSession}
+              onClick={handleReturnHome}
               className="px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest text-xs transition-transform hover:scale-105"
             >
-              🚀 Guardar Nota y Volver
+              🚀 Volver
             </button>
           </div>
         )}
