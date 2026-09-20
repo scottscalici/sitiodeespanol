@@ -14,6 +14,8 @@ import {
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { getCachedCollection } from '../utils/firestoreCache';
+import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 
 export default function CalentamientoEngine({ onClose }) {
   const { courseId, targetDia } = useParams();
@@ -48,6 +50,12 @@ export default function CalentamientoEngine({ onClose }) {
   const [pointsAwarded, setPointsAwarded] = useState(null);
   const [speedBonusAwarded, setSpeedBonusAwarded] = useState(0);
   const vocabSkippedAtStartRef = useRef(false);
+
+  // A freshly-generated random verb set for a redo of an already-completed
+  // verb set — reproduces the admin's original group/tense/subject recipe
+  // (configBlocks) rather than repeating the exact same fixed questions.
+  // Stays null on a first attempt, where the curated bakedQuestions are used.
+  const [sessionVerbs, setSessionVerbs] = useState(null);
 
   // In-app feedback modal (replaces native alert() popups)
   const [feedbackModal, setFeedbackModal] = useState(null); // { tone, emoji, title, message }
@@ -112,6 +120,10 @@ export default function CalentamientoEngine({ onClose }) {
             // own completion is tracked by this id, not the verb doc's id.
             vocabDocId: vocabDocId || `${formattedCourse}_dia${targetDiaNum}_vocab`,
             bakedQuestions: verbsData?.bakedQuestions || [],
+            // The admin's original verb-group recipe — reused to draw a
+            // brand new random verb set on a redo (see below).
+            configBlocks: verbsData?.configBlocks || [],
+            includeVosotros: verbsData?.includeVosotros || false,
             sequence: vocabData?.sequence || [],
           });
           setIsTimerRunning(true);
@@ -147,6 +159,9 @@ export default function CalentamientoEngine({ onClose }) {
 
   // 3. Restore any saved draft progress once the warmup loads, so an
   // "accidental" close doesn't erase answers the student already submitted.
+  // Also sets up a redo of an already-completed verb set with a freshly
+  // generated verb set (same configBlocks recipe, new random draw) instead
+  // of repeating the exact same fixed questions.
   useEffect(() => {
     if (!warmupData || !userData) return;
 
@@ -157,19 +172,46 @@ export default function CalentamientoEngine({ onClose }) {
     vocabSkippedAtStartRef.current = !!userData?.progress?.vocab_completed?.[warmupData.vocabDocId];
 
     const draft = userData?.progress?.warmups_draft?.[warmupData.docId];
-    if (!draft) return;
+    const alreadyCompletedThisVerbSet = !!userData?.progress?.warmups?.[warmupData.docId]?.completed;
+    let resumed = false;
 
-    const resume = window.confirm(
-      'Encontramos respuestas guardadas de un intento anterior de este calentamiento. ¿Quieres continuar donde lo dejaste?'
-    );
+    if (draft) {
+      const resume = window.confirm(
+        'Encontramos respuestas guardadas de un intento anterior de este calentamiento. ¿Quieres continuar donde lo dejaste?'
+      );
 
-    if (resume) {
-      if (draft.verbInputs) setVerbInputs(draft.verbInputs);
-      if (draft.verbResults) setVerbResults(draft.verbResults);
-      if (draft.checkedOnce) setCheckedOnce(draft.checkedOnce);
-      if (draft.firstAttemptErrors) setFirstAttemptErrors(draft.firstAttemptErrors);
-      if (typeof draft.completedModules === 'number') setCompletedModules(draft.completedModules);
-      if (typeof draft.currentModule === 'number') setCurrentModule(draft.currentModule);
+      if (resume) {
+        resumed = true;
+        if (draft.verbInputs) setVerbInputs(draft.verbInputs);
+        if (draft.verbResults) setVerbResults(draft.verbResults);
+        if (draft.checkedOnce) setCheckedOnce(draft.checkedOnce);
+        if (draft.firstAttemptErrors) setFirstAttemptErrors(draft.firstAttemptErrors);
+        if (typeof draft.completedModules === 'number') setCompletedModules(draft.completedModules);
+        if (typeof draft.currentModule === 'number') setCurrentModule(draft.currentModule);
+        // Pin the exact verb set this in-progress redo was already showing,
+        // so restored verbInputs/verbResults line up with the right verbs.
+        if (draft.sessionVerbs?.length) setSessionVerbs(draft.sessionVerbs);
+      }
+    }
+
+    // A fresh redo (no draft resumed) of a verb set already completed before
+    // gets a brand new random set from the same admin-authored configBlocks.
+    if (!resumed && alreadyCompletedThisVerbSet && warmupData.configBlocks?.length) {
+      (async () => {
+        try {
+          const verbsArray = await getCachedCollection('verbs');
+          const verbsMap = {};
+          verbsArray.forEach((v) => {
+            verbsMap[v.id] = v;
+          });
+          const fresh = generateVerbQuestions(warmupData.configBlocks, verbsMap, {
+            includeVosotros: warmupData.includeVosotros,
+          });
+          if (fresh.length) setSessionVerbs(fresh);
+        } catch (err) {
+          console.error('Error generating a fresh verb set for redo:', err);
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warmupData]);
@@ -182,7 +224,7 @@ export default function CalentamientoEngine({ onClose }) {
       .padStart(2, '0')}`;
   };
 
-  const bakedVerbs = warmupData?.bakedQuestions || [];
+  const bakedVerbs = sessionVerbs || warmupData?.bakedQuestions || [];
   const bakedVocab = warmupData?.sequence || [];
 
   const verbPages = Math.ceil(bakedVerbs.length / 5);
@@ -291,6 +333,7 @@ export default function CalentamientoEngine({ onClose }) {
       firstAttemptErrors: mergedErrors,
       completedModules: newCompletedModules,
       currentModule,
+      ...(sessionVerbs ? { sessionVerbs } : {}),
     });
 
     if (allCorrect) {
@@ -360,6 +403,7 @@ export default function CalentamientoEngine({ onClose }) {
             firstAttemptErrors,
             completedModules: newCompletedModules,
             currentModule,
+            ...(sessionVerbs ? { sessionVerbs } : {}),
           },
           { vocabDone: vocabPageIndex === vocabPages }
         );

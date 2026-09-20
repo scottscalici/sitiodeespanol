@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import {
+  generateVerbQuestions,
+  formatSubjectAndTranslation as formatSubjectAndTranslationShared,
+} from '../../utils/verbQuestionGenerator';
 
 export default function CalentamientoAdmin() {
   const [calId, setCalId] = useState('cal_s2_d26');
@@ -81,6 +85,7 @@ export default function CalentamientoAdmin() {
       setCourse(p.course || 's2');
       setConfigBlocks(p.configBlocks || []);
       setPreviewQuestions(p.bakedQuestions || []);
+      setIncludeVosotros(p.includeVosotros || false);
     }
   };
 
@@ -123,97 +128,12 @@ export default function CalentamientoAdmin() {
     setConfigBlocks(updated);
   };
 
-  // --- SMART SUBJECT PICKER (70/30 Singular/Plural, Vosotros Controlled) ---
-  const getRandomSubject = (targetPref) => {
-    if (targetPref !== 'any') return targetPref;
-
-    const singulars = ['yo', 'tú', 'él_ella_ud'];
-    const plurals = includeVosotros
-      ? ['nosotros', 'vosotros', 'ellos_ellas_uds']
-      : ['nosotros', 'ellos_ellas_uds'];
-
-    // 70% chance for singular, 30% for plural
-    const isSingular = Math.random() < 0.7;
-    if (isSingular) {
-      return singulars[Math.floor(Math.random() * singulars.length)];
-    } else {
-      return plurals[Math.floor(Math.random() * plurals.length)];
-    }
-  };
-
- // --- HELPERS TO CLEAN UP 3RD PERSON SUBJECTS ---
- const formatSubjectAndTranslation = (rawSubject, rawEnglish) => {
-  let sp = rawSubject;
-  let en = rawEnglish || 'Sin traducción';
-
-  if (rawSubject === 'él_ella_ud') {
-    const choices = [
-      { subj: 'él', enPrefix: 'he' },
-      { subj: 'ella', enPrefix: 'she' },
-      { subj: 'Ud.', enPrefix: 'you (formal)' }
-    ];
-    const choice = choices[Math.floor(Math.random() * choices.length)];
-    sp = choice.subj;
-    en = en.replace(/he\/she\/you/i, choice.enPrefix);
-  } else if (rawSubject === 'ellos_ellas_uds') {
-    const choices = [
-      { subj: 'ellos', enPrefix: 'they' },
-      { subj: 'ellas', enPrefix: 'they' },
-      { subj: 'Uds.', enPrefix: 'you all' }
-    ];
-    const choice = choices[Math.floor(Math.random() * choices.length)];
-    sp = choice.subj;
-    en = en.replace(/they\/you all/i, choice.enPrefix);
-  }
-  
-  return { sp, en };
-};
-
-// --- HELPER GENERATOR FUNCTION ---
-const generateQuestionsArray = () => {
-  let finalizedQuestions = [];
-
-  for (const block of configBlocks) {
-    let pool = block.allowedVerbs.map(vId => masterVerbsMap[vId]).filter(Boolean);
-    
-    if (block.specificVerb !== 'any') {
-      pool = pool.filter(v => v.palabra === block.specificVerb);
-    }
-
-    for (let i = 0; i < block.count && pool.length > 0; i++) {
-      const randomVerb = pool[Math.floor(Math.random() * pool.length)];
-      const chosenTense = block.tense;
-      
-      const rawSubject = getRandomSubject(block.targetSubject);
-      
-      // Navigate nested structure
-      const tenseMap = randomVerb.tenses?.[chosenTense] || {};
-      const subjectData = tenseMap[rawSubject] || {};
-
-      // Extract form and raw english
-      const formAnswer = subjectData.target || '???';
-      const rawEnglish = subjectData.english || randomVerb.translations?.infinitivo?.english || '';
-
-      // Clean up 3rd person subjects & translations
-      const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(rawSubject, rawEnglish);
-
-      finalizedQuestions.push({
-        palabra: randomVerb.palabra,
-        mostrar: randomVerb.palabra,
-        tense: chosenTense,
-        rawSubject: rawSubject, // Keep the raw internal key so we can edit it later
-        sujeto: finalSubject,
-        traducción: finalEnglish,
-        forma: formAnswer,
-        allowedVerbs: block.allowedVerbs // Attach the group's verbs so the dropdown knows its limits
-      });
-    }
-  }
-  return finalizedQuestions;
-};
+  // formatSubjectAndTranslation is still called directly by handlePreviewEdit
+  // below — kept under this name so that call site didn't need to change.
+  const formatSubjectAndTranslation = formatSubjectAndTranslationShared;
 
   const handlePreview = () => {
-    const generated = generateQuestionsArray();
+    const generated = generateVerbQuestions(configBlocks, masterVerbsMap, { includeVosotros });
     setPreviewQuestions(generated);
     setEditingPreviewIndex(null); // Reset any open edits
   };
@@ -309,6 +229,7 @@ const generateQuestionsArray = () => {
           dia: Number(dia),
           course,
           configBlocks,
+          includeVosotros,
           bakedQuestions: cleanQuestions,
           createdAt: new Date().toISOString(),
         },
