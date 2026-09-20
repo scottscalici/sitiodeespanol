@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
@@ -133,6 +133,21 @@ function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
+        {user?.isAnonymous && (
+          <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
+            <div className="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
+              <span className="font-black text-xs sm:text-sm uppercase tracking-wide">
+                👤 Sesión de Invitado — tu progreso no se guardará
+              </span>
+              <button
+                onClick={() => signOut(auth)}
+                className="bg-white/20 hover:bg-white text-white hover:text-orange-700 font-black text-[11px] uppercase tracking-wide px-3 py-1 rounded-md transition-colors"
+              >
+                Crear Cuenta
+              </button>
+            </div>
+          </div>
+        )}
         <main className="w-full flex-grow">
           <Routes>
             {/* 🟢 PUBLIC STUDENT ROUTES */}

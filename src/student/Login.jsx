@@ -3,6 +3,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  signInAnonymously,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -68,6 +69,20 @@ const Login = () => {
       else if (err.code === 'auth/wrong-password')
         setError('Contraseña incorrecta.');
       else setError('Credenciales incorrectas. Inténtalo de nuevo.');
+    }
+  };
+
+  const handleGuestAccess = async () => {
+    setError(null);
+    setMessage(null);
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      if (err.code === 'auth/admin-restricted-operation') {
+        setError('El acceso de invitado no está habilitado todavía. Contacta al administrador.');
+      } else {
+        setError('No se pudo iniciar la sesión de invitado. Inténtalo de nuevo.');
+      }
     }
   };
 
@@ -315,6 +330,45 @@ const Login = () => {
           {isRegistering ? 'REGISTRARSE ➔' : 'ENTRAR AL GIMNASIO ➔'}
         </button>
       </form>
+
+      {!isRegistering && (
+        <div style={{ marginTop: '20px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              color: '#94a3b8',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+            }}
+          >
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
+            o
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }}></div>
+          </div>
+          <button
+            onClick={handleGuestAccess}
+            style={{
+              width: '100%',
+              backgroundColor: 'white',
+              color: '#2c3e50',
+              padding: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              border: '2px solid #2c3e50',
+              borderRadius: '5px',
+              marginTop: '15px',
+            }}
+          >
+            👤 Continuar como Invitado
+          </button>
+          <p style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center', marginTop: '8px' }}>
+            Explora el sitio sin cuenta — tu progreso no se guardará.
+          </p>
+        </div>
+      )}
 
       <div
         style={{
