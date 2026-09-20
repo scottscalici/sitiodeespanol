@@ -9,6 +9,7 @@ import {
   query,
   where,
   setDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
@@ -128,6 +129,28 @@ export default function CalentamientoEngine({ onClose }) {
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
+  // 3. Restore any saved draft progress once the warmup loads, so an
+  // "accidental" close doesn't erase answers the student already submitted.
+  useEffect(() => {
+    if (!warmupData || !userData) return;
+    const draft = userData?.progress?.warmups_draft?.[warmupData.docId];
+    if (!draft) return;
+
+    const resume = window.confirm(
+      'Encontramos respuestas guardadas de un intento anterior de este calentamiento. ¿Quieres continuar donde lo dejaste?'
+    );
+
+    if (resume) {
+      if (draft.verbInputs) setVerbInputs(draft.verbInputs);
+      if (draft.verbResults) setVerbResults(draft.verbResults);
+      if (draft.checkedOnce) setCheckedOnce(draft.checkedOnce);
+      if (draft.firstAttemptErrors) setFirstAttemptErrors(draft.firstAttemptErrors);
+      if (typeof draft.completedModules === 'number') setCompletedModules(draft.completedModules);
+      if (typeof draft.currentModule === 'number') setCurrentModule(draft.currentModule);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warmupData]);
+
   const formatTime = (secs) => {
     const mins = Math.floor(secs / 60);
     const remSecs = secs % 60;
@@ -153,6 +176,31 @@ export default function CalentamientoEngine({ onClose }) {
 
   // --- Check if the student has already completed this warmup before ---
   const hasCompletedBefore = userData?.progress?.warmups?.[warmupData.docId]?.completed;
+
+  // Save partial progress at natural checkpoints, so it survives an
+  // accidental close/refresh. Admins aren't tracked (they don't earn grades).
+  const saveDraft = async (snapshot) => {
+    if (!userData || !userData.uid || userData.role === 'admin' || !warmupData?.docId) return;
+    try {
+      const userRef = doc(db, 'users', userData.uid);
+      await setDoc(
+        userRef,
+        {
+          progress: {
+            warmups_draft: {
+              [warmupData.docId]: {
+                ...snapshot,
+                savedAt: new Date().toISOString(),
+              },
+            },
+          },
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error('Error saving calentamiento draft:', err);
+    }
+  };
 
   // Handle Verb Checking (WITH DIAGNOSTIC ERROR TRACKING)
   const handleCheckVerbs = (pageIndex) => {
@@ -195,13 +243,27 @@ export default function CalentamientoEngine({ onClose }) {
 
     setVerbResults(newResults);
     setCheckedOnce(newCheckedOnce);
-    
+
     // Add any new errors found during this check to our master list
+    const mergedErrors =
+      newErrorsToLog.length > 0
+        ? [...firstAttemptErrors, ...newErrorsToLog]
+        : firstAttemptErrors;
     if (newErrorsToLog.length > 0) {
-      setFirstAttemptErrors(prev => [...prev, ...newErrorsToLog]);
+      setFirstAttemptErrors(mergedErrors);
     }
 
-    setCompletedModules(Math.max(completedModules, pageIndex));
+    const newCompletedModules = Math.max(completedModules, pageIndex);
+    setCompletedModules(newCompletedModules);
+
+    saveDraft({
+      verbInputs,
+      verbResults: newResults,
+      checkedOnce: newCheckedOnce,
+      firstAttemptErrors: mergedErrors,
+      completedModules: newCompletedModules,
+      currentModule,
+    });
 
     if (allCorrect) {
       alert('¡Excelente! Módulo de verbos perfecto.');
@@ -231,10 +293,21 @@ export default function CalentamientoEngine({ onClose }) {
 
       // Check if all are done
       if (newMatched.length === totalSliceCount) {
-        setVocabPhase('done');
-        setCompletedModules(
-          Math.max(completedModules, verbPages + vocabPageIndex)
+        const newCompletedModules = Math.max(
+          completedModules,
+          verbPages + vocabPageIndex
         );
+        setVocabPhase('done');
+        setCompletedModules(newCompletedModules);
+
+        saveDraft({
+          verbInputs,
+          verbResults,
+          checkedOnce,
+          firstAttemptErrors,
+          completedModules: newCompletedModules,
+          currentModule,
+        });
       }
     } else {
       alert('Incorrecto, intenta de nuevo.');
@@ -309,18 +382,23 @@ export default function CalentamientoEngine({ onClose }) {
           ...bumpStreak(existingData),
         };
 
-        // 2. ONLY attach the progress object if we beat the high score
+        // 2. Always clear the in-progress draft now that the session is finished
+        updatePayload.progress = {
+          warmups_draft: {
+            [warmupData.docId]: deleteField(),
+          },
+        };
+
+        // 3. ONLY attach the graded progress object if we beat the high score
         if (isNewHighScore) {
           console.log("📈 Saving new academic high score!");
-          updatePayload.progress = {
-            warmups: {
-              [warmupData.docId]: {
-                completed: true,
-                grade: percentageGrade,
-                rawScore: `${totalGrade.toFixed(1)}/5`,
-                errors: firstAttemptErrors, 
-                timestamp: new Date().toISOString(),
-              },
+          updatePayload.progress.warmups = {
+            [warmupData.docId]: {
+              completed: true,
+              grade: percentageGrade,
+              rawScore: `${totalGrade.toFixed(1)}/5`,
+              errors: firstAttemptErrors,
+              timestamp: new Date().toISOString(),
             },
           };
         } else {
