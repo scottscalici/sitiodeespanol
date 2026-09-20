@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
-import { fetchUnitTotalPods, getUnitSummary, getAssignedDominioTasks } from '../../utils/learningPathProgress';
+import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import {
+  fetchUnitTotalPods,
+  getUnitCompletedPods,
+  getAssignedDominioTasks,
+} from '../../utils/learningPathProgress';
+
+// Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
+const getFlagClasses = (percent) => {
+  if (percent == null) return 'text-slate-400';
+  if (percent < 50) return 'text-rose-400 bg-rose-950/40 border-rose-900/60';
+  if (percent < 70) return 'text-amber-400 bg-amber-950/40 border-amber-900/60';
+  return 'text-emerald-400 bg-slate-900 border-slate-700';
+};
+
+// Current quarter = the one whose date range contains today; null (no match,
+// or no quarters configured yet) falls back to an all-time average.
+const getCurrentQuarter = (quarters, todayStr) => {
+  return (
+    (quarters || []).find((q) => q.startDate && q.endDate && q.startDate <= todayStr && todayStr <= q.endDate) ||
+    null
+  );
+};
 
 export default function TeacherGradebook() {
   const [students, setStudents] = useState([]);
@@ -11,6 +33,19 @@ export default function TeacherGradebook() {
   const [unitColumns, setUnitColumns] = useState([]); // [{ path_id, titulo, day_due, courses: Set }]
   const [unitTotals, setUnitTotals] = useState({}); // { [path_id]: totalPods }
 
+  // course -> today's assigned calentamiento docId (or null)
+  const [todaysWarmupByCourse, setTodaysWarmupByCourse] = useState({});
+  // calentamiento docId -> course, so warmup averages can be scoped by course
+  const [calentamientoCourseById, setCalentamientoCourseById] = useState({});
+
+  // Grading-period (quarter) config, editable from this page
+  const [quarters, setQuarters] = useState([]);
+  const [quarterModalOpen, setQuarterModalOpen] = useState(false);
+  const [quarterDraft, setQuarterDraft] = useState([]);
+
+  // Roster filter: 'all' or `${course}|${section}`
+  const [rosterFilter, setRosterFilter] = useState('all');
+
   // Diagnostic specific states
   const [selectedWarmupId, setSelectedWarmupId] = useState('');
   const [aggregatedErrors, setAggregatedErrors] = useState([]);
@@ -18,23 +53,42 @@ export default function TeacherGradebook() {
   // 🔑 Password Reset Modal State
   const [resetModal, setResetModal] = useState(null); // { uid, email, newPassword, status }
 
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadGradebookData = async (force = false) => {
     const fetchStudents = async () => {
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', '==', 'student'));
-        const snap = await getDocs(q);
-
-        const studentData = snap.docs.map((doc) => ({
-          uid: doc.id,
-          ...doc.data(),
-        }));
-
-        setStudents(studentData);
+        const allUsers = await getCachedCollection('users', { force });
+        setStudents(allUsers.filter((u) => u.role === 'student'));
       } catch (error) {
         console.error('Error fetching gradebook data:', error);
-      } finally {
-        setLoading(false);
+      }
+    };
+
+    const fetchQuarters = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'academic_quarters'));
+        setQuarters(snap.exists() ? snap.data().quarters || [] : []);
+      } catch (error) {
+        console.error('Error fetching quarter config:', error);
+      }
+    };
+
+    const fetchCalendarAndWarmups = async (liveDia) => {
+      try {
+        const calentamientos = await getCachedCollection('calentamientos', { force });
+        const courseById = {};
+        const todaysByCourse = {};
+        calentamientos.forEach((c) => {
+          courseById[c.id] = c.course;
+          if (Number(c.dia) === liveDia && !todaysByCourse[c.course]) {
+            todaysByCourse[c.course] = c.id;
+          }
+        });
+        setCalentamientoCourseById(courseById);
+        setTodaysWarmupByCourse(todaysByCourse);
+      } catch (error) {
+        console.error('Error fetching calentamientos for gradebook:', error);
       }
     };
 
@@ -51,6 +105,8 @@ export default function TeacherGradebook() {
         const liveDia = pastEntries.length > 0
           ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
           : 1;
+
+        await fetchCalendarAndWarmups(liveDia);
 
         const tareasData = tareasSnap.exists() ? tareasSnap.data() : {};
         const columnsByPathId = {};
@@ -81,9 +137,74 @@ export default function TeacherGradebook() {
       }
     };
 
-    fetchStudents();
-    fetchLearningPathColumns();
+    await Promise.all([fetchStudents(), fetchQuarters(), fetchLearningPathColumns()]);
+  };
+
+  useEffect(() => {
+    loadGradebookData().finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    invalidateCollectionCache('users');
+    invalidateCollectionCache('calentamientos');
+    await loadGradebookData(true);
+    setRefreshing(false);
+  };
+
+  // --- WARMUP AVERAGE (current quarter if configured, else all-time),
+  // scoped to warmups that belong to the student's own course ---
+  const getWarmupAverage = (student) => {
+    const warmups = student.progress?.warmups || {};
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const quarter = getCurrentQuarter(quarters, todayStr);
+
+    const grades = Object.entries(warmups)
+      .filter(([warmupId, entry]) => {
+        if (calentamientoCourseById[warmupId] !== student.course) return false;
+        if (quarter && !(entry.timestamp && entry.timestamp.slice(0, 10) >= quarter.startDate && entry.timestamp.slice(0, 10) <= quarter.endDate)) {
+          return false;
+        }
+        return typeof entry.grade === 'number';
+      })
+      .map(([, entry]) => entry.grade);
+
+    if (grades.length === 0) return { percent: null, quarterLabel: quarter?.label || null };
+    const avg = Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length);
+    return { percent: avg, quarterLabel: quarter?.label || null };
+  };
+
+  // --- TODAY'S ASSIGNED WARMUP STATUS for this student's course ---
+  const getTodaysWarmupStatus = (student) => {
+    const todaysId = todaysWarmupByCourse[student.course];
+    if (!todaysId) return { status: 'none' };
+    const entry = student.progress?.warmups?.[todaysId];
+    if (entry) return { status: 'done', percent: entry.grade ?? null, rawScore: entry.rawScore };
+    const draft = student.progress?.warmups_draft?.[todaysId];
+    if (draft) return { status: 'in_progress' };
+    return { status: 'not_started' };
+  };
+
+  // --- AGGREGATE LEARNING PATH % across every Dominio unit assigned so far
+  // for this student's course ---
+  const getLearningPathPercent = (student) => {
+    const relevantCols = unitColumns.filter((col) => col.courses.has(student.course));
+    if (relevantCols.length === 0) return null;
+    const totalPods = relevantCols.reduce((sum, col) => sum + (unitTotals[col.path_id] || 0), 0);
+    if (totalPods === 0) return null;
+    const completedPods = relevantCols.reduce(
+      (sum, col) => sum + Math.min(getUnitCompletedPods(student.progress, col.path_id), unitTotals[col.path_id] || 0),
+      0
+    );
+    return Math.round((completedPods / totalPods) * 100);
+  };
+
+  const saveQuarters = async () => {
+    await setDoc(doc(db, 'config', 'academic_quarters'), { quarters: quarterDraft }, { merge: true });
+    setQuarters(quarterDraft);
+    setQuarterModalOpen(false);
+  };
 
   // --- DIAGNOSTIC AGGREGATION LOGIC ---
   useEffect(() => {
@@ -197,6 +318,54 @@ const handleResetPassword = async () => {
             <span>⚠️</span> Diagnósticos
           </button>
         </div>
+
+        {activeTab === 'gradebook' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={rosterFilter}
+              onChange={(e) => setRosterFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="all">Todos los estudiantes</option>
+              {Array.from(
+                new Set(
+                  students
+                    .filter((s) => s.course && s.section)
+                    .map((s) => `${s.course}|${s.section}`)
+                )
+              )
+                .sort()
+                .map((key) => {
+                  const [course, section] = key.split('|');
+                  return (
+                    <option key={key} value={key}>
+                      {course.toUpperCase()} — {section}
+                    </option>
+                  );
+                })}
+            </select>
+
+            <button
+              onClick={() => {
+                setQuarterDraft(quarters.length ? quarters : [{ label: 'Trimestre 1', startDate: '', endDate: '' }]);
+                setQuarterModalOpen(true);
+              }}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+              title="Configurar fechas de trimestres"
+            >
+              📅 Trimestres
+            </button>
+
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+              title="Volver a cargar los datos más recientes"
+            >
+              {refreshing ? '⏳' : '🔄'} Actualizar
+            </button>
+          </div>
+        )}
       </header>
 
       {/* --- DIAGNOSTICS TAB CONTENT --- */}
@@ -280,126 +449,139 @@ const handleResetPassword = async () => {
         </main>
       )}
 
-      {/* --- UNIFIED GRADEBOOK: FIXED COLUMNS, ONE PER ASSIGNMENT --- */}
-      {activeTab === 'gradebook' && (
-        <main className="max-w-6xl mx-auto bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-950/50 border-b border-slate-700 text-xs font-black text-slate-400 uppercase tracking-widest">
-                <th className="p-4 pl-6 sticky left-0 bg-slate-950/50">Estudiante</th>
-                <th className="p-4">Puntos</th>
-                {getAvailableWarmupIds().map((warmupId) => (
-                  <th key={warmupId} className="p-4 whitespace-nowrap">{warmupId}</th>
-                ))}
-                {unitColumns.map((col) => (
-                  <th key={col.path_id} className="p-4 whitespace-nowrap text-emerald-400">
-                    <span className="block">{col.titulo || col.path_id}</span>
-                    <span className="block text-[9px] font-mono text-emerald-600 normal-case">Vence: Día {col.day_due}</span>
+      {/* --- GRADEBOOK: NAME, SECTION, WARMUP AVERAGE, TODAY, LEARNING PATH --- */}
+      {activeTab === 'gradebook' && (() => {
+        const visibleStudents = students
+          .filter((s) => rosterFilter === 'all' || `${s.course}|${s.section}` === rosterFilter)
+          .sort((a, b) => {
+            const lastCompare = (a.lastName || '').localeCompare(b.lastName || '');
+            return lastCompare !== 0 ? lastCompare : (a.firstName || '').localeCompare(b.firstName || '');
+          });
+
+        return (
+          <main className="max-w-6xl mx-auto bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-950/50 border-b border-slate-700 text-xs font-black text-slate-400 uppercase tracking-widest">
+                  <th className="p-4 pl-6 sticky left-0 bg-slate-950/50">Estudiante</th>
+                  <th className="p-4">Sección</th>
+                  <th className="p-4">Puntos</th>
+                  <th className="p-4">
+                    Promedio Calentamientos
+                    <span className="block text-[9px] font-mono text-slate-500 normal-case">
+                      {getCurrentQuarter(quarters, new Date().toLocaleDateString('en-CA'))?.label || 'Todo el año'}
+                    </span>
                   </th>
-                ))}
-                <th className="p-4 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {students.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={getAvailableWarmupIds().length + unitColumns.length + 3}
-                    className="p-8 text-center text-slate-500 font-bold"
-                  >
-                    No hay estudiantes registrados.
-                  </td>
+                  <th className="p-4">Calentamiento de Hoy</th>
+                  <th className="p-4">Camino de Aprendizaje</th>
+                  <th className="p-4 text-center">Acciones</th>
                 </tr>
-              ) : (
-                students.map((student) => {
-                  const warmups = student.progress?.warmups || {};
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {visibleStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
+                      No hay estudiantes en este filtro.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleStudents.map((student) => {
+                    const displayName = student.firstName || student.lastName
+                      ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
+                      : student.email;
+                    const { percent: avgPercent } = getWarmupAverage(student);
+                    const todays = getTodaysWarmupStatus(student);
+                    const pathPercent = getLearningPathPercent(student);
 
-                  return (
-                    <tr
-                      key={student.uid}
-                      className="hover:bg-slate-700/20 transition-colors"
-                    >
-                      <td className="p-4 pl-6 sticky left-0 bg-slate-800">
-                        <p className="font-bold text-white">{student.email}</p>
-                        <p className="text-xs text-slate-500 font-mono mt-1">
-                          UID: {student.uid.slice(0, 6)}...
-                        </p>
-                      </td>
+                    return (
+                      <tr key={student.uid} className="hover:bg-slate-700/20 transition-colors">
+                        <td className="p-4 pl-6 sticky left-0 bg-slate-800">
+                          <p className="font-bold text-white">{displayName}</p>
+                          <p className="text-xs text-slate-500 mt-1">{student.email}</p>
+                        </td>
 
-                      <td className="p-4">
-                        <span className="inline-block bg-amber-950/50 border border-amber-900/50 text-amber-400 font-black px-3 py-1 rounded-lg text-sm">
-                          🏆 {student.total_points || 0}
-                        </span>
-                      </td>
+                        <td className="p-4">
+                          <span className="inline-block bg-slate-900 border border-slate-700 text-slate-300 font-bold px-2.5 py-1 rounded-lg text-xs">
+                            {student.course?.toUpperCase() || '?'} {student.section || ''}
+                          </span>
+                        </td>
 
-                      {getAvailableWarmupIds().map((warmupId) => {
-                        const entry = warmups[warmupId];
-                        return (
-                          <td key={warmupId} className="p-4">
-                            {entry ? (
-                              <div className="bg-slate-900 border border-slate-700 rounded-lg p-2 text-center min-w-[80px]">
-                                <p className="text-sm font-black text-sky-400">
-                                  {entry.rawScore || `${entry.grade}%`}
-                                </p>
+                        <td className="p-4">
+                          <span className="inline-block bg-amber-950/50 border border-amber-900/50 text-amber-400 font-black px-3 py-1 rounded-lg text-sm">
+                            🏆 {student.total_points || 0}
+                          </span>
+                        </td>
+
+                        <td className="p-4">
+                          {avgPercent == null ? (
+                            <span className="text-slate-600 font-bold">—</span>
+                          ) : (
+                            <div className={`inline-block border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-sm ${getFlagClasses(avgPercent)}`}>
+                              {avgPercent}%
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="p-4">
+                          {todays.status === 'none' && <span className="text-slate-600 font-bold">—</span>}
+                          {todays.status === 'not_started' && (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg">
+                              No iniciado
+                            </span>
+                          )}
+                          {todays.status === 'in_progress' && (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-sky-400 bg-sky-950/40 border border-sky-900/60 px-2.5 py-1.5 rounded-lg">
+                              En progreso
+                            </span>
+                          )}
+                          {todays.status === 'done' && (
+                            <div className={`inline-block border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-sm ${getFlagClasses(todays.percent ?? 0)}`}>
+                              {todays.rawScore || `${todays.percent}%`}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="p-4">
+                          {pathPercent == null ? (
+                            <span className="text-slate-600 font-bold">—</span>
+                          ) : (
+                            <div className="w-full max-w-[140px]">
+                              <div className={`text-xs font-black mb-1 ${getFlagClasses(pathPercent).split(' ')[0]}`}>
+                                {pathPercent}%
                               </div>
-                            ) : (
-                              <span className="text-slate-600 font-bold">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {unitColumns.map((col) => {
-                        if (!col.courses.has(student.course)) {
-                          return <td key={col.path_id} className="p-4"><span className="text-slate-600 font-bold">—</span></td>;
-                        }
-                        const { completedPods, percent, letterGrade } = getUnitSummary(student.progress, col.path_id, unitTotals[col.path_id] || 0);
-                        return (
-                          <td key={col.path_id} className="p-4">
-                            <div className="w-full max-w-xs">
-                              <div className="flex justify-between text-xs font-bold mb-1">
-                                <span className="text-slate-400">
-                                  {completedPods} / {unitTotals[col.path_id] || 0} Pods
-                                </span>
-                                <span className="text-emerald-400">
-                                  {percent}% ({letterGrade})
-                                </span>
-                              </div>
-                              <div className="w-full bg-slate-900 rounded-full h-2.5 border border-slate-700 overflow-hidden">
+                              <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden">
                                 <div
-                                  className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
-                                  style={{ width: `${percent}%` }}
+                                  className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                                  style={{ width: `${pathPercent}%` }}
                                 ></div>
                               </div>
                             </div>
-                          </td>
-                        );
-                      })}
+                          )}
+                        </td>
 
-                      {/* 🔑 NEW PASSWORD RESET BUTTON */}
-                      <td className="p-4 text-center">
-                        <button
-                          onClick={() => setResetModal({
-                            uid: student.uid,
-                            email: student.email,
-                            newPassword: '',
-                            status: ''
-                          })}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
-                          title="Forzar nueva contraseña"
-                        >
-                          <span>🔑</span> Reset
-                        </button>
-                      </td>
-
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </main>
-      )}
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => setResetModal({
+                              uid: student.uid,
+                              email: student.email,
+                              newPassword: '',
+                              status: ''
+                            })}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
+                            title="Forzar nueva contraseña"
+                          >
+                            <span>🔑</span> Reset
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </main>
+        );
+      })()}
 
       {/* 🔐 PASSWORD OVERRIDE MODAL */}
       {resetModal && (
@@ -438,6 +620,93 @@ const handleResetPassword = async () => {
                 className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
               >
                 Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📅 QUARTER (GRADING PERIOD) EDITOR MODAL */}
+      {quarterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-1 flex items-center gap-2">
+              <span>📅</span> Fechas de Trimestres
+            </h3>
+            <p className="text-xs text-slate-400 mb-6">
+              El promedio de calentamientos se calcula solo dentro del trimestre actual. Sin fechas configuradas, se usa el promedio de todo el año.
+            </p>
+
+            <div className="space-y-3 mb-4">
+              {quarterDraft.map((q, idx) => (
+                <div key={idx} className="flex gap-2 items-center bg-slate-900 border border-slate-700 rounded-lg p-3">
+                  <input
+                    type="text"
+                    value={q.label}
+                    onChange={(e) => {
+                      const updated = [...quarterDraft];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setQuarterDraft(updated);
+                    }}
+                    placeholder="Trimestre 1"
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs font-bold focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  <input
+                    type="date"
+                    value={q.startDate}
+                    onChange={(e) => {
+                      const updated = [...quarterDraft];
+                      updated[idx] = { ...updated[idx], startDate: e.target.value };
+                      setQuarterDraft(updated);
+                    }}
+                    className="bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  <span className="text-slate-600 text-xs">a</span>
+                  <input
+                    type="date"
+                    value={q.endDate}
+                    onChange={(e) => {
+                      const updated = [...quarterDraft];
+                      updated[idx] = { ...updated[idx], endDate: e.target.value };
+                      setQuarterDraft(updated);
+                    }}
+                    className="bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  <button
+                    onClick={() => setQuarterDraft(quarterDraft.filter((_, i) => i !== idx))}
+                    className="text-rose-400 hover:text-rose-300 font-black px-2"
+                    title="Eliminar"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() =>
+                setQuarterDraft([
+                  ...quarterDraft,
+                  { label: `Trimestre ${quarterDraft.length + 1}`, startDate: '', endDate: '' },
+                ])
+              }
+              className="text-xs font-bold text-sky-400 hover:text-sky-300 mb-6"
+            >
+              + Agregar trimestre
+            </button>
+
+            <div className="flex justify-end gap-3 border-t border-slate-700 pt-4">
+              <button
+                onClick={() => setQuarterModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white uppercase tracking-widest transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveQuarters}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
+              >
+                Guardar
               </button>
             </div>
           </div>
