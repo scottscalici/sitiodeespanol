@@ -1,7 +1,22 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
-export default function LecturaCard({ lecturaId, title, testId, textId }) {
+export default function LecturaCard({ lecturaId }) {
+  const [lectura, setLectura] = useState(null);
+
+  useEffect(() => {
+    if (!lecturaId) return;
+    let cancelled = false;
+    getDoc(doc(db, 'lecturas', lecturaId))
+      .then((snap) => { if (!cancelled && snap.exists()) setLectura(snap.data()); })
+      .catch((err) => console.error('Error loading lectura:', err));
+    return () => { cancelled = true; };
+  }, [lecturaId]);
+
+  const { subtitulo: title, test_id: testId, text_id: textId } = lectura || {};
+
   return (
     <Link
       to={`/lectura/${lecturaId}`}

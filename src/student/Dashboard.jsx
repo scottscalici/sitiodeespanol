@@ -363,9 +363,6 @@ const Dashboard = () => {
               <LecturaCard
                 key={lecturaId}
                 lecturaId={lecturaId}
-                title="Comprensión de Lectura"
-                testId="IB Paper 1"
-                textId="A"
               />
             ))}
 
