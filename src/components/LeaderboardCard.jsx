@@ -36,7 +36,8 @@ const LeaderboardCard = ({ course }) => {
 
         const rows = snap.docs.map((docSnap) => {
           const d = docSnap.data();
-          const name = [d.firstName, d.lastName].filter(Boolean).join(' ') || d.email || 'Estudiante';
+          const lastInitial = d.lastName ? `${d.lastName.trim().charAt(0).toUpperCase()}.` : '';
+          const name = [d.firstName, lastInitial].filter(Boolean).join(' ') || d.email || 'Estudiante';
           return {
             uid: docSnap.id,
             name,
