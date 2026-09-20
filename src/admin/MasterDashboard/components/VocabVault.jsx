@@ -10,6 +10,54 @@ const buildWordId = (textbook, palabra) => `${slugifyBook(textbook)}_${slugifyWo
 const tagsToText = (arr) => (Array.isArray(arr) ? arr.join(', ') : '');
 const textToTags = (text) => (text || '').split(',').map(t => t.trim()).filter(Boolean);
 
+// --- BULK IMPORT EXAMPLE (shown + loadable in the Importer tab) ---
+// id and lastUpdated are generated automatically on import — leave them out.
+const EXAMPLE_JSON = JSON.stringify([
+  {
+    palabra: "brindar",
+    traduccion: "to toast (drink)",
+    definiciones: {
+      nivel1: [
+        "To toast. Raising a glass to say cheers.",
+        "To toast. Queremos brindar por la felicidad de los novios."
+      ],
+      nivel2: [
+        "Es la acción de levantar tu vaso de champán o vino para celebrar la salud y la alegría de otras personas.",
+        "Siempre dices '¡Salud!' al hacerlo."
+      ],
+      nivel3: [
+        "Manifestar, al ir a beber, el bien que se desea a alguien o la satisfacción por algo.",
+        "Elevar las copas en un acto de comunión social para expresar parabienes o buenos augurios hacia un individuo o proyecto."
+      ]
+    },
+    usage_tags: ["tema:celebraciones", "tema:interacciones"],
+    metadata: {
+      textbook: "Descubre 1",
+      secciones: [],
+      tipo: "verbo",
+      evaluacion: true,
+      ib_tags: ["Organización social"]
+    }
+  },
+  {
+    palabra: "celebrar",
+    traduccion: "to celebrate",
+    definiciones: {
+      nivel1: ["To celebrate. Having a party for a special event."],
+      nivel2: ["Es la acción de hacer una fiesta o un evento feliz porque es un día importante."],
+      nivel3: ["Conmemorar un acontecimiento, especialmente si es feliz, con fiestas o actos solemnes."]
+    },
+    usage_tags: ["tema:celebraciones"],
+    metadata: {
+      textbook: "Descubre 1",
+      secciones: [],
+      tipo: "verbo",
+      evaluacion: true,
+      ib_tags: ["Organización social"]
+    }
+  }
+], null, 2);
+
 // --- DATA HEALER HELPER ---
 const getSafeSectionsArray = (metadata) => {
   if (!metadata) return [];
@@ -49,6 +97,7 @@ const VocabVault = () => {
   // --- UPLOADER STATES ---
   const [jsonInput, setJsonInput] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [showJsonExample, setShowJsonExample] = useState(false);
 
   // --- EDITOR STATES ---
   const [editingWord, setEditingWord] = useState(null);
@@ -510,7 +559,17 @@ const VocabVault = () => {
       {activeTab === 'upload' && (
         <div style={s.panel}>
           <h2 style={{color: '#ff9a40'}}>🚀 JSON Bulk Importer</h2>
-          <textarea style={s.jsonTextarea} value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder='Paste JSON array here...' />
+          <p style={{color: '#888', fontSize: '13px', marginTop: '-5px'}}>
+            Paste a JSON array of word objects below. Each word needs <code>palabra</code>, <code>traduccion</code>, <code>definiciones</code> (nivel1/nivel2/nivel3 arrays of strings), <code>usage_tags</code>, and <code>metadata</code> (textbook, secciones, tipo, evaluacion, ib_tags). Leave <code>secciones: []</code> if you don't have sections yet. Don't include <code>id</code> or <code>lastUpdated</code> — those are generated automatically.
+          </p>
+          <div style={{display: 'flex', gap: '10px', marginBottom: '10px'}}>
+            <button onClick={() => setJsonInput(EXAMPLE_JSON)} style={{...s.primaryBtn, background: '#1a1a1a', border: '1px solid #ff9a40', color: '#ff9a40'}}>📋 Load Example Into Editor</button>
+            <button onClick={() => setShowJsonExample(v => !v)} style={{...s.primaryBtn, background: 'none', border: '1px solid #333', color: '#888'}}>{showJsonExample ? 'Hide' : 'Show'} Format Reference</button>
+          </div>
+          {showJsonExample && (
+            <pre style={s.exampleBlock}>{EXAMPLE_JSON}</pre>
+          )}
+          <textarea style={s.jsonTextarea} value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder='Paste JSON array here, or click "Load Example Into Editor" above to start from a template...' />
           <button onClick={handleUpload} style={{...s.primaryBtn, marginTop: '15px'}}>Push to Firestore</button>
         </div>
       )}
@@ -810,6 +869,7 @@ const s = {
   content: { display: 'flex', flexDirection: 'column', gap: '20px' },
   panel: { background: '#0a0a0a', padding: '30px', borderRadius: '8px', border: '1px solid #222' },
   jsonTextarea: { width: '100%', height: '400px', background: '#000', border: '1px dashed #ff9a40', color: '#aaa', padding: '15px', fontFamily: 'monospace', borderRadius: '6px' },
+  exampleBlock: { width: '100%', maxHeight: '350px', overflowY: 'auto', background: '#000', border: '1px solid #333', color: '#7fd97f', padding: '15px', fontFamily: 'monospace', fontSize: '12px', borderRadius: '6px', marginBottom: '15px', boxSizing: 'border-box', whiteSpace: 'pre-wrap' },
   primaryBtn: { background: '#ff9a40', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
   sidebar: { width: '300px', background: '#0a0a0a', padding: '20px', borderRadius: '8px', border: '1px solid #222', display: 'flex', flexDirection: 'column' },
   badge: { background: '#1a1a1a', border: '1px solid #333', color: '#888', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' },
