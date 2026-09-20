@@ -260,6 +260,24 @@ const renderIframe = (videoObj) => {
               ))}
             </div>
 
+            {/* SWIPE ZONES — Drive-hosted clips load in a cross-origin iframe
+                that swallows every touch over its whole area, so the outer
+                container's touch handlers never fire there. These two strips
+                sit above the iframe and catch swipe gestures; the middle is
+                left uncovered so Drive's own play button stays tappable. */}
+            <div
+              className="absolute inset-x-0 top-0 h-[28%] z-10 touch-none"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onClick={handleVideoTap}
+            ></div>
+            <div
+              className="absolute inset-x-0 bottom-0 h-[28%] z-10 touch-none"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onClick={handleVideoTap}
+            ></div>
+
             {/* FLOATING ACTION BAR (Right Side) */}
             <div className="absolute bottom-16 right-4 z-30 flex flex-col gap-6 items-center">
               
