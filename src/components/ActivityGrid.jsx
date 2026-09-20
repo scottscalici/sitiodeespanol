@@ -5,6 +5,7 @@ const ActivityGrid = ({ activities = [], liveDia, course }) => {
   // 1. Filter the massive list down to ONLY today's activities for the current course
   const todaysActivities = activities.filter(act => {
     if (act.type === 'conversacion') return false;
+    if (act.type === 'video') return false;
     if (course === 's2') return act.s2_dias?.includes(liveDia);
     if (course === 's4') return act.s4_dias?.includes(liveDia);
     return false;

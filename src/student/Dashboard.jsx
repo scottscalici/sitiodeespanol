@@ -159,6 +159,14 @@ const Dashboard = () => {
     return false;
   });
 
+  // --- VIDEO FILTERING ---
+  const activeVideos = (data?.activities || []).filter((act) => {
+    if (act.type !== 'video') return false;
+    if (course === 's2') return act.s2_dias?.includes(liveDia);
+    if (course === 's4') return act.s4_dias?.includes(liveDia);
+    return false;
+  });
+
   // --- UTILITY FILTERING ---
   const activeDestacados = (data?.destacado || []).filter(d =>
     Number(d.dia) === liveDia && (!d.course || d.course === course || (Array.isArray(d.course) && d.course.includes(course)))
@@ -290,6 +298,45 @@ const Dashboard = () => {
               </Link>
             ))}
 
+            {/* 📺 VIDEO — TV WIDGET STYLE */}
+            {activeVideos.map((vid) => (
+              <Link
+                key={vid.id}
+                to={`/actividad/video/${vid.id}`}
+                className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-rose-800 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-center gap-4">
+                  {/* TV Outline Badge */}
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+                    {vid.img ? (
+                      <img src={vid.img} alt={vid.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-white drop-shadow">
+                        <rect x="3" y="7" width="18" height="13" rx="2" />
+                        <path d="M8 7l4-4 4 4" />
+                      </svg>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-red-100 mb-1">Video · Día {liveDia}</span>
+                    <h3 className="text-2xl font-black text-white leading-tight tracking-tight truncate">{vid.title}</h3>
+                    {vid.subtitle && (
+                      <p className="text-red-50/90 text-sm font-medium mt-1 line-clamp-2">{vid.subtitle}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                    Ver Video <span>→</span>
+                  </span>
+                </div>
+              </Link>
+            ))}
+
             {/* 📄 LECTURAS (DYNAMIC READING CARDS) */}
             {activeLecturas.map(lecturaId => (
               <LecturaCard
@@ -395,18 +442,27 @@ const Dashboard = () => {
 
               <Countdown course={course} />
 
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <h3 className="font-bold text-[11px] mb-4 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
-                  <span>📝</span> Tareas de Referencia
-                </h3>
-                <div className="space-y-3 opacity-75">
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl">
+                <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="relative flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span className="text-3xl drop-shadow">📝</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
+                  </div>
+                </div>
+
+                <div className="relative space-y-3">
                   {courseTasks.length === 0 ? (
-                    <p className="text-xs text-slate-300 italic text-center">No hay tareas.</p>
+                    <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
                   ) : (
                     courseTasks.map((t, idx) => (
-                      <div key={idx} className="bg-slate-50/50 rounded-lg p-3 border border-slate-100">
-                        <h4 className="font-bold text-slate-600 text-xs leading-tight">{t.titulo}</h4>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Vence: Día {t.day_due}</p>
+                      <div key={idx} className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10">
+                        <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}</h4>
+                        <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: Día {t.day_due}</p>
                       </div>
                     ))
                   )}
