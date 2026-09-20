@@ -1,16 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { awardPoints } from '../utils/pointsHelper';
+
+const MIN_WATCH_SECONDS = 8; // must dwell this long, or the whole clip if it's shorter
+const POINTS_PER_VIDEO = 2;
 
 const TicoTalk = () => {
+  const { currentUser } = useAuth();
   const [videoDatabase, setVideoDatabase] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  
+  const [loadError, setLoadError] = useState(false);
+
   // Heart Animation State
   const [showBigHeart, setShowBigHeart] = useState(false);
   const [likedVideos, setLikedVideos] = useState({});
 
+  // Sound: starts muted (required for reliable autoplay), stays unmuted for
+  // the rest of the session once the student turns it on once.
+  const [hasUnmuted, setHasUnmuted] = useState(false);
+
   const lastTapRef = useRef(0); // For tracking double-taps on mobile
+  const touchStartYRef = useRef(0);
+  const videoEnteredAtRef = useRef(Date.now());
 
   // Your Apps Script URL
   const jsonUrl = "https://script.google.com/macros/s/AKfycbyL_siaRKlrOAtyrbE5v-53PH0gRJDhS9LFEAdUH3zB3czS10DzGc6tlwo7YovNBoGi/exec";
@@ -21,36 +34,71 @@ const TicoTalk = () => {
         const response = await fetch(jsonUrl + '?v=' + new Date().getTime());
         if (!response.ok) throw new Error("Could not load the JSON file.");
         let data = await response.json();
-        
+
         // Shuffle the array so the feed is different every time!
         data = data.sort(() => Math.random() - 0.5);
-        
+
         setVideoDatabase(data);
+        setLoadError(data.length === 0);
         setLoading(false);
       } catch (error) {
         console.error("Error loading FYP database:", error);
+        setLoadError(true);
         setLoading(false);
       }
     };
     fetchVideos();
   }, []);
 
-  // --- SWIPE LOGIC ---
+  // Award points per video, but only once it's actually been watched — either
+  // for MIN_WATCH_SECONDS, or for its own full (known) length if that's
+  // shorter. Measured by timing how long the student dwelt on it before
+  // navigating away, via this effect's cleanup.
+  useEffect(() => {
+    if (loading || videoDatabase.length === 0) return;
+    videoEnteredAtRef.current = Date.now();
+    const video = videoDatabase[currentIndex];
+    const knownClipLength = (video?.start != null && video?.end != null)
+      ? Number(video.end) - Number(video.start)
+      : null;
+    const requiredSeconds = knownClipLength != null
+      ? Math.min(MIN_WATCH_SECONDS, knownClipLength)
+      : MIN_WATCH_SECONDS;
+
+    return () => {
+      const dwellSeconds = (Date.now() - videoEnteredAtRef.current) / 1000;
+      if (dwellSeconds >= requiredSeconds && currentUser?.uid) {
+        awardPoints(currentUser.uid, POINTS_PER_VIDEO).catch((err) => console.error('Error awarding TicoTalk points:', err));
+      }
+    };
+  }, [currentIndex, loading, videoDatabase, currentUser]);
+
+  // --- SWIPE LOGIC (functional updates so a stale closure — e.g. from the
+  // keyboard listener below — can never read an out-of-date currentIndex) ---
   const handleNext = () => {
-    if (currentIndex < videoDatabase.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else {
-      // Loop back to start if they reach the end
-      setCurrentIndex(0); 
-    }
+    setCurrentIndex(prev => (prev < videoDatabase.length - 1 ? prev + 1 : 0));
+  };
+  const handlePrev = () => {
+    setCurrentIndex(prev => (prev > 0 ? prev - 1 : videoDatabase.length - 1));
   };
 
-  let touchStartY = 0;
-  const handleTouchStart = (e) => { touchStartY = e.changedTouches[0].screenY; };
+  const handleTouchStart = (e) => { touchStartYRef.current = e.changedTouches[0].screenY; };
   const handleTouchEnd = (e) => {
     const touchEndY = e.changedTouches[0].screenY;
-    if (touchStartY - touchEndY > 60) handleNext(); // Swiped Up
+    const delta = touchStartYRef.current - touchEndY;
+    if (delta > 60) handleNext(); // Swiped Up
+    else if (delta < -60) handlePrev(); // Swiped Down
   };
+
+  // Keyboard nav for desktop — ArrowDown/Up mirror swipe up/down.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowDown') handleNext();
+      else if (e.key === 'ArrowUp') handlePrev();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [videoDatabase.length]);
 
   // --- DOUBLE TAP LOGIC ---
   const handleVideoTap = () => {
@@ -115,8 +163,8 @@ const renderIframe = (videoObj) => {
     if (videoObj.end) timeParams += `&end=${videoObj.end}`;
     // Added loop=1 and playlist=finalId so YouTube shorts loop infinitely like TikTok!
     return (
-      <iframe 
-        src={`https://www.youtube.com/embed/${finalId}?autoplay=1&mute=1&playsinline=1&loop=1&playlist=${finalId}${timeParams}`} 
+      <iframe
+        src={`https://www.youtube.com/embed/${finalId}?autoplay=1&mute=${hasUnmuted ? 0 : 1}&playsinline=1&loop=1&playlist=${finalId}${timeParams}`}
         className="w-full h-full pointer-events-none" 
         frameBorder="0" 
         allow="autoplay; encrypted-media" 
@@ -170,6 +218,12 @@ const renderIframe = (videoObj) => {
           <div className="w-full h-full flex items-center justify-center">
             <p className="text-white font-bold animate-pulse">Sintonizando...</p>
           </div>
+        ) : loadError || videoDatabase.length === 0 ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <span className="text-4xl">📡</span>
+            <p className="text-white font-bold">No se pudieron cargar los videos.</p>
+            <p className="text-slate-400 text-sm">Intenta de nuevo en un momento.</p>
+          </div>
         ) : (
           <div className="w-full h-full relative" 
                onTouchStart={handleTouchStart} 
@@ -221,8 +275,24 @@ const renderIframe = (videoObj) => {
                 </div>
               </button>
 
+              {/* Sound Toggle */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setHasUnmuted(prev => !prev); }}
+                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center transition-transform active:scale-90"
+              >
+                <span className="text-xl">{hasUnmuted ? '🔊' : '🔇'}</span>
+              </button>
+
+              {/* Previous Button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); handlePrev(); }}
+                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center transition-transform active:scale-90"
+              >
+                <span className="text-xl">⬆️</span>
+              </button>
+
               {/* Next Button (Visible fallback for desktop users) */}
-              <button 
+              <button
                 onClick={(e) => { e.stopPropagation(); handleNext(); }}
                 className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center transition-transform active:scale-90"
               >
