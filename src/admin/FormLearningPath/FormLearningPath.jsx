@@ -529,7 +529,7 @@ export default function FormLearningPath() {
       />
 
       <PathBuilder 
-        course={course} pathId={pathId} setPathId={setPathId} pathTitle={pathTitle} setPathTitle={setPathTitle}
+        course={course} setCourse={setCourse} pathId={pathId} setPathId={setPathId} pathTitle={pathTitle} setPathTitle={setPathTitle}
         isSaving={isSaving} pods={pods} handleAddPod={handleAddPod} handleAddSegment={handleAddSegment}
         handleDeleteSegment={handleDeleteSegment} handleDeletePod={handleDeletePod} handleSavePathToFirestore={handleSavePathToFirestore}
         setPods={setPods} activeSegmentId={activeSegmentId} setActiveSegmentId={setActiveSegmentId} handleRemoveItem={handleRemoveItem}

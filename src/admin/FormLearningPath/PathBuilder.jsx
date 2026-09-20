@@ -2,6 +2,7 @@ import React from 'react';
 
 export default function PathBuilder({
   course,
+  setCourse,
   pathId,
   setPathId,
   pathTitle,
@@ -66,9 +67,14 @@ export default function PathBuilder({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 text-xs font-black bg-blue-100 text-blue-800 rounded-md uppercase tracking-wider">
-                {course.toUpperCase()} Course
-              </span>
+              <button
+                type="button"
+                onClick={() => setCourse(course === 's2' ? 's4' : 's2')}
+                title="Click to switch which course this path is tagged for"
+                className="px-2.5 py-0.5 text-xs font-black bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                {course.toUpperCase()} Course ⇄
+              </button>
               <div className="flex flex-col">
                 <input
                   type="text"

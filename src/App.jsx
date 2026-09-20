@@ -163,7 +163,7 @@ function App() {
             <Route path="/juegos/silabas" element={<SilabasPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
-            <Route path="/student-learning-path" element={<StudentLearningPath />} />
+            <Route path="/student-learning-path/:targetDia?" element={<StudentLearningPath />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />

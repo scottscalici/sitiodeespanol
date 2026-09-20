@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
@@ -15,6 +16,7 @@ const BRANCHES = [
 
 export default function StudentLearningPath() {
   const { userData } = useAuth();
+  const { targetDia } = useParams();
   const isAdmin = userData?.role === 'admin';
   const course = userData?.course || 's2';
 
@@ -32,17 +34,22 @@ export default function StudentLearningPath() {
     const fetchAssignments = async () => {
       setIsLoading(true);
       try {
-        const [calSnap, tareasSnap] = await Promise.all([
-          getDoc(doc(db, 'config', 'academic_year_2026_2027')),
-          getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
-        ]);
+        const tareasSnap = await getDoc(doc(db, 'curriculum_tracks', 'tareas_master'));
 
-        const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        const pastEntries = calendarArray.filter((c) => c.fecha && c.fecha <= todayStr && c.dia != null);
-        const currentDay = pastEntries.length > 0
-          ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
-          : 1;
+        // A day carried in the URL (e.g. from the Dashboard's day-preview override)
+        // always wins — otherwise fall back to today's real day from the calendar,
+        // same as every other day-gated card computes on its own.
+        const parsedTargetDia = parseInt(targetDia, 10);
+        let currentDay = parsedTargetDia;
+        if (!currentDay) {
+          const calSnap = await getDoc(doc(db, 'config', 'academic_year_2026_2027'));
+          const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
+          const todayStr = new Date().toLocaleDateString('en-CA');
+          const pastEntries = calendarArray.filter((c) => c.fecha && c.fecha <= todayStr && c.dia != null);
+          currentDay = pastEntries.length > 0
+            ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
+            : 1;
+        }
         setLiveDia(currentDay);
 
         const tareasData = tareasSnap.exists() ? tareasSnap.data() : {};
@@ -57,7 +64,7 @@ export default function StudentLearningPath() {
     };
 
     fetchAssignments();
-  }, [course]);
+  }, [course, targetDia]);
 
   // --- 2. LOAD THE SELECTED UNIT'S DOCUMENT ---
   useEffect(() => {
