@@ -46,6 +46,8 @@ export default function CalentamientoEngine({ onClose }) {
   const autoSavedRef = useRef(false);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [pointsAwarded, setPointsAwarded] = useState(null);
+  const [speedBonusAwarded, setSpeedBonusAwarded] = useState(0);
+  const vocabSkippedAtStartRef = useRef(false);
 
   // In-app feedback modal (replaces native alert() popups)
   const [feedbackModal, setFeedbackModal] = useState(null); // { tone, emoji, title, message }
@@ -147,6 +149,13 @@ export default function CalentamientoEngine({ onClose }) {
   // "accidental" close doesn't erase answers the student already submitted.
   useEffect(() => {
     if (!warmupData || !userData) return;
+
+    // Snapshot whether vocab was already done BEFORE this session started —
+    // used later to pick the speed-bonus threshold. Read directly here
+    // (rather than the live hasCompletedVocabBefore) so a vocab completion
+    // that happens DURING this session doesn't retroactively change it.
+    vocabSkippedAtStartRef.current = !!userData?.progress?.vocab_completed?.[warmupData.vocabDocId];
+
     const draft = userData?.progress?.warmups_draft?.[warmupData.docId];
     if (!draft) return;
 
@@ -382,6 +391,25 @@ export default function CalentamientoEngine({ onClose }) {
     const pointsEarned = hasCompletedBefore ? 0 : 20;
     setPointsAwarded(pointsEarned);
 
+    // Speed bonus: rewards a fast, accurate run. Vocab was part of THIS
+    // session only if it wasn't already done before it started (checked via
+    // a ref snapshotted at load, not the live flag, so finishing vocab just
+    // now doesn't retroactively tighten the threshold on you).
+    const hadVocabThisSession = bakedVocab.length > 0 && !vocabSkippedAtStartRef.current;
+    const speedThresholdSeconds = hadVocabThisSession ? 120 : 60;
+    let speedBonus = 0;
+    if (
+      timerSeconds > 0 &&
+      timerSeconds <= speedThresholdSeconds &&
+      verbAccuracy >= 0.8
+    ) {
+      speedBonus = 10;
+      if (verbAccuracy === 1) speedBonus += 5; // perfect accuracy bonus on top
+    }
+    setSpeedBonusAwarded(speedBonus);
+
+    const pointsEarnedThisSession = pointsEarned + speedBonus;
+
     // Admins testing content shouldn't rack up scores meant for students.
     if (userData && userData.uid && userData.role !== 'admin') {
       try {
@@ -392,10 +420,10 @@ export default function CalentamientoEngine({ onClose }) {
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
 
-        let newTotal = pointsEarned;
-        let newMonthly = pointsEarned;
-        let newWeekly = pointsEarned;
-        let newDaily = pointsEarned;
+        let newTotal = pointsEarnedThisSession;
+        let newMonthly = pointsEarnedThisSession;
+        let newWeekly = pointsEarnedThisSession;
+        let newDaily = pointsEarnedThisSession;
         let existingGrade = -1;
         let existingData = {};
 
@@ -796,11 +824,15 @@ export default function CalentamientoEngine({ onClose }) {
               </div>
             </div>
 
-            <div className="p-4 bg-amber-950/30 rounded-2xl border border-amber-900/50 max-w-md mx-auto">
+            <div className="p-4 bg-amber-950/30 rounded-2xl border border-amber-900/50 max-w-md mx-auto space-y-1">
               <p className="text-xs font-bold text-amber-500 uppercase mb-1">
                 Recompensa Obtenida:
               </p>
-              {pointsAwarded === 0 ? (
+              {pointsAwarded === null ? (
+                <p className="text-sm text-slate-400 italic animate-pulse">
+                  Calculando recompensa...
+                </p>
+              ) : pointsAwarded === 0 && speedBonusAwarded === 0 ? (
                 <>
                   <p className="text-lg font-black text-slate-400">
                     Ya ganaste tus puntos la primera vez
@@ -810,9 +842,21 @@ export default function CalentamientoEngine({ onClose }) {
                   </p>
                 </>
               ) : (
-                <p className="text-2xl font-black text-amber-400">
-                  🏆 +{pointsAwarded ?? 20} Puntos
-                </p>
+                <>
+                  <p className="text-2xl font-black text-amber-400">
+                    🏆 +{pointsAwarded + speedBonusAwarded} Puntos
+                  </p>
+                  {pointsAwarded === 0 && speedBonusAwarded > 0 && (
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">
+                      Ya ganaste tus puntos base — esto es solo el bono de velocidad
+                    </p>
+                  )}
+                  {speedBonusAwarded > 0 && (
+                    <p className="text-xs font-black text-sky-400 uppercase tracking-widest">
+                      ⚡ Bono de velocidad: +{speedBonusAwarded}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
