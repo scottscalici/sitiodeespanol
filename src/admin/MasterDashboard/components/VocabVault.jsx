@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../firebase.js'; 
-import { collection, doc, setDoc, updateDoc, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../../firebase.js';
+import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+
+// --- SLUG HELPERS (shared by bulk importer + single-word editor) ---
+const slugifyBook = (textbook) => (textbook || 'unknown_book').replace(/\s+/g, '_').toLowerCase();
+const slugifyWord = (palabra) => (palabra || '').replace(/\//g, '-').replace(/\s+/g, '_').replace(/[()]/g, '').toLowerCase();
+const buildWordId = (textbook, palabra) => `${slugifyBook(textbook)}_${slugifyWord(palabra)}`;
+
+const tagsToText = (arr) => (Array.isArray(arr) ? arr.join(', ') : '');
+const textToTags = (text) => (text || '').split(',').map(t => t.trim()).filter(Boolean);
 
 // --- DATA HEALER HELPER ---
 const getSafeSectionsArray = (metadata) => {
@@ -45,7 +53,8 @@ const VocabVault = () => {
   // --- EDITOR STATES ---
   const [editingWord, setEditingWord] = useState(null);
   const [librarySearch, setLibrarySearch] = useState("");
-  const [auditFilter, setAuditFilter] = useState("all"); 
+  const [auditFilter, setAuditFilter] = useState("all");
+  const [libraryTextbookFilter, setLibraryTextbookFilter] = useState("all");
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedWords, setSelectedWords] = useState([]);
   const [bulkTextbook, setBulkTextbook] = useState("");
@@ -183,9 +192,7 @@ const VocabVault = () => {
       const data = JSON.parse(jsonInput);
       setUploadStatus('⏳ Processing...');
       for (const item of data) {
-        const cleanWord = item.palabra.replace(/\//g, '-').replace(/\s+/g, '_').replace(/[()]/g, '').toLowerCase();
-        const cleanTextbook = item.metadata?.textbook ? item.metadata.textbook.replace(/\s+/g, '_').toLowerCase() : 'unknown_book';
-        const docId = `${cleanTextbook}_${cleanWord}`;
+        const docId = buildWordId(item.metadata?.textbook, item.palabra);
         await setDoc(doc(db, "vocabulary", docId), { ...item, lastUpdated: serverTimestamp() });
       }
       setJsonInput('');
@@ -203,24 +210,56 @@ const VocabVault = () => {
     };
     setEditingWord({
       ...wordObj,
+      isNew: false,
       edit_textbook: wordObj?.metadata?.textbook || "",
       edit_section: getSafeSectionsArray(wordObj?.metadata).join(', '),
+      edit_tipo: wordObj?.metadata?.tipo || "",
+      edit_evaluacion: !!wordObj?.metadata?.evaluacion,
+      edit_ib_tags: tagsToText(wordObj?.metadata?.ib_tags),
+      edit_usage_tags: tagsToText(wordObj?.usage_tags),
       def1_text: safelyGetText(wordObj?.definiciones?.nivel1),
       def2_text: safelyGetText(wordObj?.definiciones?.nivel2),
       def3_text: safelyGetText(wordObj?.definiciones?.nivel3)
     });
   };
 
+  const createNewWord = () => {
+    const presetBook = libraryTextbookFilter !== 'all' ? libraryTextbookFilter : "";
+    setEditingWord({
+      isNew: true,
+      id: null,
+      palabra: "",
+      traduccion: "",
+      edit_textbook: presetBook,
+      edit_section: "",
+      edit_tipo: "",
+      edit_evaluacion: false,
+      edit_ib_tags: "",
+      edit_usage_tags: "",
+      def1_text: "",
+      def2_text: "",
+      def3_text: ""
+    });
+  };
+
   const saveEditedWord = async () => {
+    if (!editingWord.palabra?.trim()) return alert("Word (palabra) is required.");
+    if (!editingWord.edit_textbook?.trim()) return alert("Textbook is required.");
     try {
-      const docRef = doc(db, "vocabulary", editingWord.id);
+      const metadata = {
+        ...(editingWord.metadata || {}),
+        textbook: editingWord.edit_textbook,
+        secciones: editingWord.edit_section.split(',').map(s => s.trim()).filter(Boolean),
+        tipo: editingWord.edit_tipo,
+        evaluacion: editingWord.edit_evaluacion,
+        ib_tags: textToTags(editingWord.edit_ib_tags)
+      };
+      delete metadata.seccion;
+
       const updatedData = {
         ...editingWord,
-        metadata: {
-          ...(editingWord.metadata || {}),
-          textbook: editingWord.edit_textbook,
-          secciones: editingWord.edit_section.split(',').map(s => s.trim()).filter(Boolean)
-        },
+        metadata,
+        usage_tags: textToTags(editingWord.edit_usage_tags),
         definiciones: {
           nivel1: (editingWord.def1_text || "").split('\n').filter(t => t.trim() !== ''),
           nivel2: (editingWord.def2_text || "").split('\n').filter(t => t.trim() !== ''),
@@ -228,15 +267,39 @@ const VocabVault = () => {
         },
         lastUpdated: serverTimestamp()
       };
-      if (updatedData.metadata.seccion !== undefined) delete updatedData.metadata.seccion;
       delete updatedData.def1_text; delete updatedData.def2_text; delete updatedData.def3_text;
       delete updatedData.edit_textbook; delete updatedData.edit_section;
-      
-      await updateDoc(docRef, updatedData);
-      setFullVocab(fullVocab.map(w => w.id === editingWord.id ? updatedData : w));
+      delete updatedData.edit_tipo; delete updatedData.edit_evaluacion;
+      delete updatedData.edit_ib_tags; delete updatedData.edit_usage_tags;
+      delete updatedData.isNew;
+
+      if (editingWord.isNew) {
+        const newId = buildWordId(editingWord.edit_textbook, editingWord.palabra);
+        if (fullVocab.some(w => w.id === newId)) {
+          if (!window.confirm(`A word with id "${newId}" already exists. Overwrite it?`)) return;
+        }
+        updatedData.id = newId;
+        await setDoc(doc(db, "vocabulary", newId), updatedData);
+        setFullVocab(prev => [...prev.filter(w => w.id !== newId), { ...updatedData, id: newId }]);
+        setEditingWord(null);
+        alert("Word created!");
+      } else {
+        const docRef = doc(db, "vocabulary", editingWord.id);
+        await updateDoc(docRef, updatedData);
+        setFullVocab(fullVocab.map(w => w.id === editingWord.id ? { ...updatedData, id: editingWord.id } : w));
+        setEditingWord(null);
+        alert("Updated successfully!");
+      }
+    } catch (e) { console.error(e); alert("Error saving."); }
+  };
+
+  const deleteWord = async (wordId) => {
+    if (!window.confirm("Delete this word permanently? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "vocabulary", wordId));
+      setFullVocab(prev => prev.filter(w => w.id !== wordId));
       setEditingWord(null);
-      alert("Updated successfully!");
-    } catch (e) { alert("Error saving."); }
+    } catch (e) { alert("Error deleting."); }
   };
 
   const applyBulkTags = async () => {
@@ -423,6 +486,7 @@ const VocabVault = () => {
   if (isLoading) return <div style={s.centerScreen}><h2>Loading Vocab Vault...</h2></div>;
 
   const filteredVocabList = fullVocab.filter(v => {
+    if (libraryTextbookFilter !== 'all' && (v?.metadata?.textbook || '') !== libraryTextbookFilter) return false;
     if (auditFilter === 'no_section') return getSafeSectionsArray(v?.metadata).length === 0;
     if (auditFilter === 'no_book') return !v?.metadata?.textbook;
     const term = librarySearch.toLowerCase();
@@ -455,10 +519,16 @@ const VocabVault = () => {
       {activeTab === 'library' && (
         <div style={{display: 'flex', gap: '30px', height: '75vh'}}>
           <div style={s.sidebar}>
-            <div style={{marginBottom: '15px'}}>
+            <div style={{marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+               <button onClick={createNewWord} style={{...s.primaryBtn, width: '100%'}}>+ New Word</button>
                <button onClick={publishChapters} style={{...s.primaryBtn, width: '100%', background: '#2a1a00', border: '1px solid #ff9a40', color: '#ff9a40'}}>🚀 Sync Chapter Bundles</button>
                {uploadStatus && <div style={{fontSize: '11px', color: '#ff9a40', marginTop: '5px', textAlign: 'center'}}>{uploadStatus}</div>}
             </div>
+
+            <select value={libraryTextbookFilter} onChange={e => setLibraryTextbookFilter(e.target.value)} style={{...s.selectBox, marginBottom: '10px'}}>
+              <option value="all">All Textbooks</option>
+              {availableTextbooks.map(tb => <option key={tb} value={tb}>{tb}</option>)}
+            </select>
 
             <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
               <button onClick={() => {setAuditFilter('all'); setSelectedWords([]);}} style={auditFilter === 'all' ? s.badgeActive : s.badge}>All</button>
@@ -487,14 +557,39 @@ const VocabVault = () => {
                </div>
              ) : editingWord ? (
                <div style={s.editorForm}>
-                 <div style={{display: 'flex', justifyContent: 'space-between'}}><h2 style={{color: '#ff9a40'}}>Editing: {editingWord.palabra}</h2><button onClick={()=>setEditingWord(null)} style={s.cancelBtn}>Close</button></div>
-                 <div style={{display: 'flex', gap: '10px'}}><div style={s.inputBox}><label style={s.label}>Textbook</label><input value={editingWord.edit_textbook} onChange={e=>setEditingWord({...editingWord, edit_textbook: e.target.value})} style={s.inputLarge}/></div><div style={s.inputBox}><label style={s.label}>Sections</label><input value={editingWord.edit_section} onChange={e=>setEditingWord({...editingWord, edit_section: e.target.value})} style={s.inputLarge}/></div></div>
+                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                   <h2 style={{color: '#ff9a40'}}>{editingWord.isNew ? 'New Word' : `Editing: ${editingWord.palabra}`}</h2>
+                   <button onClick={()=>setEditingWord(null)} style={s.cancelBtn}>Close</button>
+                 </div>
+                 {!editingWord.edit_section && (
+                   <div style={{fontSize: '12px', color: '#ffb3b3', background: '#2a1111', border: '1px solid #4a1111', padding: '8px 12px', borderRadius: '4px'}}>
+                     ⚠️ No section assigned yet — this word won't appear on the student site until you tag a section (find it later via the "⚠️ No Section" filter) and Sync Chapter Bundles.
+                   </div>
+                 )}
+                 <div style={{display: 'flex', gap: '10px'}}><div style={s.inputBox}><label style={s.label}>Textbook</label><input value={editingWord.edit_textbook} onChange={e=>setEditingWord({...editingWord, edit_textbook: e.target.value})} style={s.inputLarge}/></div><div style={s.inputBox}><label style={s.label}>Sections (optional)</label><input placeholder="e.g. 9.1 — leave blank for now" value={editingWord.edit_section} onChange={e=>setEditingWord({...editingWord, edit_section: e.target.value})} style={s.inputLarge}/></div></div>
                  <div style={{display: 'flex', gap: '10px'}}><div style={s.inputBox}><label style={s.label}>Spanish</label><input value={editingWord.palabra} onChange={e=>setEditingWord({...editingWord, palabra: e.target.value})} style={s.inputLarge}/></div><div style={s.inputBox}><label style={s.label}>English</label><input value={editingWord.traduccion} onChange={e=>setEditingWord({...editingWord, traduccion: e.target.value})} style={s.inputLarge}/></div></div>
-                 <div style={s.inputBox}><label style={s.label}>L1 (English)</label><textarea value={editingWord.def1_text} onChange={e=>setEditingWord({...editingWord, def1_text: e.target.value})} style={s.defTextarea}/></div>
-                 <div style={s.inputBox}><label style={s.label}>L2 (Basic Sp)</label><textarea value={editingWord.def2_text} onChange={e=>setEditingWord({...editingWord, def2_text: e.target.value})} style={s.defTextarea}/></div>
-                 <button onClick={saveEditedWord} style={s.primaryBtn}>Update</button>
+                 <div style={{display: 'flex', gap: '10px'}}>
+                   <div style={s.inputBox}><label style={s.label}>Tipo (verbo, adjetivo, etc.)</label><input value={editingWord.edit_tipo} onChange={e=>setEditingWord({...editingWord, edit_tipo: e.target.value})} style={s.inputLarge}/></div>
+                   <div style={{...s.inputBox, flexGrow: 0, justifyContent: 'center'}}>
+                     <label style={s.label}>Evaluación</label>
+                     <label style={{color: '#ff9a40', display: 'flex', alignItems: 'center', gap: '6px', height: '38px'}}>
+                       <input type="checkbox" checked={editingWord.edit_evaluacion} onChange={e=>setEditingWord({...editingWord, edit_evaluacion: e.target.checked})}/> Testable
+                     </label>
+                   </div>
+                 </div>
+                 <div style={{display: 'flex', gap: '10px'}}>
+                   <div style={s.inputBox}><label style={s.label}>IB Tags (comma-separated)</label><input value={editingWord.edit_ib_tags} onChange={e=>setEditingWord({...editingWord, edit_ib_tags: e.target.value})} style={s.inputLarge}/></div>
+                   <div style={s.inputBox}><label style={s.label}>Usage Tags (comma-separated)</label><input placeholder="tema:celebraciones, tema:acciones" value={editingWord.edit_usage_tags} onChange={e=>setEditingWord({...editingWord, edit_usage_tags: e.target.value})} style={s.inputLarge}/></div>
+                 </div>
+                 <div style={s.inputBox}><label style={s.label}>Nivel 1 — English (one per line)</label><textarea value={editingWord.def1_text} onChange={e=>setEditingWord({...editingWord, def1_text: e.target.value})} style={s.defTextarea}/></div>
+                 <div style={s.inputBox}><label style={s.label}>Nivel 2 — Spanish básico (one per line)</label><textarea value={editingWord.def2_text} onChange={e=>setEditingWord({...editingWord, def2_text: e.target.value})} style={s.defTextarea}/></div>
+                 <div style={s.inputBox}><label style={s.label}>Nivel 3 — Spanish avanzado (one per line)</label><textarea value={editingWord.def3_text} onChange={e=>setEditingWord({...editingWord, def3_text: e.target.value})} style={s.defTextarea}/></div>
+                 <div style={{display: 'flex', gap: '10px'}}>
+                   <button onClick={saveEditedWord} style={{...s.primaryBtn, flexGrow: 1}}>{editingWord.isNew ? 'Create Word' : 'Update'}</button>
+                   {!editingWord.isNew && <button onClick={() => deleteWord(editingWord.id)} style={{...s.primaryBtn, background: '#4a1111', border: '1px solid #f44', color: '#ffb3b3'}}>Delete</button>}
+                 </div>
                </div>
-             ) : <div style={{color:'#666'}}>Select a word to edit.</div>}
+             ) : <div style={{color:'#666'}}>Select a word to edit, or click "+ New Word" to add one.</div>}
           </div>
         </div>
       )}
