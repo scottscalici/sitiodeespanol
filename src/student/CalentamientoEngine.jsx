@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
-import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
+import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
 
 export default function CalentamientoEngine({ onClose }) {
   const { courseId, targetDia } = useParams();
@@ -273,9 +273,11 @@ export default function CalentamientoEngine({ onClose }) {
         let newWeekly = pointsEarned;
         let newDaily = pointsEarned;
         let existingGrade = -1;
+        let existingData = {};
 
         if (snap.exists()) {
           const data = snap.data();
+          existingData = data;
           newTotal += data.total_points || data.current_path_points || 0;
           if (data.monthKey === monthKey) newMonthly += data.monthly_points || 0;
           if (data.weekKey === weekKey) newWeekly += data.weekly_points || 0;
@@ -304,6 +306,7 @@ export default function CalentamientoEngine({ onClose }) {
           daily_points: newDaily,
           weekKey,
           monthKey,
+          ...bumpStreak(existingData),
         };
 
         // 2. ONLY attach the progress object if we beat the high score

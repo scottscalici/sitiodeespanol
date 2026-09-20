@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
-import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
+import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
 import { getAssignedDominioTasks } from '../utils/learningPathProgress';
 
 // Configuration for the 3 distinct branches
@@ -13,6 +13,25 @@ const BRANCHES = [
   { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald' },
   { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber' }
 ];
+
+// Zigzag path layout constants — a repeating offset pattern (as % from center)
+// works for any number of segments without knowing the count ahead of time.
+const PATH_X_PATTERN = [0, -15, 15];
+const PATH_ROW_HEIGHT = 128;
+const PATH_TOP_PAD = 70;
+const NODE_SIZE = 76;
+const CURRENT_NODE_SIZE = 92;
+const CHECKPOINT_SIZE = 96;
+
+const CheckIcon = ({ className, size = 28 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+);
+const LockIcon = ({ className, size = 24 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
+);
+const TrophyIcon = ({ className, size = 34 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z" /></svg>
+);
 
 export default function StudentLearningPath() {
   const { userData } = useAuth();
@@ -101,7 +120,7 @@ export default function StudentLearningPath() {
       currentPodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
     return () => clearTimeout(t);
-  }, [pods.length, activeBranch, activePodIndex]);
+  }, [pods.length, activeBranch, activePodIndex, activeSegmentIndex]);
 
   // --- DYNAMIC COLOR DICTIONARIES ---
   const themeColors = {
@@ -137,6 +156,39 @@ export default function StudentLearningPath() {
 
   const selectedTask = assignedTasks.find((t) => t.path_id === selectedPathId);
   const isPastDue = selectedTask && Number(selectedTask.day_due) < liveDia;
+
+  // --- ZIGZAG PATH LAYOUT: flatten pods into one climbable list of segment
+  // nodes + a checkpoint node per pod, then give each a computed x/y position.
+  // This works for any pod/segment count — nothing here is hardcoded to a
+  // specific unit's length.
+  const pathItemsRaw = [];
+  pods.forEach((pod, pIdx) => {
+    const podLocked = !isAdmin && pIdx > activePodIndex;
+    (pod.segments || []).forEach((seg, sIdx) => {
+      const isCompleted = pIdx < activePodIndex || (pIdx === activePodIndex && sIdx < activeSegmentIndex);
+      const isCurrent = pIdx === activePodIndex && sIdx === activeSegmentIndex;
+      pathItemsRaw.push({
+        key: seg.id, kind: 'segment', pod, pIdx, seg, sIdx,
+        isCompleted, isCurrent, isLocked: podLocked,
+        canClick: isAdmin || isCompleted || isCurrent,
+      });
+    });
+    pathItemsRaw.push({
+      key: `${pod.id}_checkpoint`, kind: 'checkpoint', pod, pIdx,
+      isCompleted: pIdx < activePodIndex, isLocked: podLocked,
+    });
+  });
+
+  const pathTotalHeight = pathItemsRaw.length * PATH_ROW_HEIGHT + PATH_TOP_PAD + 50;
+  const pathItems = pathItemsRaw.map((item, idx) => {
+    const reverseIdx = pathItemsRaw.length - 1 - idx;
+    return {
+      ...item,
+      x: item.kind === 'checkpoint' ? 50 : 50 + PATH_X_PATTERN[idx % PATH_X_PATTERN.length],
+      y: PATH_TOP_PAD + reverseIdx * PATH_ROW_HEIGHT,
+    };
+  });
+  const pathLineD = pathItems.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
   if (isLoading) {
     return (
@@ -239,9 +291,8 @@ export default function StudentLearningPath() {
         </div>
       </div>
 
-      {/* THE PYRAMID CLIMB */}
-      <div className="flex-1 max-w-3xl mx-auto w-full p-6 flex flex-col-reverse justify-start gap-12 mt-4">
-
+      {/* THE ZIGZAG PATH */}
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 pt-8 pb-6">
         {pods.length === 0 ? (
           <div className="text-center py-20">
             <span className="text-6xl">{currentBranchConfig.icon}</span>
@@ -249,105 +300,86 @@ export default function StudentLearningPath() {
             <p className="text-slate-500 font-medium mt-2">Esta rama de la ruta aún está en construcción.</p>
           </div>
         ) : (
-          pods.map((pod, pIdx) => {
-            const isLocked = !isAdmin && pIdx > activePodIndex;
-            const isCurrentPod = pIdx === activePodIndex;
+          <div className="relative w-full max-w-[420px] mx-auto" style={{ height: pathTotalHeight }}>
+            <svg width="100%" height={pathTotalHeight} viewBox={`0 0 100 ${pathTotalHeight}`} preserveAspectRatio="none" className="absolute inset-0 pointer-events-none">
+              <path d={pathLineD} fill="none" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" strokeDasharray="0.5 5" vectorEffect="non-scaling-stroke" />
+            </svg>
 
-            return (
-              <div
-                key={pod.id}
-                ref={isCurrentPod ? currentPodRef : null}
-                className="relative flex flex-col flex-col-reverse items-center"
-              >
-                <div className={`w-full max-w-md flex flex-col-reverse gap-4 relative z-10 ${isLocked ? 'opacity-50' : ''}`}>
-                  {isLocked && (
-                    <div className="absolute inset-0 z-20 backdrop-blur-[2px] bg-white/30 flex items-center justify-center rounded-2xl">
-                      <span className="bg-white/90 px-4 py-2 rounded-xl text-slate-500 font-bold shadow-sm flex items-center gap-2">☁️ Bloqueado</span>
+            {pathItems.map((item) => {
+              if (item.kind === 'checkpoint') {
+                const state = item.isCompleted ? 'done' : item.isLocked ? 'locked' : 'pending';
+                const styles = {
+                  done: { box: 'bg-amber-500', icon: 'text-white', label: 'text-amber-600', suffix: '· ¡Completo!' },
+                  locked: { box: 'bg-slate-200 border-4 border-dashed border-slate-300', icon: 'text-slate-400', label: 'text-slate-400', suffix: '· Bloqueado' },
+                  pending: { box: 'bg-white border-4 border-amber-300', icon: 'text-amber-400', label: 'text-amber-500', suffix: '' },
+                }[state];
+                return (
+                  <div key={item.key}>
+                    <div
+                      className={`absolute rounded-full flex items-center justify-center shadow-md ${styles.box}`}
+                      style={{ left: `calc(${item.x}% - ${CHECKPOINT_SIZE / 2}px)`, top: item.y - CHECKPOINT_SIZE / 2, width: CHECKPOINT_SIZE, height: CHECKPOINT_SIZE }}
+                    >
+                      <TrophyIcon className={styles.icon} />
+                    </div>
+                    <div
+                      className={`absolute text-center text-[11px] font-black uppercase tracking-wide ${styles.label}`}
+                      style={{ left: 0, right: 0, top: item.y + CHECKPOINT_SIZE / 2 + 8 }}
+                    >
+                      Nivel {item.pIdx + 1} {styles.suffix}
+                    </div>
+                  </div>
+                );
+              }
+
+              const size = item.isCurrent ? CURRENT_NODE_SIZE : NODE_SIZE;
+              const adminBypass = isAdmin && !item.isCompleted && !item.isCurrent;
+
+              let bgClass, content, ringClass = '';
+              if (item.isCompleted) {
+                bgClass = 'bg-emerald-500';
+                content = <CheckIcon className="text-white" />;
+              } else if (item.isCurrent) {
+                bgClass = theme.active;
+                content = <span className="text-white font-black text-2xl">{item.sIdx + 1}</span>;
+                ringClass = `ring-4 ${theme.ring} animate-pulse`;
+              } else if (item.isLocked) {
+                bgClass = 'bg-slate-200';
+                content = <LockIcon className="text-slate-400" />;
+              } else {
+                bgClass = 'bg-slate-100 border-2 border-dashed border-slate-300';
+                content = <span className="text-slate-300 font-black text-lg">{item.sIdx + 1}</span>;
+              }
+              if (adminBypass) ringClass += ' ring-2 ring-purple-400 ring-offset-2';
+
+              const Tag = item.canClick ? 'button' : 'div';
+
+              return (
+                <React.Fragment key={item.key}>
+                  {item.isCurrent && (
+                    <div className="absolute text-center" style={{ left: `calc(${item.x}% - 90px)`, width: 180, top: item.y - size / 2 - 58 }}>
+                      <span className={`inline-block bg-white border-2 ${theme.border} ${theme.text} text-xs font-black px-3 py-1.5 rounded-2xl shadow-sm whitespace-nowrap`}>
+                        ¡Empieza aquí!
+                      </span>
+                      <div className={`w-0 h-0 mx-auto ${theme.text}`} style={{ borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '7px solid currentColor' }}></div>
                     </div>
                   )}
+                  <Tag
+                    type={Tag === 'button' ? 'button' : undefined}
+                    onClick={item.canClick ? () => setActiveWorkoutSegment(item.seg) : undefined}
+                    ref={item.isCurrent ? currentPodRef : null}
+                    className={`absolute rounded-full flex items-center justify-center shadow-md transition-transform p-0 ${bgClass} ${ringClass} ${item.canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
+                    style={{ left: `calc(${item.x}% - ${size / 2}px)`, top: item.y - size / 2, width: size, height: size }}
+                  >
+                    {content}
+                  </Tag>
+                </React.Fragment>
+              );
+            })}
 
-                  {pod.segments?.map((seg, sIdx) => {
-                    const isCurrentSegment = isCurrentPod && sIdx === activeSegmentIndex;
-                    const isCompletedSegment = pIdx < activePodIndex || (isCurrentPod && sIdx < activeSegmentIndex);
-                    const isFutureSegment = isAdmin && !isCurrentSegment && !isCompletedSegment;
-
-                    return (
-                      <div
-                        key={seg.id}
-                        className={`relative overflow-hidden rounded-2xl border-2 p-5 transition-all ${
-                          isCurrentSegment
-                            ? `bg-white border-transparent ${theme.ring} ring-4 shadow-lg transform scale-105 z-10 my-2`
-                            : isCompletedSegment
-                            ? `bg-white/60 ${theme.border} border-solid`
-                            : 'bg-white/40 border-dashed border-slate-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center relative z-10">
-                          <div className="flex items-center gap-4">
-                            <div
-                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                                isCurrentSegment ? `${theme.active} text-white` :
-                                isCompletedSegment ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-slate-300'
-                              }`}
-                            >
-                              {isCompletedSegment ? '✓' : sIdx + 1}
-                            </div>
-
-                            <div>
-                              <h3 className={`font-bold ${isCurrentSegment ? 'text-slate-900' : 'text-slate-500'}`}>Paso {sIdx + 1}</h3>
-                              <p className="text-xs font-semibold text-slate-400">{seg.total_questions || seg.qs} Preguntas</p>
-                            </div>
-                          </div>
-
-                          {/* ACTION BUTTONS */}
-                          <div className="flex gap-2">
-                            {isCompletedSegment && !isCurrentSegment && (
-                              <button
-                                onClick={() => setActiveWorkoutSegment(seg)}
-                                className="bg-white text-slate-500 hover:text-slate-700 border-2 border-slate-200 hover:border-slate-300 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95"
-                              >
-                                Repasar
-                              </button>
-                            )}
-                            {isCurrentSegment && (
-                              <button
-                                onClick={() => setActiveWorkoutSegment(seg)}
-                                className={`${theme.active} hover:opacity-90 text-white px-5 py-2 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95`}
-                              >
-                                Empezar
-                              </button>
-                            )}
-                            {isFutureSegment && (
-                              <button
-                                onClick={() => setActiveWorkoutSegment(seg)}
-                                className="bg-purple-50 text-purple-600 hover:bg-purple-100 border-2 border-purple-200 hover:border-purple-300 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95"
-                              >
-                                Modo Admin
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* POD HEADER */}
-                <div className="mb-6 mt-12 text-center z-10 relative bg-white/80 backdrop-blur-sm px-6 py-2 rounded-2xl border border-white/50 shadow-sm inline-block">
-                  <span className="text-xs font-black uppercase tracking-widest text-slate-400 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-200">
-                    Nivel {pIdx + 1}
-                  </span>
-                  <h2 className={`text-2xl font-black mt-2 ${!isAdmin && isLocked ? 'text-slate-400' : theme.text}`}>
-                    {pod.title}
-                  </h2>
-                </div>
-
-                {pIdx < pods.length - 1 && (
-                  <div className={`absolute top-0 bottom-0 left-1/2 -ml-[2px] w-1 -mt-12 -mb-12 ${!isAdmin && isLocked ? 'bg-slate-200' : theme.line} z-0`}></div>
-                )}
-              </div>
-            );
-          })
+            <div className="absolute text-center text-[11px] font-bold text-slate-400" style={{ left: 0, right: 0, top: pathTotalHeight - 24 }}>
+              — Inicio de la ruta —
+            </div>
+          </div>
         )}
       </div>
 
@@ -416,9 +448,11 @@ export default function StudentLearningPath() {
                 let newWeekly = totalPointsEarned;
                 let newDaily = totalPointsEarned;
                 let newPathPoints = totalPointsEarned;
+                let existingData = {};
 
                 if (snap.exists()) {
                    const data = snap.data();
+                   existingData = data;
                    newTotal += (data.total_points || data.current_path_points || 0);
                    if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
                    if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
@@ -434,6 +468,7 @@ export default function StudentLearningPath() {
                   daily_points: newDaily,
                   weekKey,
                   monthKey,
+                  ...bumpStreak(existingData),
                   progress: {
                     [selectedPathId]: {
                       [activeBranch]: {

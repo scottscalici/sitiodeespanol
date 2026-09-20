@@ -8,6 +8,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
+  const streakCount = userData?.streak_count || 0;
   const badgeText = course === 's2' ? 'ESPAÑOL II' : 'IB ESPAÑOL';
 
   const formatSpanishDate = (dateStr) => {
@@ -111,6 +112,14 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           <div>
             <p className="text-3xl sm:text-4xl font-black leading-none">{totalPoints}</p>
             <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mt-0.5">Puntos Totales</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 bg-orange-500/20 border border-orange-400/30 rounded-xl px-4 py-2">
+          <span className="text-2xl">🔥</span>
+          <div>
+            <p className="text-xl font-black leading-none">{streakCount}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mt-0.5">Racha</p>
           </div>
         </div>
 
