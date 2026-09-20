@@ -183,8 +183,8 @@ export default function StudentLearningPath() {
               <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200 shadow-sm">
                 🏆 Totales: {allTimePoints}
               </span>
-              <span className={`px-2.5 py-1 rounded-full shadow-sm bg-white border border-slate-200 ${theme.text}`}>
-                ⭐ {currentBranchConfig.icon} {pathPoints}
+              <span className={`px-2.5 py-1 rounded-full shadow-sm border ${theme.bg} ${theme.border} ${theme.text}`}>
+                {currentBranchConfig.label}: {pathPoints}
               </span>
 
               {/* GRADE & PERCENTAGE PILL */}

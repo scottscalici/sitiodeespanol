@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { app, db } from '../firebase';
 
 const auth = getAuth(app);
@@ -73,24 +73,37 @@ const register = async (email, password, firstName, lastName, course, section) =
 
   // 5. MASTER LISTENER (Fires every time the app loads or user logs in/out)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeUserDoc = () => {};
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      unsubscribeUserDoc(); // stop watching the previous user's doc, if any
 
       if (user) {
-        // Fetch their specific role and grade data from Firestore
+        // Live-subscribe to their profile so points/progress pills update
+        // in real time as soon as any activity writes to it — no reload needed.
         const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setUserData(docSnap.data());
-        }
+        unsubscribeUserDoc = onSnapshot(
+          docRef,
+          (docSnap) => {
+            if (docSnap.exists()) setUserData(docSnap.data());
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error listening to user profile:', error);
+            setLoading(false);
+          }
+        );
       } else {
         setUserData(null);
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeUserDoc();
+      unsubscribeAuth();
+    };
   }, []);
 
   const value = {
