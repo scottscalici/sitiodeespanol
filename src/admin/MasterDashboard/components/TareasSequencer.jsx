@@ -3,9 +3,10 @@ import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const TASK_TYPES = [
-  "Dominio", 
-  "VHL", 
-  "Schoology", 
+  "Dominio",
+  "VHL",
+  "KWL",
+  "Schoology",
   "Escuchar", 
   "Leer", 
   "Hablar", 

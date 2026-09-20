@@ -19,6 +19,22 @@ import Curiosidad from '../components/Curiosidad';
 import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
 import Anuncios from '../components/Anuncios';
+import LeaderboardCard from '../components/LeaderboardCard';
+
+const PLATFORM_TAREA_INFO = {
+  VHL: {
+    logo: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/vhl-logo.png',
+    label: 'VHL Asignado',
+    gradient: 'from-blue-700 via-indigo-900 to-slate-900',
+    accent: 'text-blue-200',
+  },
+  KWL: {
+    logo: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/kwl-logo.png',
+    label: 'KWL Asignado',
+    gradient: 'from-blue-700 via-indigo-900 to-slate-900',
+    accent: 'text-blue-200',
+  },
+};
 
 const Dashboard = () => {
   const { userData } = useAuth();
@@ -158,6 +174,11 @@ const Dashboard = () => {
     if (course === 's4') return act.s4_dias?.includes(liveDia);
     return false;
   });
+
+  // --- PLATFORM TAREA FILTERING (VHL/KWL — shown only on the day assigned) ---
+  const activePlatformTareas = safeTareas.filter(
+    (t) => Number(t.day_assigned) === Number(liveDia) && PLATFORM_TAREA_INFO[t.tipo]
+  );
 
   // --- VIDEO FILTERING ---
   const activeVideos = (data?.activities || []).filter((act) => {
@@ -428,6 +449,33 @@ const Dashboard = () => {
 
             <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
 
+            {/* 🎓 PLATFORM TAREA (VHL/KWL) — SHOWN ONLY ON DAY ASSIGNED */}
+            {activePlatformTareas.map((t) => {
+              const info = PLATFORM_TAREA_INFO[t.tipo];
+              return (
+                <div
+                  key={t.id}
+                  className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${info.gradient} p-6 shadow-xl`}
+                >
+                  <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white flex items-center justify-center shadow-inner p-2">
+                      <img src={info.logo} alt={t.tipo} className="w-full h-full object-contain" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <span className={`block text-xs font-black uppercase tracking-widest ${info.accent} mb-1`}>
+                        {info.label} · Día {liveDia}
+                      </span>
+                      <h3 className="text-xl font-black text-white leading-tight tracking-tight truncate">{t.titulo}</h3>
+                      <p className="text-blue-50/80 text-sm font-medium mt-1">Vence: Día {t.day_due}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
             {/* 🔥 DESTACADO */}
             <Destacado destacado={activeDestacados} />
           </div>
@@ -436,6 +484,7 @@ const Dashboard = () => {
           <div className="space-y-6">
             <GamesSidebar />
             <LearningPathTile liveDia={liveDia} courseTasks={safeTareas} />
+            <LeaderboardCard course={course} />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}
               <ResourceHub course={course} />
