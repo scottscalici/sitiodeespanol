@@ -47,6 +47,10 @@ export default function CalentamientoEngine({ onClose }) {
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [pointsAwarded, setPointsAwarded] = useState(null);
 
+  // In-app feedback modal (replaces native alert() popups)
+  const [feedbackModal, setFeedbackModal] = useState(null); // { tone, emoji, title, message }
+  const closeFeedbackModal = () => setFeedbackModal(null);
+
   // Reset Vocab States when moving to a new module
   useEffect(() => {
     setVocabPhase('preview');
@@ -277,11 +281,19 @@ export default function CalentamientoEngine({ onClose }) {
     });
 
     if (allCorrect) {
-      alert('¡Excelente! Módulo de verbos perfecto.');
+      setFeedbackModal({
+        tone: 'success',
+        emoji: '🎉',
+        title: '¡Excelente! ¡Pura Vida!',
+        message: 'Bloque de verbos perfecto.',
+      });
     } else {
-      alert(
-        'Hay respuestas incorrectas. Puedes corregirlas o avanzar si estás satisfecho.'
-      );
+      setFeedbackModal({
+        tone: 'warning',
+        emoji: '🤔',
+        title: 'Casi...',
+        message: 'Hay respuestas incorrectas. Puedes corregirlas o avanzar si estás satisfecho.',
+      });
     }
   };
 
@@ -337,7 +349,12 @@ export default function CalentamientoEngine({ onClose }) {
         );
       }
     } else {
-      alert('Incorrecto, intenta de nuevo.');
+      setFeedbackModal({
+        tone: 'error',
+        emoji: '❌',
+        title: 'Incorrecto',
+        message: 'Intenta de nuevo.',
+      });
       setSelectedSpanishCard(null);
     }
   };
@@ -814,6 +831,53 @@ export default function CalentamientoEngine({ onClose }) {
           </div>
         )}
       </main>
+
+      {/* FEEDBACK MODAL (replaces native alert() popups) */}
+      {feedbackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6"
+          onClick={closeFeedbackModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-sm rounded-3xl border-2 bg-slate-800 p-8 text-center shadow-2xl ${
+              feedbackModal.tone === 'success'
+                ? 'border-emerald-500'
+                : feedbackModal.tone === 'error'
+                ? 'border-rose-500'
+                : 'border-amber-500'
+            }`}
+          >
+            <div className="text-6xl mb-4">{feedbackModal.emoji}</div>
+            <h3
+              className={`text-2xl font-black uppercase tracking-tight mb-2 ${
+                feedbackModal.tone === 'success'
+                  ? 'text-emerald-400'
+                  : feedbackModal.tone === 'error'
+                  ? 'text-rose-400'
+                  : 'text-amber-400'
+              }`}
+            >
+              {feedbackModal.title}
+            </h3>
+            <p className="text-sm text-slate-300 font-medium mb-6">
+              {feedbackModal.message}
+            </p>
+            <button
+              onClick={closeFeedbackModal}
+              className={`px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-white shadow-md transition-all hover:scale-105 ${
+                feedbackModal.tone === 'success'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : feedbackModal.tone === 'error'
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }`}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
