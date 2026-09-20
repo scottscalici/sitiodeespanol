@@ -45,7 +45,7 @@ const GamesSidebar = () => {
 
           {/* Action Button */}
           <div className="w-full bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.2em] py-3 rounded-xl text-center group-hover:bg-indigo-500 transition-colors shadow-md">
-            Entrar al Arcade ↗
+            Entrar al Recreo ↗
           </div>
         </div>
       </Link>
