@@ -577,6 +577,9 @@ const DailyPlanHub = () => {
                 <Link to="/admin-secret-portal-sentences" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
                   ✍️ Sentence Manager
                 </Link>
+                <Link to="/admin-secret-portal-gamification" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
+                  🏆 Insignias
+                </Link>
               </div>
             </div>
 

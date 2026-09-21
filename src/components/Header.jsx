@@ -1,15 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { getCachedCollection } from '../utils/firestoreCache';
+import { getTitleForPoints, getAllEarnedBadges, DEFAULT_TITLE_TIERS } from '../utils/gamification';
+import BadgeIcon from './BadgeIcon';
+import TrophyCase from './TrophyCase';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
-  const { userData } = useAuth();
+  const { userData, currentUser } = useAuth();
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
   const streakCount = userData?.streak_count || 0;
   const badgeText = course === 's2' ? 'ESPAÑOL II' : 'IB ESPAÑOL';
+
+  // --- GAMIFICATION: title ladder + badges, computed from data we already have ---
+  const [gamConfig, setGamConfig] = useState(null);
+  const [learningPathsById, setLearningPathsById] = useState({});
+  const [showTrophyCase, setShowTrophyCase] = useState(false);
+
+  useEffect(() => {
+    const fetchGamificationData = async () => {
+      try {
+        const [configSnap, paths] = await Promise.all([
+          getDoc(doc(db, 'config', 'gamification')),
+          getCachedCollection('learning_paths'),
+        ]);
+        if (configSnap.exists()) setGamConfig(configSnap.data());
+        setLearningPathsById(Object.fromEntries(paths.map((p) => [p.id, p])));
+      } catch (error) {
+        console.error('Error loading gamification data:', error);
+      }
+    };
+    fetchGamificationData();
+  }, []);
+
+  const titleTiers = gamConfig?.titleTiers?.length ? gamConfig.titleTiers : DEFAULT_TITLE_TIERS;
+  const currentTitle = getTitleForPoints(totalPoints, titleTiers);
+  const earnedBadges = getAllEarnedBadges(userData, learningPathsById, gamConfig);
+  const featuredBadgeId = userData?.featuredBadgeId;
+  const featuredBadge = earnedBadges.find((b) => b.id === featuredBadgeId) || earnedBadges[0] || null;
 
   const formatSpanishDate = (dateStr) => {
     if (!dateStr) return '';
@@ -115,6 +148,16 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           </div>
         </div>
 
+        {/* TITLE PILL + FEATURED BADGE — click opens the full trophy case */}
+        <button
+          onClick={() => setShowTrophyCase(true)}
+          className="flex items-center gap-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl pl-2 py-1.5 pr-4 transition-colors"
+          title="Ver mi vitrina de trofeos"
+        >
+          <BadgeIcon icon={featuredBadge?.icon} tier={featuredBadge?.tier} size="sm" />
+          <span className="text-xs font-black uppercase tracking-wider">{currentTitle}</span>
+        </button>
+
         <div className="flex items-center gap-3 bg-orange-500/20 border border-orange-400/30 rounded-xl px-4 py-2">
           <span className="text-2xl">🔥</span>
           <div>
@@ -133,6 +176,18 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">Este Mes</span>
         </div>
       </div>
+
+      {showTrophyCase && (
+        <TrophyCase
+          uid={currentUser?.uid}
+          currentTitle={currentTitle}
+          totalPoints={totalPoints}
+          titleTiers={titleTiers}
+          earnedBadges={earnedBadges}
+          featuredBadgeId={featuredBadgeId}
+          onClose={() => setShowTrophyCase(false)}
+        />
+      )}
     </header>
   );
 };

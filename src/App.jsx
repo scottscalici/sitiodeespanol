@@ -47,6 +47,7 @@ import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorP
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
+import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
@@ -333,6 +334,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ImpostorThemesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-gamification"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GamificationManager />
                 </AdminRoute>
               }
             />
