@@ -76,6 +76,14 @@ service cloud.firestore {
       allow read, write: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
     }
 
+    // --- IMPOSTOR GAME (ephemeral multiplayer lobbies) ---
+    // Any logged-in user (student or admin) needs to create/join rooms and
+    // update player state — this is a low-stakes real-time game session,
+    // not protected student data, so it doesn't need admin-only writes.
+    match /impostor_rooms/{document=**} {
+      allow read, write: if isLoggedIn();
+    }
+
     // --- THE MASTER CATCH-ALL (Curriculum & Other Apps) ---
     match /{document=**} {
       allow read: if isLoggedIn();

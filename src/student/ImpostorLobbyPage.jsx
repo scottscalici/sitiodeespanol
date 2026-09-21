@@ -71,7 +71,7 @@ const ImpostorLobbyPage = () => {
       navigate(`/juegos/impostor/${code}`);
     } catch (err) {
       console.error('Error creating Impostor room:', err);
-      setError('❌ No se pudo crear la sala. Intenta de nuevo.');
+      setError(`❌ No se pudo crear la sala. (${err.code || err.message})`);
     } finally {
       setBusy(false);
     }
@@ -108,7 +108,7 @@ const ImpostorLobbyPage = () => {
       navigate(`/juegos/impostor/${code}`);
     } catch (err) {
       console.error('Error joining Impostor room:', err);
-      setError('❌ No se pudo unir a la sala. Intenta de nuevo.');
+      setError(`❌ No se pudo unir a la sala. (${err.code || err.message})`);
     } finally {
       setBusy(false);
     }
