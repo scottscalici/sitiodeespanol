@@ -354,7 +354,7 @@ export default function VocabPage() {
                     Adivina la palabra
                   </span>
                   <p className="text-xl sm:text-2xl font-medium text-slate-700 leading-relaxed">
-                    {currentStudyWord.definiciones?.nivel2?.definition || currentStudyWord.traduccion}
+                    {currentStudyWord.definiciones?.nivel2?.[0] || currentStudyWord.traduccion}
                   </p>
                   <p className="absolute bottom-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                     Toca para revelar
