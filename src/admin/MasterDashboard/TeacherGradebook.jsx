@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -52,6 +52,10 @@ export default function TeacherGradebook() {
 
   // 🔑 Password Reset Modal State
   const [resetModal, setResetModal] = useState(null); // { uid, email, newPassword, status }
+
+  // 🏆 Special Trophy Modal State — hand-awarded, not tied to points/progress
+  const [trophyModal, setTrophyModal] = useState(null); // { uid, email, name, icon, note, status }
+  const [awardingTrophy, setAwardingTrophy] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -291,6 +295,51 @@ const handleResetPassword = async () => {
     setResetModal({ ...resetModal, status: 'Error: Verifica tu conexión o permisos.' });
   }
 };
+
+  // 🏆 SPECIAL TROPHY: hand-awarded for anything not tracked by points or
+  // pod progress (effort, attitude, whatever). Stored directly on the user
+  // doc — TrophyCase/gamification.js reads it as a third badge type.
+  const handleAwardTrophy = async () => {
+    if (!trophyModal?.name?.trim()) {
+      setTrophyModal({ ...trophyModal, status: 'Error: El trofeo necesita un nombre.' });
+      return;
+    }
+    setAwardingTrophy(true);
+    const trophy = {
+      id: `trophy_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: trophyModal.name.trim(),
+      icon: trophyModal.icon.trim() || '🏆',
+      note: trophyModal.note.trim(),
+      awardedAt: new Date().toISOString(),
+    };
+    try {
+      await setDoc(doc(db, 'users', trophyModal.uid), { specialTrophies: arrayUnion(trophy) }, { merge: true });
+      invalidateCollectionCache('users');
+      setStudents((prev) =>
+        prev.map((s) => (s.uid === trophyModal.uid ? { ...s, specialTrophies: [...(s.specialTrophies || []), trophy] } : s))
+      );
+      setTrophyModal({ ...trophyModal, name: '', icon: '🏆', note: '', status: `✅ "${trophy.name}" otorgado.`, existing: [...(trophyModal.existing || []), trophy] });
+    } catch (error) {
+      console.error('Error awarding trophy:', error);
+      setTrophyModal({ ...trophyModal, status: 'Error: No se pudo otorgar el trofeo.' });
+    } finally {
+      setAwardingTrophy(false);
+    }
+  };
+
+  const handleRemoveTrophy = async (trophy) => {
+    try {
+      await setDoc(doc(db, 'users', trophyModal.uid), { specialTrophies: arrayRemove(trophy) }, { merge: true });
+      invalidateCollectionCache('users');
+      setStudents((prev) =>
+        prev.map((s) => (s.uid === trophyModal.uid ? { ...s, specialTrophies: (s.specialTrophies || []).filter((t) => t.id !== trophy.id) } : s))
+      );
+      setTrophyModal((prev) => ({ ...prev, existing: (prev.existing || []).filter((t) => t.id !== trophy.id) }));
+    } catch (error) {
+      console.error('Error removing trophy:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
@@ -577,18 +626,35 @@ const handleResetPassword = async () => {
                         </td>
 
                         <td className="p-4 text-center">
-                          <button
-                            onClick={() => setResetModal({
-                              uid: student.uid,
-                              email: student.email,
-                              newPassword: '',
-                              status: ''
-                            })}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
-                            title="Forzar nueva contraseña"
-                          >
-                            <span>🔑</span> Reset
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => setResetModal({
+                                uid: student.uid,
+                                email: student.email,
+                                newPassword: '',
+                                status: ''
+                              })}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-sm"
+                              title="Forzar nueva contraseña"
+                            >
+                              <span>🔑</span> Reset
+                            </button>
+                            <button
+                              onClick={() => setTrophyModal({
+                                uid: student.uid,
+                                email: student.email,
+                                name: '',
+                                icon: '🏆',
+                                note: '',
+                                status: '',
+                                existing: student.specialTrophies || [],
+                              })}
+                              className="bg-amber-950/40 hover:bg-amber-900/60 text-amber-400 border border-amber-900/60 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-sm"
+                              title="Otorgar un trofeo especial"
+                            >
+                              <span>🏆</span> Trofeo
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -637,6 +703,89 @@ const handleResetPassword = async () => {
                 className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
               >
                 Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🏆 SPECIAL TROPHY MODAL — hand-awarded, not tied to points/progress */}
+      {trophyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-1 flex items-center gap-2">
+              <span>🏆</span> Otorgar Trofeo Especial
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Estudiante: <span className="font-bold text-amber-400">{trophyModal.email}</span> — para cualquier logro que no
+              se mide con puntos (esfuerzo, actitud, creatividad, etc.).
+            </p>
+
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="🏆"
+                value={trophyModal.icon}
+                onChange={(e) => setTrophyModal({ ...trophyModal, icon: e.target.value, status: '' })}
+                title="Emoji o URL de imagen"
+                className="w-16 bg-slate-900 border border-slate-600 rounded-lg p-3 text-white text-center focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              />
+              <input
+                type="text"
+                placeholder="Nombre del trofeo (ej. Mejor Actitud)"
+                value={trophyModal.name}
+                onChange={(e) => setTrophyModal({ ...trophyModal, name: e.target.value, status: '' })}
+                className="flex-1 bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+            <textarea
+              placeholder="Nota opcional (ej. Por ayudar a sus compañeros esta semana)"
+              value={trophyModal.note}
+              onChange={(e) => setTrophyModal({ ...trophyModal, note: e.target.value, status: '' })}
+              rows={2}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white mb-4 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+            />
+
+            {trophyModal.status && (
+              <p className={`text-xs font-bold mb-4 ${trophyModal.status.includes('Error') ? 'text-rose-400' : 'text-emerald-400'}`}>
+                {trophyModal.status}
+              </p>
+            )}
+
+            {trophyModal.existing?.length > 0 && (
+              <div className="mb-4 border-t border-slate-700 pt-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  Trofeos ya otorgados
+                </p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {trophyModal.existing.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-slate-200 font-bold">{t.icon} {t.name}</span>
+                      <button
+                        onClick={() => handleRemoveTrophy(t)}
+                        className="text-rose-400 hover:text-rose-300 text-[10px] font-black uppercase"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 border-t border-slate-700 pt-4 mt-2">
+              <button
+                onClick={() => setTrophyModal(null)}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white uppercase tracking-widest transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={handleAwardTrophy}
+                disabled={awardingTrophy}
+                className="px-6 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
+              >
+                {awardingTrophy ? 'Otorgando...' : 'Otorgar'}
               </button>
             </div>
           </div>

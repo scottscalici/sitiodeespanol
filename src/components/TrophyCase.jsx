@@ -25,6 +25,7 @@ export default function TrophyCase({ uid, currentTitle, totalPoints, titleTiers,
   const nextTier = getNextTitleTier(totalPoints, titleTiers);
   const chapterBadges = earnedBadges.filter((b) => b.type === 'chapter');
   const skillBadges = earnedBadges.filter((b) => b.type === 'skill');
+  const specialTrophies = earnedBadges.filter((b) => b.type === 'special');
 
   return (
     <div
@@ -91,6 +92,42 @@ export default function TrophyCase({ uid, currentTitle, totalPoints, titleTiers,
                         className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase disabled:opacity-50"
                       >
                         {savingId === badge.id ? '...' : 'Destacar'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* SPECIAL TROPHIES — hand-awarded, not tied to points or progress */}
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-rose-400 mb-3">
+              Trofeos Especiales ({specialTrophies.length})
+            </h3>
+            {specialTrophies.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">Ninguno todavía — tu profesor/a puede otorgar uno.</p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                {specialTrophies.map((trophy) => (
+                  <div key={trophy.id} className="flex flex-col items-center gap-1.5 text-center">
+                    <BadgeIcon
+                      icon={trophy.icon}
+                      size="lg"
+                      title={trophy.note ? `${trophy.name} — ${trophy.note}` : trophy.name}
+                      onClick={() => handleFeature(trophy.id)}
+                    />
+                    <span className="text-[11px] font-bold text-slate-200 leading-tight">{trophy.name}</span>
+                    {trophy.note && <span className="text-[10px] text-slate-400 italic leading-tight">{trophy.note}</span>}
+                    {featuredBadgeId === trophy.id ? (
+                      <span className="text-[9px] font-black text-emerald-400 uppercase">✓ Destacada</span>
+                    ) : (
+                      <button
+                        onClick={() => handleFeature(trophy.id)}
+                        disabled={savingId === trophy.id}
+                        className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase disabled:opacity-50"
+                      >
+                        {savingId === trophy.id ? '...' : 'Destacar'}
                       </button>
                     )}
                   </div>

@@ -72,9 +72,16 @@ export const getChapterBadgeTier = (completedPods, tierThresholds) => {
   return null;
 };
 
+// Hand-awarded, one-off trophies for anything not tracked by the site (e.g.
+// "Most Improved", "Best Effort") — stored directly on the user doc since,
+// unlike chapter/skill badges, there's no progress data to derive them from.
+export const getSpecialTrophies = (userData) =>
+  (userData?.specialTrophies || []).map((trophy) => ({ ...trophy, type: 'special', tier: null }));
+
 // Returns every badge the student has currently earned (chapter badges with
-// their tier, plus fully-completed skill badges), derived live from
-// userData.progress + the learning_paths docs + the admin's badge config.
+// their tier, fully-completed skill badges, and hand-awarded special
+// trophies), derived live from userData.progress + the learning_paths docs +
+// the admin's badge config (plus userData.specialTrophies for hand-awarded ones).
 export const getAllEarnedBadges = (userData, learningPathsById, gamificationConfig) => {
   const chapterBadges = (gamificationConfig?.chapterBadges || [])
     .map((badge) => {
@@ -98,5 +105,5 @@ export const getAllEarnedBadges = (userData, learningPathsById, gamificationConf
     })
     .filter(Boolean);
 
-  return [...chapterBadges, ...skillBadges];
+  return [...chapterBadges, ...skillBadges, ...getSpecialTrophies(userData)];
 };
