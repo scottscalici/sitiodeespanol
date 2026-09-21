@@ -56,9 +56,13 @@ export default function TeacherGradebook() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadGradebookData = async (force = false) => {
+    // The roster is nothing else's cache to share (only this page reads
+    // 'users' this way) and this tool exists specifically to check a
+    // student's CURRENT state live in class — always pull fresh instead of
+    // risking a stale in-memory snapshot from an earlier mount this tab.
     const fetchStudents = async () => {
       try {
-        const allUsers = await getCachedCollection('users', { force });
+        const allUsers = await getCachedCollection('users', { force: true });
         setStudents(allUsers.filter((u) => u.role === 'student'));
       } catch (error) {
         console.error('Error fetching gradebook data:', error);
@@ -143,6 +147,19 @@ export default function TeacherGradebook() {
   useEffect(() => {
     loadGradebookData().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quietly re-pull the roster every 20s while this tab is on-screen, so a
+  // teacher watching a student live doesn't have to remember to hit refresh.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        getCachedCollection('users', { force: true })
+          .then((allUsers) => setStudents(allUsers.filter((u) => u.role === 'student')))
+          .catch((error) => console.error('Error auto-refreshing gradebook:', error));
+      }
+    }, 20000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = async () => {
