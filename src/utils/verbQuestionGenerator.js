@@ -21,6 +21,20 @@ export const getRandomSubject = (targetPref, includeVosotros = false) => {
   }
 };
 
+// English 3rd-person-singular conjugation (he/she) for the handful of
+// irregular verbs plus the standard -s/-es/-ies spelling rules. The stored
+// translation template ("he/she/you correct") is written correctly for
+// "you" but needs the verb itself conjugated when the pronoun swapped in
+// is actually "he" or "she" — e.g. "correct" -> "corrects", "live" -> "lives".
+const IRREGULAR_THIRD_PERSON = { be: 'is', have: 'has', do: 'does', go: 'goes' };
+const conjugateThirdPersonSingular = (verb) => {
+  const lower = verb.toLowerCase();
+  if (IRREGULAR_THIRD_PERSON[lower]) return IRREGULAR_THIRD_PERSON[lower];
+  if (/(?:[sxz]|[cs]h)$/i.test(verb)) return `${verb}es`;
+  if (/[^aeiou]y$/i.test(verb)) return `${verb.slice(0, -1)}ies`;
+  return `${verb}s`;
+};
+
 // --- HELPERS TO CLEAN UP 3RD PERSON SUBJECTS ---
 export const formatSubjectAndTranslation = (rawSubject, rawEnglish) => {
   let sp = rawSubject;
@@ -28,13 +42,21 @@ export const formatSubjectAndTranslation = (rawSubject, rawEnglish) => {
 
   if (rawSubject === 'él_ella_ud') {
     const choices = [
-      { subj: 'él', enPrefix: 'he' },
-      { subj: 'ella', enPrefix: 'she' },
-      { subj: 'Ud.', enPrefix: 'you (formal)' },
+      { subj: 'él', enPrefix: 'he', conjugate: true },
+      { subj: 'ella', enPrefix: 'she', conjugate: true },
+      { subj: 'Ud.', enPrefix: 'you (formal)', conjugate: false },
     ];
     const choice = choices[Math.floor(Math.random() * choices.length)];
     sp = choice.subj;
-    en = en.replace(/he\/she\/you/i, choice.enPrefix);
+    // Trailing verb capture is optional so a translation with no clean
+    // single word after the placeholder still falls back to a plain swap
+    // instead of silently leaving "he/she/you" unreplaced.
+    en = en.replace(/he\/she\/you(\s+\S+)?/i, (_match, tail) => {
+      if (!tail) return choice.enPrefix;
+      const [, space, verb] = tail.match(/^(\s+)(\S+)$/);
+      const word = choice.conjugate ? conjugateThirdPersonSingular(verb) : verb;
+      return `${choice.enPrefix}${space}${word}`;
+    });
   } else if (rawSubject === 'ellos_ellas_uds') {
     const choices = [
       { subj: 'ellos', enPrefix: 'they' },
