@@ -274,16 +274,26 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       setMasterPool(uniqueMasterPool);
 
       // 🚀 SMART DISTRACTOR GENERATOR
-      const getWordDistractors = (count, excludeWordsArray = []) => {
+      // truncateToFirstWord=true (default) is for sentence-builder word banks,
+      // where each option becomes a single draggable word tile. Vocab
+      // multiple-choice passes false so a multi-word term like "Las Bellas
+      // Artes" stays whole instead of showing up as a bare "las" option.
+      const getWordDistractors = (count, excludeWordsArray = [], { truncateToFirstWord = true } = {}) => {
           let options = [];
-          const excludeLower = excludeWordsArray.map(w => w.toLowerCase());
+          const excludeLower = excludeWordsArray.map(w => w.trim().toLowerCase());
 
           // 1. Try to pull from valid vocab first
           const shuffledPool = shuffle(uniqueMasterPool);
           for (const item of shuffledPool) {
-              let candidate = item.label.trim();
-              if (candidate.includes(' ')) candidate = candidate.split(' ')[0]; // Grabs first word of a phrase
-              candidate = candidate.replace(/[.,!?¿¡]/g, '').toLowerCase();
+              // Exclude on the FULL cleaned label first — otherwise the
+              // correct answer's own truncated fragment (e.g. "las" from
+              // "Las Bellas Artes") won't string-match the untruncated
+              // exclude list and sneaks back in as a fake distractor.
+              const fullLabel = item.label.trim().replace(/[.,!?¿¡]/g, '').toLowerCase();
+              if (!fullLabel || excludeLower.includes(fullLabel)) continue;
+
+              let candidate = fullLabel;
+              if (truncateToFirstWord && candidate.includes(' ')) candidate = candidate.split(' ')[0]; // Grabs first word of a phrase
 
               if (candidate && !options.includes(candidate) && !excludeLower.includes(candidate)) {
                   options.push(candidate);
@@ -501,7 +511,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
             const matchPool = shuffle([...uniqueMasterPool]).slice(0, 5);
             generatedQueue.push({ id: `q_${i}`, type: 'matching', topic: 'Vocabulario (Conecta las palabras)', pairs: matchPool.map(c => ({ es: c.label.trim(), en: (getEnglishTrans(c) || "Translation").trim() })), esOptions: shuffle(matchPool.map(c => c.label.trim())), enOptions: shuffle(matchPool.map(c => (getEnglishTrans(c) || "Translation").trim())), _pointCategory: 'regular' });
           } else if (format === 'mc') {
-            let options = [spaWord, ...getWordDistractors(3, [spaWord])];
+            let options = [spaWord, ...getWordDistractors(3, [spaWord], { truncateToFirstWord: false })];
             generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaWord, topic: target.tags || 'Vocabulario', _pointCategory: 'regular' });
           } else if (format === 'listen') {
             generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Comprensión Auditiva', _pointCategory: 'regular' });
