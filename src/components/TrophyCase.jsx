@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import BadgeIcon from './BadgeIcon';
-import { BADGE_TIER_LABELS, getNextTitleTier } from '../utils/gamification';
+import { BADGE_TIER_LABELS } from '../utils/gamification';
 
 // Full badge collection view. Kept out of the header on purpose — the header
 // only ever shows one featured badge, no matter how many (even 50+) a
 // student has earned; this modal is where the whole trophy case lives.
-export default function TrophyCase({ uid, currentTitle, totalPoints, titleTiers, earnedBadges, featuredBadgeId, onClose }) {
+export default function TrophyCase({ uid, currentTitle, totalPoints, earnedBadges, featuredBadgeId, onClose }) {
   const [savingId, setSavingId] = useState(null);
 
   const handleFeature = async (badgeId) => {
@@ -22,7 +22,6 @@ export default function TrophyCase({ uid, currentTitle, totalPoints, titleTiers,
     }
   };
 
-  const nextTier = getNextTitleTier(totalPoints, titleTiers);
   const chapterBadges = earnedBadges.filter((b) => b.type === 'chapter');
   const skillBadges = earnedBadges.filter((b) => b.type === 'skill');
   const specialTrophies = earnedBadges.filter((b) => b.type === 'special');
@@ -53,12 +52,7 @@ export default function TrophyCase({ uid, currentTitle, totalPoints, titleTiers,
           <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Título Actual</p>
             <p className="text-2xl font-black text-emerald-400">{currentTitle}</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {totalPoints} puntos totales
-              {nextTier && (
-                <> · {nextTier.minPoints - totalPoints} más para <span className="font-bold text-white">{nextTier.title}</span></>
-              )}
-            </p>
+            <p className="text-xs text-slate-400 mt-1">{totalPoints} puntos totales</p>
           </div>
 
           {/* CHAPTER BADGES */}

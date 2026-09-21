@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCachedCollection } from '../utils/firestoreCache';
-import { getTitleForPoints, getAllEarnedBadges, DEFAULT_TITLE_TIERS } from '../utils/gamification';
+import { getTitleForPoints, getAllEarnedBadges, isBadgeUpgrade, DEFAULT_TITLE_TIERS } from '../utils/gamification';
 import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
+import RewardCelebration from './RewardCelebration';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
   const { userData, currentUser } = useAuth();
@@ -20,7 +21,9 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   // --- GAMIFICATION: title ladder + badges, computed from data we already have ---
   const [gamConfig, setGamConfig] = useState(null);
   const [learningPathsById, setLearningPathsById] = useState({});
+  const [gamDataLoaded, setGamDataLoaded] = useState(false);
   const [showTrophyCase, setShowTrophyCase] = useState(false);
+  const [celebrationQueue, setCelebrationQueue] = useState([]);
 
   useEffect(() => {
     const fetchGamificationData = async () => {
@@ -33,6 +36,8 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
         setLearningPathsById(Object.fromEntries(paths.map((p) => [p.id, p])));
       } catch (error) {
         console.error('Error loading gamification data:', error);
+      } finally {
+        setGamDataLoaded(true);
       }
     };
     fetchGamificationData();
@@ -43,6 +48,46 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   const earnedBadges = getAllEarnedBadges(userData, learningPathsById, gamConfig);
   const featuredBadgeId = userData?.featuredBadgeId;
   const featuredBadge = earnedBadges.find((b) => b.id === featuredBadgeId) || earnedBadges[0] || null;
+
+  // --- SURPRISE REWARD DETECTION ---
+  // No "X points to next level" is shown anywhere on purpose — this popup is
+  // the only way a student finds out, right when it happens (or the next
+  // time they open the app, if it happened while they were away). The first
+  // time this ever runs for a student it just records a baseline instead of
+  // celebrating, so nothing already-earned floods them with popups.
+  const badgeSignature = earnedBadges.map((b) => `${b.id}:${b.tier || '1'}`).sort().join(',');
+  useEffect(() => {
+    if (!gamDataLoaded || !currentUser?.uid || !userData) return;
+
+    const currentBadgeMap = Object.fromEntries(earnedBadges.map((b) => [b.id, b.tier || true]));
+    const seen = userData.rewardsSeen;
+
+    if (!seen) {
+      setDoc(doc(db, 'users', currentUser.uid), { rewardsSeen: { title: currentTitle, badges: currentBadgeMap } }, { merge: true }).catch(
+        (err) => console.error('Error seeding rewardsSeen baseline:', err)
+      );
+      return;
+    }
+
+    const newCelebrations = [];
+    if (currentTitle && seen.title !== currentTitle) {
+      newCelebrations.push({ kind: 'title', title: currentTitle });
+    }
+    earnedBadges.forEach((badge) => {
+      const currentVal = badge.tier || true;
+      if (isBadgeUpgrade(seen.badges?.[badge.id], currentVal)) {
+        newCelebrations.push({ kind: 'badge', badge, tier: badge.tier });
+      }
+    });
+
+    if (newCelebrations.length > 0) {
+      setCelebrationQueue((prev) => [...prev, ...newCelebrations]);
+      setDoc(doc(db, 'users', currentUser.uid), { rewardsSeen: { title: currentTitle, badges: currentBadgeMap } }, { merge: true }).catch(
+        (err) => console.error('Error updating rewardsSeen:', err)
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gamDataLoaded, currentTitle, badgeSignature]);
 
   const formatSpanishDate = (dateStr) => {
     if (!dateStr) return '';
@@ -182,12 +227,16 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           uid={currentUser?.uid}
           currentTitle={currentTitle}
           totalPoints={totalPoints}
-          titleTiers={titleTiers}
           earnedBadges={earnedBadges}
           featuredBadgeId={featuredBadgeId}
           onClose={() => setShowTrophyCase(false)}
         />
       )}
+
+      <RewardCelebration
+        celebration={celebrationQueue[0]}
+        onContinue={() => setCelebrationQueue((prev) => prev.slice(1))}
+      />
     </header>
   );
 };

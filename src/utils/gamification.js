@@ -36,6 +36,18 @@ export const DEFAULT_TITLE_TIERS = [
 export const BADGE_TIER_LABELS = { bronze: 'Bronce', silver: 'Plata', gold: 'Oro' };
 const TIER_RANK = { bronze: 1, silver: 2, gold: 3 };
 
+// Compares what a student has already been shown a celebration for
+// (`seenValue`) against what they currently have (`currentValue`), for one
+// badge. Values are either `true` (a non-tiered badge, earned/not-earned)
+// or a tier string. Used to decide whether a fresh "you just earned this!"
+// popup is owed — a badge that was already silver and is now still silver
+// isn't new; silver -> gold is.
+export const isBadgeUpgrade = (seenValue, currentValue) => {
+  if (!currentValue) return false;
+  if (currentValue === true) return seenValue !== true;
+  return (TIER_RANK[currentValue] || 0) > (TIER_RANK[seenValue] || 0);
+};
+
 const sortedTiers = (tiers) => [...(tiers || [])].sort((a, b) => a.minPoints - b.minPoints);
 
 export const getTitleForPoints = (points, tiers = DEFAULT_TITLE_TIERS) => {
