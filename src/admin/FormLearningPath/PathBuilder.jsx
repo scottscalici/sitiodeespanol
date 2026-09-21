@@ -29,12 +29,41 @@ export default function PathBuilder({
   onBranchChange,
   selectedBook,
   selectedChapter,
+  badgeCatalog,
+  onCreateBadge,
 }) {
   const BRANCH_TABS = [
     { id: 'vocab', label: 'Vocabulario', activeClass: 'bg-indigo-600 text-white' },
     { id: 'verbs', label: 'Verbos', activeClass: 'bg-emerald-600 text-white' },
     { id: 'practical', label: 'Aplicación', activeClass: 'bg-amber-500 text-white' },
   ];
+
+  // "Finishing this pod awards X badge/tier" — set per pod, read live by
+  // gamification.js against the student's podIndex for this exact branch.
+  const handleBadgeAwardChange = (podIndex, value) => {
+    const copy = [...pods];
+    if (value === '__new__') {
+      const name = window.prompt('Nombre de la nueva insignia (ej. Word Families, Presente):');
+      if (!name?.trim()) return;
+      const icon = window.prompt('Ícono (emoji, o pega una URL de imagen más adelante):', '🏅') || '🏅';
+      const tiered = window.confirm('¿Sube de nivel (bronce → plata → oro)? Aceptar = sí. Cancelar = insignia de un solo nivel.');
+      const badge = { id: `badge_${Date.now()}`, name: name.trim(), icon: icon.trim(), tiered };
+      onCreateBadge(badge);
+      copy[podIndex].badgeAward = { badgeId: badge.id, tier: tiered ? 'bronze' : null };
+    } else if (!value) {
+      copy[podIndex].badgeAward = null;
+    } else {
+      const badgeDef = badgeCatalog.find((b) => b.id === value);
+      copy[podIndex].badgeAward = { badgeId: value, tier: badgeDef?.tiered ? (copy[podIndex].badgeAward?.tier || 'bronze') : null };
+    }
+    setPods(copy);
+  };
+
+  const handleBadgeTierChange = (podIndex, tier) => {
+    const copy = [...pods];
+    copy[podIndex].badgeAward = { ...copy[podIndex].badgeAward, tier };
+    setPods(copy);
+  };
   return (
     <div className="w-2/3 overflow-y-auto p-8 bg-slate-100">
       
@@ -183,6 +212,39 @@ export default function PathBuilder({
                   <button onClick={() => handleDeletePod(podIndex)} className="text-xs bg-red-900/40 hover:bg-red-600 text-red-300 hover:text-white border border-red-700/50 p-1.5 rounded-lg transition-all">🗑️</button>
                 )}
               </div>
+            </div>
+
+            {/* Badge Award Row — "finishing this pod awards X badge/tier" */}
+            <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+                🏆 Insignia al completar:
+              </span>
+              <select
+                value={pod.badgeAward?.badgeId || ''}
+                onChange={(e) => handleBadgeAwardChange(podIndex, e.target.value)}
+                className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="">-- Ninguna --</option>
+                {badgeCatalog.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.icon} {b.name}
+                    {b.tiered ? ' (por niveles)' : ''}
+                  </option>
+                ))}
+                <option value="__new__">+ Nueva insignia...</option>
+              </select>
+
+              {pod.badgeAward?.badgeId && badgeCatalog.find((b) => b.id === pod.badgeAward.badgeId)?.tiered && (
+                <select
+                  value={pod.badgeAward.tier || 'bronze'}
+                  onChange={(e) => handleBadgeTierChange(podIndex, e.target.value)}
+                  className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="bronze">🥉 Bronce</option>
+                  <option value="silver">🥈 Plata</option>
+                  <option value="gold">🥇 Oro</option>
+                </select>
+              )}
             </div>
 
             {/* Segments Container */}

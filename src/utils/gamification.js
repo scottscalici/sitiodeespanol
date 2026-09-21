@@ -1,11 +1,13 @@
 // Title ladder + badge logic for the gamification system.
 //
 // Titles and badges are computed on the fly from data that already exists
-// (total_points, and the podIndex/segmentIndex progress pointers written by
+// (total_points, and the podIndex progress pointers written by
 // StudentLearningPath.jsx) rather than stored on the user doc. That keeps
 // them always in sync with real progress and needs no migration or extra
-// writes on every completion — the only new persisted field is
-// `featuredBadgeId` (the student's own choice of which badge to display).
+// writes on every completion — the only new persisted fields are
+// `featuredBadgeId` (the student's own choice of which badge to display)
+// and `pod.badgeAward` on individual pods in a learning_paths document
+// (set from the Pod Creator — "award this badge/tier when this pod is done").
 
 export const BRANCHES = ['vocab', 'verbs', 'practical'];
 
@@ -32,6 +34,7 @@ export const DEFAULT_TITLE_TIERS = [
 ];
 
 export const BADGE_TIER_LABELS = { bronze: 'Bronce', silver: 'Plata', gold: 'Oro' };
+const TIER_RANK = { bronze: 1, silver: 2, gold: 3 };
 
 const sortedTiers = (tiers) => [...(tiers || [])].sort((a, b) => a.minPoints - b.minPoints);
 
@@ -51,59 +54,52 @@ export const getNextTitleTier = (points, tiers = DEFAULT_TITLE_TIERS) => {
   return sorted.find((tier) => tier.minPoints > points) || null;
 };
 
-// Total pods across all three branches of a learning_paths document.
-export const getPathPodCount = (pathDoc) =>
-  BRANCHES.reduce((sum, b) => sum + (pathDoc?.branches?.[b]?.pods?.length || 0), 0);
-
-// Completed pods for a given path, summed across branches. podIndex is a
-// pointer to the pod currently in progress, so everything before it is done.
-export const getCompletedPodCount = (userData, pathId) => {
-  const unitProgress = userData?.progress?.[pathId];
-  return BRANCHES.reduce((sum, b) => sum + (unitProgress?.[b]?.podIndex || 0), 0);
-};
-
-// tierThresholds: { bronze, silver, gold } — cumulative pod-count checkpoints,
-// not per-tier deltas (e.g. { bronze: 1, silver: 2, gold: 3 }).
-export const getChapterBadgeTier = (completedPods, tierThresholds) => {
-  if (!tierThresholds) return null;
-  if (tierThresholds.gold != null && completedPods >= tierThresholds.gold) return 'gold';
-  if (tierThresholds.silver != null && completedPods >= tierThresholds.silver) return 'silver';
-  if (tierThresholds.bronze != null && completedPods >= tierThresholds.bronze) return 'bronze';
-  return null;
-};
-
 // Hand-awarded, one-off trophies for anything not tracked by the site (e.g.
 // "Most Improved", "Best Effort") — stored directly on the user doc since,
 // unlike chapter/skill badges, there's no progress data to derive them from.
 export const getSpecialTrophies = (userData) =>
   (userData?.specialTrophies || []).map((trophy) => ({ ...trophy, type: 'special', tier: null }));
 
-// Returns every badge the student has currently earned (chapter badges with
-// their tier, fully-completed skill badges, and hand-awarded special
-// trophies), derived live from userData.progress + the learning_paths docs +
-// the admin's badge config (plus userData.specialTrophies for hand-awarded ones).
+// Scans every pod of every learning_paths doc for a `badgeAward` tag (set in
+// the Pod Creator, e.g. "finishing this pod awards Presente: bronze") and
+// checks it against the student's progress pointer for that specific
+// path+branch. A pod counts as done once the branch's podIndex has advanced
+// past it. Returns a map of badgeId -> tier string (highest tier reached) or
+// `true` for a non-tiered badge that's been earned via any tagged pod.
+export const getPodBadgeAwards = (userData, learningPathsById) => {
+  const earned = {};
+  Object.values(learningPathsById || {}).forEach((pathDoc) => {
+    BRANCHES.forEach((branch) => {
+      const pods = pathDoc?.branches?.[branch]?.pods || [];
+      const completedCount = userData?.progress?.[pathDoc.id]?.[branch]?.podIndex || 0;
+      pods.forEach((pod, idx) => {
+        const award = pod?.badgeAward;
+        if (!award?.badgeId || idx >= completedCount) return;
+        if (award.tier) {
+          const currentRank = TIER_RANK[earned[award.badgeId]] || 0;
+          if (TIER_RANK[award.tier] > currentRank) earned[award.badgeId] = award.tier;
+        } else if (!earned[award.badgeId]) {
+          earned[award.badgeId] = true;
+        }
+      });
+    });
+  });
+  return earned;
+};
+
+// Returns every badge the student has currently earned — pod-triggered
+// chapter/skill badges (looked up against the admin's badge catalog for
+// name/icon) plus hand-awarded special trophies.
 export const getAllEarnedBadges = (userData, learningPathsById, gamificationConfig) => {
-  const chapterBadges = (gamificationConfig?.chapterBadges || [])
-    .map((badge) => {
-      const pathDoc = learningPathsById?.[badge.pathId];
-      if (!pathDoc) return null;
-      const completedPods = getCompletedPodCount(userData, badge.pathId);
-      const tier = getChapterBadgeTier(completedPods, badge.tiers);
-      if (!tier) return null;
-      return { ...badge, type: 'chapter', tier };
-    })
-    .filter(Boolean);
+  const catalog = gamificationConfig?.badges || [];
+  const earnedMap = getPodBadgeAwards(userData, learningPathsById);
 
-  const skillBadges = (gamificationConfig?.skillBadges || [])
-    .map((badge) => {
-      const pathDoc = learningPathsById?.[badge.pathId];
-      if (!pathDoc) return null;
-      const totalPods = getPathPodCount(pathDoc);
-      const completedPods = getCompletedPodCount(userData, badge.pathId);
-      if (totalPods === 0 || completedPods < totalPods) return null;
-      return { ...badge, type: 'skill', tier: null };
-    })
-    .filter(Boolean);
+  const podBadges = Object.entries(earnedMap).map(([badgeId, tierOrTrue]) => {
+    const def = catalog.find((b) => b.id === badgeId) || { id: badgeId, name: badgeId, icon: '🏅' };
+    return tierOrTrue === true
+      ? { ...def, type: 'skill', tier: null }
+      : { ...def, type: 'chapter', tier: tierOrTrue };
+  });
 
-  return [...chapterBadges, ...skillBadges, ...getSpecialTrophies(userData)];
+  return [...podBadges, ...getSpecialTrophies(userData)];
 };

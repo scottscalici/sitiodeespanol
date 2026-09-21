@@ -2,30 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Link } from 'react-router-dom';
-import { getCachedCollection } from '../../utils/firestoreCache';
-import { DEFAULT_TITLE_TIERS, getPathPodCount } from '../../utils/gamification';
+import { DEFAULT_TITLE_TIERS } from '../../utils/gamification';
 import BadgeIcon from '../../components/BadgeIcon';
 
-const newChapterBadge = () => ({
-  id: `chapter_${Date.now()}`,
-  name: '',
-  icon: '🏅',
-  pathId: '',
-  tiers: { bronze: 1, silver: 2, gold: 3 },
-});
-
-const newSkillBadge = () => ({
-  id: `skill_${Date.now()}`,
-  name: '',
-  icon: '🥷',
-  pathId: '',
-});
+const newBadge = () => ({ id: `badge_${Date.now()}`, name: '', icon: '🏅', tiered: false });
 
 export default function GamificationManager() {
   const [titleTiers, setTitleTiers] = useState(DEFAULT_TITLE_TIERS);
-  const [chapterBadges, setChapterBadges] = useState([]);
-  const [skillBadges, setSkillBadges] = useState([]);
-  const [learningPaths, setLearningPaths] = useState([]);
+  const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -33,17 +17,12 @@ export default function GamificationManager() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [configSnap, paths] = await Promise.all([
-          getDoc(doc(db, 'config', 'gamification')),
-          getCachedCollection('learning_paths'),
-        ]);
-        if (configSnap.exists()) {
-          const data = configSnap.data();
+        const snap = await getDoc(doc(db, 'config', 'gamification'));
+        if (snap.exists()) {
+          const data = snap.data();
           if (data.titleTiers?.length) setTitleTiers(data.titleTiers);
-          setChapterBadges(data.chapterBadges || []);
-          setSkillBadges(data.skillBadges || []);
+          setBadges(data.badges || []);
         }
-        setLearningPaths(paths);
       } catch (error) {
         console.error('Error loading gamification config:', error);
       } finally {
@@ -52,16 +31,6 @@ export default function GamificationManager() {
     };
     load();
   }, []);
-
-  const pathLabel = (pathId) => {
-    const p = learningPaths.find((lp) => lp.id === pathId);
-    return p ? `${p.title || p.id} (${p.id})` : pathId ? `⚠️ ${pathId} (no encontrado)` : '';
-  };
-
-  const podCountFor = (pathId) => {
-    const p = learningPaths.find((lp) => lp.id === pathId);
-    return p ? getPathPodCount(p) : null;
-  };
 
   // --- TITLE TIER HANDLERS ---
   const updateTitleTier = (idx, field, value) => {
@@ -72,28 +41,14 @@ export default function GamificationManager() {
   const addTitleTier = () => setTitleTiers([...titleTiers, { minPoints: 0, title: '' }]);
   const removeTitleTier = (idx) => setTitleTiers(titleTiers.filter((_, i) => i !== idx));
 
-  // --- CHAPTER BADGE HANDLERS ---
-  const updateChapterBadge = (idx, field, value) => {
-    const updated = [...chapterBadges];
+  // --- BADGE CATALOG HANDLERS ---
+  const updateBadge = (idx, field, value) => {
+    const updated = [...badges];
     updated[idx] = { ...updated[idx], [field]: value };
-    setChapterBadges(updated);
+    setBadges(updated);
   };
-  const updateChapterTier = (idx, tierKey, value) => {
-    const updated = [...chapterBadges];
-    updated[idx] = { ...updated[idx], tiers: { ...updated[idx].tiers, [tierKey]: Number(value) || 0 } };
-    setChapterBadges(updated);
-  };
-  const addChapterBadge = () => setChapterBadges([...chapterBadges, newChapterBadge()]);
-  const removeChapterBadge = (idx) => setChapterBadges(chapterBadges.filter((_, i) => i !== idx));
-
-  // --- SKILL BADGE HANDLERS ---
-  const updateSkillBadge = (idx, field, value) => {
-    const updated = [...skillBadges];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setSkillBadges(updated);
-  };
-  const addSkillBadge = () => setSkillBadges([...skillBadges, newSkillBadge()]);
-  const removeSkillBadge = (idx) => setSkillBadges(skillBadges.filter((_, i) => i !== idx));
+  const addBadge = () => setBadges([...badges, newBadge()]);
+  const removeBadge = (idx) => setBadges(badges.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
     setSaving(true);
@@ -101,8 +56,7 @@ export default function GamificationManager() {
     try {
       await setDoc(doc(db, 'config', 'gamification'), {
         titleTiers,
-        chapterBadges,
-        skillBadges,
+        badges,
         lastUpdated: new Date().toISOString(),
       });
       setStatus('✅ Guardado.');
@@ -124,7 +78,7 @@ export default function GamificationManager() {
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
             <span>🏆</span> Gamification Manager
@@ -179,146 +133,62 @@ export default function GamificationManager() {
           </button>
         </section>
 
-        {/* CHAPTER BADGES */}
+        {/* BADGE CATALOG */}
         <section className="bg-slate-800 border border-slate-700 rounded-2xl p-5 space-y-3">
           <h2 className="text-sm font-black text-indigo-400 uppercase tracking-widest">
-            Insignias de Capítulo ({chapterBadges.length})
+            Catálogo de Insignias ({badges.length})
           </h2>
           <p className="text-slate-400 text-xs">
-            Una insignia por capítulo, con un solo ícono que sube de nivel (bronce → plata → oro) según los pods
-            completados en su Learning Path (sumados entre vocab/verbs/practical). Los umbrales son la cantidad
-            acumulada de pods, no un incremento.
+            Define el nombre e ícono de cada insignia aquí (o créalas al vuelo desde el Pod Creator). Marca "Por
+            niveles" para una insignia de capítulo que sube bronce → plata → oro; sin marcar, es una insignia de un
+            solo nivel. Dónde y cuándo se otorga cada una se decide por pod en el{' '}
+            <Link to="/admin-secret-portal-learning-path" className="text-indigo-400 underline">
+              Pod Creator
+            </Link>{' '}
+            — no aquí.
           </p>
-          <div className="space-y-4">
-            {chapterBadges.map((badge, idx) => {
-              const totalPods = podCountFor(badge.pathId);
-              return (
-                <div key={badge.id} className="bg-slate-900/60 border border-slate-700 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <BadgeIcon icon={badge.icon} tier="gold" size="sm" />
-                    <input
-                      type="text"
-                      value={badge.icon}
-                      onChange={(e) => updateChapterBadge(idx, 'icon', e.target.value)}
-                      className="w-16 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500"
-                      placeholder="🏅"
-                      title="Emoji o URL de imagen"
-                    />
-                    <input
-                      type="text"
-                      value={badge.name}
-                      onChange={(e) => updateChapterBadge(idx, 'name', e.target.value)}
-                      className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"
-                      placeholder="Nombre del capítulo (ej. Presente)"
-                    />
-                    <button
-                      onClick={() => removeChapterBadge(idx)}
-                      className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <select
-                    value={badge.pathId}
-                    onChange={(e) => updateChapterBadge(idx, 'pathId', e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-xs focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="">-- Selecciona un Learning Path --</option>
-                    {learningPaths.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title || p.id} ({p.id})
-                      </option>
-                    ))}
-                  </select>
-                  {badge.pathId && (
-                    <p className="text-[10px] text-slate-500">
-                      {pathLabel(badge.pathId)} — {totalPods != null ? `${totalPods} pods en total` : 'no encontrado'}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {['bronze', 'silver', 'gold'].map((tierKey) => (
-                      <div key={tierKey}>
-                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                          {tierKey === 'bronze' ? 'Bronce ≥' : tierKey === 'silver' ? 'Plata ≥' : 'Oro ≥'}
-                        </label>
-                        <input
-                          type="number"
-                          value={badge.tiers?.[tierKey] ?? ''}
-                          onChange={(e) => updateChapterTier(idx, tierKey, e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm font-mono focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <button
-            onClick={addChapterBadge}
-            className="text-indigo-400 hover:text-indigo-300 text-xs font-bold uppercase tracking-widest"
-          >
-            + Añadir Insignia de Capítulo
-          </button>
-        </section>
-
-        {/* SKILL BADGES */}
-        <section className="bg-slate-800 border border-slate-700 rounded-2xl p-5 space-y-3">
-          <h2 className="text-sm font-black text-amber-400 uppercase tracking-widest">
-            Insignias de Destreza ({skillBadges.length})
-          </h2>
-          <p className="text-slate-400 text-xs">
-            Insignias de un solo nivel — se ganan al completar el 100% de los pods de un Learning Path dedicado a esa
-            destreza (ej. subjuntivo).
-          </p>
-          <div className="space-y-3">
-            {skillBadges.map((badge, idx) => (
-              <div key={badge.id} className="bg-slate-900/60 border border-slate-700 rounded-xl p-4 space-y-2">
-                <div className="flex items-center gap-3">
-                  <BadgeIcon icon={badge.icon} size="sm" />
+          <div className="space-y-2">
+            {badges.map((badge, idx) => (
+              <div key={badge.id} className="flex items-center gap-2 bg-slate-900/60 border border-slate-700 rounded-xl p-3">
+                <BadgeIcon icon={badge.icon} tier={badge.tiered ? 'gold' : null} size="sm" />
+                <input
+                  type="text"
+                  value={badge.icon}
+                  onChange={(e) => updateBadge(idx, 'icon', e.target.value)}
+                  className="w-16 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-indigo-500"
+                  placeholder="🏅"
+                  title="Emoji o URL de imagen"
+                />
+                <input
+                  type="text"
+                  value={badge.name}
+                  onChange={(e) => updateBadge(idx, 'name', e.target.value)}
+                  className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm focus:outline-none focus:border-indigo-500"
+                  placeholder="Nombre de la insignia"
+                />
+                <label className="flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-400 whitespace-nowrap px-2">
                   <input
-                    type="text"
-                    value={badge.icon}
-                    onChange={(e) => updateSkillBadge(idx, 'icon', e.target.value)}
-                    className="w-16 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm text-center focus:outline-none focus:border-amber-500"
-                    placeholder="🥷"
+                    type="checkbox"
+                    checked={!!badge.tiered}
+                    onChange={(e) => updateBadge(idx, 'tiered', e.target.checked)}
+                    className="w-4 h-4"
                   />
-                  <input
-                    type="text"
-                    value={badge.name}
-                    onChange={(e) => updateSkillBadge(idx, 'name', e.target.value)}
-                    className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-sm focus:outline-none focus:border-amber-500"
-                    placeholder="Nombre (ej. Ninja del Subjuntivo)"
-                  />
-                  <button
-                    onClick={() => removeSkillBadge(idx)}
-                    className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <select
-                  value={badge.pathId}
-                  onChange={(e) => updateSkillBadge(idx, 'pathId', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-xs focus:outline-none focus:border-amber-500"
+                  Por niveles
+                </label>
+                <button
+                  onClick={() => removeBadge(idx)}
+                  className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2"
                 >
-                  <option value="">-- Selecciona un Learning Path --</option>
-                  {learningPaths.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title || p.id} ({p.id})
-                    </option>
-                  ))}
-                </select>
+                  ✕
+                </button>
               </div>
             ))}
           </div>
           <button
-            onClick={addSkillBadge}
-            className="text-amber-400 hover:text-amber-300 text-xs font-bold uppercase tracking-widest"
+            onClick={addBadge}
+            className="text-indigo-400 hover:text-indigo-300 text-xs font-bold uppercase tracking-widest"
           >
-            + Añadir Insignia de Destreza
+            + Añadir Insignia
           </button>
         </section>
 

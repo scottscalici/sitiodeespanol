@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
-import { collection, doc, setDoc, getDoc, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, addDoc, arrayUnion } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 
 export default function FormLearningPath() {
@@ -92,6 +92,33 @@ export default function FormLearningPath() {
   const [pendingGroupAssign, setPendingGroupAssign] = useState(null);
   const [selectedGroupVerbs, setSelectedGroupVerbs] = useState([]);
   const [migrationStatus, setMigrationStatus] = useState('');
+
+  // Badge catalog (config/gamification.badges) — pods reference these by id
+  // via pod.badgeAward to say "finishing this pod awards X badge/tier".
+  const [badgeCatalog, setBadgeCatalog] = useState([]);
+
+  useEffect(() => {
+    const fetchBadgeCatalog = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'gamification'));
+        if (snap.exists()) setBadgeCatalog(snap.data().badges || []);
+      } catch (err) {
+        console.error('Error fetching badge catalog:', err);
+      }
+    };
+    fetchBadgeCatalog();
+  }, []);
+
+  // Lets the Pod Creator create a new badge on the fly (without a trip to the
+  // Gamification Manager) the moment an admin wants to tag a pod with one.
+  const handleCreateBadge = async (newBadge) => {
+    setBadgeCatalog((prev) => [...prev, newBadge]);
+    try {
+      await setDoc(doc(db, 'config', 'gamification'), { badges: arrayUnion(newBadge) }, { merge: true });
+    } catch (err) {
+      console.error('Error saving new badge to catalog:', err);
+    }
+  };
 
   // One-time migration: the "preliminar" unit was hand-built as 3 separate documents
   // (…_vocab, …_verbs, …_practical) before units were consolidated into a single doc
@@ -539,6 +566,7 @@ export default function FormLearningPath() {
         handleTogglePod={handleTogglePod} handleMovePod={handleMovePod} handleMoveSegment={handleMoveSegment}
         activeBranch={activeBranch} onBranchChange={handleBranchChange}
         selectedBook={selectedBook} selectedChapter={selectedChapter}
+        badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
       />
 
       {pendingGroupAssign && (
