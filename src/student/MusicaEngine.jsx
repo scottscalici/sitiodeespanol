@@ -178,7 +178,7 @@ const MusicaEngine = () => {
           <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-3 flex-1">
             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                Misión de Música
+                Música
               </span>
               {song.course && song.course.map((c, i) => (
                 <span key={i} className="bg-neutral-800 text-neutral-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">

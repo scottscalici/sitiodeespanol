@@ -78,7 +78,7 @@ const MusicaLayout = ({ activity }) => {
           )}
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest text-white bg-pink-600 px-3 py-1 rounded-full mb-3 inline-block shadow-md">
-              Misión de Música
+              Música
             </span>
             <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-1">
               {activity.title}

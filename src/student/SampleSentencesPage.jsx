@@ -70,7 +70,7 @@ const SampleSentencesPage = () => {
         </div>
 
         <div className="text-center">
-          <h1 className="text-3xl font-black uppercase tracking-tight">Oraciones de Práctica</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Oraciones</h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
             {courseId?.toUpperCase()} · Día {targetDia}
           </p>

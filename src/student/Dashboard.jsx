@@ -389,7 +389,7 @@ const Dashboard = () => {
 
                   {/* Track Info */}
                   <div className="min-w-0 flex-1">
-                    <span className="block text-xs font-black uppercase tracking-widest text-purple-300 mb-1">Misión de Música: Día {liveDia}</span>
+                    <span className="block text-xs font-black uppercase tracking-widest text-purple-300 mb-1">Música: Día {liveDia}</span>
                     <h2 className="text-xl font-black text-white truncate">{dailySong.titulo}</h2>
                     <p className="text-base text-purple-200 truncate">{dailySong.artista}</p>
                   </div>
@@ -430,7 +430,7 @@ const Dashboard = () => {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Conjunto Asignado</span>
+                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
                     <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
                     <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
                   </div>
