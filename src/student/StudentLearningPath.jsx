@@ -48,6 +48,10 @@ export default function StudentLearningPath() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeWorkoutSegment, setActiveWorkoutSegment] = useState(null);
 
+  // In-app feedback modal (replaces native alert() popups)
+  const [feedbackModal, setFeedbackModal] = useState(null); // { tone, emoji, title, message }
+  const closeFeedbackModal = () => setFeedbackModal(null);
+
   // --- 1. FIND EVERY DOMINIO UNIT ASSIGNED TO THIS STUDENT'S COURSE SO FAR ---
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -482,18 +486,80 @@ export default function StudentLearningPath() {
 
               } catch (error) {
                 console.error('Error saving to Firestore:', error);
-                alert(`⚠️ Error de Firebase: ${error.message}`);
+                setFeedbackModal({
+                  tone: 'error',
+                  emoji: '⚠️',
+                  title: 'Error de Firebase',
+                  message: error.message,
+                });
               }
             }
 
-            // --- 4. ALERTS ---
+            // --- 4. FEEDBACK ---
             if (score >= 80) {
-              alert(`¡Excelente! Aprobaste con un ${score}%. Multiplicador: ${multiplier}x (+${totalPointsEarned} pts)`);
+              setFeedbackModal({
+                tone: 'success',
+                emoji: '🎉',
+                title: '¡Excelente! ¡Aprobaste!',
+                message: `Obtuviste un ${score}%. Multiplicador: ${multiplier}x (+${totalPointsEarned} pts)`,
+              });
             } else {
-              alert(`Obtuviste un ${score}%. Necesitas al menos 80% para avanzar. \n(+${totalPointsEarned} pts de práctica)`);
+              setFeedbackModal({
+                tone: 'warning',
+                emoji: '💪',
+                title: '¡Buen esfuerzo!',
+                message: `Obtuviste un ${score}%. Necesitas al menos 80% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)`,
+              });
             }
           }}
         />
+      )}
+
+      {/* FEEDBACK MODAL (replaces native alert() popups) */}
+      {feedbackModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6"
+          onClick={closeFeedbackModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-sm rounded-3xl border-2 bg-slate-800 p-8 text-center shadow-2xl ${
+              feedbackModal.tone === 'success'
+                ? 'border-emerald-500'
+                : feedbackModal.tone === 'error'
+                ? 'border-rose-500'
+                : 'border-amber-500'
+            }`}
+          >
+            <div className="text-6xl mb-4">{feedbackModal.emoji}</div>
+            <h3
+              className={`text-2xl font-black uppercase tracking-tight mb-2 ${
+                feedbackModal.tone === 'success'
+                  ? 'text-emerald-400'
+                  : feedbackModal.tone === 'error'
+                  ? 'text-rose-400'
+                  : 'text-amber-400'
+              }`}
+            >
+              {feedbackModal.title}
+            </h3>
+            <p className="text-sm text-slate-300 font-medium mb-6">
+              {feedbackModal.message}
+            </p>
+            <button
+              onClick={closeFeedbackModal}
+              className={`px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-white shadow-md transition-all hover:scale-105 ${
+                feedbackModal.tone === 'success'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : feedbackModal.tone === 'error'
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }`}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
