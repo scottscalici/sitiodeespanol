@@ -27,6 +27,8 @@ export default function PathBuilder({
   handleMoveSegment,
   activeBranch,
   onBranchChange,
+  selectedBook,
+  selectedChapter,
 }) {
   const BRANCH_TABS = [
     { id: 'vocab', label: 'Vocabulario', activeClass: 'bg-indigo-600 text-white' },
@@ -75,6 +77,16 @@ export default function PathBuilder({
               >
                 {course.toUpperCase()} Course ⇄
               </button>
+              <span
+                className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider ${
+                  selectedBook
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-rose-100 text-rose-800'
+                }`}
+                title="Vocabulary/verbs assigned to this path's pods come from this textbook — double check it matches the course above."
+              >
+                📖 {selectedBook ? `${selectedBook}${selectedChapter ? ` Ch ${selectedChapter}` : ''}` : 'No textbook selected!'}
+              </span>
               <div className="flex flex-col">
                 <input
                   type="text"

@@ -101,6 +101,9 @@ export default function VaultSidebar({
                 {availableBooks.length === 0 && (
                   <option value="">Loading Books...</option>
                 )}
+                {availableBooks.length > 0 && (
+                  <option value="">-- Select Textbook --</option>
+                )}
                 {availableBooks.map((bk) => (
                   <option key={bk} value={bk}>
                     {bk}
@@ -259,6 +262,12 @@ export default function VaultSidebar({
           </div>
         ) : (
           <>
+            {activeTab === 'vocab' && !selectedBook && (
+              <div className="text-center py-10 text-amber-600 font-bold text-sm bg-amber-50 border border-amber-200 rounded-xl">
+                ⚠️ Select a textbook above first — vocabulary won't load until you pick one.
+              </div>
+            )}
+
             {activeTab === 'vocab' &&
               vaultVocab.map((item) => {
                 const used = isItemUsed(item.id);

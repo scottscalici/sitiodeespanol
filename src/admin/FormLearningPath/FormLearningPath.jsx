@@ -7,19 +7,22 @@ import { getCachedCollection, invalidateCollectionCache } from '../../utils/fire
 
 export default function FormLearningPath() {
   const [course, setCourse] = useState('s2');
-  const [pathId, setPathId] = useState('s2_descubre2_ch8');
-  const [pathTitle, setPathTitle] = useState('Descubre 2 - Capítulo 8');
+  const [pathId, setPathId] = useState('');
+  const [pathTitle, setPathTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
 
   // --- MASTER VAULT STATE ---
   const [activeTab, setActiveTab] = useState('vocab');
-  
-  const [selectedBook, setSelectedBook] = useState('Descubre 2');
-  const [availableBooks, setAvailableBooks] = useState(['Descubre 2']);
-  
-  const [selectedChapter, setSelectedChapter] = useState('8');
-  const [selectedSection, setSelectedSection] = useState('8.1');
+
+  // Intentionally starts blank (not a hardcoded book) so a new pod is never
+  // silently built from whatever textbook happened to be the last default —
+  // the admin must actively pick a book before any vocab can be assigned.
+  const [selectedBook, setSelectedBook] = useState('');
+  const [availableBooks, setAvailableBooks] = useState([]);
+
+  const [selectedChapter, setSelectedChapter] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
   
   const [availableChapters, setAvailableChapters] = useState([]);
   const [availableSections, setAvailableSections] = useState([]);
@@ -455,6 +458,7 @@ export default function FormLearningPath() {
 
   const handleSavePathToFirestore = async () => {
     if (!pathId.trim()) return alert("Please enter a valid ID.");
+    if (!selectedBook) return alert("Please select a textbook before saving — nothing has been chosen yet.");
     setIsSaving(true);
     try {
       const branches = {
@@ -534,6 +538,7 @@ export default function FormLearningPath() {
         existingPaths={existingPaths} handleLoadPath={handleLoadPath} selectedExistingPathId={selectedExistingPathId} setSelectedExistingPathId={setSelectedExistingPathId}
         handleTogglePod={handleTogglePod} handleMovePod={handleMovePod} handleMoveSegment={handleMoveSegment}
         activeBranch={activeBranch} onBranchChange={handleBranchChange}
+        selectedBook={selectedBook} selectedChapter={selectedChapter}
       />
 
       {pendingGroupAssign && (
