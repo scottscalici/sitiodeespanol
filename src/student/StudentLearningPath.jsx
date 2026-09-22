@@ -10,17 +10,15 @@ import { getAssignedDominioTasks } from '../utils/learningPathProgress';
 // A path is one content type from creation now — no more vocab/verbs/practical
 // branches bundled into a single document, so there's nothing to tab between.
 // "practical" is gone; sentences attach directly to a vocab or verb path's
-// segments instead. CONTENT_TYPES also drives the hexagon-vs-circle node
-// shape and the page's accent color, so a verb path is visually distinct
-// from a vocab path at a glance, not just labeled differently.
+// segments instead. CONTENT_TYPES also drives the page's accent color, so a
+// verb path is visually distinct from a vocab path at a glance. Node shape
+// used to also vary (hexagon for verbs) — reverted back to circle-only after
+// review: the clip-path hexagon read as forced/unnatural rather than a clean
+// hexagon, so color alone carries the distinction now.
 const CONTENT_TYPES = {
-  vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo', shape: 'circle' },
-  verb: { label: 'Verbos', icon: '⚡', theme: 'emerald', shape: 'hexagon' },
+  vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo' },
+  verb: { label: 'Verbos', icon: '⚡', theme: 'emerald' },
 };
-
-// Flat-top hexagon, applied via clip-path so verb-path nodes read as a
-// distinct shape from vocab's circles at a glance, not just a different color.
-const HEXAGON_CLIP = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
 
 // Zigzag path layout constants — a repeating offset pattern (as % from center)
 // works for any number of segments without knowing the count ahead of time.
@@ -339,7 +337,6 @@ export default function StudentLearningPath() {
                       className={`absolute rounded-full flex items-center justify-center shadow-md ${styles.box}`}
                       style={{
                         left: `calc(${item.x}% - ${CHECKPOINT_SIZE / 2}px)`, top: item.y - CHECKPOINT_SIZE / 2, width: CHECKPOINT_SIZE, height: CHECKPOINT_SIZE,
-                        clipPath: contentConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
                       }}
                     >
                       <TrophyIcon className={styles.icon} />
@@ -393,7 +390,6 @@ export default function StudentLearningPath() {
                     className={`absolute rounded-full flex items-center justify-center shadow-md transition-transform p-0 ${bgClass} ${ringClass} ${item.canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
                     style={{
                       left: `calc(${item.x}% - ${size / 2}px)`, top: item.y - size / 2, width: size, height: size,
-                      clipPath: contentConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
                     }}
                   >
                     {content}
