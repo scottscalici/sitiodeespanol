@@ -16,6 +16,7 @@ import RecreoHub from './student/RecreoHub';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
 import PracticeHub from './student/PracticeHub';
+import Recuperacion from './student/Recuperacion';
 import TicoTalk from './student/TicoTalk';
 import WorkoutEngine from './student/WorkoutEngine';
 import GrammarNoteViewer from './student/GrammarNoteViewer';
@@ -167,6 +168,7 @@ function App() {
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/student-learning-path/:targetDia?" element={<StudentLearningPath />} />
             <Route path="/practice-hub" element={<PracticeHub />} />
+            <Route path="/recuperacion" element={<Recuperacion />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />

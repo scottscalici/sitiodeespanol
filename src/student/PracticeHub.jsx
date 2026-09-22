@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { awardPoints } from '../utils/pointsHelper';
+import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../utils/evaluaciones';
 import WorkoutEngine from './WorkoutEngine';
 
 // Practice Hub is deliberately outside the graded Dominio learning path: every
@@ -52,7 +53,10 @@ export default function PracticeHub() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const docs = await getCachedCollection('practice_pods');
+        const [docs, currentEvalOptions] = await Promise.all([
+          getCachedCollection('practice_pods'),
+          fetchEvaluacionOptions(course),
+        ]);
         const flattened = [];
         docs
           .filter((d) => d.course === course && Array.isArray(d.pods))
@@ -60,6 +64,14 @@ export default function PracticeHub() {
             d.pods.forEach((pod) => {
               const segment = pod.segments?.[0];
               if (!segment) return;
+              // Re-resolve the día live against the current Evaluaciones
+              // Sequencer calendar (by label match) instead of trusting the
+              // day number saved when the link was made — so pushing a quiz
+              // to a different día, or swapping two, is reflected here
+              // without the admin having to re-link every circle.
+              const evalLink = pod.evalLink
+                ? { ...pod.evalLink, dia: resolveCurrentEvalDia(currentEvalOptions, pod.evalLink) }
+                : null;
               flattened.push({
                 id: `${d.path_id}__${pod.id}`,
                 title: pod.title,
@@ -67,7 +79,7 @@ export default function PracticeHub() {
                 textbook: d.textbook || '',
                 chapter: d.chapter || '',
                 targetTense: segment.targetTense || 'ALL',
-                evalLink: pod.evalLink || null,
+                evalLink,
                 wordCount: segment.introduced_concepts?.length || 0,
                 segment,
               });

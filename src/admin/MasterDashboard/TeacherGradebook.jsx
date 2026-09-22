@@ -8,6 +8,7 @@ import {
   getAssignedDominioTasks,
   getUnitSummary,
 } from '../../utils/learningPathProgress';
+import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
 
 // Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
 const getFlagClasses = (percent) => {
@@ -379,6 +380,16 @@ const handleResetPassword = async () => {
           >
             <span>⚠️</span> Diagnósticos
           </button>
+          <button
+            onClick={() => setActiveTab('recuperacion')}
+            className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-1 ${
+              activeTab === 'recuperacion'
+                ? 'bg-rose-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>📋</span> Recuperación
+          </button>
         </div>
 
         {activeTab === 'gradebook' && (
@@ -510,6 +521,9 @@ const handleResetPassword = async () => {
           )}
         </main>
       )}
+
+      {/* --- RECUPERACIÓN TAB CONTENT --- */}
+      {activeTab === 'recuperacion' && <TeacherRecuperacionTab />}
 
       {/* --- GRADEBOOK: NAME, SECTION, WARMUP AVERAGE, TODAY, LEARNING PATH --- */}
       {activeTab === 'gradebook' && (() => {

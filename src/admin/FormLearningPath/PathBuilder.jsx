@@ -41,11 +41,26 @@ export default function PathBuilder({
     const copy = [...pods];
     if (!diaStr) {
       copy[podIndex].evalLink = null;
+      copy[podIndex].gateConfig = null; // a gate is meaningless without a quiz link
     } else {
       const dia = Number(diaStr);
       const match = evaluacionOptions.find((o) => o.dia === dia);
       copy[podIndex].evalLink = match ? { dia: match.dia, label: match.label } : null;
     }
+    setPods(copy);
+  };
+
+  const DEFAULT_GATE_CONFIG = { questionCount: 50, timeLimitSeconds: 300, passThreshold: 90 };
+
+  const handleGateToggle = (podIndex, enabled) => {
+    const copy = [...pods];
+    copy[podIndex].gateConfig = enabled ? { ...DEFAULT_GATE_CONFIG } : null;
+    setPods(copy);
+  };
+
+  const updateGateConfig = (podIndex, field, value) => {
+    const copy = [...pods];
+    copy[podIndex].gateConfig = { ...copy[podIndex].gateConfig, [field]: Math.max(1, Number(value) || 1) };
     setPods(copy);
   };
 
@@ -301,6 +316,60 @@ export default function PathBuilder({
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Recuperación Gate Row — only meaningful once this circle is
+                linked to a quiz. Turns it from a normal ungated practice
+                circle into a timed, full-coverage mastery check (every word
+                in the bank gets asked at least once, no repeats until it
+                has) that a student must clear at the pass threshold to show
+                up on the teacher's eligibility list for that quiz. */}
+            {isPracticeHub && pod.evalLink && (
+              <div className="px-4 py-2 bg-rose-50 border-b border-rose-100 flex items-center gap-3 flex-wrap">
+                <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-rose-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!pod.gateConfig}
+                    onChange={(e) => handleGateToggle(podIndex, e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded"
+                  />
+                  🎯 Habilitar como Recuperación (Gate)
+                </label>
+                {pod.gateConfig && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <label className="text-[9px] font-black text-rose-800 uppercase">Preguntas</label>
+                      <input
+                        type="number" min="1"
+                        value={pod.gateConfig.questionCount}
+                        onChange={(e) => updateGateConfig(podIndex, 'questionCount', e.target.value)}
+                        className="w-16 border border-rose-200 rounded-md p-1 text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <label className="text-[9px] font-black text-rose-800 uppercase">Minutos</label>
+                      <input
+                        type="number" min="1"
+                        value={Math.round(pod.gateConfig.timeLimitSeconds / 60)}
+                        onChange={(e) => updateGateConfig(podIndex, 'timeLimitSeconds', Number(e.target.value) * 60)}
+                        className="w-16 border border-rose-200 rounded-md p-1 text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <label className="text-[9px] font-black text-rose-800 uppercase">% Para Aprobar</label>
+                      <input
+                        type="number" min="1" max="100"
+                        value={pod.gateConfig.passThreshold}
+                        onChange={(e) => updateGateConfig(podIndex, 'passThreshold', Math.min(100, Number(e.target.value)))}
+                        className="w-16 border border-rose-200 rounded-md p-1 text-xs font-bold bg-white"
+                      />
+                    </div>
+                    <p className="text-[10px] text-rose-700 italic basis-full">
+                      Cubre cada palabra del banco al menos una vez (sin repetir hasta terminar la vuelta) — si tienes más palabras que preguntas, sube el número de preguntas para garantizar cobertura completa.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 

@@ -21,3 +21,19 @@ export const fetchEvaluacionOptions = async (course) => {
     return [];
   }
 };
+
+// A pod's evalLink ({dia, label}) is saved once when an admin picks it in
+// the Pod Creator — it does NOT live-update on its own. If the teacher later
+// edits the Evaluaciones Sequencer (pushes a quiz to a different día, swaps
+// two días' labels), the pod's stored `dia` would silently go stale. Callers
+// that sort/display by día should resolve the CURRENT día live instead of
+// trusting the stored one: look up whichever día in a fresh
+// fetchEvaluacionOptions() result currently carries this exact label text.
+// Falls back to the stored día only if that label can no longer be found
+// anywhere in the current calendar (most likely because it was reworded,
+// not just moved) — stale-but-visible beats disappearing entirely.
+export const resolveCurrentEvalDia = (currentOptions, evalLink) => {
+  if (!evalLink) return null;
+  const match = currentOptions.find((o) => o.label === evalLink.label);
+  return match ? match.dia : evalLink.dia;
+};

@@ -289,6 +289,23 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const uniqueMasterPool = Array.from(masterPoolMap.values());
       setMasterPool(uniqueMasterPool);
 
+      // Recuperación gate mode: instead of the normal per-question random
+      // draw (with replacement — fine for endless practice, but doesn't
+      // guarantee every concept gets asked), pre-build a shuffled queue that
+      // covers every concept at least once, then pads with extra random
+      // draws if totalQs asks for more than the concept count. The caller is
+      // responsible for bumping totalQs up to at least the concept count so
+      // "full coverage" is a real guarantee, not just a best effort.
+      const fullCoverage = !!segment.fullCoverage;
+      let conceptQueue = [];
+      if (fullCoverage) {
+        const allTargets = shuffle([...validVocab, ...validVerbs]);
+        conceptQueue = [...allTargets];
+        for (let n = 0; allTargets.length > 0 && conceptQueue.length < totalQs; n++) {
+          conceptQueue.push(allTargets[n % allTargets.length]);
+        }
+      }
+
       // 🚀 SMART DISTRACTOR GENERATOR
       // truncateToFirstWord=true (default) is for sentence-builder word banks,
       // where each option becomes a single draggable word tile. Vocab
@@ -408,13 +425,18 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
         // --- 3. VOCABULARIO Y VERBOS ---
         else {
           let target;
-          const isHistoryTurn = forceHistory || (validHistory.length > 0 && Math.random() < 0.20);
+          if (fullCoverage) {
+            target = conceptQueue[i];
+            if (!target) continue;
+          } else {
+            const isHistoryTurn = forceHistory || (validHistory.length > 0 && Math.random() < 0.20);
 
-          if (isHistoryTurn && validHistory.length > 0) target = validHistory[Math.floor(Math.random() * validHistory.length)];
-          else if (validVerbs.length > 0 && Math.random() < 0.6) target = validVerbs[Math.floor(Math.random() * validVerbs.length)];
-          else if (validVocab.length > 0) target = validVocab[Math.floor(Math.random() * validVocab.length)];
-          else if (validVerbs.length > 0) target = validVerbs[Math.floor(Math.random() * validVerbs.length)];
-          else continue;
+            if (isHistoryTurn && validHistory.length > 0) target = validHistory[Math.floor(Math.random() * validHistory.length)];
+            else if (validVerbs.length > 0 && Math.random() < 0.6) target = validVerbs[Math.floor(Math.random() * validVerbs.length)];
+            else if (validVocab.length > 0) target = validVocab[Math.floor(Math.random() * validVocab.length)];
+            else if (validVerbs.length > 0) target = validVerbs[Math.floor(Math.random() * validVerbs.length)];
+            else continue;
+          }
 
           if (target.fullData && target.fullData.tenses) {
             let availableTenses = Object.keys(target.fullData.tenses).filter(t => typeof target.fullData.tenses[t] === 'object');

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -53,13 +54,22 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
           <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0">📋</span>
           Evaluación
         </h3>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors shrink-0"
-          title="Ver calendario completo"
-        >
-          Calendario
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/recuperacion"
+            className="text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
+            title="Reflexiona y practica para repetir una evaluación"
+          >
+            Recuperación
+          </Link>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
+            title="Ver calendario completo"
+          >
+            Calendario
+          </button>
+        </div>
       </div>
 
       {/* TODAY'S EVALUATION */}
