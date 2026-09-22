@@ -138,10 +138,13 @@ export default function StudentLearningPath() {
   }, [pods.length, activeBranch, activePodIndex, activeSegmentIndex]);
 
   // --- DYNAMIC COLOR DICTIONARIES ---
+  // Page background uses the -100 shade, not -50 — at -50 the indigo/emerald/amber
+  // tints are all so close to white that vocab vs. verbs vs. practical barely read
+  // as different colors at a glance.
   const themeColors = {
-    emerald: { bg: 'bg-emerald-50', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400', tabHover: 'hover:bg-emerald-100', tabActive: 'bg-emerald-600 text-white shadow-md' },
-    amber: { bg: 'bg-amber-50', active: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-900', border: 'border-amber-200', line: 'bg-amber-400', tabHover: 'hover:bg-amber-100', tabActive: 'bg-amber-500 text-white shadow-md' },
-    indigo: { bg: 'bg-indigo-50', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400', tabHover: 'hover:bg-indigo-100', tabActive: 'bg-indigo-600 text-white shadow-md' },
+    emerald: { bg: 'bg-emerald-100', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400', tabHover: 'hover:bg-emerald-100', tabActive: 'bg-emerald-600 text-white shadow-md' },
+    amber: { bg: 'bg-amber-100', active: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-900', border: 'border-amber-200', line: 'bg-amber-400', tabHover: 'hover:bg-amber-100', tabActive: 'bg-amber-500 text-white shadow-md' },
+    indigo: { bg: 'bg-indigo-100', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400', tabHover: 'hover:bg-indigo-100', tabActive: 'bg-indigo-600 text-white shadow-md' },
   };
   const theme = themeColors[currentBranchConfig.theme] || themeColors.emerald;
 
