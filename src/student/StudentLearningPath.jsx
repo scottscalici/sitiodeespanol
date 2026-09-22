@@ -89,7 +89,13 @@ export default function StudentLearningPath() {
         const tareasData = tareasSnap.exists() ? tareasSnap.data() : {};
         const assigned = getAssignedDominioTasks(tareasData[course] || [], currentDay);
         setAssignedTasks(assigned);
-        setSelectedPathId((prev) => prev || assigned[0]?.path_id || '');
+
+        // A specific unit carried in the URL (a Dashboard card deep-links to
+        // its own path) wins over the "most recently assigned" default —
+        // otherwise every card would land on whichever unit is newest.
+        const pathOverride = searchParams.get('path');
+        const overrideIsValid = pathOverride && assigned.some((t) => t.path_id === pathOverride);
+        setSelectedPathId((prev) => (overrideIsValid ? pathOverride : prev || assigned[0]?.path_id || ''));
       } catch (error) {
         console.error('Error fetching assigned units:', error);
       } finally {
