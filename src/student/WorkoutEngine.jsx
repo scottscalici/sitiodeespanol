@@ -811,7 +811,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                    <div className="flex flex-wrap items-center justify-center gap-3 text-2xl md:text-3xl font-bold text-slate-800">
                       {currentQ.correctSyntax.split(' ').map((w, idx) => {
                           if (w.toLowerCase() === currentQ.infinitive.toLowerCase()) {
-                             return <input key={idx} autoFocus type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} disabled={isChecked}
+                             return <input key={idx} autoFocus type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} readOnly={isChecked}
                                  className="w-32 md:w-40 text-center border-b-4 border-blue-500 bg-blue-50 focus:bg-blue-100 text-blue-900 rounded-t-lg outline-none px-2 py-1 mx-1"
                                  onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} />
                           }
@@ -840,7 +840,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                  <div className="w-48 border-b-4 border-slate-300 pb-1"></div>
               </div>
 
-              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} disabled={isChecked} placeholder="Conjuga el verbo..."
+              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Conjuga el verbo..."
                 className="w-full max-w-md text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all font-bold text-slate-700"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
 
@@ -953,7 +953,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           {currentQ.type === 'listen' && (
             <>
               <button onClick={() => playAudio(currentQ.prompt)} className="w-24 h-24 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-4xl shadow-lg mx-auto mb-8 transition-transform active:scale-95">🔊</button>
-              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} disabled={isChecked} placeholder="Escribe en español..."
+              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe en español..."
                 className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
 
@@ -989,7 +989,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           {currentQ.type === 'write' && (
             <>
               <h2 className="text-3xl font-black text-slate-800 mb-8">{currentQ.prompt}</h2>
-              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} disabled={isChecked} placeholder="Escribe en español..."
+              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe en español..."
                 className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
             </>
