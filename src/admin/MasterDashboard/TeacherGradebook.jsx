@@ -5,8 +5,8 @@ import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported he
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import {
   fetchUnitTotalPods,
-  getUnitCompletedPods,
   getAssignedDominioTasks,
+  getUnitSummary,
 } from '../../utils/learningPathProgress';
 
 // Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
@@ -207,18 +207,14 @@ export default function TeacherGradebook() {
     return { status: 'not_started' };
   };
 
-  // --- AGGREGATE LEARNING PATH % across every Dominio unit assigned so far
-  // for this student's course ---
-  const getLearningPathPercent = (student) => {
-    const relevantCols = unitColumns.filter((col) => col.courses.has(student.course));
-    if (relevantCols.length === 0) return null;
-    const totalPods = relevantCols.reduce((sum, col) => sum + (unitTotals[col.path_id] || 0), 0);
+  // --- One learning-path percent per unit column, for one student ---
+  // Returns null when the unit doesn't apply to this student's course (so
+  // the cell can render a blank dash) rather than a misleading 0%.
+  const getUnitPercentForStudent = (student, col) => {
+    if (!col.courses.has(student.course)) return null;
+    const totalPods = unitTotals[col.path_id] || 0;
     if (totalPods === 0) return null;
-    const completedPods = relevantCols.reduce(
-      (sum, col) => sum + Math.min(getUnitCompletedPods(student.progress, col.path_id), unitTotals[col.path_id] || 0),
-      0
-    );
-    return Math.round((completedPods / totalPods) * 100);
+    return getUnitSummary(student.progress, col.path_id, totalPods).percent;
   };
 
   const saveQuarters = async () => {
@@ -524,6 +520,13 @@ const handleResetPassword = async () => {
             return lastCompare !== 0 ? lastCompare : (a.firstName || '').localeCompare(b.firstName || '');
           });
 
+        // One column per Dominio unit relevant to a currently-visible student's
+        // course, oldest-due first. Past-due units stay listed (unitColumns has
+        // no upper due-date bound), so old grades remain visible/retrievable.
+        const visibleUnitColumns = unitColumns
+          .filter((col) => visibleStudents.some((s) => col.courses.has(s.course)))
+          .sort((a, b) => Number(a.day_due) - Number(b.day_due));
+
         return (
           <main className="max-w-6xl mx-auto bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -539,14 +542,18 @@ const handleResetPassword = async () => {
                     </span>
                   </th>
                   <th className="p-4">Calentamiento de Hoy</th>
-                  <th className="p-4">Camino de Aprendizaje</th>
+                  {visibleUnitColumns.map((col) => (
+                    <th key={col.path_id} className="p-4">
+                      {col.titulo}
+                    </th>
+                  ))}
                   <th className="p-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {visibleStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
+                    <td colSpan={6 + visibleUnitColumns.length} className="p-8 text-center text-slate-500 font-bold">
                       No hay estudiantes en este filtro.
                     </td>
                   </tr>
@@ -557,7 +564,6 @@ const handleResetPassword = async () => {
                       : student.email;
                     const { percent: avgPercent } = getWarmupAverage(student);
                     const todays = getTodaysWarmupStatus(student);
-                    const pathPercent = getLearningPathPercent(student);
 
                     return (
                       <tr key={student.uid} className="hover:bg-slate-700/20 transition-colors">
@@ -607,23 +613,28 @@ const handleResetPassword = async () => {
                           )}
                         </td>
 
-                        <td className="p-4">
-                          {pathPercent == null ? (
-                            <span className="text-slate-600 font-bold">—</span>
-                          ) : (
-                            <div className="w-full max-w-[140px]">
-                              <div className={`text-xs font-black mb-1 ${getFlagClasses(pathPercent).split(' ')[0]}`}>
-                                {pathPercent}%
-                              </div>
-                              <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden">
-                                <div
-                                  className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                                  style={{ width: `${pathPercent}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          )}
-                        </td>
+                        {visibleUnitColumns.map((col) => {
+                          const unitPercent = getUnitPercentForStudent(student, col);
+                          return (
+                            <td key={col.path_id} className="p-4">
+                              {unitPercent == null ? (
+                                <span className="text-slate-600 font-bold">—</span>
+                              ) : (
+                                <div className="w-full max-w-[140px]">
+                                  <div className={`text-xs font-black mb-1 ${getFlagClasses(unitPercent).split(' ')[0]}`}>
+                                    {unitPercent}%
+                                  </div>
+                                  <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden">
+                                    <div
+                                      className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                                      style={{ width: `${unitPercent}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
 
                         <td className="p-4 text-center">
                           <div className="flex items-center justify-center gap-2">
