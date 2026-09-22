@@ -84,6 +84,18 @@ service cloud.firestore {
       allow read, write: if isLoggedIn();
     }
 
+    // --- RECUPERACIÓN (reflection + practice gate attempts) ---
+    // Doc ID is `${uid}__${circleId}`, but that's not checkable directly, so
+    // ownership is verified against the document's own `uid` field instead —
+    // a student may only create/update their own record (submitting their
+    // reflection, recording a gate attempt); an admin (teacher) can read
+    // every student's record for the eligibility list, but never write one.
+    match /recuperaciones/{docId} {
+      allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // --- THE MASTER CATCH-ALL (Curriculum & Other Apps) ---
     match /{document=**} {
       allow read: if isLoggedIn();

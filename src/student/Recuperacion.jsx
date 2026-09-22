@@ -36,6 +36,7 @@ export default function Recuperacion() {
   const [isSubmittingReflection, setIsSubmittingReflection] = useState(false);
   const [sessionNonce, setSessionNonce] = useState(0);
   const [feedbackModal, setFeedbackModal] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -114,6 +115,7 @@ export default function Recuperacion() {
   const handleSubmitReflection = async () => {
     if (!REFLECTION_PROMPTS.every((p) => (reflectionAnswers[p.key] || '').trim())) return;
     setIsSubmittingReflection(true);
+    setErrorMessage('');
     try {
       await submitReflection(uid, {
         course, studentName, circleId: selectedCircle.id, evalLabel: selectedCircle.evalLabel,
@@ -125,6 +127,7 @@ export default function Recuperacion() {
       setPhase('gate');
     } catch (err) {
       console.error('Error submitting reflection:', err);
+      setErrorMessage('No se pudo enviar la reflexión. Intenta de nuevo o avísale a tu profesor.');
     }
     setIsSubmittingReflection(false);
   };
@@ -136,12 +139,14 @@ export default function Recuperacion() {
 
   const handleGateComplete = async (segId, score) => {
     setPhase('gate');
+    setErrorMessage('');
     try {
       const updated = await recordGateAttempt(uid, selectedCircle.id, score, selectedCircle.gateConfig.passThreshold);
       setDocsByCircle((prev) => ({ ...prev, [selectedCircle.id]: updated }));
       setFeedbackModal({ score, passed: score >= selectedCircle.gateConfig.passThreshold, threshold: selectedCircle.gateConfig.passThreshold });
     } catch (err) {
       console.error('Error recording gate attempt:', err);
+      setErrorMessage('No se pudo guardar tu intento. Intenta de nuevo o avísale a tu profesor.');
     }
   };
 
@@ -241,6 +246,9 @@ export default function Recuperacion() {
                 </div>
               ))}
             </div>
+            {errorMessage && (
+              <p className="mt-4 text-sm font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3">{errorMessage}</p>
+            )}
             <button
               onClick={handleSubmitReflection}
               disabled={isSubmittingReflection || !REFLECTION_PROMPTS.every((p) => (reflectionAnswers[p.key] || '').trim())}
@@ -278,6 +286,9 @@ export default function Recuperacion() {
               </div>
             )}
 
+            {errorMessage && (
+              <p className="mb-4 text-sm font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3">{errorMessage}</p>
+            )}
             <button
               onClick={startAttempt}
               className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-xl uppercase tracking-wide text-sm transition-colors"
