@@ -9,10 +9,14 @@ import { getAssignedDominioTasks } from '../utils/learningPathProgress';
 
 // Configuration for the 3 distinct branches
 const BRANCHES = [
-  { id: 'vocab', label: 'Vocabulario', icon: '📖', theme: 'indigo' },
-  { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald' },
-  { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber' }
+  { id: 'vocab', label: 'Vocabulario', icon: '📖', theme: 'indigo', shape: 'circle' },
+  { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald', shape: 'hexagon' },
+  { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber', shape: 'circle' }
 ];
+
+// Flat-top hexagon, applied via clip-path so verb-branch nodes read as a
+// distinct shape from vocab's circles at a glance, not just a different color.
+const HEXAGON_CLIP = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
 
 // Zigzag path layout constants — a repeating offset pattern (as % from center)
 // works for any number of segments without knowing the count ahead of time.
@@ -321,14 +325,17 @@ export default function StudentLearningPath() {
                 const state = item.isCompleted ? 'done' : item.isLocked ? 'locked' : 'pending';
                 const styles = {
                   done: { box: 'bg-amber-500', icon: 'text-white', label: 'text-amber-600', suffix: '· ¡Completo!' },
-                  locked: { box: 'bg-slate-200 border-4 border-dashed border-slate-300', icon: 'text-slate-400', label: 'text-slate-400', suffix: '· Bloqueado' },
+                  locked: { box: 'bg-slate-200 border-4 border-slate-300', icon: 'text-slate-400', label: 'text-slate-400', suffix: '· Bloqueado' },
                   pending: { box: 'bg-white border-4 border-amber-300', icon: 'text-amber-400', label: 'text-amber-500', suffix: '' },
                 }[state];
                 return (
                   <div key={item.key}>
                     <div
                       className={`absolute rounded-full flex items-center justify-center shadow-md ${styles.box}`}
-                      style={{ left: `calc(${item.x}% - ${CHECKPOINT_SIZE / 2}px)`, top: item.y - CHECKPOINT_SIZE / 2, width: CHECKPOINT_SIZE, height: CHECKPOINT_SIZE }}
+                      style={{
+                        left: `calc(${item.x}% - ${CHECKPOINT_SIZE / 2}px)`, top: item.y - CHECKPOINT_SIZE / 2, width: CHECKPOINT_SIZE, height: CHECKPOINT_SIZE,
+                        clipPath: currentBranchConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
+                      }}
                     >
                       <TrophyIcon className={styles.icon} />
                     </div>
@@ -357,7 +364,7 @@ export default function StudentLearningPath() {
                 bgClass = 'bg-slate-200';
                 content = <LockIcon className="text-slate-400" />;
               } else {
-                bgClass = 'bg-slate-100 border-2 border-dashed border-slate-300';
+                bgClass = 'bg-slate-100 border-2 border-slate-300';
                 content = <span className="text-slate-300 font-black text-lg">{item.sIdx + 1}</span>;
               }
               if (adminBypass) ringClass += ' ring-2 ring-purple-400 ring-offset-2';
@@ -379,7 +386,10 @@ export default function StudentLearningPath() {
                     onClick={item.canClick ? () => setActiveWorkoutSegment(item.seg) : undefined}
                     ref={item.isCurrent ? currentPodRef : null}
                     className={`absolute rounded-full flex items-center justify-center shadow-md transition-transform p-0 ${bgClass} ${ringClass} ${item.canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
-                    style={{ left: `calc(${item.x}% - ${size / 2}px)`, top: item.y - size / 2, width: size, height: size }}
+                    style={{
+                      left: `calc(${item.x}% - ${size / 2}px)`, top: item.y - size / 2, width: size, height: size,
+                      clipPath: currentBranchConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
+                    }}
                   >
                     {content}
                   </Tag>
