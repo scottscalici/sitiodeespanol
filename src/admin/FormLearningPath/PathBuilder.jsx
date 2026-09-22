@@ -87,7 +87,7 @@ export default function PathBuilder({
           </div>
 
           <button 
-            onClick={() => window.location.href = '/admin'} 
+            onClick={() => window.location.href = '/admin-daily-plan-hub'}
             className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all"
           >
             ← Back to Admin

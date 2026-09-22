@@ -480,7 +480,7 @@ const Dashboard = () => {
           {/* RIGHT: SIDEBAR */}
           <div className="space-y-6">
             <GamesSidebar />
-            <LearningPathTile liveDia={liveDia} courseTasks={safeTareas} />
+            <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
             <LeaderboardCard course={course} />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}

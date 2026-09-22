@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchUnitTotalPods, getUnitSummary, getCurrentDominioTask } from '../utils/learningPathProgress';
 
-const LearningPathTile = ({ liveDia, courseTasks = [] }) => {
+const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
   const { userData } = useAuth();
   const [totalPods, setTotalPods] = useState(0);
 
@@ -24,7 +24,7 @@ const LearningPathTile = ({ liveDia, courseTasks = [] }) => {
 
   return (
     <Link
-      to={`/student-learning-path/${liveDia}`}
+      to={`/student-learning-path/${liveDia}${course ? `?course=${course}` : ''}`}
       className="group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-blue-500/20 hover:border-blue-500 transition-all duration-300 relative overflow-hidden"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>

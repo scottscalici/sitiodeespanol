@@ -1,16 +1,21 @@
 import { doc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 
-// Monday of the current week, as YYYY-MM-DD — changes once per week.
+// Monday of the current week, as YYYY-MM-DD — changes once per week. Uses the
+// LOCAL calendar date (like getTodayDateKey below), not toISOString(), which
+// converts to UTC and can silently roll the date to the next day for anyone
+// west of UTC in the evening — that would make a student's weekKey mismatch
+// the key computed elsewhere the same evening, wrongly zeroing their weekly
+// total on the leaderboard.
 export const getWeekKey = (d = new Date()) => {
   const date = new Date(d);
   const day = (date.getDay() + 6) % 7; // Monday = 0
   date.setDate(date.getDate() - day);
-  return date.toISOString().slice(0, 10);
+  return date.toLocaleDateString('en-CA');
 };
 
-// YYYY-MM — changes once per month.
-export const getMonthKey = (d = new Date()) => new Date(d).toISOString().slice(0, 7);
+// YYYY-MM, from the local calendar date — see getWeekKey for why not toISOString().
+export const getMonthKey = (d = new Date()) => new Date(d).toLocaleDateString('en-CA').slice(0, 7);
 
 // Real calendar date (local, YYYY-MM-DD) — streaks track actual daily usage,
 // not the course's scheduled "liveDia".

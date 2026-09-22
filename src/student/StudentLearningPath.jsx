@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
@@ -36,8 +36,15 @@ const TrophyIcon = ({ className, size = 34 }) => (
 export default function StudentLearningPath() {
   const { userData } = useAuth();
   const { targetDia } = useParams();
+  const [searchParams] = useSearchParams();
   const isAdmin = userData?.role === 'admin';
-  const course = userData?.course || 's2';
+  // Admins previewing the Dashboard's S2/S4 toggle carry that choice here via
+  // ?course= (the tile they clicked was already scoped to it) — a real
+  // student always uses their own profile course, never a URL override.
+  const courseOverride = searchParams.get('course');
+  const course = isAdmin && (courseOverride === 's2' || courseOverride === 's4')
+    ? courseOverride
+    : (userData?.course || 's2');
 
   // --- STATE ---
   const [activeBranch, setActiveBranch] = useState('vocab');
