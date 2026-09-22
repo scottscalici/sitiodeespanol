@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
 
 const MIN_WATCH_SECONDS = 8; // must dwell this long, or the whole clip if it's shorter
-const POINTS_PER_VIDEO = 2;
+const POINTS_PER_VIDEO = 1;
 
 const TicoTalk = () => {
   const { currentUser } = useAuth();

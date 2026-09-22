@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const Senordle = ({ targetWord = "PLAYA", gameId = "today", validWords = [], onGameEnd }) => {
   const SAVE_KEY = `senordle_progress_${gameId}`;
   const safeTarget = targetWord.toUpperCase();
+
+  // SenordlePage remounts this component (via key={date-course}) per game
+  // session — set on mount (below) as a clean stand-in for "when this
+  // attempt started," used to keep a fast deliberate loss from paying out.
+  const startTimeRef = useRef(null);
 
   const [guesses, setGuesses] = useState(Array(6).fill("").map(() => Array(5).fill("")));
   const [currentRow, setCurrentRow] = useState(0);
@@ -11,8 +16,9 @@ const Senordle = ({ targetWord = "PLAYA", gameId = "today", validWords = [], onG
 
 // Load saved progress
 useEffect(() => {
+  startTimeRef.current = Date.now();
   const saved = localStorage.getItem(SAVE_KEY);
-  
+
   if (saved) {
     const parsed = JSON.parse(saved);
     setGuesses(parsed.guesses);
@@ -70,7 +76,8 @@ useEffect(() => {
     if (isWin || isLoss) {
       setGameOver(true);
       setTimeout(() => alert(isWin ? "¡Excelente! Pura Vida." : `La palabra era: ${safeTarget}`), 300);
-      if (onGameEnd) onGameEnd(currentRow + 1, isWin);
+      const elapsedSeconds = (Date.now() - startTimeRef.current) / 1000;
+      if (onGameEnd) onGameEnd(currentRow + 1, isWin, elapsedSeconds);
     }
 
     const nextRow = currentRow + 1;

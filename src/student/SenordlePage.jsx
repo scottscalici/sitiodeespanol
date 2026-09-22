@@ -10,6 +10,11 @@ import { awardPoints } from '../utils/pointsHelper';
 // Points by try number (index 0 = 1st try). A failed 6th try falls back to the 10-point floor.
 const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
 
+// A deliberate fast loss (6 quick valid-but-wrong guesses) still paid out
+// the 10-point floor. A genuine loss after actually taking time still earns
+// it; a rushed one doesn't.
+const MIN_FAIL_SECONDS = 30;
+
 const SenordlePage = () => {
   const { currentUser } = useAuth();
   const [targetWord, setTargetWord] = useState("LIBRO");
@@ -72,8 +77,9 @@ useEffect(() => {
     localStorage.setItem('preferredCourse', course);
   }, [course]);
 
-  const handleGameEnd = async (tries, won) => {
+  const handleGameEnd = async (tries, won, elapsedSeconds = 0) => {
     if (!currentUser) return;
+    if (!won && elapsedSeconds < MIN_FAIL_SECONDS) return;
     const points = won ? (SENORDLE_POINTS_BY_TRY[tries - 1] ?? 10) : 10;
     try {
       await awardPoints(currentUser.uid, points);

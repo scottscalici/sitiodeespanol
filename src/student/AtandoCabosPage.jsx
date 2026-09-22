@@ -21,6 +21,13 @@ const AtandoCabosPage = () => {
   const [mistakesLeft, setMistakesLeft] = useState(4);
   const [isShaking, setIsShaking] = useState(false);
   const pointsAwardedRef = useRef(false);
+  const gameStartTimeRef = useRef(null);
+
+  // A deliberate instant-loss (click any 4 words, submit, repeat until out of
+  // mistakes) still paid out the 10-point floor in under a second. A genuine
+  // loss after actually reading the board and trying still earns it; an
+  // instant one doesn't.
+  const MIN_FAIL_SECONDS = 30;
 
   const solvedColors = [
     "bg-[#f9df6d] text-slate-900", // Yellow
@@ -40,6 +47,7 @@ const AtandoCabosPage = () => {
       setMistakesLeft(4);
       setIsShaking(false);
       pointsAwardedRef.current = false;
+      gameStartTimeRef.current = Date.now();
     }
   };
 
@@ -49,6 +57,14 @@ const AtandoCabosPage = () => {
     const won = solvedCategories.length === 4;
     const lost = mistakesLeft === 0 && !won;
     if (!won && !lost) return;
+
+    if (lost) {
+      const elapsedSeconds = (Date.now() - (gameStartTimeRef.current || Date.now())) / 1000;
+      if (elapsedSeconds < MIN_FAIL_SECONDS) {
+        pointsAwardedRef.current = true; // still mark so this effect doesn't retrigger
+        return;
+      }
+    }
 
     pointsAwardedRef.current = true;
     const bonus = Math.min(mistakesLeft, 4);

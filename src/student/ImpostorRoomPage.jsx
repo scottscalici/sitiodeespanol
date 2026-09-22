@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import PointsIndicator from '../components/PointsIndicator';
 import { awardPoints } from '../utils/pointsHelper';
 
-const POINTS_PER_ROUND = 10;
+const POINTS_PER_ROUND = 5;
 
 const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
 
@@ -224,18 +224,29 @@ const ImpostorRoomPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players, room?.gameState]);
 
-  // Each player awards their own points once a round resolves (avoids writing to other users' docs)
+  // Each player awards their own points once a round resolves (avoids writing
+  // to other users' docs). The reveal/gameover screen sits there until the
+  // host advances — sometimes a while — and a plain refresh used to re-fire
+  // this for the exact same round every time (scoredRoundRef lives in the
+  // component, not the database, so it resets to 0 on every reload). Checking
+  // the player's own persisted lastScoredRound instead closes that off.
   useEffect(() => {
-    if (!currentUser || !room) return;
+    if (!currentUser || !room || !me) return;
     if (room.gameState !== 'reveal' && room.gameState !== 'gameover') return;
+    if (room.round <= (me.lastScoredRound || 0)) return;
     if (room.round <= scoredRoundRef.current) return;
     scoredRoundRef.current = room.round;
 
     awardPoints(currentUser.uid, POINTS_PER_ROUND)
-      .then(() => setPointsFlash({ amount: POINTS_PER_ROUND }))
+      .then(() => {
+        setPointsFlash({ amount: POINTS_PER_ROUND });
+        return updateDoc(doc(db, 'impostor_rooms', roomCode, 'players', currentUser.uid), {
+          lastScoredRound: room.round,
+        });
+      })
       .catch((err) => console.error('Error awarding Impostor points:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, room?.gameState, room?.round]);
+  }, [currentUser, room?.gameState, room?.round, me?.lastScoredRound]);
 
   const nextRound = async () => {
     if (!isHost) return;

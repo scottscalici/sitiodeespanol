@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../firebase'; // Ensure your firebase config is here
-import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import PointsIndicator from '../components/PointsIndicator';
 import { awardPoints } from '../utils/pointsHelper';
 
 const EslabonesFinales = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, userData } = useAuth();
   const [currentGame, setCurrentGame] = useState(null);
+  const [chainDocId, setChainDocId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pointsFlash, setPointsFlash] = useState(null);
 
@@ -26,9 +27,10 @@ const EslabonesFinales = () => {
   const pointsAwardedRef = useRef(false);
 
   // Helper to reset game state for a new puzzle
-  const initializeGame = (puzzle) => {
+  const initializeGame = (puzzle, docId) => {
     if (puzzle) {
       setCurrentGame(puzzle);
+      setChainDocId(docId);
       setCurrentIndex(1);
       setRevealedCount(1);
       setInputValue("");
@@ -38,18 +40,31 @@ const EslabonesFinales = () => {
     }
   };
 
-  // 🏆 POINTS: 5 per word in the chain, minus 2 per hint (wrong guess) used, 10-point floor
+  // 🏆 POINTS: 5 per word in the chain, minus 2 per hint (wrong guess) used, 10-point
+  // floor — but only the FIRST time this exact chain is completed. Points were
+  // previously re-earned on every refresh (the chain reloads unsolved and the
+  // already-known answers can just be retyped) since pointsAwardedRef resets on
+  // every mount; this checks a persisted flag instead, the same pattern
+  // Calentamiento already uses for its own completion gate.
+  const hasCompletedBefore = !!userData?.progress?.eslabones?.[chainDocId]?.completed;
+
   useEffect(() => {
-    if (!currentGame || !gameWon || pointsAwardedRef.current || !currentUser) return;
+    if (!currentGame || !gameWon || pointsAwardedRef.current || !currentUser || !chainDocId) return;
+    if (hasCompletedBefore) { pointsAwardedRef.current = true; return; }
     pointsAwardedRef.current = true;
 
     const wordsCount = Math.max((currentGame.chain?.length || 1) - 1, 0);
     const points = Math.max(10, wordsCount * 5 - wrongGuesses * 2);
 
     awardPoints(currentUser.uid, points)
-      .then(() => setPointsFlash({ amount: points }))
+      .then(() => {
+        setPointsFlash({ amount: points });
+        return setDoc(doc(db, 'users', currentUser.uid), {
+          progress: { eslabones: { [chainDocId]: { completed: true, timestamp: new Date().toISOString() } } },
+        }, { merge: true });
+      })
       .catch((err) => console.error('Error saving Eslabones points:', err));
-  }, [gameWon, currentGame, wrongGuesses, currentUser]);
+  }, [gameWon, currentGame, wrongGuesses, currentUser, chainDocId, hasCompletedBefore]);
 
   // EFFECT: Fetch Today's Chain from Firestore
   useEffect(() => {
@@ -63,11 +78,11 @@ const EslabonesFinales = () => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          initializeGame(docSnap.data());
+          initializeGame(docSnap.data(), docId);
         } else {
           // Fallback: If today's puzzle isn't found, find the most recent one for that course
           const q = query(
-            collection(db, "juego_eslabones"), 
+            collection(db, "juego_eslabones"),
             where("course", "==", course)
           );
           const querySnapshot = await getDocs(q);
@@ -75,7 +90,7 @@ const EslabonesFinales = () => {
             const all = querySnapshot.docs.map(d => d.data());
             // Sort by date descending
             all.sort((a, b) => b.fecha.localeCompare(a.fecha));
-            initializeGame(all[0]);
+            initializeGame(all[0], `es-${course}-${all[0].fecha}`);
           } else {
             setCurrentGame(null);
           }
