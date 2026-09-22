@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { awardPoints } from '../utils/pointsHelper';
@@ -38,8 +39,15 @@ const THEME_CLASSES = {
 
 export default function PracticeHub() {
   const { currentUser, userData } = useAuth();
-  const course = userData?.course || 's2';
+  const [searchParams] = useSearchParams();
   const isAdmin = userData?.role === 'admin';
+  // Admins previewing the Dashboard's S2/S4 toggle carry that choice here via
+  // ?course= (the tile they clicked was already scoped to it) — a real
+  // student always uses their own profile course, never a URL override.
+  const courseOverride = searchParams.get('course');
+  const course = isAdmin && (courseOverride === 's2' || courseOverride === 's4')
+    ? courseOverride
+    : (userData?.course || 's2');
 
   const [isLoading, setIsLoading] = useState(true);
   const [circles, setCircles] = useState([]);
@@ -94,17 +102,22 @@ export default function PracticeHub() {
     load();
   }, [course]);
 
-  // --- SCOPE-AND-SEQUENCE VIEW: vocab grouped by textbook/chapter, verbs
-  // grouped by target tense, each group in ascending natural order ---
+  // --- SCOPE-AND-SEQUENCE VIEW: vocab grouped by BOOK first (its own header,
+  // so the same chapter number in two different textbooks — e.g. a shared
+  // review chapter between courses — never gets conflated under one bucket),
+  // then by chapter within that book; verbs grouped by target tense ---
   const sequenceGroups = useMemo(() => {
-    const vocabByChapter = new Map();
+    const vocabByBook = new Map();
     const verbByTense = new Map();
 
     circles.forEach((c) => {
       if (c.contentType === 'vocab') {
-        const key = `${c.textbook || 'Sin libro'} — Cap. ${c.chapter || '?'}`;
-        if (!vocabByChapter.has(key)) vocabByChapter.set(key, { key, sortKey: Number(c.chapter) || 0, circles: [] });
-        vocabByChapter.get(key).circles.push(c);
+        const bookKey = c.textbook || 'Sin libro';
+        if (!vocabByBook.has(bookKey)) vocabByBook.set(bookKey, new Map());
+        const chapterMap = vocabByBook.get(bookKey);
+        const chapterKey = `Cap. ${c.chapter || '?'}`;
+        if (!chapterMap.has(chapterKey)) chapterMap.set(chapterKey, { key: chapterKey, sortKey: Number(c.chapter) || 0, circles: [] });
+        chapterMap.get(chapterKey).circles.push(c);
       } else {
         const key = TENSE_LABELS[c.targetTense] || c.targetTense;
         if (!verbByTense.has(key)) verbByTense.set(key, { key, sortKey: Object.keys(TENSE_LABELS).indexOf(c.targetTense), circles: [] });
@@ -112,9 +125,14 @@ export default function PracticeHub() {
       }
     });
 
-    const vocabGroups = Array.from(vocabByChapter.values()).sort((a, b) => a.sortKey - b.sortKey);
+    const vocabBooks = Array.from(vocabByBook.entries())
+      .map(([book, chapterMap]) => ({
+        book,
+        chapterGroups: Array.from(chapterMap.values()).sort((a, b) => a.sortKey - b.sortKey),
+      }))
+      .sort((a, b) => a.book.localeCompare(b.book));
     const verbGroups = Array.from(verbByTense.values()).sort((a, b) => a.sortKey - b.sortKey);
-    return { vocabGroups, verbGroups };
+    return { vocabBooks, verbGroups };
   }, [circles]);
 
   // --- QUIZ-ORDER VIEW: every linked circle sorted by its evaluación día,
@@ -238,10 +256,17 @@ export default function PracticeHub() {
 
         {view === 'sequence' && (
           <>
-            {sequenceGroups.vocabGroups.length > 0 && (
+            {sequenceGroups.vocabBooks.length > 0 && (
               <div className="mb-4">
                 <h2 className="text-lg font-black text-indigo-700 mb-2">📖 Vocabulario</h2>
-                {sequenceGroups.vocabGroups.map(renderGroup)}
+                {sequenceGroups.vocabBooks.map(({ book, chapterGroups }) => (
+                  <div key={book} className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5">
+                    <h3 className="text-base font-black text-indigo-900 mb-4 flex items-center gap-2">
+                      <span>📗</span> {book}
+                    </h3>
+                    {chapterGroups.map(renderGroup)}
+                  </div>
+                ))}
               </div>
             )}
             {sequenceGroups.verbGroups.length > 0 && (

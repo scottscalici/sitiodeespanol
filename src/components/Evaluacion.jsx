@@ -56,7 +56,7 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
         </h3>
         <div className="flex items-center gap-2 shrink-0">
           <Link
-            to="/recuperacion"
+            to={`/recuperacion${course ? `?course=${course}` : ''}`}
             className="text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
             title="Reflexiona y practica para repetir una evaluación"
           >

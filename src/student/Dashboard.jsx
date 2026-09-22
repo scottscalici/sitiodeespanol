@@ -482,7 +482,7 @@ const Dashboard = () => {
           <div className="space-y-6">
             <GamesSidebar />
             <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
-            <PracticeHubTile />
+            <PracticeHubTile course={course} />
             <LeaderboardCard course={course} />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}

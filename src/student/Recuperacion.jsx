@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +22,15 @@ const REFLECTION_PROMPTS = [
 
 export default function Recuperacion() {
   const { currentUser, userData } = useAuth();
-  const course = userData?.course || 's2';
+  const [searchParams] = useSearchParams();
+  const isAdmin = userData?.role === 'admin';
+  // Admins previewing the Dashboard's S2/S4 toggle carry that choice here via
+  // ?course= (the Evaluación card's Recuperación button was already scoped to
+  // it) — a real student always uses their own profile course.
+  const courseOverride = searchParams.get('course');
+  const course = isAdmin && (courseOverride === 's2' || courseOverride === 's4')
+    ? courseOverride
+    : (userData?.course || 's2');
   // The Firestore profile's own `uid` field isn't guaranteed to be set (some
   // accounts predate that convention) — currentUser.uid is Firebase Auth's
   // own id and always present for a signed-in user, so it's the reliable one.

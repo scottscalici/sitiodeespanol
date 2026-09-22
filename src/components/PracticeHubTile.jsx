@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 
 // Always-visible entry point to the ungated practice pool — unlike
 // LearningPathTile, this never depends on what's currently assigned, so it
-// renders unconditionally.
-const PracticeHubTile = () => {
+// renders unconditionally. `course` carries an admin's Dashboard toggle
+// through to Practice Hub (same pattern as LearningPathTile) — a real
+// student's own link never needs the param since Practice Hub falls back to
+// their profile course on its own.
+const PracticeHubTile = ({ course }) => {
   return (
     <Link
-      to="/practice-hub"
+      to={`/practice-hub${course ? `?course=${course}` : ''}`}
       className="group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-teal-500/20 hover:border-teal-500 transition-all duration-300 relative overflow-hidden"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
