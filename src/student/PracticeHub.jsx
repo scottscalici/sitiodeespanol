@@ -37,7 +37,7 @@ const THEME_CLASSES = {
 };
 
 export default function PracticeHub() {
-  const { userData } = useAuth();
+  const { currentUser, userData } = useAuth();
   const course = userData?.course || 's2';
   const isAdmin = userData?.role === 'admin';
 
@@ -151,9 +151,9 @@ export default function PracticeHub() {
 
     setActiveCircle(null);
 
-    if (!isAdmin && userData?.uid) {
+    if (!isAdmin && currentUser?.uid) {
       try {
-        await awardPoints(userData.uid, totalPointsEarned);
+        await awardPoints(currentUser.uid, totalPointsEarned);
       } catch (err) {
         console.error('Error awarding practice points:', err);
       }

@@ -20,9 +20,12 @@ const REFLECTION_PROMPTS = [
 ];
 
 export default function Recuperacion() {
-  const { userData } = useAuth();
+  const { currentUser, userData } = useAuth();
   const course = userData?.course || 's2';
-  const uid = userData?.uid;
+  // The Firestore profile's own `uid` field isn't guaranteed to be set (some
+  // accounts predate that convention) — currentUser.uid is Firebase Auth's
+  // own id and always present for a signed-in user, so it's the reliable one.
+  const uid = currentUser?.uid;
   const studentName = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || userData?.email || 'Estudiante';
 
   const [isLoading, setIsLoading] = useState(true);
