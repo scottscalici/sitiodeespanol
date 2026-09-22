@@ -32,7 +32,23 @@ export default function PathBuilder({
   selectedChapter,
   badgeCatalog,
   onCreateBadge,
+  isPracticeHub = false,
+  evaluacionOptions = [],
 }) {
+  const podLabel = isPracticeHub ? 'Círculo' : 'Pod';
+
+  const handleEvalLinkChange = (podIndex, diaStr) => {
+    const copy = [...pods];
+    if (!diaStr) {
+      copy[podIndex].evalLink = null;
+    } else {
+      const dia = Number(diaStr);
+      const match = evaluacionOptions.find((o) => o.dia === dia);
+      copy[podIndex].evalLink = match ? { dia: match.dia, label: match.label } : null;
+    }
+    setPods(copy);
+  };
+
   // "Finishing this pod awards X badge/tier" — set per pod, read live by
   // gamification.js against the student's podIndex for this path.
   const handleBadgeAwardChange = (podIndex, value) => {
@@ -170,7 +186,7 @@ export default function PathBuilder({
               onClick={handleAddPod}
               className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow transition-all flex items-center gap-1.5"
             >
-              <span>+ Add Pod ({pods.length}/20)</span>
+              <span>+ Add {podLabel} ({pods.length}/20)</span>
             </button>
 
             <button
@@ -199,8 +215,8 @@ export default function PathBuilder({
                 >
                   {pod.isExpanded ? '▼' : '▶'}
                 </button>
-                <span className="bg-blue-600 px-3 py-1 rounded-lg text-xs font-black tracking-wider">
-                  POD {podIndex + 1}
+                <span className="bg-blue-600 px-3 py-1 rounded-lg text-xs font-black tracking-wider uppercase">
+                  {podLabel} {podIndex + 1}
                 </span>
                 <input
                   type="text"
@@ -228,42 +244,74 @@ export default function PathBuilder({
               </div>
             </div>
 
-            {/* Badge Award Row — "finishing this pod awards X badge/tier" */}
-            <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
-                🏆 Insignia al completar:
-              </span>
-              <select
-                value={pod.badgeAward?.badgeId || ''}
-                onChange={(e) => handleBadgeAwardChange(podIndex, e.target.value)}
-                className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="">-- Ninguna --</option>
-                {badgeCatalog.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.icon} {b.name}
-                    {b.tiered ? ' (por niveles)' : ''}
-                  </option>
-                ))}
-                <option value="__new__">+ Nueva insignia...</option>
-              </select>
-
-              {pod.badgeAward?.badgeId && badgeCatalog.find((b) => b.id === pod.badgeAward.badgeId)?.tiered && (
+            {/* Badge Award Row — "finishing this pod awards X badge/tier".
+                Not applicable to Practice Hub circles (ungated, no badges). */}
+            {!isPracticeHub && (
+              <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+                  🏆 Insignia al completar:
+                </span>
                 <select
-                  value={pod.badgeAward.tier || 'bronze'}
-                  onChange={(e) => handleBadgeTierChange(podIndex, e.target.value)}
+                  value={pod.badgeAward?.badgeId || ''}
+                  onChange={(e) => handleBadgeAwardChange(podIndex, e.target.value)}
                   className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
-                  <option value="bronze">🥉 Bronce</option>
-                  <option value="silver">🥈 Plata</option>
-                  <option value="gold">🥇 Oro</option>
+                  <option value="">-- Ninguna --</option>
+                  {badgeCatalog.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.icon} {b.name}
+                      {b.tiered ? ' (por niveles)' : ''}
+                    </option>
+                  ))}
+                  <option value="__new__">+ Nueva insignia...</option>
                 </select>
-              )}
-            </div>
+
+                {pod.badgeAward?.badgeId && badgeCatalog.find((b) => b.id === pod.badgeAward.badgeId)?.tiered && (
+                  <select
+                    value={pod.badgeAward.tier || 'bronze'}
+                    onChange={(e) => handleBadgeTierChange(podIndex, e.target.value)}
+                    className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="bronze">🥉 Bronce</option>
+                    <option value="silver">🥈 Plata</option>
+                    <option value="gold">🥇 Oro</option>
+                  </select>
+                )}
+              </div>
+            )}
+
+            {/* Eval Link Row — ties this circle to a día on the Evaluaciones
+                Sequencer calendar so the student-side "quiz order" view can
+                sort by when it's actually quizzed. Optional: leave unlinked
+                for a standalone/general-practice circle. */}
+            {isPracticeHub && (
+              <div className="px-4 py-2 bg-sky-50 border-b border-sky-100 flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-sky-700">
+                  🗓️ Vincular a Evaluación:
+                </span>
+                <select
+                  value={pod.evalLink?.dia ?? ''}
+                  onChange={(e) => handleEvalLinkChange(podIndex, e.target.value)}
+                  className="bg-white border border-sky-300 rounded-lg px-2 py-1 text-xs font-bold text-sky-900 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">-- Ninguna (práctica general) --</option>
+                  {evaluacionOptions.map((o) => (
+                    <option key={o.dia} value={o.dia}>
+                      Día {o.dia} — {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Segments Container */}
             {pod.isExpanded && (
               <div className="p-6 bg-slate-50 space-y-5">
+                {isPracticeHub && pod.segments.length > 1 && (
+                  <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-1">
+                    ⚠️ Only this circle's first segment is used when a student plays it — extra segments below are ignored.
+                  </p>
+                )}
                 {pod.segments.map((seg, segIndex) => {
                   const isActive = activeSegmentId === seg.id;
                   return (

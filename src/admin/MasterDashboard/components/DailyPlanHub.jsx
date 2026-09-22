@@ -583,6 +583,22 @@ const DailyPlanHub = () => {
               </div>
             </div>
 
+            {/* 🎯 PRACTICE HUB */}
+            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">
+                    <span>🎯</span> Practice Hub
+                  </h2>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link to="/admin-secret-portal-practice-hub" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
+                  🎯 Practice Circle Builder
+                </Link>
+              </div>
+            </div>
+
             {/* Señordle & Arcade */}
             <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">

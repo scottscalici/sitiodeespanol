@@ -5,8 +5,18 @@ import PathBuilder from './PathBuilder';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
+import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 
-export default function FormLearningPath() {
+// mode='learningPath' (default): the graded, sequential Dominio builder,
+// saving to learning_paths. mode='practiceHub': same vault + pod/segment
+// editor, but each "pod" is an ungated, replayable practice circle
+// (optionally tagged to an evaluación día for the quiz-order view) saved to
+// the separate practice_pods collection instead — nothing here gates
+// progress or advancement, so no badgeAward UI applies to it.
+export default function FormLearningPath({ mode = 'learningPath' }) {
+  const isPracticeHub = mode === 'practiceHub';
+  const collectionName = isPracticeHub ? 'practice_pods' : 'learning_paths';
+
   // A path is now one content type from the start — no more vocab/verbs/
   // practical branches bundled into one document. "practical" is gone
   // entirely; sentences now attach directly to a vocab or verb path's
@@ -61,9 +71,10 @@ export default function FormLearningPath() {
   const makeDefaultPods = () => ([
     {
       id: `pod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      title: 'Pod 1: Introducción',
+      title: isPracticeHub ? 'Círculo 1' : 'Pod 1: Introducción',
       isExpanded: true,
       badgeAward: null,
+      evalLink: null,
       segments: [makeDefaultSegment()],
     },
   ]);
@@ -80,9 +91,11 @@ export default function FormLearningPath() {
 
   // Badge catalog (config/gamification.badges) — pods reference these by id
   // via pod.badgeAward to say "finishing this pod awards X badge/tier".
+  // Not applicable to Practice Hub circles (ungated, no badge triggers).
   const [badgeCatalog, setBadgeCatalog] = useState([]);
 
   useEffect(() => {
+    if (isPracticeHub) return;
     const fetchBadgeCatalog = async () => {
       try {
         const snap = await getDoc(doc(db, 'config', 'gamification'));
@@ -92,7 +105,17 @@ export default function FormLearningPath() {
       }
     };
     fetchBadgeCatalog();
-  }, []);
+  }, [isPracticeHub]);
+
+  // Evaluación calendar options (curriculum_tracks/evaluaciones_master),
+  // course-scoped — lets a Practice Hub circle optionally link to a specific
+  // quiz día for the student-side "quiz order" view. Refetched whenever the
+  // course toggle changes.
+  const [evaluacionOptions, setEvaluacionOptions] = useState([]);
+  useEffect(() => {
+    if (!isPracticeHub) return;
+    fetchEvaluacionOptions(course).then(setEvaluacionOptions);
+  }, [isPracticeHub, course]);
 
   // Lets the Pod Creator create a new badge on the fly (without a trip to the
   // Gamification Manager) the moment an admin wants to tag a pod with one.
@@ -112,7 +135,7 @@ export default function FormLearningPath() {
     try {
       // Shared cache — TareasSequencer also reads learning_paths for its
       // Dominio-tarea picker, so this dedupes with that tool too.
-      const paths = await getCachedCollection('learning_paths');
+      const paths = await getCachedCollection(collectionName);
       setExistingPaths(paths);
     } catch (err) { console.error("Error fetching paths:", err); }
   };
@@ -132,6 +155,7 @@ export default function FormLearningPath() {
     ...p,
     isExpanded: p.isExpanded !== undefined ? p.isExpanded : true,
     badgeAward: p.badgeAward || null,
+    evalLink: p.evalLink || null,
     segments: (p.segments || []).map(sanitizeSegment),
   }));
 
@@ -139,7 +163,7 @@ export default function FormLearningPath() {
     if (!id) return;
     setSelectedExistingPathId(id);
     try {
-      const docSnap = await getDoc(doc(db, 'learning_paths', id));
+      const docSnap = await getDoc(doc(db, collectionName, id));
       if (docSnap.exists()) {
         const data = docSnap.data();
         setPathId(data.path_id || id);
@@ -282,7 +306,9 @@ export default function FormLearningPath() {
   const handleAddPod = () => {
     const newSeg = makeDefaultSegment();
     setPods([...pods, {
-      id: `pod_${Date.now()}`, title: `Pod ${pods.length + 1}`, isExpanded: true, badgeAward: null,
+      id: `pod_${Date.now()}`,
+      title: isPracticeHub ? `Círculo ${pods.length + 1}` : `Pod ${pods.length + 1}`,
+      isExpanded: true, badgeAward: null, evalLink: null,
       segments: [newSeg],
     }]);
     setActiveSegmentId(newSeg.id);
@@ -437,7 +463,7 @@ export default function FormLearningPath() {
     if (contentType === 'vocab' && !selectedBook) return alert("Please select a textbook before saving — nothing has been chosen yet.");
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'learning_paths', pathId), {
+      await setDoc(doc(db, collectionName, pathId), {
         path_id: pathId,
         title: pathTitle,
         course,
@@ -449,7 +475,7 @@ export default function FormLearningPath() {
         pods,
         branches: deleteField(), // clear any stale pre-split shape on this doc
       }, { merge: true });
-      invalidateCollectionCache('learning_paths');
+      invalidateCollectionCache(collectionName);
       alert("🎉 Saved!"); fetchExistingPaths();
     } catch (err) {}
     setIsSaving(false);
@@ -507,6 +533,7 @@ export default function FormLearningPath() {
         handleTogglePod={handleTogglePod} handleMovePod={handleMovePod} handleMoveSegment={handleMoveSegment}
         selectedBook={selectedBook} selectedChapter={selectedChapter}
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
+        isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
       />
 
       {pendingGroupAssign && (

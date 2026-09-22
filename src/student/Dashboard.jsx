@@ -11,6 +11,7 @@ import Evaluacion from '../components/Evaluacion';
 import Countdown from '../components/Countdown';
 import GamesSidebar from '../components/GamesSidebar';
 import LearningPathTile from '../components/LearningPathTile';
+import PracticeHubTile from '../components/PracticeHubTile';
 import ActivityGrid from '../components/ActivityGrid';
 import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
@@ -481,6 +482,7 @@ const Dashboard = () => {
           <div className="space-y-6">
             <GamesSidebar />
             <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
+            <PracticeHubTile />
             <LeaderboardCard course={course} />
             <div className="pt-6 border-t border-slate-200 space-y-6">
               {/* 🟢 FIXED RESOURCE HUB PROP */}
