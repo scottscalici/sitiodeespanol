@@ -460,7 +460,13 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                 let spaTarget = conjugationData.target;
 
                 if (randomSubject === 'él_ella_ud' && randomTenseKey === 'presente' && engTrans.startsWith('he/she/you ')) {
-                    let verbStr = engTrans.replace('he/she/you ', '').trim();
+                    // The conjugatable verb is always the FIRST word (e.g. "take
+                    // advantage of" -> "takes advantage of") — pluralizing
+                    // whatever word happens to be last broke on any multi-word
+                    // phrasal translation, producing nonsense like "take
+                    // advantage ofs".
+                    const words = engTrans.replace('he/she/you ', '').trim().split(' ');
+                    let verbStr = words[0];
                     if (!verbStr.endsWith('s')) {
                        if (verbStr.endsWith('y')) verbStr = verbStr.slice(0, -1) + 'ies';
                        else if (verbStr.endsWith('ch') || verbStr.endsWith('sh') || verbStr.endsWith('x') || verbStr.endsWith('z')) verbStr += 'es';
@@ -469,7 +475,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                        else if (verbStr === 'go') verbStr = 'goes';
                        else if (verbStr === 'are') verbStr = 'is';
                        else verbStr += 's';
-                       engTrans = "he/she/you " + verbStr;
+                       words[0] = verbStr;
+                       engTrans = "he/she/you " + words.join(' ');
                     }
                 }
 
@@ -521,7 +528,15 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                 } else if (format === 'speak_verb') {
                      generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 } else {
-                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
+                     // A student who doesn't already recognize this infinitive has
+                     // no way to know what it means from engTrans alone (that's the
+                     // CONJUGATED phrase, e.g. "you take advantage of" — stripping
+                     // the subject and reconstructing "to ___" isn't always obvious,
+                     // especially for a less common regular verb). translations.
+                     // infinitivo.english is the bare "to VERB" gloss already stored
+                     // on the verb doc for exactly this purpose.
+                     const infinitiveEnglish = target.fullData.translations?.infinitivo?.english || `to ${target.fullData.palabra}`;
+                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 }
                 continue;
               }
@@ -826,7 +841,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           {currentQ.type === 'conjugate' && (
             <div className="animate-fade-in">
-              <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+              <div className="flex flex-wrap items-center justify-center gap-3 mb-1">
                 <span className="bg-emerald-100 text-emerald-800 font-black px-4 py-2 rounded-xl border border-emerald-300 shadow-sm text-lg">
                     {currentQ.infinitive}
                 </span>
@@ -834,6 +849,9 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                     {currentQ.tense}
                 </span>
               </div>
+              {currentQ.infinitiveEnglish && (
+                <p className="text-center text-slate-400 text-sm font-medium mb-5">{currentQ.infinitiveEnglish}</p>
+              )}
 
               <div className="flex items-end justify-center gap-4 mb-8">
                  <h2 className="text-3xl md:text-4xl font-black text-slate-800">{currentQ.subject}</h2>
