@@ -23,7 +23,7 @@ const PracticeHubTile = ({ course }) => {
           <span className="text-2xl">🎯</span>
         </div>
 
-        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-5">
+        <p className="text-slate-300 text-sm font-bold uppercase tracking-wide mb-5">
           Práctica libre por capítulo o por evaluación
         </p>
 

@@ -48,7 +48,7 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
               <h3 className={`font-black text-transparent bg-clip-text bg-gradient-to-r ${cardTheme.title} uppercase tracking-widest text-lg mb-1`}>
                 Ruta de Aprendizaje
               </h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">
+              <p className="text-white text-base font-black uppercase tracking-wide mb-1">
                 {task.titulo || task.path_id}
               </p>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4">
