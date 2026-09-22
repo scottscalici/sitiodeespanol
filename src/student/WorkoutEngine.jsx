@@ -222,8 +222,24 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const totalQs = segment.total_questions || 15;
       const rawConcepts = segment.introduced_concepts || [];
       const grammar = segment.pinned_sentences || [];
-      const mods = segment.modalities || { read: true, write: true, listen: true, speak: true };
       const targetTense = segment.targetTense || 'ALL';
+
+      // Admin-set quota (e.g. { recall: 5, mc: 3, matching: 1, listen: 1,
+      // speak: 0, sentence: 0 }) replaces the old random pick among allowed
+      // "modalities" — expand it into one shuffled slot per question, then
+      // pop one per loop iteration below. `recall` renders as "conjugate" for
+      // a verb target or "write" for a vocab target, decided per-question
+      // once we know what kind of concept got drawn. A segment saved before
+      // this existed (segment.modalities instead of questionMix) falls back
+      // to plain recall for every slot.
+      let typeQueue = [];
+      if (segment.questionMix) {
+        Object.entries(segment.questionMix).forEach(([type, count]) => {
+          for (let n = 0; n < count; n++) typeQueue.push(type);
+        });
+      }
+      typeQueue = shuffle(typeQueue);
+      while (typeQueue.length < totalQs) typeQueue.push('recall');
 
       // ASYNC UNPACK CURRENT CONCEPTS
       let concepts = [];
@@ -337,10 +353,11 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
         // --- 2. GRAMÁTICA Y ORACIONES ---
         const forceHistory = concepts.length === 0;
-        const isGrammarTurn = grammar.length > 0 && (i % 3 === 0 || (concepts.length === 0 && validHistory.length === 0));
+        const requestedType = typeQueue[i] || 'recall';
+        const isGrammarTurn = grammar.length > 0 && (requestedType === 'sentence' || (concepts.length === 0 && validHistory.length === 0));
 
         if (isGrammarTurn) {
-          const target = grammar[i % grammar.length];
+          const target = grammar[Math.floor(Math.random() * grammar.length)];
           const spaSentence = target.label;
           const engTrans = getEnglishTrans(target) || "⚠️ Agrega la traducción en la base de datos";
 
@@ -436,17 +453,18 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
                 let format = 'conjugate';
 
-                if (!isSpeedRound) {
-                  let availableFormats = [];
-                  if (mods.read) {
-                      availableFormats.push('mc_verb');
-                      if (availableSubjects.length >= 2) availableFormats.push('matching_verb');
-                  }
-                  if (mods.write) availableFormats.push('conjugate');
-                  if (mods.listen) availableFormats.push('listen_verb');
-                  if (mods.speak) availableFormats.push('speak_verb');
-
-                  format = availableFormats.length > 0 ? availableFormats[Math.floor(Math.random() * availableFormats.length)] : 'conjugate';
+                if (isSpeedRound) {
+                  format = 'conjugate';
+                } else if (requestedType === 'mc') {
+                  format = 'mc_verb';
+                } else if (requestedType === 'matching' && availableSubjects.length >= 2) {
+                  format = 'matching_verb';
+                } else if (requestedType === 'listen') {
+                  format = 'listen_verb';
+                } else if (requestedType === 'speak') {
+                  format = 'speak_verb';
+                } else {
+                  format = 'conjugate'; // 'recall', or 'matching' with too few subjects to pair up
                 }
 
                 if (format === 'matching_verb') {
@@ -494,17 +512,18 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           let format = 'write';
 
-          if (!isSpeedRound) {
-            let availableFormats = [];
-            if (mods.read) {
-                availableFormats.push('mc');
-                if (uniqueMasterPool.length >= 5) availableFormats.push('matching');
-            }
-            if (mods.write) availableFormats.push('write');
-            if (mods.listen) availableFormats.push('listen');
-            if (mods.speak) availableFormats.push('speak');
-
-            format = availableFormats.length > 0 ? availableFormats[Math.floor(Math.random() * availableFormats.length)] : 'write';
+          if (isSpeedRound) {
+            format = 'write';
+          } else if (requestedType === 'mc') {
+            format = 'mc';
+          } else if (requestedType === 'matching' && uniqueMasterPool.length >= 5) {
+            format = 'matching';
+          } else if (requestedType === 'listen') {
+            format = 'listen';
+          } else if (requestedType === 'speak') {
+            format = 'speak';
+          } else {
+            format = 'write'; // 'recall', or 'matching' with too small a pool
           }
 
           if (format === 'matching') {

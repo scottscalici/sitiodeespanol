@@ -1,6 +1,9 @@
 import React from 'react';
+import { QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, sumMix } from '../../utils/questionTypes';
 
 export default function PathBuilder({
+  contentType,
+  setContentType,
   course,
   setCourse,
   pathId,
@@ -25,21 +28,13 @@ export default function PathBuilder({
   handleTogglePod,
   handleMovePod,
   handleMoveSegment,
-  activeBranch,
-  onBranchChange,
   selectedBook,
   selectedChapter,
   badgeCatalog,
   onCreateBadge,
 }) {
-  const BRANCH_TABS = [
-    { id: 'vocab', label: 'Vocabulario', activeClass: 'bg-indigo-600 text-white' },
-    { id: 'verbs', label: 'Verbos', activeClass: 'bg-emerald-600 text-white' },
-    { id: 'practical', label: 'Aplicación', activeClass: 'bg-amber-500 text-white' },
-  ];
-
   // "Finishing this pod awards X badge/tier" — set per pod, read live by
-  // gamification.js against the student's podIndex for this exact branch.
+  // gamification.js against the student's podIndex for this path.
   const handleBadgeAwardChange = (podIndex, value) => {
     const copy = [...pods];
     if (value === '__new__') {
@@ -64,12 +59,31 @@ export default function PathBuilder({
     copy[podIndex].badgeAward = { ...copy[podIndex].badgeAward, tier };
     setPods(copy);
   };
+
+  // Bumping a quota count keeps total_questions in sync automatically — it's
+  // no longer an independently-editable field, since it's just the sum.
+  const updateQuestionMix = (podIndex, segIndex, type, value) => {
+    const copy = [...pods];
+    const seg = copy[podIndex].segments[segIndex];
+    seg.questionMix = { ...seg.questionMix, [type]: Math.max(0, Number(value) || 0) };
+    seg.total_questions = sumMix(seg.questionMix);
+    setPods(copy);
+  };
+
+  const updateSegmentField = (podIndex, segIndex, field, value) => {
+    const copy = [...pods];
+    copy[podIndex].segments[segIndex][field] = value;
+    setPods(copy);
+  };
+
+  const typeLabels = QUESTION_TYPE_LABELS[contentType] || QUESTION_TYPE_LABELS.vocab;
+
   return (
     <div className="w-2/3 overflow-y-auto p-8 bg-slate-100">
-      
+
       {/* Top Control Bar */}
       <div className="flex flex-col gap-4 mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        
+
         {/* Load Existing Paths Selector Row */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2 w-full max-w-md">
@@ -86,7 +100,7 @@ export default function PathBuilder({
             </select>
           </div>
 
-          <button 
+          <button
             onClick={() => window.location.href = '/admin-daily-plan-hub'}
             className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl font-bold text-xs shadow-sm transition-all"
           >
@@ -97,7 +111,7 @@ export default function PathBuilder({
         {/* Path Metadata Inputs & Save/Add Actions */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <button
                 type="button"
                 onClick={() => setCourse(course === 's2' ? 's4' : 's2')}
@@ -106,40 +120,40 @@ export default function PathBuilder({
               >
                 {course.toUpperCase()} Course ⇄
               </button>
-              <span
-                className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider ${
-                  selectedBook
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-rose-100 text-rose-800'
-                }`}
-                title="Vocabulary/verbs assigned to this path's pods come from this textbook — double check it matches the course above."
-              >
-                📖 {selectedBook ? `${selectedBook}${selectedChapter ? ` Ch ${selectedChapter}` : ''}` : 'No textbook selected!'}
-              </span>
-              <div className="flex flex-col">
-                <input
-                  type="text"
-                  value={pathId}
-                  onChange={(e) => setPathId(e.target.value)}
-                  className="text-xs font-mono text-slate-400 bg-transparent border-b border-slate-300 focus:outline-none focus:border-blue-500"
-                  placeholder="s2_descubre2_ch8"
-                />
-              </div>
-            </div>
 
-            <div className="flex gap-1.5 mb-2">
-              {BRANCH_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => onBranchChange(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                    activeBranch === tab.id ? tab.activeClass : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              {/* A path is one content type from the start — no more branches
+                  bundling vocab+verbs+practical into one document. Switching
+                  this after content exists is allowed but will hide whichever
+                  vault tab no longer matches, so only do it before assigning. */}
+              <button
+                type="button"
+                onClick={() => setContentType(contentType === 'vocab' ? 'verb' : 'vocab')}
+                title="Click to switch whether this whole path is vocab-based or verb-based"
+                className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider transition-colors cursor-pointer ${
+                  contentType === 'verb' ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800'
+                }`}
+              >
+                {contentType === 'verb' ? '⚡ Verbos' : '📖 Vocabulario'} ⇄
+              </button>
+
+              {contentType === 'vocab' && (
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider ${
+                    selectedBook ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                   }`}
+                  title="Vocabulary assigned to this path's pods comes from this textbook — double check it matches the course above."
                 >
-                  {tab.label}
-                </button>
-              ))}
+                  📚 {selectedBook ? `${selectedBook}${selectedChapter ? ` Ch ${selectedChapter}` : ''}` : 'No textbook selected!'}
+                </span>
+              )}
+
+              <input
+                type="text"
+                value={pathId}
+                onChange={(e) => setPathId(e.target.value)}
+                className="text-xs font-mono text-slate-400 bg-transparent border-b border-slate-300 focus:outline-none focus:border-blue-500"
+                placeholder="s2_presente"
+              />
             </div>
 
             <input
@@ -152,14 +166,14 @@ export default function PathBuilder({
           </div>
 
           <div className="flex gap-3 items-center">
-            <button 
+            <button
               onClick={handleAddPod}
               className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow transition-all flex items-center gap-1.5"
             >
               <span>+ Add Pod ({pods.length}/20)</span>
             </button>
 
-            <button 
+            <button
               onClick={handleSavePathToFirestore}
               disabled={isSaving}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
@@ -175,11 +189,11 @@ export default function PathBuilder({
       <div className="space-y-6 pb-20">
         {pods.map((pod, podIndex) => (
           <div key={pod.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            
+
             {/* Pod Header Bar */}
             <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={() => handleTogglePod(podIndex)}
                   className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                 >
@@ -188,9 +202,9 @@ export default function PathBuilder({
                 <span className="bg-blue-600 px-3 py-1 rounded-lg text-xs font-black tracking-wider">
                   POD {podIndex + 1}
                 </span>
-                <input 
-                  type="text" 
-                  value={pod.title} 
+                <input
+                  type="text"
+                  value={pod.title}
                   onChange={(e) => {
                     const copy = [...pods];
                     copy[podIndex].title = e.target.value;
@@ -254,7 +268,7 @@ export default function PathBuilder({
                   const isActive = activeSegmentId === seg.id;
                   return (
                     <div key={seg.id} onClick={() => setActiveSegmentId(seg.id)} className={`bg-white border-2 rounded-xl p-5 shadow-sm transition-all cursor-pointer relative ${isActive ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300'}`}>
-                      
+
                       <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
                           <span className={`w-6 h-6 rounded-full font-black text-xs flex items-center justify-center border ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
@@ -275,41 +289,66 @@ export default function PathBuilder({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4" onClick={(e) => e.stopPropagation()}>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Total Qs</label>
-                          <input type="number" value={seg.total_questions} onChange={(e) => {
-                              const copy = [...pods]; copy[podIndex].segments[segIndex].total_questions = Number(e.target.value); setPods(copy);
-                            }}
-                            className="w-full border border-slate-200 rounded-lg p-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" 
+                      <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+                        <label className="flex items-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!seg.isSpeedRound}
+                            onChange={(e) => updateSegmentField(podIndex, segIndex, 'isSpeedRound', e.target.checked)}
+                            className="w-4 h-4 text-rose-600 rounded"
                           />
-                        </div>
+                          <span className="text-rose-700">🔥 Reto de Velocidad (Boss Battle)</span>
+                        </label>
 
-                        <div className="md:col-span-2">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Ratio Preset</label>
-                          <select value={seg.preset} onChange={(e) => {
-                              const copy = [...pods]; copy[podIndex].segments[segIndex].preset = e.target.value;
-                              if (e.target.value === 'speed_round' && !seg.timeLimit) copy[podIndex].segments[segIndex].timeLimit = 60;
-                              setPods(copy);
-                            }}
-                            className="w-full border border-slate-200 rounded-lg p-2 text-sm font-semibold bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            <option value="100_vocab">100% Vocab</option>
-                            <option value="100_verbs">100% Verbs (Conjugation Focus)</option>
-                            <option value="100_grammar">100% Grammar (Syntax)</option>
-                            <option value="balanced_spiral">Balanced Spiral (50/30/20)</option>
-                            <option value="custom">Custom Mix</option>
-                            <option value="speed_round">🔥 Speed Round (Boss Battle)</option>
-                          </select>
-                        </div>
+                        {seg.isSpeedRound ? (
+                          <div className="mt-2 bg-rose-50/50 p-3 rounded-lg border border-rose-100 flex items-end gap-4">
+                            <div>
+                              <label className="block text-[9px] font-black text-rose-800 uppercase mb-1">Tiempo Límite (segundos)</label>
+                              <input
+                                type="number"
+                                value={seg.timeLimit || 60}
+                                onChange={(e) => updateSegmentField(podIndex, segIndex, 'timeLimit', Number(e.target.value))}
+                                className="w-32 border border-rose-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-rose-500 outline-none bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-black text-rose-800 uppercase mb-1">Preguntas</label>
+                              <input
+                                type="number"
+                                value={seg.total_questions}
+                                onChange={(e) => updateSegmentField(podIndex, segIndex, 'total_questions', Number(e.target.value))}
+                                className="w-24 border border-rose-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-rose-500 outline-none bg-white"
+                              />
+                            </div>
+                            <p className="text-[10px] text-rose-700 italic pb-1.5">Un reto de velocidad siempre usa recordatorio rápido (escribir/conjugar) — no usa la mezcla de tipos de abajo.</p>
+                          </div>
+                        ) : (
+                          <div className="mt-2 grid grid-cols-3 md:grid-cols-6 gap-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                            {QUESTION_TYPE_ORDER.map((type) => (
+                              <div key={type}>
+                                <label className="block text-[9px] font-black text-blue-800 uppercase mb-1 truncate" title={typeLabels[type]}>
+                                  {typeLabels[type]}
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={seg.questionMix?.[type] ?? 0}
+                                  onChange={(e) => updateQuestionMix(podIndex, segIndex, type, e.target.value)}
+                                  className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                        {/* 🚀 NEW: TARGET TENSE DROPDOWN */}
-                        <div>
+                      {contentType === 'verb' && (
+                        <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                           <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Verb Tense</label>
-                          <select value={seg.targetTense || 'ALL'} onChange={(e) => {
-                              const copy = [...pods]; copy[podIndex].segments[segIndex].targetTense = e.target.value; setPods(copy);
-                            }}
-                            className="w-full border border-emerald-200 rounded-lg p-2 text-sm font-semibold bg-emerald-50 text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                          <select
+                            value={seg.targetTense || 'ALL'}
+                            onChange={(e) => updateSegmentField(podIndex, segIndex, 'targetTense', e.target.value)}
+                            className="w-full max-w-xs border border-emerald-200 rounded-lg p-2 text-sm font-semibold bg-emerald-50 text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
                           >
                             <option value="ALL">Mix All Tenses</option>
                             <option value="presente">Presente</option>
@@ -323,52 +362,14 @@ export default function PathBuilder({
                             <option value="subjuntivo_presente">Subjuntivo</option>
                           </select>
                         </div>
-
-                        {seg.preset === 'speed_round' && (
-                          <div className="md:col-span-4 bg-rose-50/50 p-3 rounded-lg border border-rose-100 mt-1">
-                            <label className="block text-[9px] font-black text-rose-800 uppercase mb-1">Time Limit (Seconds)</label>
-                            <input type="number" value={seg.timeLimit || 60} onChange={(e) => {
-                                const copy = [...pods]; copy[podIndex].segments[segIndex].timeLimit = Number(e.target.value); setPods(copy);
-                              }}
-                              className="w-full max-w-xs border border-rose-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-rose-500 outline-none bg-white" 
-                            />
-                          </div>
-                        )}
-
-                        {seg.preset === 'custom' && (
-                          <div className="md:col-span-4 grid grid-cols-3 gap-3 bg-blue-50/50 p-3 rounded-lg border border-blue-100 mt-1">
-                            {['vocab', 'verb', 'grammar'].map(type => (
-                              <div key={type}>
-                                <label className="block text-[9px] font-black text-blue-800 uppercase mb-1 capitalize">{type} %</label>
-                                <input type="number" value={seg.custom_ratios?.[type] || 0} onChange={(e) => {
-                                    const copy = [...pods]; copy[podIndex].segments[segIndex].custom_ratios = { ...seg.custom_ratios, [type]: Number(e.target.value) }; setPods(copy);
-                                  }}
-                                  className="w-full border border-blue-200 rounded-md p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mb-4" onClick={(e) => e.stopPropagation()}>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5">Permitted Modalities</label>
-                        <div className="flex flex-wrap gap-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          {['read', 'write', 'listen', 'speak'].map((mod) => (
-                            <label key={mod} className="text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer capitalize">
-                              <input type="checkbox" checked={seg.modalities[mod]} onChange={(e) => {
-                                  const copy = [...pods]; copy[podIndex].segments[segIndex].modalities[mod] = e.target.checked; setPods(copy);
-                                }} className="w-4 h-4 text-blue-600 rounded" />
-                              {mod === 'read' ? '📖 Read' : mod === 'write' ? '✍️ Write' : mod === 'listen' ? '🎧 Listen' : '🗣️ Speak'}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/50 min-h-[110px] flex flex-col justify-between">
                           <div>
-                            <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1"><span>📦</span> Introduced Vocab & Verbs ({seg.introduced_concepts.length})</p>
+                            <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1">
+                              <span>📦</span> {contentType === 'verb' ? 'Verbos Introducidos' : 'Vocabulario Introducido'} ({seg.introduced_concepts.length})
+                            </p>
                             <div className="flex flex-wrap gap-1.5">
                               {seg.introduced_concepts.map((concept, cIdx) => (
                                 <span key={cIdx} className="bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-sm flex items-center gap-1.5">

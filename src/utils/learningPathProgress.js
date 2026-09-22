@@ -3,19 +3,34 @@ import { db } from '../firebase';
 
 export const LEARNING_PATH_BRANCHES = ['vocab', 'verbs', 'practical'];
 
-// Fetches one unit's total pod count, summed across its 3 branches.
+// A learning_paths doc is either the new flat shape (data.pods, one progress
+// pointer at progress[pathId]) or the legacy branched shape
+// (data.branches.{vocab,verbs,practical}.pods, one pointer per branch at
+// progress[pathId][branch]) from before the vocab/verb split. Both are
+// supported so an old unit built before the split keeps working untouched.
+const isFlatPath = (data) => Array.isArray(data?.pods);
+
+// Fetches one unit's total pod count.
 export const fetchUnitTotalPods = async (unitId) => {
   if (!unitId) return 0;
   const snap = await getDoc(doc(db, 'learning_paths', unitId));
   if (!snap.exists()) return 0;
-  const branches = snap.data().branches || {};
+  const data = snap.data();
+  if (isFlatPath(data)) return data.pods.length;
+  const branches = data.branches || {};
   return LEARNING_PATH_BRANCHES.reduce((sum, branch) => sum + (branches[branch]?.pods?.length || 0), 0);
 };
 
-// Pods completed = podIndex (pods fully finished before the one currently in progress), summed across branches.
+// Pods completed = podIndex (pods fully finished before the one currently in
+// progress). Flat paths keep one pointer; legacy branched paths sum across
+// their three branch pointers. Since this only has `progress`, not the path
+// doc itself, it can't tell which shape a given unitId is — it sums both
+// possible locations, which is safe because a doc only ever populates one.
 export const getUnitCompletedPods = (progress, unitId) => {
   const unitProgress = progress?.[unitId];
-  return LEARNING_PATH_BRANCHES.reduce((sum, branch) => sum + (unitProgress?.[branch]?.podIndex || 0), 0);
+  const flatCount = unitProgress?.podIndex || 0;
+  const branchedCount = LEARNING_PATH_BRANCHES.reduce((sum, branch) => sum + (unitProgress?.[branch]?.podIndex || 0), 0);
+  return flatCount + branchedCount;
 };
 
 export const getLetterGrade = (percent) => {

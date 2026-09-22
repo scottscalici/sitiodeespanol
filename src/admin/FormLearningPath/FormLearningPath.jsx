@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
-import { collection, doc, setDoc, getDoc, addDoc, arrayUnion } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
 
 export default function FormLearningPath() {
+  // A path is now one content type from the start — no more vocab/verbs/
+  // practical branches bundled into one document. "practical" is gone
+  // entirely; sentences now attach directly to a vocab or verb path's
+  // segments via pinned_sentences + the "sentence" slice of questionMix.
+  const [contentType, setContentType] = useState('vocab'); // 'vocab' | 'verb'
   const [course, setCourse] = useState('s2');
   const [pathId, setPathId] = useState('');
   const [pathTitle, setPathTitle] = useState('');
@@ -23,14 +29,14 @@ export default function FormLearningPath() {
 
   const [selectedChapter, setSelectedChapter] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
-  
+
   const [availableChapters, setAvailableChapters] = useState([]);
   const [availableSections, setAvailableSections] = useState([]);
   const [rawChapterData, setRawChapterData] = useState(null);
 
   const [vaultVocab, setVaultVocab] = useState([]);
   const [vaultVerbs, setVaultVerbs] = useState([]);
-  const [allVerbsList, setAllVerbsList] = useState([]); 
+  const [allVerbsList, setAllVerbsList] = useState([]);
   const [selectedVerbFilter, setSelectedVerbFilter] = useState('ALL');
   const [availableVerbTenses, setAvailableVerbTenses] = useState([]);
   const [vaultGrammar, setVaultGrammar] = useState([]);
@@ -40,58 +46,37 @@ export default function FormLearningPath() {
   const [availableGrammarChapters, setAvailableGrammarChapters] = useState([]);
   const [availableGrammarTags, setAvailableGrammarTags] = useState([]);
 
-  // --- POD BUILDER STATE (one pod list per branch: vocab / verbs / practical) ---
-  const BRANCHES = ['vocab', 'verbs', 'practical'];
+  // --- POD BUILDER STATE — one flat pod list for the whole path ---
+  const makeDefaultSegment = () => ({
+    id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    total_questions: sumMix(QUESTION_TYPE_DEFAULTS),
+    questionMix: { ...QUESTION_TYPE_DEFAULTS },
+    isSpeedRound: false,
+    timeLimit: 60,
+    targetTense: 'ALL',
+    introduced_concepts: [],
+    pinned_sentences: [],
+  });
 
   const makeDefaultPods = () => ([
     {
       id: `pod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      title: 'Pod 1: Introducción y Vocabulario Base',
+      title: 'Pod 1: Introducción',
       isExpanded: true,
-      segments: [
-        {
-          id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          total_questions: 15,
-          preset: '100_vocab',
-          custom_ratios: { vocab: 34, verb: 33, grammar: 33 },
-          modalities: { read: true, write: true, listen: true, speak: true },
-          introduced_concepts: [],
-          pinned_sentences: []
-        }
-      ]
-    }
+      badgeAward: null,
+      segments: [makeDefaultSegment()],
+    },
   ]);
 
-  const [activeBranch, setActiveBranch] = useState('vocab');
-  const [podsByBranch, setPodsByBranch] = useState(() => ({
-    vocab: makeDefaultPods(),
-    verbs: makeDefaultPods(),
-    practical: makeDefaultPods(),
-  }));
-
-  // Everything below still just reads/writes `pods` — it's a view onto the active branch
-  const pods = podsByBranch[activeBranch];
-  const setPods = (updater) => {
-    setPodsByBranch((prev) => ({
-      ...prev,
-      [activeBranch]: typeof updater === 'function' ? updater(prev[activeBranch]) : updater,
-    }));
-  };
-
+  const [pods, setPods] = useState(makeDefaultPods);
   const [activeSegmentId, setActiveSegmentIdRaw] = useState(pods[0].segments[0].id);
   const setActiveSegmentId = setActiveSegmentIdRaw;
 
-  const handleBranchChange = (branch) => {
-    setActiveBranch(branch);
-    const branchPods = podsByBranch[branch];
-    setActiveSegmentIdRaw(branchPods[0]?.segments[0]?.id || null);
-  };
   const [existingPaths, setExistingPaths] = useState([]);
   const [selectedExistingPathId, setSelectedExistingPathId] = useState('');
 
   const [pendingGroupAssign, setPendingGroupAssign] = useState(null);
   const [selectedGroupVerbs, setSelectedGroupVerbs] = useState([]);
-  const [migrationStatus, setMigrationStatus] = useState('');
 
   // Badge catalog (config/gamification.badges) — pods reference these by id
   // via pod.badgeAward to say "finishing this pod awards X badge/tier".
@@ -120,56 +105,6 @@ export default function FormLearningPath() {
     }
   };
 
-  // One-time migration: the "preliminar" unit was hand-built as 3 separate documents
-  // (…_vocab, …_verbs, …_practical) before units were consolidated into a single doc
-  // with a `branches` object. This reads those 3 docs and writes the new combined shape.
-  const handleMigrateLegacyPreliminar = async () => {
-    const LEGACY_BASE_ID = 's2_descubre2_preliminar';
-    setMigrationStatus('Migrando...');
-    try {
-      const branchSnaps = await Promise.all(
-        BRANCHES.map((branch) => getDoc(doc(db, 'learning_paths', `${LEGACY_BASE_ID}_${branch}`)))
-      );
-      const anyFound = branchSnaps.some((snap) => snap.exists());
-      if (!anyFound) {
-        setMigrationStatus('No se encontraron los documentos antiguos — ¿ya se migró?');
-        return;
-      }
-
-      const branches = {};
-      let title = 'Unidad Preliminar';
-      let course = 's2';
-      BRANCHES.forEach((branch, i) => {
-        const snap = branchSnaps[i];
-        if (snap.exists()) {
-          const data = snap.data();
-          branches[branch] = { pods: data.pods || [] };
-          title = data.title || title;
-          course = data.course || course;
-        } else {
-          branches[branch] = { pods: [] };
-        }
-      });
-
-      const totalPods = BRANCHES.reduce((sum, b) => sum + branches[b].pods.length, 0);
-      await setDoc(doc(db, 'learning_paths', LEGACY_BASE_ID), {
-        path_id: LEGACY_BASE_ID,
-        title,
-        course,
-        total_pods: totalPods,
-        updated_at: new Date().toISOString(),
-        branches,
-      }, { merge: true });
-      invalidateCollectionCache('learning_paths');
-
-      setMigrationStatus(`✅ Migrado a "${LEGACY_BASE_ID}" (${totalPods} pods). Los 3 documentos antiguos no se borraron — puedes eliminarlos manualmente cuando confirmes que todo funciona.`);
-      fetchExistingPaths();
-    } catch (err) {
-      console.error('Error migrating legacy preliminar unit:', err);
-      setMigrationStatus('❌ Error al migrar. Revisa la consola.');
-    }
-  };
-
   // =========================================================
   // LOAD EXISTING PATHS FROM FIRESTORE
   // =========================================================
@@ -182,13 +117,22 @@ export default function FormLearningPath() {
     } catch (err) { console.error("Error fetching paths:", err); }
   };
 
-  const sanitizePods = (rawPods) => (rawPods || []).map(p => ({
+  const sanitizeSegment = (s) => ({
+    ...s,
+    questionMix: s.questionMix || { ...QUESTION_TYPE_DEFAULTS },
+    total_questions: s.total_questions ?? sumMix(s.questionMix || QUESTION_TYPE_DEFAULTS),
+    isSpeedRound: s.isSpeedRound ?? (s.preset === 'speed_round'),
+    timeLimit: s.timeLimit || 60,
+    targetTense: s.targetTense || 'ALL',
+    introduced_concepts: s.introduced_concepts || [],
+    pinned_sentences: s.pinned_sentences || [],
+  });
+
+  const sanitizePods = (rawPods) => (rawPods || []).map((p) => ({
     ...p,
     isExpanded: p.isExpanded !== undefined ? p.isExpanded : true,
-    segments: p.segments.map(s => ({
-      ...s,
-      custom_ratios: s.custom_ratios || { vocab: 34, verb: 33, grammar: 33 }
-    }))
+    badgeAward: p.badgeAward || null,
+    segments: (p.segments || []).map(sanitizeSegment),
   }));
 
   const handleLoadPath = async (id) => {
@@ -204,23 +148,30 @@ export default function FormLearningPath() {
         if (data.textbook) setSelectedBook(data.textbook);
         if (data.chapter) setSelectedChapter(data.chapter);
 
-        // New shape: one doc with a `branches` object. Old shape (pre-consolidation): a flat
-        // `pods` array, which only ever represented the vocab branch — loaded as a best-effort fallback.
-        const newPodsByBranch = data.branches
-          ? {
-              vocab: sanitizePods(data.branches.vocab?.pods).length ? sanitizePods(data.branches.vocab?.pods) : makeDefaultPods(),
-              verbs: sanitizePods(data.branches.verbs?.pods).length ? sanitizePods(data.branches.verbs?.pods) : makeDefaultPods(),
-              practical: sanitizePods(data.branches.practical?.pods).length ? sanitizePods(data.branches.practical?.pods) : makeDefaultPods(),
-            }
-          : {
-              vocab: sanitizePods(data.pods).length ? sanitizePods(data.pods) : makeDefaultPods(),
-              verbs: makeDefaultPods(),
-              practical: makeDefaultPods(),
-            };
+        // New shape: a flat `pods` array + explicit contentType. A path saved
+        // before the vocab/verb split only has `branches` — load whichever
+        // branch actually has pods (vocab preferred) as a best-effort import,
+        // since that old shape can't be edited here directly anymore.
+        let loadedPods, loadedContentType;
+        if (Array.isArray(data.pods)) {
+          loadedPods = data.pods;
+          loadedContentType = data.contentType || 'vocab';
+        } else if (data.branches?.vocab?.pods?.length) {
+          loadedPods = data.branches.vocab.pods;
+          loadedContentType = 'vocab';
+        } else if (data.branches?.verbs?.pods?.length) {
+          loadedPods = data.branches.verbs.pods;
+          loadedContentType = 'verb';
+        } else {
+          loadedPods = [];
+          loadedContentType = 'vocab';
+        }
 
-        setPodsByBranch(newPodsByBranch);
-        setActiveBranch('vocab');
-        setActiveSegmentIdRaw(newPodsByBranch.vocab[0]?.segments[0]?.id || null);
+        const sanitized = sanitizePods(loadedPods);
+        setPods(sanitized.length ? sanitized : makeDefaultPods());
+        setContentType(loadedContentType);
+        setActiveTab(loadedContentType === 'verb' ? 'verbs' : 'vocab');
+        setActiveSegmentIdRaw(sanitized[0]?.segments[0]?.id || null);
       }
     } catch (err) { console.error("Error loading path:", err); }
   };
@@ -277,7 +228,7 @@ export default function FormLearningPath() {
   };
 
   // =========================================================
-  // POD & SEGMENT CONTROLS 
+  // POD & SEGMENT CONTROLS
   // =========================================================
   const handleTogglePod = (podIndex) => {
     const updated = [...pods];
@@ -322,35 +273,25 @@ export default function FormLearningPath() {
 
   const handleAddSegment = (podIndex) => {
     const updated = [...pods];
-    const newSegId = `seg_${Date.now()}`;
-    updated[podIndex].segments.push({ 
-      id: newSegId, total_questions: 12, preset: 'balanced_spiral', 
-      custom_ratios: { vocab: 34, verb: 33, grammar: 33 },
-      modalities: { read: true, write: true, listen: true, speak: true }, 
-      introduced_concepts: [], pinned_sentences: [] 
-    });
-    setPods(updated); 
-    setActiveSegmentId(newSegId);
+    const newSeg = makeDefaultSegment();
+    updated[podIndex].segments.push(newSeg);
+    setPods(updated);
+    setActiveSegmentId(newSeg.id);
   };
 
   const handleAddPod = () => {
-    const newSegId = `seg_${Date.now()}`;
-    setPods([...pods, { 
-      id: `pod_${Date.now()}`, title: `Pod ${pods.length + 1}: Lección y Práctica`, isExpanded: true, 
-      segments: [{ 
-        id: newSegId, total_questions: 15, preset: '100_vocab', 
-        custom_ratios: { vocab: 34, verb: 33, grammar: 33 },
-        modalities: { read: true, write: true, listen: true, speak: true }, 
-        introduced_concepts: [], pinned_sentences: [] 
-      }] 
+    const newSeg = makeDefaultSegment();
+    setPods([...pods, {
+      id: `pod_${Date.now()}`, title: `Pod ${pods.length + 1}`, isExpanded: true, badgeAward: null,
+      segments: [newSeg],
     }]);
-    setActiveSegmentId(newSegId);
+    setActiveSegmentId(newSeg.id);
   };
 
   // =========================================================
   // FIRESTORE FETCH & SAVE (NUEVA LÓGICA INTELIGENTE)
   // =========================================================
-  
+
   // Función auxiliar para extraer el nombre del libro si falta el campo
   const guessBookName = (data, docId) => {
     if (data.book || data.textbook || data.course) return data.book || data.textbook || data.course;
@@ -371,19 +312,19 @@ export default function FormLearningPath() {
       bundles.forEach(data => {
         const bookName = guessBookName(data, data.id);
         booksSet.add(bookName);
-        
+
         if (bookName === selectedBook && data.chapter) {
-          chaptersSet.add(data.chapter); 
+          chaptersSet.add(data.chapter);
         }
       });
-      
+
       if (booksSet.size > 0) setAvailableBooks(Array.from(booksSet).sort());
-      
+
       if (chaptersSet.size > 0) {
         const sortedChaps = Array.from(chaptersSet).sort((a, b) => Number(b) - Number(a));
         setAvailableChapters(sortedChaps);
         if (!sortedChaps.includes(selectedChapter)) {
-          setSelectedChapter(sortedChaps[0]); 
+          setSelectedChapter(sortedChaps[0]);
         }
       } else {
         setAvailableChapters([]);
@@ -410,10 +351,10 @@ export default function FormLearningPath() {
         targetData.words.forEach(w => w.metadata?.secciones?.forEach(sec => uniqueSections.add(sec)));
         const sortedSections = Array.from(uniqueSections).sort();
         setAvailableSections(sortedSections);
-        
+
         const targetSection = sortedSections.includes(selectedSection) ? selectedSection : sortedSections[0] || '';
         setSelectedSection(targetSection);
-        
+
         const filteredWords = targetData.words.filter(w => w.metadata?.secciones?.includes(targetSection));
         setVaultVocab(filteredWords.map(w => ({ id: w.id || w.palabra, label: w.palabra, translation: w.traduccion, tags: targetSection, fullData: w })));
       } else {
@@ -463,6 +404,14 @@ export default function FormLearningPath() {
   useEffect(() => { fetchAllChapters(); }, [selectedBook]);
   useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook]);
 
+  // A vocab path's vault can never show verbs, and vice versa — keeps the
+  // "no vocab bleeding into a verb path" rule enforced by the tool itself,
+  // not just convention.
+  useEffect(() => {
+    if (contentType === 'verb' && activeTab === 'vocab') setActiveTab('verbs');
+    if (contentType === 'vocab' && activeTab === 'verbs') setActiveTab('vocab');
+  }, [contentType, activeTab]);
+
   useEffect(() => {
     let filtered = allGrammarList;
     if (selectedGrammarChapter !== 'all') filtered = filtered.filter(g => g.chapterId === selectedGrammarChapter);
@@ -485,16 +434,21 @@ export default function FormLearningPath() {
 
   const handleSavePathToFirestore = async () => {
     if (!pathId.trim()) return alert("Please enter a valid ID.");
-    if (!selectedBook) return alert("Please select a textbook before saving — nothing has been chosen yet.");
+    if (contentType === 'vocab' && !selectedBook) return alert("Please select a textbook before saving — nothing has been chosen yet.");
     setIsSaving(true);
     try {
-      const branches = {
-        vocab: { pods: podsByBranch.vocab },
-        verbs: { pods: podsByBranch.verbs },
-        practical: { pods: podsByBranch.practical },
-      };
-      const totalPods = BRANCHES.reduce((sum, b) => sum + podsByBranch[b].length, 0);
-      await setDoc(doc(db, 'learning_paths', pathId), { path_id: pathId, title: pathTitle, course, textbook: selectedBook, chapter: selectedChapter, total_pods: totalPods, updated_at: new Date().toISOString(), branches }, { merge: true });
+      await setDoc(doc(db, 'learning_paths', pathId), {
+        path_id: pathId,
+        title: pathTitle,
+        course,
+        contentType,
+        textbook: contentType === 'vocab' ? selectedBook : '',
+        chapter: contentType === 'vocab' ? selectedChapter : '',
+        total_pods: pods.length,
+        updated_at: new Date().toISOString(),
+        pods,
+        branches: deleteField(), // clear any stale pre-split shape on this doc
+      }, { merge: true });
       invalidateCollectionCache('learning_paths');
       alert("🎉 Saved!"); fetchExistingPaths();
     } catch (err) {}
@@ -529,22 +483,8 @@ export default function FormLearningPath() {
 
   return (
     <div className="flex w-screen h-screen bg-slate-100 font-sans fixed inset-0 z-50 overflow-hidden">
-      {/* One-time migration for the hand-built "preliminar" unit (3 old docs -> 1 consolidated doc) */}
-      <div className="fixed bottom-4 left-4 z-[200] flex flex-col items-start gap-2">
-        <button
-          onClick={handleMigrateLegacyPreliminar}
-          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg"
-        >
-          🛠️ Migrar Unidad Preliminar (legado)
-        </button>
-        {migrationStatus && (
-          <p className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 shadow-lg max-w-sm">
-            {migrationStatus}
-          </p>
-        )}
-      </div>
-
       <VaultSidebar
+        contentType={contentType}
         selectedBook={selectedBook} setSelectedBook={setSelectedBook} availableBooks={availableBooks}
         activeTab={activeTab} setActiveTab={setActiveTab} selectedChapter={selectedChapter} setSelectedChapter={setSelectedChapter}
         selectedSection={selectedSection} handleSectionChange={handleSectionChange} availableSections={availableSections}
@@ -557,14 +497,14 @@ export default function FormLearningPath() {
         availableGrammarChapters={availableGrammarChapters} availableGrammarTags={availableGrammarTags}
       />
 
-      <PathBuilder 
+      <PathBuilder
+        contentType={contentType} setContentType={setContentType}
         course={course} setCourse={setCourse} pathId={pathId} setPathId={setPathId} pathTitle={pathTitle} setPathTitle={setPathTitle}
         isSaving={isSaving} pods={pods} handleAddPod={handleAddPod} handleAddSegment={handleAddSegment}
         handleDeleteSegment={handleDeleteSegment} handleDeletePod={handleDeletePod} handleSavePathToFirestore={handleSavePathToFirestore}
         setPods={setPods} activeSegmentId={activeSegmentId} setActiveSegmentId={setActiveSegmentId} handleRemoveItem={handleRemoveItem}
         existingPaths={existingPaths} handleLoadPath={handleLoadPath} selectedExistingPathId={selectedExistingPathId} setSelectedExistingPathId={setSelectedExistingPathId}
         handleTogglePod={handleTogglePod} handleMovePod={handleMovePod} handleMoveSegment={handleMoveSegment}
-        activeBranch={activeBranch} onBranchChange={handleBranchChange}
         selectedBook={selectedBook} selectedChapter={selectedChapter}
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
       />

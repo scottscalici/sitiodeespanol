@@ -7,14 +7,18 @@ import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
 import { getAssignedDominioTasks } from '../utils/learningPathProgress';
 
-// Configuration for the 3 distinct branches
-const BRANCHES = [
-  { id: 'vocab', label: 'Vocabulario', icon: '📖', theme: 'indigo', shape: 'circle' },
-  { id: 'verbs', label: 'Verbos', icon: '⚡', theme: 'emerald', shape: 'hexagon' },
-  { id: 'practical', label: 'Aplicación', icon: '🛠️', theme: 'amber', shape: 'circle' }
-];
+// A path is one content type from creation now — no more vocab/verbs/practical
+// branches bundled into a single document, so there's nothing to tab between.
+// "practical" is gone; sentences attach directly to a vocab or verb path's
+// segments instead. CONTENT_TYPES also drives the hexagon-vs-circle node
+// shape and the page's accent color, so a verb path is visually distinct
+// from a vocab path at a glance, not just labeled differently.
+const CONTENT_TYPES = {
+  vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo', shape: 'circle' },
+  verb: { label: 'Verbos', icon: '⚡', theme: 'emerald', shape: 'hexagon' },
+};
 
-// Flat-top hexagon, applied via clip-path so verb-branch nodes read as a
+// Flat-top hexagon, applied via clip-path so verb-path nodes read as a
 // distinct shape from vocab's circles at a glance, not just a different color.
 const HEXAGON_CLIP = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
 
@@ -51,7 +55,6 @@ export default function StudentLearningPath() {
     : (userData?.course || 's2');
 
   // --- STATE ---
-  const [activeBranch, setActiveBranch] = useState('vocab');
   const [liveDia, setLiveDia] = useState(1);
   const [assignedTasks, setAssignedTasks] = useState([]);
   const [selectedPathId, setSelectedPathId] = useState('');
@@ -115,7 +118,7 @@ export default function StudentLearningPath() {
     const fetchUnit = async () => {
       try {
         const snap = await getDoc(doc(db, 'learning_paths', selectedPathId));
-        setUnitData(snap.exists() ? snap.data() : { title: 'Unidad', branches: {} });
+        setUnitData(snap.exists() ? snap.data() : { title: 'Unidad' });
       } catch (error) {
         console.error('Error fetching unit:', error);
       }
@@ -123,15 +126,27 @@ export default function StudentLearningPath() {
     fetchUnit();
   }, [selectedPathId]);
 
-  // --- DYNAMIC DATA FOR ACTIVE BRANCH ---
-  const currentBranchConfig = BRANCHES.find(b => b.id === activeBranch);
-  const pods = unitData?.branches?.[activeBranch]?.pods || [];
+  // --- SHAPE DETECTION: a path built after the vocab/verb split has a flat
+  // `pods` array + `contentType`. One built before it only has `branches` —
+  // rendered here as a best-effort read of whichever branch has content,
+  // since that old shape can no longer be authored (see Pod Creator), only
+  // viewed. Progress for a legacy unit stays nested under that branch key,
+  // exactly as it was already being written before this split existed.
+  const isFlatPath = Array.isArray(unitData?.pods);
+  const legacyBranchKey = !isFlatPath
+    ? (unitData?.branches?.vocab?.pods?.length ? 'vocab' : unitData?.branches?.verbs?.pods?.length ? 'verbs' : 'practical')
+    : null;
+  const pods = isFlatPath ? unitData.pods : (unitData?.branches?.[legacyBranchKey]?.pods || []);
   const currentPodRef = useRef(null);
 
-  // --- PROGRESS SYNC (Derived from live userData, nested under unit -> branch) ---
+  const contentType = isFlatPath ? (unitData?.contentType || 'vocab') : (legacyBranchKey === 'verbs' ? 'verb' : 'vocab');
+  const contentConfig = CONTENT_TYPES[contentType] || CONTENT_TYPES.vocab;
+
+  // --- PROGRESS SYNC (derived from live userData) ---
   const unitProgress = userData?.progress?.[selectedPathId];
-  const activePodIndex = unitProgress?.[activeBranch]?.podIndex || 0;
-  const activeSegmentIndex = unitProgress?.[activeBranch]?.segmentIndex || 0;
+  const progressNode = legacyBranchKey ? unitProgress?.[legacyBranchKey] : unitProgress;
+  const activePodIndex = progressNode?.podIndex || 0;
+  const activeSegmentIndex = progressNode?.segmentIndex || 0;
 
   // --- LAND ON CURRENT PROGRESS INSTEAD OF THE TOP OF THE PATH ---
   useEffect(() => {
@@ -141,18 +156,17 @@ export default function StudentLearningPath() {
       currentPodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
     return () => clearTimeout(t);
-  }, [pods.length, activeBranch, activePodIndex, activeSegmentIndex]);
+  }, [pods.length, selectedPathId, activePodIndex, activeSegmentIndex]);
 
   // --- DYNAMIC COLOR DICTIONARIES ---
-  // Page background uses the -100 shade, not -50 — at -50 the indigo/emerald/amber
-  // tints are all so close to white that vocab vs. verbs vs. practical barely read
-  // as different colors at a glance.
+  // Page background uses the -100 shade, not -50 — at -50 the indigo/emerald
+  // tints are all so close to white that vocab vs. verbs barely read as
+  // different colors at a glance.
   const themeColors = {
-    emerald: { bg: 'bg-emerald-100', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400', tabHover: 'hover:bg-emerald-100', tabActive: 'bg-emerald-600 text-white shadow-md' },
-    amber: { bg: 'bg-amber-100', active: 'bg-amber-500', ring: 'ring-amber-400', text: 'text-amber-900', border: 'border-amber-200', line: 'bg-amber-400', tabHover: 'hover:bg-amber-100', tabActive: 'bg-amber-500 text-white shadow-md' },
-    indigo: { bg: 'bg-indigo-100', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400', tabHover: 'hover:bg-indigo-100', tabActive: 'bg-indigo-600 text-white shadow-md' },
+    emerald: { bg: 'bg-emerald-100', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400' },
+    indigo: { bg: 'bg-indigo-100', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400' },
   };
-  const theme = themeColors[currentBranchConfig.theme] || themeColors.emerald;
+  const theme = themeColors[contentConfig.theme] || themeColors.indigo;
 
   // --- MATH: STANDARD PROGRESS & GRADES ---
   const totalSegments = pods.reduce((acc, pod) => acc + (pod.segments?.length || 0), 0);
@@ -176,7 +190,7 @@ export default function StudentLearningPath() {
   // Extract all time brackets safely from the live user profile
   const allTimePoints = userData?.total_points || userData?.current_path_points || 0;
   const dailyPoints = userData?.daily_points || 0;
-  const pathPoints = unitProgress?.[activeBranch]?.path_points || 0;
+  const pathPoints = progressNode?.path_points || 0;
 
   const selectedTask = assignedTasks.find((t) => t.path_id === selectedPathId);
   const isPastDue = selectedTask && Number(selectedTask.day_due) < liveDia;
@@ -241,6 +255,7 @@ export default function StudentLearningPath() {
           <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-2">
             <div>
               <h1 className="text-xl font-black text-slate-800 flex items-center flex-wrap gap-2">
+                <span>{contentConfig.icon}</span>
                 {unitData?.title || 'Ruta de Aprendizaje'}
                 {isAdmin && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full align-middle">ADMIN</span>}
                 {isPastDue && <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full align-middle">Vencido — Día {selectedTask.day_due}</span>}
@@ -250,7 +265,7 @@ export default function StudentLearningPath() {
               {assignedTasks.length > 1 && (
                 <select
                   value={selectedPathId}
-                  onChange={(e) => { setSelectedPathId(e.target.value); setActiveBranch('vocab'); }}
+                  onChange={(e) => setSelectedPathId(e.target.value)}
                   className="mt-1 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
                 >
                   {assignedTasks.map((task) => (
@@ -271,7 +286,7 @@ export default function StudentLearningPath() {
                 🏆 Totales: {allTimePoints}
               </span>
               <span className={`px-2.5 py-1 rounded-full shadow-sm border ${theme.bg} ${theme.border} ${theme.text}`}>
-                {currentBranchConfig.label}: {pathPoints}
+                {contentConfig.label}: {pathPoints}
               </span>
 
               {/* GRADE & PERCENTAGE PILL */}
@@ -287,25 +302,6 @@ export default function StudentLearningPath() {
             </div>
           </div>
 
-          {/* --- BRANCH SELECTOR TABS --- */}
-          <div className="flex justify-center sm:justify-start gap-2 border-b border-slate-200 pb-2">
-            {BRANCHES.map(branch => {
-              const isActive = activeBranch === branch.id;
-              const branchTheme = themeColors[branch.theme];
-              return (
-                <button
-                  key={branch.id}
-                  onClick={() => setActiveBranch(branch.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-black tracking-wider transition-all flex items-center gap-2
-                    ${isActive ? branchTheme.tabActive : `bg-white text-slate-500 border border-slate-200 ${branchTheme.tabHover}`}`}
-                >
-                  <span>{branch.icon}</span>
-                  <span className="hidden sm:inline uppercase">{branch.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
           <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
             <div
               className={`h-2.5 rounded-full ${theme.active} transition-all duration-500`}
@@ -319,9 +315,9 @@ export default function StudentLearningPath() {
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 pt-8 pb-6">
         {pods.length === 0 ? (
           <div className="text-center py-20">
-            <span className="text-6xl">{currentBranchConfig.icon}</span>
+            <span className="text-6xl">{contentConfig.icon}</span>
             <h2 className="text-2xl font-black text-slate-800 mt-4 uppercase tracking-tighter">Próximamente</h2>
-            <p className="text-slate-500 font-medium mt-2">Esta rama de la ruta aún está en construcción.</p>
+            <p className="text-slate-500 font-medium mt-2">Esta unidad aún está en construcción.</p>
           </div>
         ) : (
           <div className="relative w-full max-w-[420px] mx-auto" style={{ height: pathTotalHeight }}>
@@ -343,7 +339,7 @@ export default function StudentLearningPath() {
                       className={`absolute rounded-full flex items-center justify-center shadow-md ${styles.box}`}
                       style={{
                         left: `calc(${item.x}% - ${CHECKPOINT_SIZE / 2}px)`, top: item.y - CHECKPOINT_SIZE / 2, width: CHECKPOINT_SIZE, height: CHECKPOINT_SIZE,
-                        clipPath: currentBranchConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
+                        clipPath: contentConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
                       }}
                     >
                       <TrophyIcon className={styles.icon} />
@@ -397,7 +393,7 @@ export default function StudentLearningPath() {
                     className={`absolute rounded-full flex items-center justify-center shadow-md transition-transform p-0 ${bgClass} ${ringClass} ${item.canClick ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
                     style={{
                       left: `calc(${item.x}% - ${size / 2}px)`, top: item.y - size / 2, width: size, height: size,
-                      clipPath: currentBranchConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
+                      clipPath: contentConfig.shape === 'hexagon' ? HEXAGON_CLIP : undefined,
                     }}
                   >
                     {content}
@@ -462,7 +458,8 @@ export default function StudentLearningPath() {
               }
             }
 
-            // --- 3. MULTI-BRACKET FIRESTORE SAVE (nested under this unit -> this branch) ---
+            // --- 3. FIRESTORE SAVE (flat for a new-shape path, nested under
+            //     the legacy branch key for a path built before the split) ---
             // Admins can freely browse/test any pod already (see isLocked below) and
             // shouldn't rack up scores or progress meant for students.
             if (!isAdmin && userData && userData.uid && selectedPathId) {
@@ -487,8 +484,13 @@ export default function StudentLearningPath() {
                    if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
                    if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
                    newDaily += (data.daily_points || 0);
-                   newPathPoints += (data.progress?.[selectedPathId]?.[activeBranch]?.path_points || 0);
+                   const existingPathProgress = data.progress?.[selectedPathId];
+                   newPathPoints += (legacyBranchKey
+                     ? existingPathProgress?.[legacyBranchKey]?.path_points
+                     : existingPathProgress?.path_points) || 0;
                 }
+
+                const newProgressNode = { path_points: newPathPoints, podIndex: newPodIdx, segmentIndex: newSegIdx };
 
                 await setDoc(userRef, {
                   total_points: newTotal,
@@ -500,13 +502,7 @@ export default function StudentLearningPath() {
                   monthKey,
                   ...bumpStreak(existingData),
                   progress: {
-                    [selectedPathId]: {
-                      [activeBranch]: {
-                        path_points: newPathPoints,
-                        podIndex: newPodIdx,
-                        segmentIndex: newSegIdx
-                      }
-                    }
+                    [selectedPathId]: legacyBranchKey ? { [legacyBranchKey]: newProgressNode } : newProgressNode,
                   }
                 }, { merge: true });
 

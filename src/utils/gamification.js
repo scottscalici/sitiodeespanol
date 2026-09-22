@@ -72,18 +72,33 @@ export const getNextTitleTier = (points, tiers = DEFAULT_TITLE_TIERS) => {
 export const getSpecialTrophies = (userData) =>
   (userData?.specialTrophies || []).map((trophy) => ({ ...trophy, type: 'special', tier: null }));
 
+// A learning_paths doc is either the new flat shape (pathDoc.pods, one
+// progress pointer at progress[pathId]) or the legacy branched shape
+// (pathDoc.branches.{vocab,verbs,practical}.pods, one pointer per branch at
+// progress[pathId][branch]). Returns one { pods, completedCount } group per
+// pod list on the doc, so callers don't need to know which shape it is.
+const getPathPodGroups = (pathDoc, pathProgress) => {
+  if (Array.isArray(pathDoc?.pods)) {
+    return [{ pods: pathDoc.pods, completedCount: pathProgress?.podIndex || 0 }];
+  }
+  return BRANCHES.map((branch) => ({
+    pods: pathDoc?.branches?.[branch]?.pods || [],
+    completedCount: pathProgress?.[branch]?.podIndex || 0,
+  }));
+};
+
 // Scans every pod of every learning_paths doc for a `badgeAward` tag (set in
 // the Pod Creator, e.g. "finishing this pod awards Presente: bronze") and
-// checks it against the student's progress pointer for that specific
-// path+branch. A pod counts as done once the branch's podIndex has advanced
-// past it. Returns a map of badgeId -> tier string (highest tier reached) or
-// `true` for a non-tiered badge that's been earned via any tagged pod.
+// checks it against the student's progress pointer for that path (or that
+// path's branch, for a path saved before the vocab/verb split). A pod counts
+// as done once the pointer has advanced past it. Returns a map of
+// badgeId -> tier string (highest tier reached) or `true` for a non-tiered
+// badge that's been earned via any tagged pod.
 export const getPodBadgeAwards = (userData, learningPathsById) => {
   const earned = {};
   Object.values(learningPathsById || {}).forEach((pathDoc) => {
-    BRANCHES.forEach((branch) => {
-      const pods = pathDoc?.branches?.[branch]?.pods || [];
-      const completedCount = userData?.progress?.[pathDoc.id]?.[branch]?.podIndex || 0;
+    const pathProgress = userData?.progress?.[pathDoc.id];
+    getPathPodGroups(pathDoc, pathProgress).forEach(({ pods, completedCount }) => {
       pods.forEach((pod, idx) => {
         const award = pod?.badgeAward;
         if (!award?.badgeId || idx >= completedCount) return;

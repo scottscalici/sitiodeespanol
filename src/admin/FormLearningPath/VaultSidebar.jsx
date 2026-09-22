@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 export default function VaultSidebar({
+  contentType,
   selectedBook,
   setSelectedBook,
   availableBooks,
@@ -187,28 +188,34 @@ export default function VaultSidebar({
         )}
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — a vocab path never even sees a Verbs tab, and vice
+          versa, so it's structurally impossible to blend vocab into a verb
+          path (or the reverse), not just a matter of admin discipline. */}
       <div className="flex border-b border-slate-200 text-sm font-bold bg-slate-50">
-        <button
-          className={`flex-1 p-3 text-center transition-all ${
-            activeTab === 'vocab'
-              ? 'border-b-2 border-blue-600 text-blue-700 bg-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-100'
-          }`}
-          onClick={() => setActiveTab('vocab')}
-        >
-          Vocab ({vaultVocab.length})
-        </button>
-        <button
-          className={`flex-1 p-3 text-center transition-all ${
-            activeTab === 'verbs'
-              ? 'border-b-2 border-emerald-600 text-emerald-700 bg-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-100'
-          }`}
-          onClick={() => setActiveTab('verbs')}
-        >
-          Verbs ({vaultVerbs.length})
-        </button>
+        {contentType === 'vocab' && (
+          <button
+            className={`flex-1 p-3 text-center transition-all ${
+              activeTab === 'vocab'
+                ? 'border-b-2 border-blue-600 text-blue-700 bg-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+            onClick={() => setActiveTab('vocab')}
+          >
+            Vocab ({vaultVocab.length})
+          </button>
+        )}
+        {contentType === 'verb' && (
+          <button
+            className={`flex-1 p-3 text-center transition-all ${
+              activeTab === 'verbs'
+                ? 'border-b-2 border-emerald-600 text-emerald-700 bg-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+            onClick={() => setActiveTab('verbs')}
+          >
+            Verbs ({vaultVerbs.length})
+          </button>
+        )}
         <button
           className={`flex-1 p-3 text-center transition-all ${
             activeTab === 'grammar'
