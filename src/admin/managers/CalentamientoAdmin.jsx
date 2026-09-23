@@ -90,7 +90,6 @@ export default function CalentamientoAdmin() {
   };
 
   const handleGroupSelect = (groupId) => {
-    setSelectedGroup(groupId);
     const found = verbGroups.find((g) => g.id === groupId);
     if (found) {
       setConfigBlocks([
@@ -105,6 +104,12 @@ export default function CalentamientoAdmin() {
         },
       ]);
     }
+    // Reset back to the placeholder so the dropdown always fires its change
+    // event on the next pick — a plain <select> doesn't fire onChange when
+    // you choose the SAME option it's already showing, which is exactly what
+    // happens after removing a block: the dropdown keeps showing that group
+    // selected, and re-picking it to add it back silently does nothing.
+    setSelectedGroup('');
   };
 
   const updateBlockConfig = (index, field, value) => {
