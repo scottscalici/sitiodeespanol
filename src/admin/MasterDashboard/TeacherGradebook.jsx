@@ -36,8 +36,12 @@ export default function TeacherGradebook() {
 
   // course -> today's assigned calentamiento docId (or null)
   const [todaysWarmupByCourse, setTodaysWarmupByCourse] = useState({});
-  // calentamiento docId -> course, so warmup averages can be scoped by course
-  const [calentamientoCourseById, setCalentamientoCourseById] = useState({});
+  // calentamiento docId -> { course, dia }, so we know which warmups were
+  // actually assigned (and by when) for the missing-assignment = 0 logic
+  const [calentamientoMetaById, setCalentamientoMetaById] = useState({});
+  // school calendar "dia" number -> fecha, to know when a given warmup's
+  // dia was actually assigned/due
+  const [calendarFechaByDia, setCalendarFechaByDia] = useState({});
 
   // Grading-period (quarter) config, editable from this page
   const [quarters, setQuarters] = useState([]);
@@ -86,15 +90,15 @@ export default function TeacherGradebook() {
     const fetchCalendarAndWarmups = async (liveDia) => {
       try {
         const calentamientos = await getCachedCollection('calentamientos', { force });
-        const courseById = {};
+        const metaById = {};
         const todaysByCourse = {};
         calentamientos.forEach((c) => {
-          courseById[c.id] = c.course;
+          metaById[c.id] = { course: c.course, dia: c.dia != null ? Number(c.dia) : null, excused: !!c.excused };
           if (Number(c.dia) === liveDia && !todaysByCourse[c.course]) {
             todaysByCourse[c.course] = c.id;
           }
         });
-        setCalentamientoCourseById(courseById);
+        setCalentamientoMetaById(metaById);
         setTodaysWarmupByCourse(todaysByCourse);
       } catch (error) {
         console.error('Error fetching calentamientos for gradebook:', error);
@@ -114,6 +118,12 @@ export default function TeacherGradebook() {
         const liveDia = pastEntries.length > 0
           ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
           : 1;
+
+        const fechaByDia = {};
+        calendarArray.forEach((c) => {
+          if (c.dia != null && c.fecha) fechaByDia[Number(c.dia)] = c.fecha;
+        });
+        setCalendarFechaByDia(fechaByDia);
 
         await fetchCalendarAndWarmups(liveDia);
 
@@ -176,23 +186,31 @@ export default function TeacherGradebook() {
   };
 
   // --- WARMUP AVERAGE (current quarter if configured, else all-time),
-  // scoped to warmups that belong to the student's own course ---
+  // scoped to warmups that belong to the student's own course.
+  // A calentamiento counts as "assigned" once its day's date has arrived;
+  // if the student never completed it, it counts as a 0 in the average
+  // instead of being skipped (which used to quietly inflate the average). ---
   const getWarmupAverage = (student) => {
     const warmups = student.progress?.warmups || {};
     const todayStr = new Date().toLocaleDateString('en-CA');
     const quarter = getCurrentQuarter(quarters, todayStr);
 
-    const grades = Object.entries(warmups)
-      .filter(([warmupId, entry]) => {
-        if (calentamientoCourseById[warmupId] !== student.course) return false;
-        if (quarter && !(entry.timestamp && entry.timestamp.slice(0, 10) >= quarter.startDate && entry.timestamp.slice(0, 10) <= quarter.endDate)) {
-          return false;
-        }
-        return typeof entry.grade === 'number';
-      })
-      .map(([, entry]) => entry.grade);
+    const assignedIds = Object.entries(calentamientoMetaById).filter(([, meta]) => {
+      if (meta.course !== student.course) return false;
+      if (meta.excused) return false;
+      const fecha = meta.dia != null ? calendarFechaByDia[meta.dia] : null;
+      if (!fecha || fecha > todayStr) return false; // not assigned yet
+      if (quarter && !(fecha >= quarter.startDate && fecha <= quarter.endDate)) return false;
+      return true;
+    }).map(([warmupId]) => warmupId);
 
-    if (grades.length === 0) return { percent: null, quarterLabel: quarter?.label || null };
+    if (assignedIds.length === 0) return { percent: null, quarterLabel: quarter?.label || null };
+
+    const grades = assignedIds.map((warmupId) => {
+      const entry = warmups[warmupId];
+      return typeof entry?.grade === 'number' ? entry.grade : 0;
+    });
+
     const avg = Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length);
     return { percent: avg, quarterLabel: quarter?.label || null };
   };

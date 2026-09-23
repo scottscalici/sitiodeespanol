@@ -28,6 +28,7 @@ export default function CalentamientoAdmin() {
 
   // Verb Generator Advanced Controls
   const [includeVosotros, setIncludeVosotros] = useState(false);
+  const [excused, setExcused] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -86,6 +87,7 @@ export default function CalentamientoAdmin() {
       setConfigBlocks(p.configBlocks || []);
       setPreviewQuestions(p.bakedQuestions || []);
       setIncludeVosotros(p.includeVosotros || false);
+      setExcused(p.excused || false);
     }
   };
 
@@ -235,6 +237,7 @@ export default function CalentamientoAdmin() {
           course,
           configBlocks,
           includeVosotros,
+          excused,
           bakedQuestions: cleanQuestions,
           createdAt: new Date().toISOString(),
         },
@@ -367,6 +370,27 @@ export default function CalentamientoAdmin() {
               className="rounded text-amber-500"
             />
             <span>Incluir "Vosotros" en selección aleatoria</span>
+          </label>
+        </div>
+
+        {/* EXCUSAR PRÁCTICA (excluida de los promedios) */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+          <div>
+            <h4 className="text-xs font-black text-slate-700 uppercase">
+              Excusar esta Práctica
+            </h4>
+            <p className="text-[11px] text-slate-400">
+              No cuenta ni como 0 ni como completada — se excluye por completo del promedio de calentamientos (gradebook y panel del estudiante). Útil para prácticas de cuando la herramienta aún no estaba lista.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer bg-slate-50 px-3 py-2 rounded-xl border">
+            <input
+              type="checkbox"
+              checked={excused}
+              onChange={(e) => setExcused(e.target.checked)}
+              className="rounded text-amber-500"
+            />
+            <span>Excusada</span>
           </label>
         </div>
 

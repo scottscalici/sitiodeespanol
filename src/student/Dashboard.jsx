@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getCachedCollection } from '../utils/firestoreCache';
 
 // Components
 import Header from '../components/Header';
@@ -47,6 +48,46 @@ const Dashboard = () => {
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
   const [activeLecturas, setActiveLecturas] = useState([]);
   const [hasSentences, setHasSentences] = useState(false);
+  const [warmupAverage, setWarmupAverage] = useState(null);
+
+  // Calentamiento promedio: a calentamiento counts once its day's date has
+  // arrived; a missed one counts as a 0 instead of being skipped, so this
+  // matches the teacher gradebook's average.
+  useEffect(() => {
+    const computeWarmupAverage = async () => {
+      if (!course || !data?.cal?.length) return;
+      try {
+        const calentamientos = await getCachedCollection('calentamientos');
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const fechaByDia = {};
+        data.cal.forEach((c) => {
+          if (c.dia != null && c.fecha) fechaByDia[Number(c.dia)] = c.fecha;
+        });
+
+        const assigned = calentamientos.filter((c) => {
+          if (c.course !== course) return false;
+          if (c.excused) return false;
+          const fecha = c.dia != null ? fechaByDia[Number(c.dia)] : null;
+          return fecha && fecha <= todayStr;
+        });
+
+        if (assigned.length === 0) {
+          setWarmupAverage(null);
+          return;
+        }
+
+        const warmups = userData?.progress?.warmups || {};
+        const grades = assigned.map((c) => {
+          const entry = warmups[c.id];
+          return typeof entry?.grade === 'number' ? entry.grade : 0;
+        });
+        setWarmupAverage(Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length));
+      } catch (error) {
+        console.error('Error computing warmup average:', error);
+      }
+    };
+    computeWarmupAverage();
+  }, [course, data?.cal, userData?.progress?.warmups]);
 
   // Fetch Music
   useEffect(() => {
@@ -230,6 +271,13 @@ const Dashboard = () => {
               className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
             >
               <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+              {warmupAverage !== null && (
+                <div className="absolute top-4 right-4 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5 text-right">
+                  <span className="block text-[9px] font-black uppercase tracking-widest text-orange-100">Promedio</span>
+                  <span className="block text-lg font-black text-white leading-none">{warmupAverage}%</span>
+                </div>
+              )}
 
               <div className="flex items-center gap-4">
                 {/* Flame Badge */}
