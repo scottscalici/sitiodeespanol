@@ -459,27 +459,6 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                 let engTrans = conjugationData.english;
                 let spaTarget = conjugationData.target;
 
-                if (randomSubject === 'él_ella_ud' && randomTenseKey === 'presente' && engTrans.startsWith('he/she/you ')) {
-                    // The conjugatable verb is always the FIRST word (e.g. "take
-                    // advantage of" -> "takes advantage of") — pluralizing
-                    // whatever word happens to be last broke on any multi-word
-                    // phrasal translation, producing nonsense like "take
-                    // advantage ofs".
-                    const words = engTrans.replace('he/she/you ', '').trim().split(' ');
-                    let verbStr = words[0];
-                    if (!verbStr.endsWith('s')) {
-                       if (verbStr.endsWith('y')) verbStr = verbStr.slice(0, -1) + 'ies';
-                       else if (verbStr.endsWith('ch') || verbStr.endsWith('sh') || verbStr.endsWith('x') || verbStr.endsWith('z')) verbStr += 'es';
-                       else if (verbStr === 'have') verbStr = 'has';
-                       else if (verbStr === 'do') verbStr = 'does';
-                       else if (verbStr === 'go') verbStr = 'goes';
-                       else if (verbStr === 'are') verbStr = 'is';
-                       else verbStr += 's';
-                       words[0] = verbStr;
-                       engTrans = "he/she/you " + words.join(' ');
-                    }
-                }
-
                 let format = 'conjugate';
 
                 if (isSpeedRound) {
