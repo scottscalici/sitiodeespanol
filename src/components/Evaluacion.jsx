@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { theme } = useActiveTheme() || {};
+  const themeColor = theme?.styles?.cardOverrides?.evaluacion;
 
   // Find today's evaluation
   const todayEval = evals.find((e) => e.dia === liveDia);
@@ -45,7 +48,10 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600 via-pink-700 to-slate-900 p-6 shadow-xl">
+    <div
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600 via-pink-700 to-slate-900 p-6 shadow-xl"
+      style={themeColor ? { background: `linear-gradient(135deg, ${themeColor}, ${theme?.styles?.accent || themeColor})` } : undefined}
+    >
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* HEADER */}

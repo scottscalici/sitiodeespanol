@@ -1,6 +1,9 @@
 import React from 'react';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const Curiosidad = ({ curiosidades = [] }) => {
+  const { theme } = useActiveTheme() || {};
+  const themeColor = theme?.styles?.cardOverrides?.curiosidad;
   if (!curiosidades || curiosidades.length === 0) return null;
 
   return (
@@ -13,9 +16,13 @@ const Curiosidad = ({ curiosidades = [] }) => {
           <article
             key={item.id || idx}
             className="bg-sky-50/40 rounded-2xl border-2 border-sky-200 p-6 sm:p-8 shadow-sm"
+            style={themeColor ? { borderColor: themeColor } : undefined}
           >
             {/* Header */}
-            <h3 className="font-black text-[10px] uppercase text-sky-500 tracking-widest mb-3">
+            <h3
+              className="font-black text-[10px] uppercase text-sky-500 tracking-widest mb-3"
+              style={themeColor ? { color: themeColor } : undefined}
+            >
               Curiosidad {activeDay}
             </h3>
             

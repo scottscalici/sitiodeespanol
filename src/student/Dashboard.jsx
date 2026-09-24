@@ -251,6 +251,12 @@ const Dashboard = () => {
   });
 
   const calentamientoOverrideColor = theme?.styles?.cardOverrides?.calentamiento;
+  const themeAccent = theme?.styles?.accent;
+  const conversacionOverrideColor = theme?.styles?.cardOverrides?.conversacion;
+  const videoOverrideColor = theme?.styles?.cardOverrides?.video;
+  const musicaOverrideColor = theme?.styles?.cardOverrides?.musica;
+  const vocabularioOverrideColor = theme?.styles?.cardOverrides?.vocabulario;
+  const themeGradientStyle = (color) => (color ? { background: `linear-gradient(135deg, ${color}, ${themeAccent || color})` } : undefined);
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -354,6 +360,7 @@ const Dashboard = () => {
                 key={conv.id}
                 to={`/actividad/conversacion/${conv.id}`}
                 className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                style={themeGradientStyle(conversacionOverrideColor)}
               >
                 <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -389,6 +396,7 @@ const Dashboard = () => {
                 key={vid.id}
                 to={`/actividad/video/${vid.id}`}
                 className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-rose-800 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                style={themeGradientStyle(videoOverrideColor)}
               >
                 <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -435,6 +443,7 @@ const Dashboard = () => {
               <Link
                 to={`/musica/${dailySong.id}`}
                 className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-800 to-slate-900 p-5 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                style={themeGradientStyle(musicaOverrideColor)}
               >
                 {/* Spotify-style icon badge, top right */}
                 <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg">
@@ -480,6 +489,7 @@ const Dashboard = () => {
                 key={bundleId}
                 to={`/vocabulario/${bundleId}`}
                 className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                style={themeGradientStyle(vocabularioOverrideColor)}
               >
                 <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -553,7 +563,10 @@ const Dashboard = () => {
 
               <Countdown course={course} />
 
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl">
+              <div
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
+                style={themeGradientStyle(theme?.styles?.cardOverrides?.tareas)}
+              >
                 <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
                 <div className="relative flex items-center gap-4 mb-4">

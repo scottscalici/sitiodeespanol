@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
 const Estructura = ({ estructura = [], liveDia }) => {
+  const { theme } = useActiveTheme() || {};
+  const themeColor = theme?.styles?.cardOverrides?.estructura;
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
   const [linkTitles, setLinkTitles] = useState({});
   const [allPages, setAllPages] = useState([]);
@@ -58,9 +61,15 @@ const Estructura = ({ estructura = [], liveDia }) => {
   if (todaysLessons.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 border-l-[6px] border-l-emerald-500 p-6 sm:p-8 space-y-6">
+    <div
+      className="bg-white rounded-2xl shadow-sm border border-slate-100 border-l-[6px] border-l-emerald-500 p-6 sm:p-8 space-y-6"
+      style={themeColor ? { borderLeftColor: themeColor } : undefined}
+    >
       <h3 className="font-black text-2xl text-slate-800 flex items-center gap-3">
-        <span className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0">📚</span>
+        <span
+          className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0"
+          style={themeColor ? { backgroundColor: `${themeColor}1A`, color: themeColor } : undefined}
+        >📚</span>
         Estructura y Gramática
       </h3>
 
