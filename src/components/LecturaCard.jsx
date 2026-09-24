@@ -3,10 +3,15 @@ import { Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useActiveTheme } from '../context/ThemeContext';
+import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 export default function LecturaCard({ lecturaId }) {
   const { theme } = useActiveTheme() || {};
-  const themeColor = theme?.styles?.cardOverrides?.lectura;
+  const themeStyle = getThemedCardStyle(
+    theme?.styles?.cardOverrides?.lectura,
+    theme?.styles?.accent,
+    theme?.styles?.textures?.lectura
+  );
   const [lectura, setLectura] = useState(null);
 
   useEffect(() => {
@@ -24,7 +29,7 @@ export default function LecturaCard({ lecturaId }) {
     <Link
       to={`/lectura/${lecturaId}`}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-      style={themeColor ? { background: `linear-gradient(135deg, ${themeColor}, ${theme?.styles?.accent || themeColor})` } : undefined}
+      style={themeStyle}
     >
       <div className="absolute -right-6 -top-6 opacity-20 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 pointer-events-none">
         <span className="text-[100px]">📄</span>
