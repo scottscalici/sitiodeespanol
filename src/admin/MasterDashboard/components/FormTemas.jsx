@@ -22,6 +22,7 @@ const CARD_KEYS = [
   { key: 'practica', label: 'Practice Hub' },
   { key: 'learningPath', label: 'Ruta de Aprendizaje' },
   { key: 'recreo', label: 'El Recreo' },
+  { key: 'leaderboard', label: 'Tabla de Líderes' },
 ];
 
 const MASCOT_KEYS = [

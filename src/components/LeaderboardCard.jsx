@@ -3,6 +3,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const TABS = [
   { key: 'total', label: 'Todo' },
@@ -14,6 +15,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 const LeaderboardCard = ({ course }) => {
   const { currentUser } = useAuth();
+  const { theme } = useActiveTheme() || {};
+  const themeColor = theme?.styles?.cardOverrides?.leaderboard;
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('total');
@@ -69,8 +72,14 @@ const LeaderboardCard = ({ course }) => {
   const amInTop = myIndex >= 0 && myIndex < 10;
 
   return (
-    <div className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg">
-      <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 uppercase tracking-widest text-lg mb-3">
+    <div
+      className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg"
+      style={themeColor ? { borderColor: themeColor } : undefined}
+    >
+      <h3
+        className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 uppercase tracking-widest text-lg mb-3"
+        style={themeColor ? { backgroundImage: `linear-gradient(to right, ${themeColor}, ${theme?.styles?.accent || themeColor})` } : undefined}
+      >
         🏆 Tabla de Líderes
       </h3>
 
@@ -84,6 +93,7 @@ const LeaderboardCard = ({ course }) => {
                 ? 'bg-amber-500 text-slate-900 shadow-md'
                 : 'text-slate-500 hover:bg-slate-800'
             }`}
+            style={activeTab === tab.key && themeColor ? { backgroundColor: themeColor } : undefined}
           >
             {tab.label}
           </button>
