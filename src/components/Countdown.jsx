@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useActiveTheme } from '../context/ThemeContext';
+import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 const Countdown = ({ course }) => {
+  const { theme } = useActiveTheme() || {};
   // Only render for Seniors (s4)
   if (course !== 's4') return null;
+
+  const themeStyle = getThemedCardStyle(
+    theme?.styles?.cardOverrides?.countdown,
+    theme?.styles?.accent,
+    theme?.styles?.textures?.countdown
+  );
 
   const [timeLeft, setTimeLeft] = useState({ days: '--', hrs: '--' });
   const targetDate = new Date("2027-03-08T07:20:00");
@@ -23,7 +32,7 @@ const Countdown = ({ course }) => {
   }, []);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-700 to-slate-900 p-6 shadow-xl text-center">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-700 to-slate-900 p-6 shadow-xl text-center" style={themeStyle}>
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
 
       <span className="inline-flex items-center gap-1.5 bg-white/10 text-indigo-200 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-5">

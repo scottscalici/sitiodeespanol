@@ -1,20 +1,28 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const GamesSidebar = () => {
+  const { theme } = useActiveTheme() || {};
+  const themeColor = theme?.styles?.cardOverrides?.recreo;
+
   return (
     <div className="space-y-4">
       {/* 🎟️ THE PORTAL TO EL RECREO (Featuring Señordle) */}
-      <Link 
-        to="/recreo" 
+      <Link
+        to="/recreo"
         className="group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-indigo-500/20 hover:border-indigo-500 transition-all duration-300 relative overflow-hidden"
+        style={themeColor ? { borderColor: themeColor } : undefined}
       >
         {/* Subtle background glow */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400 uppercase tracking-widest text-xl">
+            <h3
+              className="font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-fuchsia-400 uppercase tracking-widest text-xl"
+              style={themeColor ? { backgroundImage: `linear-gradient(to right, ${themeColor}, ${theme?.styles?.accent || themeColor})` } : undefined}
+            >
               El Recreo
             </h3>
             {/* The pulsing badge */}
@@ -44,7 +52,10 @@ const GamesSidebar = () => {
           </div>
 
           {/* Action Button */}
-          <div className="w-full bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.2em] py-3 rounded-xl text-center group-hover:bg-indigo-500 transition-colors shadow-md">
+          <div
+            className="w-full bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.2em] py-3 rounded-xl text-center group-hover:bg-indigo-500 transition-colors shadow-md"
+            style={themeColor ? { backgroundColor: themeColor } : undefined}
+          >
             Entrar al Recreo ↗
           </div>
         </div>

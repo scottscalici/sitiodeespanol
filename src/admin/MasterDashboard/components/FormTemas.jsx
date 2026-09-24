@@ -15,10 +15,13 @@ const CARD_KEYS = [
   { key: 'musica', label: 'Música', texture: true },
   { key: 'vocabulario', label: 'Vocabulario', texture: true },
   { key: 'tareas', label: 'Tareas (barra lateral)', texture: true },
+  { key: 'countdown', label: 'Cuenta Regresiva', texture: true },
+  { key: 'recursos', label: 'Panel de Recursos', texture: true },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
   { key: 'practica', label: 'Practice Hub' },
   { key: 'learningPath', label: 'Ruta de Aprendizaje' },
+  { key: 'recreo', label: 'El Recreo' },
 ];
 
 const MASCOT_KEYS = [

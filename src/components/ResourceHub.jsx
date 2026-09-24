@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useActiveTheme } from '../context/ThemeContext';
+import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 export default function ResourceHub({ course = 's2' }) {
+  const { theme } = useActiveTheme() || {};
+  const themeStyle = getThemedCardStyle(
+    theme?.styles?.cardOverrides?.recursos,
+    theme?.styles?.accent,
+    theme?.styles?.textures?.recursos
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +54,7 @@ export default function ResourceHub({ course = 's2' }) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="group relative w-full p-5 flex items-center justify-between overflow-hidden bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 hover:brightness-110 transition-all cursor-pointer text-left shadow-xl"
+        style={themeStyle}
       >
         <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
