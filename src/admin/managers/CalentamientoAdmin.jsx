@@ -166,7 +166,7 @@ export default function CalentamientoAdmin() {
     const formAnswer = subjectData.target || '???';
     const rawEnglish = subjectData.english || verbData.translations?.infinitivo?.english || '';
 
-    const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(newRawSubject, rawEnglish);
+    const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(newRawSubject, rawEnglish, q.tense);
 
     updated[index] = {
       ...q,

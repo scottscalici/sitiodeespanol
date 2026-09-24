@@ -21,20 +21,47 @@ export const getRandomSubject = (targetPref, includeVosotros = false) => {
   }
 };
 
+// English 3rd-person-singular present tense conjugation (he/she — never
+// "you") for the handful of irregular verbs plus the standard -s/-es/-ies
+// spelling rules. Only English's SIMPLE PRESENT actually conjugates for
+// person ("he/she speaks" vs "you speak") — every other tense (preterite,
+// future, subjunctive...) uses one shared form regardless of subject, which
+// is why callers must gate this on tense === 'presente' and never call it
+// for any other tense (e.g. "he spoke", not "he spokes").
+const IRREGULAR_THIRD_PERSON = { be: 'is', are: 'is', have: 'has', do: 'does', go: 'goes' };
+const conjugateThirdPersonSingular = (verb) => {
+  const lower = verb.toLowerCase();
+  if (IRREGULAR_THIRD_PERSON[lower]) return IRREGULAR_THIRD_PERSON[lower];
+  if (/(?:[sxz]|[cs]h)$/i.test(verb)) return `${verb}es`;
+  if (/[^aeiou]y$/i.test(verb)) return `${verb.slice(0, -1)}ies`;
+  return `${verb}s`;
+};
+
 // --- HELPERS TO CLEAN UP 3RD PERSON SUBJECTS ---
-export const formatSubjectAndTranslation = (rawSubject, rawEnglish) => {
+export const formatSubjectAndTranslation = (rawSubject, rawEnglish, tense) => {
   let sp = rawSubject;
   let en = rawEnglish || 'Sin traducción';
 
   if (rawSubject === 'él_ella_ud') {
     const choices = [
-      { subj: 'él', enPrefix: 'he' },
-      { subj: 'ella', enPrefix: 'she' },
-      { subj: 'Ud.', enPrefix: 'you (formal)' },
+      { subj: 'él', enPrefix: 'he', conjugate: true },
+      { subj: 'ella', enPrefix: 'she', conjugate: true },
+      { subj: 'Ud.', enPrefix: 'you (formal)', conjugate: false },
     ];
     const choice = choices[Math.floor(Math.random() * choices.length)];
     sp = choice.subj;
-    en = en.replace(/he\/she\/you/i, choice.enPrefix);
+    // Trailing verb capture is optional so a translation with no clean
+    // single word after the placeholder still falls back to a plain swap
+    // instead of silently leaving "he/she/you" unreplaced. Only the FIRST
+    // word after the placeholder is ever touched (e.g. "bring closer" ->
+    // "brings closer"), so a multi-word phrasal translation never gets a
+    // stray "s" tacked onto its last word.
+    en = en.replace(/he\/she\/you(\s+\S+)?/i, (_match, tail) => {
+      if (!tail) return choice.enPrefix;
+      const [, space, verb] = tail.match(/^(\s+)(\S+)$/);
+      const word = choice.conjugate && tense === 'presente' ? conjugateThirdPersonSingular(verb) : verb;
+      return `${choice.enPrefix}${space}${word}`;
+    });
   } else if (rawSubject === 'ellos_ellas_uds') {
     const choices = [
       { subj: 'ellos', enPrefix: 'they' },
@@ -72,7 +99,7 @@ export const generateVerbQuestions = (configBlocks, masterVerbsMap, { includeVos
       const formAnswer = subjectData.target || '???';
       const rawEnglish = subjectData.english || randomVerb.translations?.infinitivo?.english || '';
 
-      const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(rawSubject, rawEnglish);
+      const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(rawSubject, rawEnglish, chosenTense);
 
       finalizedQuestions.push({
         palabra: randomVerb.palabra,
