@@ -246,6 +246,7 @@ const DailyPlanHub = () => {
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link to="/admin-secret-portal-calentamiento" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Verbos</Link>
+                  <Link to="/admin-secret-portal-verb-editor" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📖 Editor de Verbos</Link>
                   <Link to="/admin-secret-portal-vocabvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Vocab</Link>
                 </div>
               </div>

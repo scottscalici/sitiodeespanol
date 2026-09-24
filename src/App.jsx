@@ -52,6 +52,7 @@ import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import VerbEditor from './admin/managers/VerbEditor';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
@@ -466,6 +467,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-verb-editor"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <VerbEditor />
                 </AdminRoute>
               }
             />
