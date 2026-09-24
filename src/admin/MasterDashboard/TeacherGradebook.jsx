@@ -9,6 +9,7 @@ import {
   getUnitSummary,
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
+import { getAssignedWarmups, buildWarmupBreakdown, averageFromBreakdown } from '../../utils/warmupBreakdown';
 
 // Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
 const getFlagClasses = (percent) => {
@@ -36,9 +37,10 @@ export default function TeacherGradebook() {
 
   // course -> today's assigned calentamiento docId (or null)
   const [todaysWarmupByCourse, setTodaysWarmupByCourse] = useState({});
-  // calentamiento docId -> { course, dia }, so we know which warmups were
-  // actually assigned (and by when) for the missing-assignment = 0 logic
-  const [calentamientoMetaById, setCalentamientoMetaById] = useState({});
+  // Every calentamiento doc (id, course, dia, title, excused), so we know
+  // which warmups were actually assigned (and by when) for the
+  // missing-assignment = 0 logic, and can list them by title in a breakdown.
+  const [allCalentamientos, setAllCalentamientos] = useState([]);
   // school calendar "dia" number -> fecha, to know when a given warmup's
   // dia was actually assigned/due
   const [calendarFechaByDia, setCalendarFechaByDia] = useState({});
@@ -47,6 +49,14 @@ export default function TeacherGradebook() {
   const [quarters, setQuarters] = useState([]);
   const [quarterModalOpen, setQuarterModalOpen] = useState(false);
   const [quarterDraft, setQuarterDraft] = useState([]);
+  // Which grading period the "Promedio Calentamientos" column shows —
+  // 'current' (today's quarter), 'all' (all-time), or a quarter's index —
+  // so a teacher can still pull up Q1's average after Q1 has ended instead
+  // of only ever seeing whichever quarter today happens to fall in.
+  const [viewQuarterId, setViewQuarterId] = useState('current');
+  // { student, breakdown, quarterLabel } — the per-assignment popup opened
+  // by clicking a student's Promedio Calentamientos badge.
+  const [breakdownModal, setBreakdownModal] = useState(null);
 
   // Roster filter: 'all' or `${course}|${section}`
   const [rosterFilter, setRosterFilter] = useState('all');
@@ -90,15 +100,13 @@ export default function TeacherGradebook() {
     const fetchCalendarAndWarmups = async (liveDia) => {
       try {
         const calentamientos = await getCachedCollection('calentamientos', { force });
-        const metaById = {};
         const todaysByCourse = {};
         calentamientos.forEach((c) => {
-          metaById[c.id] = { course: c.course, dia: c.dia != null ? Number(c.dia) : null, excused: !!c.excused };
           if (Number(c.dia) === liveDia && !todaysByCourse[c.course]) {
             todaysByCourse[c.course] = c.id;
           }
         });
-        setCalentamientoMetaById(metaById);
+        setAllCalentamientos(calentamientos);
         setTodaysWarmupByCourse(todaysByCourse);
       } catch (error) {
         console.error('Error fetching calentamientos for gradebook:', error);
@@ -185,34 +193,38 @@ export default function TeacherGradebook() {
     setRefreshing(false);
   };
 
-  // --- WARMUP AVERAGE (current quarter if configured, else all-time),
-  // scoped to warmups that belong to the student's own course.
+  // Resolves the dropdown's 'current' / 'all' / quarter-index selection to
+  // an actual quarter object (or null for all-time) — 'current' is a LIVE
+  // choice (whichever quarter today falls in), while picking a specific
+  // quarter stays pinned to it even once the calendar moves past it, so
+  // Q1's average is still there to record after Q1 has ended.
+  const getSelectedQuarter = () => {
+    if (viewQuarterId === 'all') return null;
+    if (viewQuarterId === 'current') return getCurrentQuarter(quarters, new Date().toLocaleDateString('en-CA'));
+    const quarter = quarters[Number(viewQuarterId)];
+    return quarter || null;
+  };
+
+  // --- WARMUP AVERAGE for the selected grading period, scoped to warmups
+  // that belong to the student's own course.
   // A calentamiento counts as "assigned" once its day's date has arrived;
   // if the student never completed it, it counts as a 0 in the average
   // instead of being skipped (which used to quietly inflate the average). ---
   const getWarmupAverage = (student) => {
-    const warmups = student.progress?.warmups || {};
+    const quarter = getSelectedQuarter();
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const quarter = getCurrentQuarter(quarters, todayStr);
+    const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
+    const breakdown = buildWarmupBreakdown(assigned, student.progress?.warmups || {});
+    return { percent: averageFromBreakdown(breakdown), quarterLabel: quarter?.label || null };
+  };
 
-    const assignedIds = Object.entries(calentamientoMetaById).filter(([, meta]) => {
-      if (meta.course !== student.course) return false;
-      if (meta.excused) return false;
-      const fecha = meta.dia != null ? calendarFechaByDia[meta.dia] : null;
-      if (!fecha || fecha > todayStr) return false; // not assigned yet
-      if (quarter && !(fecha >= quarter.startDate && fecha <= quarter.endDate)) return false;
-      return true;
-    }).map(([warmupId]) => warmupId);
-
-    if (assignedIds.length === 0) return { percent: null, quarterLabel: quarter?.label || null };
-
-    const grades = assignedIds.map((warmupId) => {
-      const entry = warmups[warmupId];
-      return typeof entry?.grade === 'number' ? entry.grade : 0;
-    });
-
-    const avg = Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length);
-    return { percent: avg, quarterLabel: quarter?.label || null };
+  // Full per-assignment breakdown for the popup — same assigned set and
+  // quarter as getWarmupAverage above, just not collapsed to one number.
+  const getWarmupBreakdownForStudent = (student) => {
+    const quarter = getSelectedQuarter();
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
+    return { breakdown: buildWarmupBreakdown(assigned, student.progress?.warmups || {}), quarterLabel: quarter?.label || null };
   };
 
   // --- TODAY'S ASSIGNED WARMUP STATUS for this student's course ---
@@ -436,6 +448,19 @@ const handleResetPassword = async () => {
                 })}
             </select>
 
+            <select
+              value={viewQuarterId}
+              onChange={(e) => setViewQuarterId(e.target.value)}
+              className="bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+              title="Qué periodo muestra el Promedio Calentamientos"
+            >
+              <option value="current">Promedio: Trimestre Actual</option>
+              {quarters.map((q, idx) => (
+                <option key={idx} value={idx}>Promedio: {q.label || `Trimestre ${idx + 1}`}</option>
+              ))}
+              <option value="all">Promedio: Todo el Año</option>
+            </select>
+
             <button
               onClick={() => {
                 setQuarterDraft(quarters.length ? quarters : [{ label: 'Trimestre 1', startDate: '', endDate: '' }]);
@@ -570,7 +595,7 @@ const handleResetPassword = async () => {
                   <th className="p-4">
                     Promedio Calentamientos
                     <span className="block text-[9px] font-mono text-slate-500 normal-case">
-                      {getCurrentQuarter(quarters, new Date().toLocaleDateString('en-CA'))?.label || 'Todo el año'}
+                      {getSelectedQuarter()?.label || 'Todo el año'}
                     </span>
                   </th>
                   <th className="p-4">Calentamiento de Hoy</th>
@@ -620,9 +645,17 @@ const handleResetPassword = async () => {
                           {avgPercent == null ? (
                             <span className="text-slate-600 font-bold">—</span>
                           ) : (
-                            <div className={`inline-block border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-sm ${getFlagClasses(avgPercent)}`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const { breakdown, quarterLabel } = getWarmupBreakdownForStudent(student);
+                                setBreakdownModal({ student, displayName, breakdown, quarterLabel });
+                              }}
+                              className={`inline-block border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-sm hover:brightness-125 transition-all cursor-pointer ${getFlagClasses(avgPercent)}`}
+                              title="Ver desglose por calentamiento"
+                            >
                               {avgPercent}%
-                            </div>
+                            </button>
                           )}
                         </td>
 
@@ -916,6 +949,80 @@ const handleResetPassword = async () => {
                 className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors shadow-md"
               >
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📋 WARMUP BREAKDOWN MODAL — per-assignment scores behind a student's Promedio badge */}
+      {breakdownModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <span>🔥</span> Desglose de Calentamientos
+              </h3>
+              <button
+                onClick={() => setBreakdownModal(null)}
+                className="text-slate-400 hover:text-white text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-6">
+              {breakdownModal.displayName} — {breakdownModal.quarterLabel || 'Todo el año'}
+            </p>
+
+            {breakdownModal.breakdown.length === 0 ? (
+              <p className="text-sm text-slate-500 italic text-center py-8">
+                No hay calentamientos asignados en este periodo.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {breakdownModal.breakdown.map((item) => (
+                  <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl p-3">
+                    <div className="flex justify-between items-center gap-3">
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-sm truncate">
+                          Día {item.dia}: {item.title}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-mono">{item.fecha}</p>
+                      </div>
+                      <div
+                        className={`shrink-0 border rounded-lg px-3 py-1 text-center min-w-[64px] font-black text-xs ${
+                          item.completed ? getFlagClasses(item.grade) : 'text-slate-500 bg-slate-950 border-slate-700'
+                        }`}
+                      >
+                        {item.completed ? `${item.grade}%` : 'Sin hacer'}
+                      </div>
+                    </div>
+
+                    {item.errors.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-rose-400/80">
+                          Falló ({item.errors.length}):
+                        </p>
+                        {item.errors.map((err, i) => (
+                          <p key={i} className="text-[11px] text-slate-400">
+                            <span className="font-bold text-slate-300">{err.verb}</span> ({err.subject}, {err.tense}) —
+                            esperaba <span className="text-emerald-400 font-mono">{err.expected}</span>, escribió{' '}
+                            <span className="text-rose-400 font-mono">{err.studentInput || '(vacío)'}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end border-t border-slate-700 pt-4 mt-6">
+              <button
+                onClick={() => setBreakdownModal(null)}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white uppercase tracking-widest transition-colors"
+              >
+                Cerrar
               </button>
             </div>
           </div>

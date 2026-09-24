@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { getAssignedWarmups, buildWarmupBreakdown, averageFromBreakdown } from '../utils/warmupBreakdown';
 
 // Components
 import Header from '../components/Header';
@@ -53,13 +54,15 @@ const Dashboard = () => {
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
   const [activeLecturas, setActiveLecturas] = useState([]);
   const [hasSentences, setHasSentences] = useState(false);
-  const [warmupAverage, setWarmupAverage] = useState(null);
+  const [warmupBreakdown, setWarmupBreakdown] = useState([]);
+  const [showWarmupModal, setShowWarmupModal] = useState(false);
+  const warmupAverage = averageFromBreakdown(warmupBreakdown);
 
   // Calentamiento promedio: a calentamiento counts once its day's date has
   // arrived; a missed one counts as a 0 instead of being skipped, so this
   // matches the teacher gradebook's average.
   useEffect(() => {
-    const computeWarmupAverage = async () => {
+    const computeWarmupBreakdown = async () => {
       if (!course || !data?.cal?.length) return;
       try {
         const calentamientos = await getCachedCollection('calentamientos');
@@ -69,29 +72,13 @@ const Dashboard = () => {
           if (c.dia != null && c.fecha) fechaByDia[Number(c.dia)] = c.fecha;
         });
 
-        const assigned = calentamientos.filter((c) => {
-          if (c.course !== course) return false;
-          if (c.excused) return false;
-          const fecha = c.dia != null ? fechaByDia[Number(c.dia)] : null;
-          return fecha && fecha <= todayStr;
-        });
-
-        if (assigned.length === 0) {
-          setWarmupAverage(null);
-          return;
-        }
-
-        const warmups = userData?.progress?.warmups || {};
-        const grades = assigned.map((c) => {
-          const entry = warmups[c.id];
-          return typeof entry?.grade === 'number' ? entry.grade : 0;
-        });
-        setWarmupAverage(Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length));
+        const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
+        setWarmupBreakdown(buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}));
       } catch (error) {
-        console.error('Error computing warmup average:', error);
+        console.error('Error computing warmup breakdown:', error);
       }
     };
-    computeWarmupAverage();
+    computeWarmupBreakdown();
   }, [course, data?.cal, userData?.progress?.warmups]);
 
   // Fetch Music
@@ -280,39 +267,46 @@ const Dashboard = () => {
             <Evaluacion evals={data?.evals?.[course] || []} liveDia={liveDia} course={course} cal={data?.cal} />
 
             {/* ⏱️ CALENTAMIENTO CARD — WORKOUT-APP STYLE */}
-            <Link
-              to={`/calentamiento/${course}/${liveDia}`}
-              className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-              style={themeGradientStyle('calentamiento')}
-            >
-              <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="relative group">
+              <Link
+                to={`/calentamiento/${course}/${liveDia}`}
+                className="block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                style={themeGradientStyle('calentamiento')}
+              >
+                <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="flex items-center gap-4">
+                  {/* Flame Badge */}
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span className="text-3xl drop-shadow">🔥</span>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
+                    <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                    Iniciar Misión <span>→</span>
+                  </span>
+                </div>
+              </Link>
 
               {warmupAverage !== null && (
-                <div className="absolute top-4 right-4 bg-white/15 backdrop-blur-sm rounded-lg px-3 py-1.5 text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowWarmupModal(true)}
+                  className="absolute top-4 right-4 bg-white/15 hover:bg-white/30 backdrop-blur-sm rounded-lg px-3 py-1.5 text-right transition-colors cursor-pointer"
+                  title="Ver desglose de calentamientos"
+                >
                   <span className="block text-[9px] font-black uppercase tracking-widest text-orange-100">Promedio</span>
                   <span className="block text-lg font-black text-white leading-none">{warmupAverage}%</span>
-                </div>
+                </button>
               )}
-
-              <div className="flex items-center gap-4">
-                {/* Flame Badge */}
-                <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                  <span className="text-3xl drop-shadow">🔥</span>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <span className="block text-xs font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
-                  <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex justify-end">
-                <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-red-600 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
-                  Iniciar Misión <span>→</span>
-                </span>
-              </div>
-            </Link>
+            </div>
 
             {/* 💡 CURIOSIDAD */}
             <Curiosidad curiosidades={activeCuriosidades} />
@@ -595,6 +589,77 @@ const Dashboard = () => {
            <UtilityCard type="recurso" data={activeRecursos} />
         </div>
       </div>
+
+      {/* 🔥 CALENTAMIENTO PROMEDIO BREAKDOWN MODAL */}
+      {showWarmupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div className="bg-slate-900 p-5 flex justify-between items-center sticky top-0">
+              <div>
+                <h2 className="text-white font-black uppercase tracking-widest text-lg">Mis Calentamientos</h2>
+                <p className="text-orange-400 font-bold text-xs uppercase tracking-widest mt-1">Promedio: {warmupAverage}%</p>
+              </div>
+              <button
+                onClick={() => setShowWarmupModal(false)}
+                className="text-slate-400 hover:text-white text-3xl font-bold leading-none p-2 -mr-2"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3 bg-slate-50">
+              {warmupBreakdown.length === 0 ? (
+                <p className="text-center text-slate-500 italic font-bold py-8">
+                  Todavía no hay calentamientos asignados.
+                </p>
+              ) : (
+                warmupBreakdown.map((item) => {
+                  const gradeClasses = !item.completed
+                    ? 'bg-slate-100 text-slate-400 border-slate-200'
+                    : item.grade < 50
+                    ? 'bg-rose-50 text-rose-600 border-rose-200'
+                    : item.grade < 70
+                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+
+                  return (
+                    <Link
+                      key={item.id}
+                      to={`/calentamiento/${item.course}/${item.dia}`}
+                      onClick={() => setShowWarmupModal(false)}
+                      className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-orange-300 hover:shadow-md transition-all"
+                    >
+                      <div className="flex justify-between items-center gap-3">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-800 text-sm truncate">Día {item.dia}: {item.title}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">{item.fecha}</p>
+                        </div>
+                        <div className={`shrink-0 border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-xs ${gradeClasses}`}>
+                          {item.completed ? `${item.grade}%` : 'Sin hacer'}
+                        </div>
+                      </div>
+
+                      {item.errors.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">
+                            Fallaste ({item.errors.length}):
+                          </p>
+                          {item.errors.map((err, i) => (
+                            <p key={i} className="text-[11px] text-slate-500">
+                              <span className="font-bold text-slate-700">{err.verb}</span> ({err.subject}, {err.tense}) —
+                              era <span className="text-emerald-600 font-mono">{err.expected}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
