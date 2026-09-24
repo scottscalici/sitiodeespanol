@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Seasonal themes (the "temas" Firestore collection) store their header
+   gradient as a literal Tailwind class string authored through the admin
+   theme editor — Tailwind's build-time scanner can't see those strings
+   since they only exist as runtime data, so without this safelist the
+   classes would be missing from the compiled CSS and the gradient would
+   silently render as transparent. This forces every from/via/to color x
+   shade x direction combination to always be generated. */
+@source inline("bg-gradient-to-{r,l,t,b,tr,tl,br,bl} {from,via,to}-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("bg-gradient-to-{r,l,t,b,tr,tl,br,bl} {from,via,to}-{white,black}");
+
 
 :root {
   --text: #6b6375;

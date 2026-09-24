@@ -5,9 +5,12 @@ import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
+import { useActiveTheme } from '../context/ThemeContext';
 
 // Components
 import Header from '../components/Header';
+import ThemeParticles from '../components/ThemeParticles';
+import ThemeHeroBanner from '../components/ThemeHeroBanner';
 import Evaluacion from '../components/Evaluacion';
 import Countdown from '../components/Countdown';
 import GamesSidebar from '../components/GamesSidebar';
@@ -40,6 +43,7 @@ const PLATFORM_TAREA_INFO = {
 
 const Dashboard = () => {
   const { userData } = useAuth();
+  const { theme } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
   const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse);
@@ -246,8 +250,11 @@ const Dashboard = () => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
 
+  const calentamientoOverrideColor = theme?.styles?.cardOverrides?.calentamiento;
+
   return (
     <div className="min-h-screen bg-slate-50/50">
+      <ThemeParticles config={theme?.effectConfig} />
       <div className="w-full max-w-6xl mx-auto space-y-8 pb-24 pt-6 px-4 sm:px-6">
 
         {/* HEADER */}
@@ -257,6 +264,9 @@ const Dashboard = () => {
 
         {/* 📢 ANUNCIOS */}
         <Anuncios anuncios={data?.anuncios} cal={data?.cal} liveDia={liveDia} course={course} />
+
+        {/* 🎨 SEASONAL THEME HERO BANNER */}
+        <ThemeHeroBanner hero={theme?.hero} accent={theme?.styles?.accent} />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: LESSON CONTENT */}
@@ -269,6 +279,11 @@ const Dashboard = () => {
             <Link
               to={`/calentamiento/${course}/${liveDia}`}
               className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+              style={
+                calentamientoOverrideColor
+                  ? { background: `linear-gradient(135deg, ${calentamientoOverrideColor}, ${theme?.styles?.accent || calentamientoOverrideColor})` }
+                  : undefined
+              }
             >
               <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 

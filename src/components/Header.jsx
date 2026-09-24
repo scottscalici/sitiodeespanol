@@ -9,9 +9,13 @@ import { getTitleForPoints, getAllEarnedBadges, isBadgeUpgrade, DEFAULT_TITLE_TI
 import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
   const { userData, currentUser } = useAuth();
+  const { theme } = useActiveTheme() || {};
+  const headerGradientClass = theme?.styles?.header || 'bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c]';
+  const headingFont = theme?.styles?.fontHeading;
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
@@ -118,12 +122,12 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   }
 
   return (
-    <header className="bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c] rounded-xl p-8 text-white shadow-lg flex flex-col gap-6">
+    <header className={`${headerGradientClass} rounded-xl p-8 text-white shadow-lg flex flex-col gap-6`}>
       <div className="flex justify-between items-center">
       <div className="flex flex-col gap-1">
         <h1
           className="text-5xl font-black tracking-tight uppercase"
-          style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}
+          style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)', fontFamily: headingFont ? 'var(--font-heading)' : undefined }}
         >
           Día {liveDia}
         </h1>

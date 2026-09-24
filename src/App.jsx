@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { ThemeProvider } from './context/ThemeContext';
 
 // 🎓 STUDENT ECOSYSTEM & PAGES
 import Login from './student/Login';
@@ -135,6 +136,7 @@ function App() {
   }
 
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {user?.isAnonymous && (
@@ -499,6 +501,7 @@ function App() {
         </main>
       </div>
     </BrowserRouter>
+    </ThemeProvider>
   );
 }
 
