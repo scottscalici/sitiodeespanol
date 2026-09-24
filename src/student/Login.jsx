@@ -272,7 +272,7 @@ const Login = () => {
                 onChange={(e) => setNotInClass(e.target.checked)}
                 style={{ marginTop: '3px' }}
               />
-              No estoy actualmente en una clase del Sr. Scalici (ex-estudiante u otro), pero quiero seguir usando el sitio.
+              I'm not currently in one of Sr. Scalici's classes (former student or other), but I'd like to keep using the site.
             </label>
           </>
         )}
