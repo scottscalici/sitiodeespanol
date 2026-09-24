@@ -52,6 +52,7 @@ const Dashboard = () => {
 
   const [dailySong, setDailySong] = useState(null);
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
+  const [vocabBundleDetails, setVocabBundleDetails] = useState({});
   const [activeLecturas, setActiveLecturas] = useState([]);
   const [hasSentences, setHasSentences] = useState(false);
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
@@ -118,6 +119,29 @@ const Dashboard = () => {
     };
     fetchVocabSequence();
   }, [course, liveDia]);
+
+  // Fetch each vocab bundle's real title (textbook + chapter) so the
+  // Dashboard card can show "Descubre 2 — Lección 8" / "Reporteros 4 —
+  // Unidad 1" instead of a slugified doc ID.
+  useEffect(() => {
+    if (activeVocabBundles.length === 0) return;
+    let cancelled = false;
+    const fetchBundleDetails = async () => {
+      try {
+        const entries = await Promise.all(
+          activeVocabBundles.map(async (bundleId) => {
+            const snap = await getDoc(doc(db, 'vocab_bundles', bundleId));
+            return [bundleId, snap.exists() ? snap.data() : null];
+          })
+        );
+        if (!cancelled) setVocabBundleDetails(Object.fromEntries(entries));
+      } catch (error) {
+        console.error('Error fetching vocab bundle details:', error);
+      }
+    };
+    fetchBundleDetails();
+    return () => { cancelled = true; };
+  }, [activeVocabBundles]);
 
   // Fetch Reading Sequence for Today
   useEffect(() => {
@@ -472,7 +496,17 @@ const Dashboard = () => {
             )}
 
             {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE */}
-            {activeVocabBundles.map(bundleId => (
+            {activeVocabBundles.map(bundleId => {
+              const bundleDetails = vocabBundleDetails[bundleId];
+              // "Unidad" for Reporteros (S4), "Lección" for Descubre (S2)
+              // and anything else — keyed off the textbook name itself so
+              // it's still right if a course ever mixes textbooks.
+              const unitWord = /reporteros/i.test(bundleDetails?.textbook || '') ? 'Unidad' : 'Lección';
+              const bundleTitle = bundleDetails
+                ? `${bundleDetails.textbook} — ${unitWord} ${bundleDetails.chapter}`
+                : bundleId.replace(/_/g, ' ');
+
+              return (
               <Link
                 key={bundleId}
                 to={`/vocabulario/${bundleId}`}
@@ -493,8 +527,8 @@ const Dashboard = () => {
 
                   <div className="min-w-0 flex-1">
                     <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleId.replace(/_/g, ' ')}</h3>
-                    <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Domina los términos y estructuras clave de esta unidad.</p>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleTitle}</h3>
+                    <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Aquí puedes ver una lista de palabras y usar tarjetas de estudio.</p>
                   </div>
                 </div>
 
@@ -504,7 +538,8 @@ const Dashboard = () => {
                   </span>
                 </div>
               </Link>
-            ))}
+              );
+            })}
 
             <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
 
