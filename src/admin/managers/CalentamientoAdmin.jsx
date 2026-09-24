@@ -17,6 +17,7 @@ export default function CalentamientoAdmin() {
   const [verbGroups, setVerbGroups] = useState([]);
   const [savedPractices, setSavedPractices] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedVerb, setSelectedVerb] = useState('');
   const [configBlocks, setConfigBlocks] = useState([]);
 
   // Master verb map cache for preview & baking
@@ -112,6 +113,26 @@ export default function CalentamientoAdmin() {
     // happens after removing a block: the dropdown keeps showing that group
     // selected, and re-picking it to add it back silently does nothing.
     setSelectedGroup('');
+  };
+
+  // Adds a single verb (not a whole group) as its own one-verb block — for
+  // the occasional verb a teacher wants to fill in outside the group system.
+  const handleAddSpecificVerb = (verbId) => {
+    const verbData = masterVerbsMap[verbId];
+    if (verbData) {
+      setConfigBlocks([
+        ...configBlocks,
+        {
+          label: verbData.palabra,
+          tense: 'presente',
+          allowedVerbs: [verbId],
+          count: 5,
+          specificVerb: verbId,
+          targetSubject: 'any',
+        },
+      ]);
+    }
+    setSelectedVerb('');
   };
 
   const updateBlockConfig = (index, field, value) => {
@@ -405,22 +426,44 @@ export default function CalentamientoAdmin() {
             </span>
           </div>
 
-          <div className="max-w-md mt-4">
-            <label className="block text-xs font-black text-slate-500 uppercase mb-1">
-              Añadir Grupo desde la Base de Datos
-            </label>
-            <select
-              value={selectedGroup}
-              onChange={(e) => handleGroupSelect(e.target.value)}
-              className="w-full p-2.5 border rounded-xl font-bold bg-slate-50"
-            >
-              <option value="">-- Selecciona un Grupo --</option>
-              {verbGroups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({g.level})
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <div className="max-w-md flex-1">
+              <label className="block text-xs font-black text-slate-500 uppercase mb-1">
+                Añadir Grupo desde la Base de Datos
+              </label>
+              <select
+                value={selectedGroup}
+                onChange={(e) => handleGroupSelect(e.target.value)}
+                className="w-full p-2.5 border rounded-xl font-bold bg-slate-50"
+              >
+                <option value="">-- Selecciona un Grupo --</option>
+                {verbGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.level})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="max-w-md flex-1">
+              <label className="block text-xs font-black text-slate-500 uppercase mb-1">
+                O Añadir un Verbo Individual
+              </label>
+              <select
+                value={selectedVerb}
+                onChange={(e) => handleAddSpecificVerb(e.target.value)}
+                className="w-full p-2.5 border rounded-xl font-bold bg-slate-50"
+              >
+                <option value="">-- Selecciona un Verbo --</option>
+                {Object.values(masterVerbsMap)
+                  .sort((a, b) => (a.palabra || '').localeCompare(b.palabra || ''))
+                  .map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.palabra}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-3 mt-4">
@@ -443,7 +486,7 @@ export default function CalentamientoAdmin() {
                     {block.label}
                   </p>
                   <p className="text-[10px] text-slate-400">
-                    {block.allowedVerbs.length} verbos
+                    {block.allowedVerbs.length} verbo{block.allowedVerbs.length === 1 ? '' : 's'}
                   </p>
                 </div>
                 <div>
