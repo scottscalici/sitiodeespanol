@@ -37,7 +37,10 @@ const LeaderboardCard = ({ course }) => {
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
 
-        const rows = snap.docs.map((docSnap) => {
+        // Independent accounts (former students using the site outside any
+        // current class) share the course-wide leaderboard query but never
+        // belong in a live class's ranking.
+        const rows = snap.docs.filter((docSnap) => !docSnap.data().independent).map((docSnap) => {
           const d = docSnap.data();
           const lastInitial = d.lastName ? `${d.lastName.trim().charAt(0).toUpperCase()}.` : '';
           const name = [d.firstName, lastInitial].filter(Boolean).join(' ') || d.email || 'Estudiante';

@@ -18,6 +18,10 @@ const Login = () => {
   // NEW: State for Course and Section dropdowns
   const [course, setCourse] = useState('s2');
   const [section, setSection] = useState('1A');
+  // Former/outside students who want to keep using the site without being
+  // tied to a current class block (so their activity doesn't mix into a
+  // teacher's live roster, gradebook, or leaderboard).
+  const [notInClass, setNotInClass] = useState(false);
   
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
@@ -50,7 +54,8 @@ const Login = () => {
           lastName: lastName,
           role: assignedRole,
           course: course,
-          section: section,
+          section: notInClass ? null : section,
+          ...(notInClass ? { independent: true } : {}),
           highest_pod_reached: 0,
           current_path_points: 0,
           created_at: new Date().toISOString(),
@@ -218,34 +223,57 @@ const Login = () => {
                   <option value="s4">IB Español B II</option>
                 </select>
               </div>
-              <div style={{ flex: 1 }}>
-                <label
-                  style={{
-                    fontWeight: 'bold',
-                    display: 'block',
-                    marginBottom: '5px',
-                  }}
-                >
-                  Sección
-                </label>
-                <select
-                  value={section}
-                  onChange={(e) => setSection(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    boxSizing: 'border-box',
-                    borderRadius: '5px',
-                    border: '1px solid #ccc',
-                    backgroundColor: 'white',
-                  }}
-                >
-                  <option value="4A">4A</option>
-                  <option value="1B">1B</option>
-                  <option value="4B">4B</option>
-                </select>
-              </div>
+              {!notInClass && (
+                <div style={{ flex: 1 }}>
+                  <label
+                    style={{
+                      fontWeight: 'bold',
+                      display: 'block',
+                      marginBottom: '5px',
+                    }}
+                  >
+                    Sección
+                  </label>
+                  <select
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      boxSizing: 'border-box',
+                      borderRadius: '5px',
+                      border: '1px solid #ccc',
+                      backgroundColor: 'white',
+                    }}
+                  >
+                    <option value="4A">4A</option>
+                    <option value="1B">1B</option>
+                    <option value="4B">4B</option>
+                  </select>
+                </div>
+              )}
             </div>
+
+            {/* Opt-out: not currently in one of Sr. Scalici's class blocks */}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                fontSize: '13px',
+                color: '#444',
+                cursor: 'pointer',
+                lineHeight: 1.4,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={notInClass}
+                onChange={(e) => setNotInClass(e.target.checked)}
+                style={{ marginTop: '3px' }}
+              />
+              No estoy actualmente en una clase del Sr. Scalici (ex-estudiante u otro), pero quiero seguir usando el sitio.
+            </label>
           </>
         )}
 

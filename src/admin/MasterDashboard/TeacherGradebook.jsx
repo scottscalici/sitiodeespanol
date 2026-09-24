@@ -82,7 +82,9 @@ export default function TeacherGradebook() {
     const fetchStudents = async () => {
       try {
         const allUsers = await getCachedCollection('users', { force: true });
-        setStudents(allUsers.filter((u) => u.role === 'student'));
+        // independent accounts (former students who registered outside any
+        // current class block) never show up in a teacher's live roster.
+        setStudents(allUsers.filter((u) => u.role === 'student' && !u.independent));
       } catch (error) {
         console.error('Error fetching gradebook data:', error);
       }
@@ -178,7 +180,7 @@ export default function TeacherGradebook() {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         getCachedCollection('users', { force: true })
-          .then((allUsers) => setStudents(allUsers.filter((u) => u.role === 'student')))
+          .then((allUsers) => setStudents(allUsers.filter((u) => u.role === 'student' && !u.independent)))
           .catch((error) => console.error('Error auto-refreshing gradebook:', error));
       }
     }, 20000);
