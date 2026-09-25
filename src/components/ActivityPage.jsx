@@ -277,10 +277,18 @@ const formatConvTime = (s) => {
 
 const pickRandomQuestion = (pool) => pool[Math.floor(Math.random() * pool.length)];
 
+const TeacherOnlyBadge = () => (
+  <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full ml-2">
+    🔒 Solo profesor
+  </span>
+);
+
 const ConversacionLayout = ({ activity }) => {
   const { raw } = activity;
   const { userData } = useAuth();
   const isS4 = userData?.course === 's4';
+  const isAdmin = userData?.role === 'admin';
+  const canSee = (field) => isAdmin || !!raw.visibilidad?.[field];
 
   const baseSegments = (raw.presentation_segments || '')
     .split(',')
@@ -398,7 +406,7 @@ const ConversacionLayout = ({ activity }) => {
     setCurrentQuestion(q);
   };
 
-  const hasPromptBox = raw.escenario || (raw.instrucciones || []).some((i) => i) || raw.modelo;
+  const hasPromptBox = raw.escenario || (raw.instrucciones || []).some((i) => i) || (raw.modelo && canSee('modelo'));
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
@@ -453,10 +461,143 @@ const ConversacionLayout = ({ activity }) => {
                 </ul>
               </div>
             )}
-            {raw.modelo && (
+            {raw.modelo && canSee('modelo') && (
               <div>
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2">Modelo de Respuesta</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-2 flex items-center">
+                  Modelo de Respuesta
+                  {isAdmin && !raw.visibilidad?.modelo && <TeacherOnlyBadge />}
+                </h4>
                 <p className="text-slate-700 italic leading-relaxed">{raw.modelo}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contenido extendido del profesor (cada sección se puede mostrar al estudiante desde el editor) */}
+        {(() => {
+          const teacherSections = [
+            { field: 'descripcion', label: 'Descripción', kind: 'text' },
+            { field: 'relacion_tema', label: 'Relación con el Tema', kind: 'text' },
+            { field: 'conexion_cultural', label: 'Conexión Cultural', kind: 'list' },
+            { field: 'preguntas_interpretativas', label: 'Preguntas Interpretativas', kind: 'list' },
+            { field: 'preguntas_personales', label: 'Preguntas Personales / Globales', kind: 'list' },
+            { field: 'conexion_personal', label: 'Conexión Personal', kind: 'list' },
+            { field: 'expansion_tema', label: 'Expansión del Tema', kind: 'list' },
+          ].filter(({ field, kind }) => canSee(field) && (kind === 'text' ? raw[field] : (raw[field] || []).length > 0));
+
+          const showExpresiones = canSee('expresiones_idiomaticas') && (raw.expresiones_idiomaticas || []).length > 0;
+          const interaccionLevels = [
+            { key: 'descriptivo', label: 'Descriptivo' },
+            { key: 'interpretativo', label: 'Interpretativo' },
+            { key: 'personal_global', label: 'Personal-Global' },
+          ].filter(({ key }) => (raw.interacciones?.[key] || []).length > 0);
+          const showInteracciones = canSee('interacciones') && interaccionLevels.length > 0;
+
+          if (teacherSections.length === 0 && !showExpresiones && !showInteracciones) return null;
+
+          return (
+            <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-6 flex flex-col gap-5">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-fuchsia-600">Contenido Extendido</h4>
+
+              {teacherSections.map(({ field, label, kind }) => (
+                <div key={field}>
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500 mb-2 flex items-center">
+                    {label}
+                    {isAdmin && !raw.visibilidad?.[field] && <TeacherOnlyBadge />}
+                  </h5>
+                  {kind === 'text' ? (
+                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{raw[field]}</p>
+                  ) : (
+                    <ul className="list-disc list-inside space-y-1">
+                      {raw[field].map((item, i) => (
+                        <li key={i} className="text-slate-700 leading-relaxed">{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+
+              {showExpresiones && (
+                <div>
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500 mb-2 flex items-center">
+                    Expresiones Idiomáticas
+                    {isAdmin && !raw.visibilidad?.expresiones_idiomaticas && <TeacherOnlyBadge />}
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {raw.expresiones_idiomaticas.map((exp, i) => (
+                      <div key={i} className="bg-white border border-fuchsia-100 rounded-lg p-3">
+                        <p className="font-black text-slate-800 text-sm">{exp.expresion}</p>
+                        <p className="text-slate-600 text-xs mt-1">{exp.significado}</p>
+                        {exp.ejemplo && <p className="text-slate-500 text-xs italic mt-1">"{exp.ejemplo}"</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {showInteracciones && (
+                <div>
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500 mb-2 flex items-center">
+                    Interacción: Niveles
+                    {isAdmin && !raw.visibilidad?.interacciones && <TeacherOnlyBadge />}
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {interaccionLevels.map(({ key, label }) => (
+                      <div key={key} className="bg-white border border-fuchsia-100 rounded-lg p-3">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-400 mb-1">{label}</p>
+                        <ul className="space-y-1">
+                          {(raw.interacciones[key] || []).map((line, i) => (
+                            <li key={i} className="text-slate-700 text-xs leading-relaxed">{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Andamio del estudiante — siempre visible cuando existe */}
+        {((raw.pasos_estudiante || []).length > 0 || (raw.banco_palabras || []).length > 0 || (raw.autoevaluacion || []).length > 0) && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 flex flex-col gap-5">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-600">🧑‍🎓 Tu Guía</h4>
+
+            {(raw.pasos_estudiante || []).length > 0 && (
+              <div className="flex flex-col gap-3">
+                {raw.pasos_estudiante.map((paso, i) => (
+                  <div key={i} className="bg-white border border-emerald-100 rounded-lg p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">{paso.titulo || `Paso ${i + 1}`}</p>
+                    <p className="text-slate-700 text-sm leading-relaxed">{paso.prompt}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(raw.banco_palabras || []).length > 0 && (
+              <div>
+                <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-2">Banco de Palabras</h5>
+                <div className="flex flex-wrap gap-2">
+                  {raw.banco_palabras.map((word, i) => (
+                    <span key={i} className="text-xs font-bold text-emerald-700 bg-white border border-emerald-200 px-3 py-1 rounded-full">
+                      {word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(raw.autoevaluacion || []).length > 0 && (
+              <div>
+                <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-2">Autoevaluación</h5>
+                <ul className="space-y-1">
+                  {raw.autoevaluacion.map((item, i) => (
+                    <li key={i} className="text-slate-700 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">☐</span> {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

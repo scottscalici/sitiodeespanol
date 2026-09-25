@@ -251,7 +251,13 @@ export default function MasterDashboard() {
               isNew: false
             };
             // Only copy these when the JSON has them, so re-importing doesn't erase values typed in the form
-            for (const key of ["subtitulo", "tag", "activity_type", "url", "extracto"]) {
+            for (const key of [
+              "subtitulo", "tag", "activity_type", "url", "extracto",
+              "descripcion", "relacion_tema", "conexion_cultural",
+              "preguntas_interpretativas", "preguntas_personales", "conexion_personal",
+              "expansion_tema", "expresiones_idiomaticas", "interacciones",
+              "visibilidad", "pasos_estudiante", "banco_palabras", "autoevaluacion",
+            ]) {
               if (lesson[key] !== undefined) dataToSave[key] = lesson[key];
             }
             await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });

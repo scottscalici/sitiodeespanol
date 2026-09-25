@@ -1,5 +1,12 @@
 import React from 'react';
 
+const VisibilidadCheckbox = ({ field, visibilidad, onToggle }) => (
+  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#444', cursor: 'pointer' }}>
+    <input type="checkbox" checked={!!visibilidad?.[field]} onChange={() => onToggle(field)} />
+    Visible para estudiantes
+  </label>
+);
+
 export default function FormConversaciones({ actividad, setActividad, handleChange }) {
 
   // Helper for comma-separated numbers (dias)
@@ -57,6 +64,60 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
   };
   const handleRemoveEnlace = (index) => {
     setActividad({ ...actividad, enlaces: (actividad.enlaces || []).filter((_, i) => i !== index) });
+  };
+
+  // Generic helper for any top-level array-of-strings field (one item per line)
+  const handleArrayLinesChange = (field, text) => {
+    setActividad({ ...actividad, [field]: text.split('\n').filter((line) => line.trim() !== '') });
+  };
+
+  // Helper for 'interacciones' (3 fixed levels, each a list of exchange lines)
+  const handleInteraccionChange = (nivel, text) => {
+    setActividad({
+      ...actividad,
+      interacciones: {
+        ...(actividad.interacciones || {}),
+        [nivel]: text.split('\n').filter((line) => line.trim() !== ''),
+      },
+    });
+  };
+
+  // Helper for 'expresiones_idiomaticas' (repeatable {expresion, significado, ejemplo})
+  const handleExpresionChange = (index, field, value) => {
+    const newExpresiones = [...(actividad.expresiones_idiomaticas || [])];
+    newExpresiones[index] = { ...newExpresiones[index], [field]: value };
+    setActividad({ ...actividad, expresiones_idiomaticas: newExpresiones });
+  };
+  const handleAddExpresion = () => {
+    setActividad({ ...actividad, expresiones_idiomaticas: [...(actividad.expresiones_idiomaticas || []), { expresion: "", significado: "", ejemplo: "" }] });
+  };
+  const handleRemoveExpresion = (index) => {
+    setActividad({ ...actividad, expresiones_idiomaticas: (actividad.expresiones_idiomaticas || []).filter((_, i) => i !== index) });
+  };
+
+  // Helper for 'pasos_estudiante' (repeatable {titulo, prompt})
+  const handlePasoChange = (index, field, value) => {
+    const newPasos = [...(actividad.pasos_estudiante || [])];
+    newPasos[index] = { ...newPasos[index], [field]: value };
+    setActividad({ ...actividad, pasos_estudiante: newPasos });
+  };
+  const handleAddPaso = () => {
+    setActividad({ ...actividad, pasos_estudiante: [...(actividad.pasos_estudiante || []), { titulo: "", prompt: "" }] });
+  };
+  const handleRemovePaso = (index) => {
+    setActividad({ ...actividad, pasos_estudiante: (actividad.pasos_estudiante || []).filter((_, i) => i !== index) });
+  };
+
+  // Toggle whether a field (by name) is shown to students — default hidden
+  // (admin-only) for every field in this map, matching "modelo" and every
+  // new teacher-content section below. Fields NOT in this system (escenario,
+  // instrucciones, enlaces, preguntas, extracto) stay always-visible, as
+  // they already were before this existed.
+  const toggleVisibilidad = (field) => {
+    setActividad({
+      ...actividad,
+      visibilidad: { ...(actividad.visibilidad || {}), [field]: !(actividad.visibilidad || {})[field] },
+    });
   };
 
   return (
@@ -181,8 +242,11 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
           <input value={actividad.instrucciones?.[0] || ""} onChange={(e) => handleInstruccionChange(0, e.target.value)} placeholder="Instrucción 1..." style={{ padding: '8px' }} />
           <input value={actividad.instrucciones?.[1] || ""} onChange={(e) => handleInstruccionChange(1, e.target.value)} placeholder="Instrucción 2..." style={{ padding: '8px' }} />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <label>Modelo de Respuesta</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>Modelo de Respuesta</label>
+            <VisibilidadCheckbox field="modelo" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
           <textarea value={actividad.modelo || ""} onChange={(e) => setActividad({...actividad, modelo: e.target.value})} style={{ padding: '8px', minHeight: '60px' }} />
         </div>
       </div>
@@ -203,6 +267,141 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
               />
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* --- CONTENIDO EXTENDIDO DEL PROFESOR --- */}
+      <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#fdf2f8' }}>
+        <h4 style={{ margin: '0 0 4px 0' }}>Contenido Extendido (Profesor)</h4>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '15px' }}>
+          Cada sección tiene su propia casilla "Visible para estudiantes" — sin marcar, solo el profesor la ve en la página de la actividad.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🖼️ Descripción (puntos para hablar, ~1:00)</label>
+            <VisibilidadCheckbox field="descripcion" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={actividad.descripcion || ""} onChange={(e) => setActividad({ ...actividad, descripcion: e.target.value })} style={{ padding: '8px', minHeight: '60px' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🌍 Relación con el Tema (~1:30)</label>
+            <VisibilidadCheckbox field="relacion_tema" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={actividad.relacion_tema || ""} onChange={(e) => setActividad({ ...actividad, relacion_tema: e.target.value })} style={{ padding: '8px', minHeight: '60px' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>💡 Conexión Cultural (una por línea)</label>
+            <VisibilidadCheckbox field="conexion_cultural" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={(actividad.conexion_cultural || []).join('\n')} onChange={(e) => handleArrayLinesChange('conexion_cultural', e.target.value)} placeholder="En Perú, ...&#10;En Colombia, ..." style={{ padding: '8px', minHeight: '100px', whiteSpace: 'pre-wrap' }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>💬 Preguntas Interpretativas</label>
+              <VisibilidadCheckbox field="preguntas_interpretativas" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+            </div>
+            <textarea value={(actividad.preguntas_interpretativas || []).join('\n')} onChange={(e) => handleArrayLinesChange('preguntas_interpretativas', e.target.value)} placeholder="Una pregunta por línea..." style={{ padding: '8px', minHeight: '120px', whiteSpace: 'pre-wrap' }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>🌎 Preguntas Personales / Globales</label>
+              <VisibilidadCheckbox field="preguntas_personales" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+            </div>
+            <textarea value={(actividad.preguntas_personales || []).join('\n')} onChange={(e) => handleArrayLinesChange('preguntas_personales', e.target.value)} placeholder="Una pregunta por línea..." style={{ padding: '8px', minHeight: '120px', whiteSpace: 'pre-wrap' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🪞 Conexión Personal (frases para empezar, una por línea)</label>
+            <VisibilidadCheckbox field="conexion_personal" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={(actividad.conexion_personal || []).join('\n')} onChange={(e) => handleArrayLinesChange('conexion_personal', e.target.value)} placeholder="Una experiencia familiar que nunca olvidaré es..." style={{ padding: '8px', minHeight: '100px', whiteSpace: 'pre-wrap' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🌱 Expansión del Tema (frases útiles, una por línea)</label>
+            <VisibilidadCheckbox field="expansion_tema" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={(actividad.expansion_tema || []).join('\n')} onChange={(e) => handleArrayLinesChange('expansion_tema', e.target.value)} style={{ padding: '8px', minHeight: '80px', whiteSpace: 'pre-wrap' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🪶 Expresiones Idiomáticas</label>
+            <VisibilidadCheckbox field="expresiones_idiomaticas" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          {(actividad.expresiones_idiomaticas || []).map((exp, i) => (
+            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input value={exp.expresion || ""} onChange={(e) => handleExpresionChange(i, 'expresion', e.target.value)} placeholder="Expresión" style={{ padding: '8px', flex: 1 }} />
+              <input value={exp.significado || ""} onChange={(e) => handleExpresionChange(i, 'significado', e.target.value)} placeholder="Significado" style={{ padding: '8px', flex: 2 }} />
+              <input value={exp.ejemplo || ""} onChange={(e) => handleExpresionChange(i, 'ejemplo', e.target.value)} placeholder="Ejemplo con 'yo'" style={{ padding: '8px', flex: 2 }} />
+              <button type="button" onClick={() => handleRemoveExpresion(i)} style={{ padding: '8px', cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+          <button type="button" onClick={handleAddExpresion} style={{ padding: '6px 12px', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Añadir Expresión</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>🔹 Interacción: Niveles (un intercambio por línea, ej: "A: ... B: ...")</label>
+            <VisibilidadCheckbox field="interacciones" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            {[
+              { key: 'descriptivo', label: 'Descriptivo' },
+              { key: 'interpretativo', label: 'Interpretativo' },
+              { key: 'personal_global', label: 'Personal-Global' },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '12px' }}>{label}</label>
+                <textarea
+                  value={(actividad.interacciones?.[key] || []).join('\n')}
+                  onChange={(e) => handleInteraccionChange(key, e.target.value)}
+                  placeholder={'A: ... B: ...'}
+                  style={{ padding: '8px', minHeight: '100px', whiteSpace: 'pre-wrap' }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* --- ANDAMIO DEL ESTUDIANTE (siempre visible) --- */}
+      <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#ecfdf5' }}>
+        <h4 style={{ margin: '0 0 4px 0' }}>🧑‍🎓 Andamio del Estudiante</h4>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '15px' }}>
+          Esta sección siempre es visible para el estudiante — no tiene casilla de visibilidad.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px', gap: '10px' }}>
+          <label>Pasos Guiados</label>
+          {(actividad.pasos_estudiante || []).map((paso, i) => (
+            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <input value={paso.titulo || ""} onChange={(e) => handlePasoChange(i, 'titulo', e.target.value)} placeholder="Paso 1 — Observo" style={{ padding: '8px', flex: 1 }} />
+              <input value={paso.prompt || ""} onChange={(e) => handlePasoChange(i, 'prompt', e.target.value)} placeholder="¿Qué ves en la imagen?..." style={{ padding: '8px', flex: 2 }} />
+              <button type="button" onClick={() => handleRemovePaso(i)} style={{ padding: '8px', cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+          <button type="button" onClick={handleAddPaso} style={{ padding: '6px 12px', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Añadir Paso</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '15px' }}>
+          <label>Banco de Palabras (una por línea)</label>
+          <textarea value={(actividad.banco_palabras || []).join('\n')} onChange={(e) => handleArrayLinesChange('banco_palabras', e.target.value)} style={{ padding: '8px', minHeight: '80px', whiteSpace: 'pre-wrap' }} />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <label>Autoevaluación (una casilla por línea)</label>
+          <textarea value={(actividad.autoevaluacion || []).join('\n')} onChange={(e) => handleArrayLinesChange('autoevaluacion', e.target.value)} placeholder="Describí lo que veo con detalle." style={{ padding: '8px', minHeight: '80px', whiteSpace: 'pre-wrap' }} />
         </div>
       </div>
 
