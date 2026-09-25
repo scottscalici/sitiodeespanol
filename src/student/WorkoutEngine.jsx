@@ -459,6 +459,16 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                 let engTrans = conjugationData.english;
                 let spaTarget = conjugationData.target;
 
+                // A student who doesn't already recognize this infinitive has no way
+                // to know what it means from engTrans alone (that's the CONJUGATED
+                // phrase, e.g. "you take advantage of" — stripping the subject and
+                // reconstructing "to ___" isn't always obvious, especially for a less
+                // common regular verb). translations.infinitivo.english is the bare
+                // "to VERB" gloss already stored on the verb doc for exactly this
+                // purpose. Carried on every format (including listen/speak) so a
+                // listen/speak opt-out's 'write' replacement question can show it too.
+                const infinitiveEnglish = target.fullData.translations?.infinitivo?.english || `to ${target.fullData.palabra}`;
+
                 let format = 'conjugate';
 
                 if (isSpeedRound) {
@@ -505,21 +515,12 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                      // subjects), so a student who doesn't already recognize the infinitive
                      // has no way to tell them apart from engTrans alone — same reasoning
                      // as the 'conjugate' recall format below.
-                     const infinitiveEnglish = target.fullData.translations?.infinitivo?.english || `to ${target.fullData.palabra}`;
                      generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                 } else if (format === 'listen_verb') {
-                     generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
+                     generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                 } else if (format === 'speak_verb') {
-                     generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
+                     generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                 } else {
-                     // A student who doesn't already recognize this infinitive has
-                     // no way to know what it means from engTrans alone (that's the
-                     // CONJUGATED phrase, e.g. "you take advantage of" — stripping
-                     // the subject and reconstructing "to ___" isn't always obvious,
-                     // especially for a less common regular verb). translations.
-                     // infinitivo.english is the bare "to VERB" gloss already stored
-                     // on the verb doc for exactly this purpose.
-                     const infinitiveEnglish = target.fullData.translations?.infinitivo?.english || `to ${target.fullData.palabra}`;
                      generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 }
                 continue;
@@ -603,7 +604,11 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
     const currentQ = questions[currentIndex];
     const spaWord = currentQ.correctAnswer;
     const engTrans = currentQ.engTrans || "Traducción";
-    const rep1 = { id: currentQ.id + '_rep1_' + Date.now(), type: 'write', prompt: engTrans, correctAnswer: spaWord, topic: 'Reemplazo: Escritura', isVerb: currentQ.isVerb };
+    const rep1 = {
+      id: currentQ.id + '_rep1_' + Date.now(), type: 'write', prompt: engTrans, correctAnswer: spaWord,
+      topic: 'Reemplazo: Escritura', isVerb: currentQ.isVerb,
+      infinitive: currentQ.infinitive, infinitiveEnglish: currentQ.infinitiveEnglish,
+    };
     setQuestions(prev => [...prev, rep1]);
     setCurrentIndex(prev => prev + 1);
     resetInteractiveState();
@@ -1000,6 +1005,16 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           {currentQ.type === 'write' && (
             <>
+              {currentQ.infinitive && (
+                <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+                  <span className="bg-emerald-100 text-emerald-800 font-black px-4 py-2 rounded-xl border border-emerald-300 shadow-sm text-lg">
+                    {currentQ.infinitive}
+                  </span>
+                  {currentQ.infinitiveEnglish && (
+                    <span className="text-slate-400 text-sm font-medium">{currentQ.infinitiveEnglish}</span>
+                  )}
+                </div>
+              )}
               <h2 className="text-3xl font-black text-slate-800 mb-8">{currentQ.prompt}</h2>
               <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe en español..."
                 className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
