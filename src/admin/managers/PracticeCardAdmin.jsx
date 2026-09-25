@@ -10,7 +10,7 @@ export default function PracticeCardAdmin() {
   const [title, setTitle] = useState('Gustar');
   const [dia, setDia] = useState(1);
   const [course, setCourse] = useState('s2');
-  const [pointsPerQuestion, setPointsPerQuestion] = useState(1);
+  const [points, setPoints] = useState(1);
   const [gradeWeight, setGradeWeight] = useState(1);
   const [excused, setExcused] = useState(false);
   const [questions, setQuestions] = useState([emptyQuestion()]);
@@ -34,7 +34,7 @@ export default function PracticeCardAdmin() {
       setTitle(c.title || '');
       setDia(c.dia || 1);
       setCourse(c.course || 's2');
-      setPointsPerQuestion(c.pointsPerQuestion || 1);
+      setPoints(c.points || 1);
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
       setQuestions(c.questions?.length ? c.questions : [emptyQuestion()]);
@@ -91,7 +91,7 @@ export default function PracticeCardAdmin() {
           title,
           dia: Number(dia),
           course,
-          pointsPerQuestion: Number(pointsPerQuestion) || 1,
+          points: Number(points) || 1,
           gradeWeight: Number(gradeWeight) || 1,
           excused,
           questions: cleanQuestions,
@@ -158,10 +158,10 @@ export default function PracticeCardAdmin() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-black text-slate-500 uppercase mb-1" title="Puntos de clasificación (XP) otorgados = esta tasa × el número de preguntas.">
-              Puntos por Pregunta
+            <label className="block text-xs font-black text-slate-500 uppercase mb-1" title="Puntos de clasificación (XP) otorgados al completar por primera vez. Normalmente entre 1 y 5.">
+              Puntos
             </label>
-            <input type="number" min="0" step="0.5" value={pointsPerQuestion} onChange={(e) => setPointsPerQuestion(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold text-center" />
+            <input type="number" min="1" max="5" value={points} onChange={(e) => setPoints(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold text-center" />
           </div>
         </div>
 
