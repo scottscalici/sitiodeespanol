@@ -311,7 +311,9 @@ const DailyPlanHub = () => {
                     {activePracticeCards.map(card => (
                       <div key={card.id} className="flex justify-between items-center">
                         <h3 className="font-bold text-white text-md">{card.title}</h3>
-                        <span className="text-xs font-mono text-neutral-500">{card.questions?.length || 0} Preguntas &middot; {card.points || 1}pt</span>
+                        <span className="text-xs font-mono text-neutral-500">
+                          {card.questions?.length || 0} Preguntas &middot; {(card.pointsPerQuestion || 1) * (card.questions?.length || 0)}pt &middot; Peso {card.gradeWeight || 1}
+                        </span>
                       </div>
                     ))}
                   </div>

@@ -97,7 +97,7 @@ const Dashboard = () => {
 
         const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
         const assignedPractice = getAssignedWarmups(allPracticeCards, fechaByDia, course, todayStr, null);
-        const practicePossible = (c) => c.questions?.length || 1;
+        const practicePossible = (c) => c.gradeWeight || 1;
         setWarmupBreakdown([
           ...buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
           ...buildWarmupBreakdown(assignedPractice, userData?.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),

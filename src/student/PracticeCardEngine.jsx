@@ -112,7 +112,11 @@ export default function PracticeCardEngine({ onClose }) {
       setSaveState('saving');
       const grade = Math.round((correctCount / questions.length) * 100);
       const rawScore = `${correctCount}/${questions.length}`;
-      const points = cardData.points || 1;
+      // Ranking/XP points are a rate the admin sets PER QUESTION, not a flat
+      // per-card value — a 2-question card at 1pt/question is worth 2,
+      // independent of the card's grade-pool weight (gradeWeight, used only
+      // by warmupBreakdown.js for the classwork average).
+      const points = (cardData.pointsPerQuestion || 1) * questions.length;
 
       try {
         const alreadyCompleted = !!userData?.progress?.practiceCards?.[cardData.id]?.completed;

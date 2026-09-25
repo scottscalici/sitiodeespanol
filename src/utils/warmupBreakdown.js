@@ -28,10 +28,13 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
 // every calentamiento is intrinsically worth 5 points by its own grading
 // formula (4 for verb accuracy + 1 for vocab, regardless of question
 // count), so that's the default; a caller assigning practice cards passes
-// its own (e.g. `c => c.questions.length`) so a 1-question card can't swing
-// the pooled total as hard as a full calentamiento. `points` is derived
-// from the stored percentage grade rather than requiring a separate stored
-// field, so it works for completions saved before this existed too.
+// its own (e.g. `c => c.gradeWeight`, an admin-set value on the card,
+// deliberately independent of its question count AND of its ranking/XP
+// points rate) so a quick practice card can't swing the pooled total as
+// hard as a full calentamiento unless the admin says it should. `points`
+// is derived from the stored percentage grade rather than requiring a
+// separate stored field, so it works for completions saved before this
+// existed too.
 export const buildWarmupBreakdown = (assignedWarmups, studentWarmups = {}, getPossible = () => 5) => {
   return assignedWarmups.map((c) => {
     const entry = studentWarmups[c.id];

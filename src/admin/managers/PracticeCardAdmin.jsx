@@ -10,7 +10,8 @@ export default function PracticeCardAdmin() {
   const [title, setTitle] = useState('Gustar');
   const [dia, setDia] = useState(1);
   const [course, setCourse] = useState('s2');
-  const [points, setPoints] = useState(1);
+  const [pointsPerQuestion, setPointsPerQuestion] = useState(1);
+  const [gradeWeight, setGradeWeight] = useState(1);
   const [excused, setExcused] = useState(false);
   const [questions, setQuestions] = useState([emptyQuestion()]);
 
@@ -33,7 +34,8 @@ export default function PracticeCardAdmin() {
       setTitle(c.title || '');
       setDia(c.dia || 1);
       setCourse(c.course || 's2');
-      setPoints(c.points || 1);
+      setPointsPerQuestion(c.pointsPerQuestion || 1);
+      setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
       setQuestions(c.questions?.length ? c.questions : [emptyQuestion()]);
     }
@@ -89,7 +91,8 @@ export default function PracticeCardAdmin() {
           title,
           dia: Number(dia),
           course,
-          points: Number(points) || 1,
+          pointsPerQuestion: Number(pointsPerQuestion) || 1,
+          gradeWeight: Number(gradeWeight) || 1,
           excused,
           questions: cleanQuestions,
           createdAt: new Date().toISOString(),
@@ -130,7 +133,7 @@ export default function PracticeCardAdmin() {
       <div className="mb-6 border-b border-slate-200 pb-4">
         <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Creador de Tarjetas de Práctica</h1>
         <p className="text-slate-500 font-bold text-sm mt-1">
-          Preguntas de opción múltiple o de escribir, ~1 punto cada tarjeta. Cuenta para el mismo promedio que los calentamientos.
+          Preguntas de opción múltiple o de escribir. Los puntos de clasificación y el peso en el promedio de clase se configuran por separado abajo.
         </p>
       </div>
 
@@ -155,9 +158,21 @@ export default function PracticeCardAdmin() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-black text-slate-500 uppercase mb-1">Puntos</label>
-            <input type="number" min="1" value={points} onChange={(e) => setPoints(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold text-center" />
+            <label className="block text-xs font-black text-slate-500 uppercase mb-1" title="Puntos de clasificación (XP) otorgados = esta tasa × el número de preguntas.">
+              Puntos por Pregunta
+            </label>
+            <input type="number" min="0" step="0.5" value={pointsPerQuestion} onChange={(e) => setPointsPerQuestion(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold text-center" />
           </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-4">
+          <div>
+            <h4 className="text-xs font-black text-slate-700 uppercase">Peso en el Promedio de Clase</h4>
+            <p className="text-[11px] text-slate-400">
+              Cuánto vale esta tarjeta en el promedio de calentamientos (independiente de los puntos de clasificación arriba). Un calentamiento vale 5 por defecto.
+            </p>
+          </div>
+          <input type="number" min="0.5" step="0.5" value={gradeWeight} onChange={(e) => setGradeWeight(e.target.value)} className="w-24 p-2.5 border rounded-xl font-bold text-center bg-slate-50 shrink-0" />
         </div>
 
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">

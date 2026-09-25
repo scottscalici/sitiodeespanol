@@ -227,7 +227,7 @@ export default function TeacherGradebook() {
   const getCombinedBreakdown = (student, quarter, todayStr) => {
     const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
     const assignedPractice = getAssignedWarmups(allPracticeCards, calendarFechaByDia, student.course, todayStr, quarter);
-    const practicePossible = (c) => c.questions?.length || 1;
+    const practicePossible = (c) => c.gradeWeight || 1;
     return [
       ...buildWarmupBreakdown(assigned, student.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
       ...buildWarmupBreakdown(assignedPractice, student.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),
