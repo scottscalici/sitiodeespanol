@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
+import { playAudio } from '../utils/playAudio';
 
 // A small, focused graded practice (e.g. Gustar, prepositional pronouns) —
 // unlike Calentamiento (verb-conjugation tables) or WorkoutEngine's
@@ -63,6 +64,11 @@ export default function PracticeCardEngine({ onClose }) {
 
   const questions = cardData?.questions || [];
   const currentQ = questions[currentIndex];
+
+  useEffect(() => {
+    if (currentQ?.type === 'listen') playAudio(currentQ.prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, cardData]);
 
   const handleClose = () => {
     if (onClose) onClose();
@@ -221,6 +227,13 @@ export default function PracticeCardEngine({ onClose }) {
                   >{opt}</button>
                 ))}
               </div>
+            </>
+          ) : currentQ.type === 'listen' ? (
+            <>
+              <button onClick={() => playAudio(currentQ.prompt)} className="w-24 h-24 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-4xl shadow-lg mx-auto mb-8 transition-transform active:scale-95">🔊</button>
+              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe lo que escuchaste..."
+                className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
+                onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
             </>
           ) : (
             <>

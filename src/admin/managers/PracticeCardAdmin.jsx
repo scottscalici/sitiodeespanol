@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import { playAudio } from '../../utils/playAudio';
 
 const emptyQuestion = () => ({ type: 'mc', prompt: '', options: ['', ''], correctAnswer: '' });
 
@@ -76,7 +77,7 @@ export default function PracticeCardAdmin() {
     try {
       const cleanQuestions = questions
         .filter((q) => q.prompt.trim() && q.correctAnswer.trim())
-        .map((q) => (q.type === 'mc' ? { ...q, options: q.options.filter((o) => o.trim()) } : { type: 'write', prompt: q.prompt, correctAnswer: q.correctAnswer }));
+        .map((q) => (q.type === 'mc' ? { ...q, options: q.options.filter((o) => o.trim()) } : { type: q.type, prompt: q.prompt, correctAnswer: q.correctAnswer }));
 
       if (cleanQuestions.length === 0) {
         alert('Agrega al menos una pregunta con respuesta antes de guardar.');
@@ -200,13 +201,21 @@ export default function PracticeCardAdmin() {
                 <select value={q.type} onChange={(e) => updateQuestion(qIdx, 'type', e.target.value)} className="p-1.5 border rounded-lg text-xs font-bold bg-white">
                   <option value="mc">Opción Múltiple</option>
                   <option value="write">Escribir</option>
+                  <option value="listen">Escuchar</option>
                 </select>
                 <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
               </div>
 
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Pregunta (inglés o instrucción)</label>
-                <input type="text" value={q.prompt} onChange={(e) => updateQuestion(qIdx, 'prompt', e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold bg-white" />
+                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">
+                  {q.type === 'listen' ? 'Texto a Reproducir (español)' : 'Pregunta (inglés o instrucción)'}
+                </label>
+                <div className="flex gap-2 items-center">
+                  <input type="text" value={q.prompt} onChange={(e) => updateQuestion(qIdx, 'prompt', e.target.value)} className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white" />
+                  {q.type === 'listen' && (
+                    <button type="button" onClick={() => playAudio(q.prompt)} className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm shrink-0" title="Probar audio">🔊</button>
+                  )}
+                </div>
               </div>
 
               {q.type === 'mc' ? (
