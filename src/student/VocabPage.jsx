@@ -17,6 +17,8 @@ export default function VocabPage() {
   const [studyDeck, setStudyDeck] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  // Tarjetas only: which language shows on the front of the card.
+  const [cardDirection, setCardDirection] = useState('es-en');
 
   // Theme colors for the list sections
   const sectionThemes = [
@@ -230,7 +232,24 @@ export default function VocabPage() {
                 </label>
               ))}
             </div>
-            
+
+            {viewMode === 'tarjetas' && (
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl shrink-0">
+                <button
+                  onClick={() => { setCardDirection('es-en'); setIsFlipped(false); }}
+                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'es-en' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Español → Inglés
+                </button>
+                <button
+                  onClick={() => { setCardDirection('en-es'); setIsFlipped(false); }}
+                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'en-es' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Inglés → Español
+                </button>
+              </div>
+            )}
+
             <button
               onClick={() => shuffleAndSetDeck(activeFilters)}
               className="flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95 shrink-0"
@@ -291,7 +310,7 @@ export default function VocabPage() {
             >
               <div className="w-full h-full transition-transform duration-500 ease-in-out" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0)' }}>
                 
-                {/* FRONT (Español) */}
+                {/* FRONT */}
                 <div className="absolute inset-0 w-full h-full bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden' }}>
                   <div className="absolute top-6 left-6 flex gap-2">
                     <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
@@ -302,17 +321,17 @@ export default function VocabPage() {
                     </span>
                   </div>
                   <h2 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tighter">
-                    {currentStudyWord.palabra}
+                    {cardDirection === 'es-en' ? currentStudyWord.palabra : currentStudyWord.traduccion}
                   </h2>
                   <p className="absolute bottom-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                     Toca para voltear
                   </p>
                 </div>
 
-                {/* BACK (Inglés) */}
+                {/* BACK */}
                 <div className="absolute inset-0 w-full h-full bg-indigo-600 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                   <h3 className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
-                    {currentStudyWord.traduccion}
+                    {cardDirection === 'es-en' ? currentStudyWord.traduccion : currentStudyWord.palabra}
                   </h3>
                 </div>
               </div>

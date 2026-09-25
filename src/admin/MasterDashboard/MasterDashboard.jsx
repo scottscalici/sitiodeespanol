@@ -250,6 +250,10 @@ export default function MasterDashboard() {
               preguntas: lesson.preguntas || { "1": [], "2": [], "3": [] },
               isNew: false
             };
+            // Only copy these when the JSON has them, so re-importing doesn't erase values typed in the form
+            for (const key of ["subtitulo", "tag", "activity_type", "url", "extracto"]) {
+              if (lesson[key] !== undefined) dataToSave[key] = lesson[key];
+            }
             await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });
             count++;
           }
