@@ -5,6 +5,24 @@ import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { useAuth } from '../context/AuthContext';
 
+// The vocab collection has words in two different shapes for
+// definiciones.nivelN, depending on which tool/import created them:
+// - VocabVault (the current admin editor) saves an ARRAY of lines, where a
+//   second line is an added context sentence — [1] is preferred there since
+//   it's the richer clue when present, falling back to [0] (the definition)
+//   for words that only have one line.
+// - Older/AI-imported words instead store a MAP with named `definition` and
+//   `context` fields — for that shape, `definition` is the intended Tabú
+//   clue (a paraphrase a student can guess from), not the example sentence.
+// Reading nivel2 as if it were always the array shape (e.g. nivel2?.[1])
+// silently returns undefined for every map-shaped word, falling through to
+// the plain translation instead of a real clue.
+const getTabuClue = (nivel2) => {
+  if (Array.isArray(nivel2)) return nivel2[1] || nivel2[0] || null;
+  if (nivel2 && typeof nivel2 === 'object') return nivel2.definition || nivel2.context || null;
+  return null;
+};
+
 // Font/column sizing tuned so a section's word list fits a projector
 // screen in one glance without scrolling — fewer words means bigger text,
 // more words means more columns and smaller text.
@@ -397,7 +415,7 @@ export default function VocabPage() {
                     Adivina la palabra
                   </span>
                   <p className="text-xl sm:text-2xl font-medium text-slate-700 leading-relaxed">
-                    {currentStudyWord.definiciones?.nivel2?.[1] || currentStudyWord.definiciones?.nivel2?.[0] || currentStudyWord.traduccion}
+                    {getTabuClue(currentStudyWord.definiciones?.nivel2) || currentStudyWord.traduccion}
                   </p>
                   <p className="absolute bottom-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                     Toca para revelar

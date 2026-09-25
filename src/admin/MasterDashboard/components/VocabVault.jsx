@@ -257,9 +257,18 @@ const VocabVault = () => {
 
   // --- LOGIC: EDITOR & BULK ---
   const openEditor = (wordObj) => {
+    // Some older/AI-imported words store definiciones.nivelN as a
+    // { definition, context } map instead of this editor's array-of-lines
+    // shape. Without this branch, opening one of those words here would
+    // show an empty textarea and — since the save path always writes back
+    // an array — silently wipe its definition and context sentence on the
+    // next save. Folding both fields into two lines (definition, then
+    // context) preserves the content and upgrades the word to the array
+    // shape once saved, matching every other word in the collection.
     const safelyGetText = (def) => {
       if (Array.isArray(def)) return def.join('\n');
       if (typeof def === 'string') return def;
+      if (def && typeof def === 'object') return [def.definition, def.context].filter(Boolean).join('\n');
       return "";
     };
     setEditingWord({
