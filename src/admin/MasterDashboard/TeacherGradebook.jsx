@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -61,6 +61,10 @@ export default function TeacherGradebook() {
   // { student, breakdown, quarterLabel } — the per-assignment popup opened
   // by clicking a student's Promedio Calentamientos badge.
   const [breakdownModal, setBreakdownModal] = useState(null);
+  // { student, item, gradeInput, status } — opened by clicking one item's
+  // score/"Sin Hacer" pill inside the breakdown popup above, to excuse that
+  // one assignment for this student only or override its grade.
+  const [overrideModal, setOverrideModal] = useState(null);
 
   // Roster filter: 'all' or `${course}|${section}`
   const [rosterFilter, setRosterFilter] = useState('all');
@@ -249,12 +253,64 @@ export default function TeacherGradebook() {
     return { breakdown: getCombinedBreakdown(student, quarter, todayStr), quarterLabel: quarter?.label || null };
   };
 
+  // Writes (or clears, when overridePatch is null) a per-student override on
+  // one assigned item — either `{ excused: true }` (drops it from this
+  // student's average entirely, rather than counting a 0) or
+  // `{ grade: <0-100> }` (replaces whatever they scored, or lack of a
+  // submission, with a specific grade). Lives alongside the student's own
+  // submission under the same progress entry, so clearing it simply
+  // un-hides their original work. `kind` ('calentamiento' | 'practica')
+  // picks the matching progress map — see getCombinedBreakdown above for
+  // why the two share this shape.
+  const applyTeacherOverride = async (uid, kind, itemId, overridePatch) => {
+    const progressField = kind === 'practica' ? 'practiceCards' : 'warmups';
+    await setDoc(
+      doc(db, 'users', uid),
+      { progress: { [progressField]: { [itemId]: { teacherOverride: overridePatch === null ? deleteField() : overridePatch } } } },
+      { merge: true }
+    );
+
+    // Computed from the current `students` state up front (rather than as a
+    // side effect inside the setStudents updater) so it's available
+    // immediately below to also refresh the breakdown popup's own snapshot —
+    // the updater callback itself runs on React's own schedule, not
+    // synchronously with this call.
+    const currentStudent = students.find((s) => s.uid === uid);
+    if (!currentStudent) return;
+    const existingEntry = currentStudent.progress?.[progressField]?.[itemId] || {};
+    const withoutOverride = { ...existingEntry };
+    delete withoutOverride.teacherOverride;
+    const newEntry = overridePatch === null ? withoutOverride : { ...existingEntry, teacherOverride: overridePatch };
+    const updatedStudent = {
+      ...currentStudent,
+      progress: { ...currentStudent.progress, [progressField]: { ...currentStudent.progress?.[progressField], [itemId]: newEntry } },
+    };
+
+    setStudents((prev) => prev.map((s) => (s.uid === uid ? updatedStudent : s)));
+
+    // The breakdown popup holds a snapshot from when it opened — refresh it
+    // in place so the pill's new state (or reverted state) shows immediately.
+    setBreakdownModal((prev) =>
+      prev && prev.student.uid === uid
+        ? { ...prev, student: updatedStudent, ...getWarmupBreakdownForStudent(updatedStudent) }
+        : prev
+    );
+  };
+
   // --- TODAY'S ASSIGNED WARMUP STATUS for this student's course ---
+  // Override-aware, same as buildWarmupBreakdown: a teacherOverride entry
+  // has no `.completed`/`.grade` of its own (those stay on the student's
+  // original submission, if any), so checking plain truthiness of `entry`
+  // used to render an excused or manually-graded item as "done" with a
+  // broken "null%" pill instead of reflecting the override.
   const getTodaysWarmupStatus = (student) => {
     const todaysId = todaysWarmupByCourse[student.course];
     if (!todaysId) return { status: 'none' };
     const entry = student.progress?.warmups?.[todaysId];
-    if (entry) return { status: 'done', percent: entry.grade ?? null, rawScore: entry.rawScore };
+    const override = entry?.teacherOverride;
+    if (override?.excused) return { status: 'excused' };
+    if (typeof override?.grade === 'number') return { status: 'done', percent: override.grade, rawScore: null };
+    if (entry?.completed) return { status: 'done', percent: entry.grade ?? null, rawScore: entry.rawScore };
     const draft = student.progress?.warmups_draft?.[todaysId];
     if (draft) return { status: 'in_progress' };
     return { status: 'not_started' };
@@ -683,6 +739,11 @@ const handleResetPassword = async () => {
 
                         <td className="p-4">
                           {todays.status === 'none' && <span className="text-slate-600 font-bold">—</span>}
+                          {todays.status === 'excused' && (
+                            <span className="text-[10px] font-black uppercase tracking-widest text-sky-400 bg-sky-950/40 border border-sky-900/60 px-2.5 py-1.5 rounded-lg">
+                              Excusado
+                            </span>
+                          )}
                           {todays.status === 'not_started' && (
                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-lg">
                               No iniciado
@@ -1011,13 +1072,27 @@ const handleResetPassword = async () => {
                         </p>
                         <p className="text-[10px] text-slate-500 font-mono">{item.fecha}</p>
                       </div>
-                      <div
-                        className={`shrink-0 border rounded-lg px-3 py-1 text-center min-w-[64px] font-black text-xs ${
-                          item.completed ? getFlagClasses(item.grade) : 'text-slate-500 bg-slate-950 border-slate-700'
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOverrideModal({
+                            student: breakdownModal.student,
+                            item,
+                            gradeInput: item.completed ? String(item.grade) : '',
+                            status: '',
+                          })
+                        }
+                        className={`shrink-0 border rounded-lg px-3 py-1 text-center min-w-[64px] font-black text-xs hover:brightness-125 transition-all cursor-pointer ${
+                          item.excusedByTeacher
+                            ? 'text-sky-400 bg-sky-950/40 border-sky-900/60'
+                            : item.completed
+                            ? getFlagClasses(item.grade)
+                            : 'text-slate-500 bg-slate-950 border-slate-700'
                         }`}
+                        title="Ajustar o excusar esta calificación"
                       >
-                        {item.completed ? `${item.grade}%` : 'Sin hacer'}
-                      </div>
+                        {item.excusedByTeacher ? 'Excusada' : item.completed ? `${item.grade}%` : 'Sin hacer'}
+                      </button>
                     </div>
 
                     {item.errors.length > 0 && (
@@ -1052,6 +1127,89 @@ const handleResetPassword = async () => {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✏️ SCORE OVERRIDE MODAL — excuse or manually set one student's grade on one item */}
+      {overrideModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Ajustar Calificación</h3>
+              <button
+                onClick={() => setOverrideModal(null)}
+                className="text-slate-400 hover:text-white text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-6">
+              Día {overrideModal.item.dia}: {overrideModal.item.title}
+            </p>
+
+            {overrideModal.item.excusedByTeacher && (
+              <div className="bg-sky-950/40 border border-sky-900/60 text-sky-400 text-xs font-bold rounded-lg px-3 py-2 mb-4">
+                Esta actividad está excusada para este estudiante — no cuenta para su promedio.
+              </div>
+            )}
+
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Calificación Manual (0–100)
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={overrideModal.gradeInput}
+                onChange={(e) => setOverrideModal({ ...overrideModal, gradeInput: e.target.value, status: '' })}
+                className="flex-1 bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-teal-500"
+                placeholder="Ej. 85"
+              />
+              <button
+                onClick={async () => {
+                  const val = Number(overrideModal.gradeInput);
+                  if (overrideModal.gradeInput === '' || isNaN(val) || val < 0 || val > 100) {
+                    setOverrideModal({ ...overrideModal, status: '❌ Ingresa un número de 0 a 100.' });
+                    return;
+                  }
+                  await applyTeacherOverride(overrideModal.student.uid, overrideModal.item.kind, overrideModal.item.id, { grade: val });
+                  setOverrideModal(null);
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest text-white bg-teal-600 hover:bg-teal-500 transition-colors shrink-0"
+              >
+                Guardar
+              </button>
+            </div>
+
+            {overrideModal.status && (
+              <p className="text-xs font-bold text-rose-400 mb-2">{overrideModal.status}</p>
+            )}
+
+            <div className="border-t border-slate-700 my-4"></div>
+
+            <button
+              onClick={async () => {
+                await applyTeacherOverride(overrideModal.student.uid, overrideModal.item.kind, overrideModal.item.id, { excused: true });
+                setOverrideModal(null);
+              }}
+              className="w-full px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest text-sky-300 bg-sky-950/50 border border-sky-900/60 hover:bg-sky-900/50 transition-colors mb-2"
+            >
+              🚫 Excusar (no cuenta para el promedio)
+            </button>
+
+            {(overrideModal.item.excusedByTeacher || overrideModal.item.overrideGrade != null) && (
+              <button
+                onClick={async () => {
+                  await applyTeacherOverride(overrideModal.student.uid, overrideModal.item.kind, overrideModal.item.id, null);
+                  setOverrideModal(null);
+                }}
+                className="w-full px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-700/50 transition-colors"
+              >
+                Quitar Anulación (usar el trabajo original)
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -35,23 +35,35 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
 // is derived from the stored percentage grade rather than requiring a
 // separate stored field, so it works for completions saved before this
 // existed too.
+// A teacher can override any one student's result for a single assigned
+// item — either excusing it entirely (e.g. an extended absence), which
+// drops it from both sides of the pooled average below rather than
+// counting it as a 0, or setting a specific grade in place of whatever the
+// student submitted (or didn't). Stored as `teacherOverride` alongside the
+// student's own submission, so undoing it just deletes that one field and
+// their original work (if any) still stands.
 export const buildWarmupBreakdown = (assignedWarmups, studentWarmups = {}, getPossible = () => 5) => {
   return assignedWarmups.map((c) => {
     const entry = studentWarmups[c.id];
-    const grade = typeof entry?.grade === 'number' ? entry.grade : 0;
-    const possible = getPossible(c);
+    const override = entry?.teacherOverride;
+    const excusedByTeacher = !!override?.excused;
+    const hasOverrideGrade = !excusedByTeacher && typeof override?.grade === 'number';
+    const grade = excusedByTeacher ? 0 : hasOverrideGrade ? override.grade : (typeof entry?.grade === 'number' ? entry.grade : 0);
+    const possible = excusedByTeacher ? 0 : getPossible(c);
     return {
       id: c.id,
       title: c.title,
       dia: c.dia,
       course: c.course,
       fecha: c.fecha,
-      completed: !!entry?.completed,
+      completed: excusedByTeacher ? false : hasOverrideGrade ? true : !!entry?.completed,
       grade,
       rawScore: entry?.rawScore || null,
       errors: entry?.errors || [],
       possible,
       points: (grade / 100) * possible,
+      excusedByTeacher,
+      overrideGrade: hasOverrideGrade ? override.grade : null,
     };
   });
 };

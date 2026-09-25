@@ -692,21 +692,35 @@ const Dashboard = () => {
                   </p>
                 ) : (
                   warmupBreakdown.map((item) => {
-                    const gradeClasses = !item.completed
+                    const gradeClasses = item.excusedByTeacher
+                      ? 'bg-sky-50 text-sky-600 border-sky-200'
+                      : !item.completed
                       ? 'bg-slate-100 text-slate-400 border-slate-200'
                       : item.grade < 50
                       ? 'bg-rose-50 text-rose-600 border-rose-200'
                       : item.grade < 70
                       ? 'bg-amber-50 text-amber-600 border-amber-200'
                       : 'bg-emerald-50 text-emerald-600 border-emerald-200';
-  
+
                     const isPractica = item.kind === 'practica';
+                    // An excused item has nothing left to do — show it as a
+                    // plain (non-clickable) row instead of linking into the
+                    // activity, so a student isn't prompted to complete
+                    // something the teacher already excused.
+                    const CardTag = item.excusedByTeacher ? 'div' : Link;
+                    const cardProps = item.excusedByTeacher
+                      ? {}
+                      : {
+                          to: isPractica ? `/practica/tarjeta/${item.course}/${item.dia}` : `/calentamiento/${item.course}/${item.dia}`,
+                          onClick: () => setShowWarmupModal(false),
+                        };
                     return (
-                      <Link
+                      <CardTag
                         key={item.id}
-                        to={isPractica ? `/practica/tarjeta/${item.course}/${item.dia}` : `/calentamiento/${item.course}/${item.dia}`}
-                        onClick={() => setShowWarmupModal(false)}
-                        className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-orange-300 hover:shadow-md transition-all"
+                        {...cardProps}
+                        className={`block bg-white rounded-xl border border-slate-200 p-4 transition-all ${
+                          item.excusedByTeacher ? '' : 'hover:border-orange-300 hover:shadow-md'
+                        }`}
                       >
                         <div className="flex justify-between items-center gap-3">
                           <div className="min-w-0">
@@ -714,7 +728,7 @@ const Dashboard = () => {
                             <p className="text-[10px] text-slate-400 font-mono">{item.fecha}</p>
                           </div>
                           <div className={`shrink-0 border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-xs ${gradeClasses}`}>
-                            {item.completed ? `${item.grade}%` : 'Sin hacer'}
+                            {item.excusedByTeacher ? 'Excusada' : item.completed ? `${item.grade}%` : 'Sin hacer'}
                           </div>
                         </div>
 
@@ -735,7 +749,7 @@ const Dashboard = () => {
                             ))}
                           </div>
                         )}
-                      </Link>
+                      </CardTag>
                     );
                   })
                 )}
