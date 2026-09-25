@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,6 +11,22 @@ const CODE_WORDS = [
 ];
 
 const generateRoomCode = () => CODE_WORDS[Math.floor(Math.random() * CODE_WORDS.length)];
+
+// Only 20 possible codes, shared globally across every class/period using
+// the site — a code gets reused constantly. Overwriting the room doc alone
+// leaves its 'players' and 'messages' subcollections untouched (Firestore
+// subcollections aren't cleared by setDoc on the parent), so without this,
+// students from whichever earlier game last used this code — possibly a
+// different class entirely — silently reappear in the new game and can even
+// get handed a "turn".
+const clearStaleRoomData = async (code) => {
+  const batch = writeBatch(db);
+  const playersSnap = await getDocs(collection(db, 'impostor_rooms', code, 'players'));
+  playersSnap.forEach((d) => batch.delete(d.ref));
+  const messagesSnap = await getDocs(collection(db, 'impostor_rooms', code, 'messages'));
+  messagesSnap.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
+};
 
 const ImpostorLobbyPage = () => {
   const { currentUser, userData } = useAuth();
@@ -40,6 +56,23 @@ const ImpostorLobbyPage = () => {
         roomRef = doc(db, 'impostor_rooms', code);
         roomSnap = await getDoc(roomRef);
         attempts += 1;
+      }
+
+      // The loop above only skips codes that are ACTIVELY in use (not yet
+      // gameover) — it can still exit with every retry exhausted while that
+      // last-checked room is still mid-game. Overwriting it here would boot
+      // that class's game and merge two groups of students into one room.
+      if (roomSnap.exists() && roomSnap.data().gameState !== 'gameover') {
+        setError('❌ Todas las salas están ocupadas ahora mismo. Intenta de nuevo en un momento.');
+        setBusy(false);
+        return;
+      }
+
+      // Reusing a code from a previous, finished game — clear its old
+      // players/messages so students from that earlier game (possibly a
+      // different class) don't reappear in this one.
+      if (roomSnap.exists()) {
+        await clearStaleRoomData(code);
       }
 
       await setDoc(roomRef, {
