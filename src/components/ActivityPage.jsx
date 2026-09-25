@@ -289,6 +289,7 @@ const ConversacionLayout = ({ activity }) => {
   const isS4 = userData?.course === 's4';
   const isAdmin = userData?.role === 'admin';
   const canSee = (field) => isAdmin || !!raw.visibilidad?.[field];
+  const [projectorMode, setProjectorMode] = useState(false);
 
   const baseSegments = (raw.presentation_segments || '')
     .split(',')
@@ -408,9 +409,25 @@ const ConversacionLayout = ({ activity }) => {
 
   const hasPromptBox = raw.escenario || (raw.instrucciones || []).some((i) => i) || (raw.modelo && canSee('modelo'));
 
+  // What goes on the board: the day's setup (escenario/instrucciones/descripción)
+  // plus the specific structures/vocab the teacher wants students to use —
+  // never "modelo", which is a sample answer and would spoil the activity if
+  // left projected while students present.
+  const projectorHasContent =
+    raw.escenario || (raw.instrucciones || []).some(Boolean) || raw.descripcion ||
+    (raw.expansion_tema || []).length > 0 || (raw.banco_palabras || []).length > 0;
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-      <div className="md:flex border-b border-slate-100 bg-slate-50/50">
+      <div className="md:flex border-b border-slate-100 bg-slate-50/50 relative">
+        {isAdmin && projectorHasContent && (
+          <button
+            onClick={() => setProjectorMode(true)}
+            className="absolute top-3 right-3 z-10 text-[10px] font-black uppercase tracking-widest text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-full shadow-sm transition-colors"
+          >
+            📽️ Proyector
+          </button>
+        )}
         {activity.img && (
           <div className="md:w-1/3 shrink-0">
             <img src={activity.img} alt={activity.title} className="w-full h-48 md:h-full object-cover" />
@@ -779,6 +796,86 @@ const ConversacionLayout = ({ activity }) => {
           </div>
         )}
       </div>
+
+      {/* 📽️ PROYECTOR — the day's setup + structures to include, board-safe (never "modelo") */}
+      {projectorMode && (
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col p-6 sm:p-10">
+          <div className="flex items-center justify-between gap-4 mb-6 shrink-0">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight truncate">{activity.title}</h2>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => document.documentElement.requestFullscreen?.()}
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 border-2 border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                ⛶ Pantalla Completa
+              </button>
+              <button
+                onClick={() => setProjectorMode(false)}
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+          </div>
+
+          <div className={`flex-1 min-h-0 flex flex-col md:flex-row gap-8 ${activity.img ? '' : 'items-center'}`}>
+            {activity.img && (
+              <div className="md:w-2/5 shrink-0 flex items-center justify-center">
+                <img src={activity.img} alt={activity.title} className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-md" />
+              </div>
+            )}
+
+            <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col gap-6 ${activity.img ? '' : 'max-w-3xl w-full'}`}>
+              {raw.escenario && (
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-1">Escenario</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-800 leading-snug">{raw.escenario}</p>
+                </div>
+              )}
+
+              {(raw.instrucciones || []).filter(Boolean).length > 0 && (
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-1">Instrucciones</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {raw.instrucciones.filter(Boolean).map((instr, i) => (
+                      <li key={i} className="text-xl sm:text-2xl font-semibold text-slate-700">{instr}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {raw.descripcion && (
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-indigo-500 mb-1">Descripción</h3>
+                  <p className="text-xl sm:text-2xl font-medium text-slate-700 leading-snug whitespace-pre-wrap">{raw.descripcion}</p>
+                </div>
+              )}
+
+              {((raw.expansion_tema || []).length > 0 || (raw.banco_palabras || []).length > 0) && (
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-fuchsia-600 mb-2">Estructuras y Vocabulario a Incluir</h3>
+                  {(raw.expansion_tema || []).length > 0 && (
+                    <ul className="list-disc list-inside space-y-1 mb-3">
+                      {raw.expansion_tema.map((frase, i) => (
+                        <li key={i} className="text-xl sm:text-2xl font-semibold text-slate-800">{frase}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {(raw.banco_palabras || []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {raw.banco_palabras.map((word, i) => (
+                        <span key={i} className="text-lg sm:text-xl font-bold text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-4 py-1.5 rounded-full">
+                          {word}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
