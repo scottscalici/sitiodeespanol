@@ -28,6 +28,7 @@ import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
 import Anuncios from '../components/Anuncios';
 import LeaderboardCard from '../components/LeaderboardCard';
+import HallOfFameCard from '../components/HallOfFameCard';
 import PracticeCard from '../components/PracticeCard';
 
 const PLATFORM_TAREA_INFO = {
@@ -621,6 +622,7 @@ const Dashboard = () => {
               <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
               <PracticeHubTile course={course} />
               <LeaderboardCard course={course} />
+              <HallOfFameCard course={course} />
               <div className="pt-6 border-t border-slate-200 space-y-6">
                 {/* 🟢 FIXED RESOURCE HUB PROP */}
                 <ResourceHub course={course} />

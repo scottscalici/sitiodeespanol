@@ -96,6 +96,16 @@ service cloud.firestore {
       allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- LEADERBOARD HISTORY (Hall of Fame weekly/monthly archives) ---
+    // Snapshotted client-side by the first student in a course to earn
+    // points in a new week/month (see archivePeriodIfNeeded in
+    // pointsHelper.js) — low-stakes derived data (top 3 scorers of the
+    // period that just ended), not itself a grade, so any logged-in user
+    // may write it, same posture as impostor_rooms above.
+    match /leaderboard_history/{document=**} {
+      allow read, write: if isLoggedIn();
+    }
+
     // --- THE MASTER CATCH-ALL (Curriculum & Other Apps) ---
     match /{document=**} {
       allow read: if isLoggedIn();

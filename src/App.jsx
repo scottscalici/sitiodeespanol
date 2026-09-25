@@ -31,6 +31,7 @@ import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
 import SampleSentencesPage from './student/SampleSentencesPage';
 import SilabasPage from './student/SilabasPage';
+import HallOfFamePage from './student/HallOfFamePage';
 
 
 // ⚙️ GLOBAL UI COMPONENTS
@@ -182,6 +183,7 @@ function App() {
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
             <Route path="/fotos-azar" element={<FotosAzarPage />} />
             <Route path="/practica/conectores" element={<ConectoresEngine />} />
+            <Route path="/salon-de-la-fama/:courseId" element={<HallOfFamePage />} />
 
 
             {/* 🔴 SECURE ADMIN ROUTES */}
