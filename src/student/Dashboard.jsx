@@ -28,6 +28,7 @@ import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
 import Anuncios from '../components/Anuncios';
 import LeaderboardCard from '../components/LeaderboardCard';
+import PracticeCard from '../components/PracticeCard';
 
 const PLATFORM_TAREA_INFO = {
   VHL: {
@@ -74,30 +75,38 @@ const Dashboard = () => {
   const [hasSentences, setHasSentences] = useState(false);
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
   const [showWarmupModal, setShowWarmupModal] = useState(false);
+  const [practiceCards, setPracticeCards] = useState([]);
   const warmupAverage = averageFromBreakdown(warmupBreakdown);
 
   // Calentamiento promedio: a calentamiento counts once its day's date has
   // arrived; a missed one counts as a 0 instead of being skipped, so this
-  // matches the teacher gradebook's average.
+  // matches the teacher gradebook's average. Practice cards (small graded
+  // activities like Gustar) are assigned/graded the exact same way and fold
+  // into this SAME average, tagged with `kind` so the breakdown modal below
+  // can tell the two apart (different link target, different error shape).
   useEffect(() => {
     const computeWarmupBreakdown = async () => {
       if (!course || !data?.cal?.length) return;
       try {
-        const calentamientos = await getCachedCollection('calentamientos');
+        const [calentamientos, allPracticeCards] = await Promise.all([
+          getCachedCollection('calentamientos'),
+          getCachedCollection('practice_cards'),
+        ]);
+        setPracticeCards(allPracticeCards);
         const todayStr = new Date().toLocaleDateString('en-CA');
-        const fechaByDia = {};
-        data.cal.forEach((c) => {
-          if (c.dia != null && c.fecha) fechaByDia[Number(c.dia)] = c.fecha;
-        });
 
         const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
-        setWarmupBreakdown(buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}));
+        const assignedPractice = getAssignedWarmups(allPracticeCards, fechaByDia, course, todayStr, null);
+        setWarmupBreakdown([
+          ...buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
+          ...buildWarmupBreakdown(assignedPractice, userData?.progress?.practiceCards || {}).map((b) => ({ ...b, kind: 'practica' })),
+        ]);
       } catch (error) {
         console.error('Error computing warmup breakdown:', error);
       }
     };
     computeWarmupBreakdown();
-  }, [course, data?.cal, userData?.progress?.warmups]);
+  }, [course, data?.cal, fechaByDia, userData?.progress?.warmups, userData?.progress?.practiceCards]);
 
   // Fetch Music
   useEffect(() => {
@@ -279,6 +288,10 @@ const Dashboard = () => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
 
+  const activePracticeCards = practiceCards.filter(
+    (pc) => pc.course === course && Number(pc.dia) === liveDia && !pc.excused
+  );
+
   const themeAccent = theme?.styles?.accent;
   const themeCardOverrides = theme?.styles?.cardOverrides || {};
   const themeTextures = theme?.styles?.textures || {};
@@ -355,7 +368,12 @@ const Dashboard = () => {
                   </button>
                 )}
               </div>
-  
+
+              {/* ✏️ PRÁCTICA — SMALL GRADED ACTIVITIES (GUSTAR, ETC.) */}
+              {activePracticeCards.map((card) => (
+                <PracticeCard key={card.id} card={card} />
+              ))}
+
               {/* 💡 CURIOSIDAD */}
               <Curiosidad curiosidades={activeCuriosidades} />
   
@@ -677,23 +695,24 @@ const Dashboard = () => {
                       ? 'bg-amber-50 text-amber-600 border-amber-200'
                       : 'bg-emerald-50 text-emerald-600 border-emerald-200';
   
+                    const isPractica = item.kind === 'practica';
                     return (
                       <Link
                         key={item.id}
-                        to={`/calentamiento/${item.course}/${item.dia}`}
+                        to={isPractica ? `/practica/tarjeta/${item.course}/${item.dia}` : `/calentamiento/${item.course}/${item.dia}`}
                         onClick={() => setShowWarmupModal(false)}
                         className="block bg-white rounded-xl border border-slate-200 p-4 hover:border-orange-300 hover:shadow-md transition-all"
                       >
                         <div className="flex justify-between items-center gap-3">
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-800 text-sm truncate">Día {item.dia}: {item.title}</p>
+                            <p className="font-bold text-slate-800 text-sm truncate">{isPractica ? '✏️' : '🔥'} Día {item.dia}: {item.title}</p>
                             <p className="text-[10px] text-slate-400 font-mono">{item.fecha}</p>
                           </div>
                           <div className={`shrink-0 border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-xs ${gradeClasses}`}>
                             {item.completed ? `${item.grade}%` : 'Sin hacer'}
                           </div>
                         </div>
-  
+
                         {item.errors.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
                             <p className="text-[9px] font-black uppercase tracking-widest text-rose-500">
@@ -701,8 +720,12 @@ const Dashboard = () => {
                             </p>
                             {item.errors.map((err, i) => (
                               <p key={i} className="text-[11px] text-slate-500">
-                                <span className="font-bold text-slate-700">{err.verb}</span> ({err.subject}, {err.tense}) —
-                                era <span className="text-emerald-600 font-mono">{err.expected}</span>
+                                {isPractica ? (
+                                  <>{err.prompt} — era <span className="text-emerald-600 font-mono">{err.expected}</span></>
+                                ) : (
+                                  <><span className="font-bold text-slate-700">{err.verb}</span> ({err.subject}, {err.tense}) —
+                                  era <span className="text-emerald-600 font-mono">{err.expected}</span></>
+                                )}
                               </p>
                             ))}
                           </div>

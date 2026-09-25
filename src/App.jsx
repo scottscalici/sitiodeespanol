@@ -11,6 +11,7 @@ import Dashboard from './student/Dashboard';
 import MusicaEngine from './student/MusicaEngine';
 import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
+import PracticeCardEngine from './student/PracticeCardEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
@@ -53,6 +54,7 @@ import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import VerbEditor from './admin/managers/VerbEditor';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
@@ -174,6 +176,7 @@ function App() {
             <Route path="/recuperacion" element={<Recuperacion />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
+            <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
@@ -469,6 +472,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-practice-cards"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PracticeCardAdmin />
                 </AdminRoute>
               }
             />

@@ -41,6 +41,10 @@ export default function TeacherGradebook() {
   // which warmups were actually assigned (and by when) for the
   // missing-assignment = 0 logic, and can list them by title in a breakdown.
   const [allCalentamientos, setAllCalentamientos] = useState([]);
+  // Small graded practice cards (Gustar, prepositional pronouns, etc.) — same
+  // assignment/grading shape as calentamientos, folded into the same
+  // "Promedio Calentamientos" average.
+  const [allPracticeCards, setAllPracticeCards] = useState([]);
   // school calendar "dia" number -> fecha, to know when a given warmup's
   // dia was actually assigned/due
   const [calendarFechaByDia, setCalendarFechaByDia] = useState({});
@@ -101,7 +105,10 @@ export default function TeacherGradebook() {
 
     const fetchCalendarAndWarmups = async (liveDia) => {
       try {
-        const calentamientos = await getCachedCollection('calentamientos', { force });
+        const [calentamientos, practiceCards] = await Promise.all([
+          getCachedCollection('calentamientos', { force }),
+          getCachedCollection('practice_cards', { force }),
+        ]);
         const todaysByCourse = {};
         calentamientos.forEach((c) => {
           if (Number(c.dia) === liveDia && !todaysByCourse[c.course]) {
@@ -109,6 +116,7 @@ export default function TeacherGradebook() {
           }
         });
         setAllCalentamientos(calentamientos);
+        setAllPracticeCards(practiceCards);
         setTodaysWarmupByCourse(todaysByCourse);
       } catch (error) {
         console.error('Error fetching calentamientos for gradebook:', error);
@@ -191,6 +199,7 @@ export default function TeacherGradebook() {
     setRefreshing(true);
     invalidateCollectionCache('users');
     invalidateCollectionCache('calentamientos');
+    invalidateCollectionCache('practice_cards');
     await loadGradebookData(true);
     setRefreshing(false);
   };
@@ -211,12 +220,23 @@ export default function TeacherGradebook() {
   // that belong to the student's own course.
   // A calentamiento counts as "assigned" once its day's date has arrived;
   // if the student never completed it, it counts as a 0 in the average
-  // instead of being skipped (which used to quietly inflate the average). ---
+  // instead of being skipped (which used to quietly inflate the average).
+  // Practice cards (small graded activities like Gustar) are assigned/graded
+  // the exact same way and fold into this SAME breakdown/average, tagged
+  // with `kind` so the popup can tell the two apart. ---
+  const getCombinedBreakdown = (student, quarter, todayStr) => {
+    const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
+    const assignedPractice = getAssignedWarmups(allPracticeCards, calendarFechaByDia, student.course, todayStr, quarter);
+    return [
+      ...buildWarmupBreakdown(assigned, student.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
+      ...buildWarmupBreakdown(assignedPractice, student.progress?.practiceCards || {}).map((b) => ({ ...b, kind: 'practica' })),
+    ];
+  };
+
   const getWarmupAverage = (student) => {
     const quarter = getSelectedQuarter();
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
-    const breakdown = buildWarmupBreakdown(assigned, student.progress?.warmups || {});
+    const breakdown = getCombinedBreakdown(student, quarter, todayStr);
     return { percent: averageFromBreakdown(breakdown), quarterLabel: quarter?.label || null };
   };
 
@@ -225,8 +245,7 @@ export default function TeacherGradebook() {
   const getWarmupBreakdownForStudent = (student) => {
     const quarter = getSelectedQuarter();
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
-    return { breakdown: buildWarmupBreakdown(assigned, student.progress?.warmups || {}), quarterLabel: quarter?.label || null };
+    return { breakdown: getCombinedBreakdown(student, quarter, todayStr), quarterLabel: quarter?.label || null };
   };
 
   // --- TODAY'S ASSIGNED WARMUP STATUS for this student's course ---
@@ -987,7 +1006,7 @@ const handleResetPassword = async () => {
                     <div className="flex justify-between items-center gap-3">
                       <div className="min-w-0">
                         <p className="font-bold text-white text-sm truncate">
-                          Día {item.dia}: {item.title}
+                          {item.kind === 'practica' ? '✏️' : '🔥'} Día {item.dia}: {item.title}
                         </p>
                         <p className="text-[10px] text-slate-500 font-mono">{item.fecha}</p>
                       </div>
@@ -1007,9 +1026,14 @@ const handleResetPassword = async () => {
                         </p>
                         {item.errors.map((err, i) => (
                           <p key={i} className="text-[11px] text-slate-400">
-                            <span className="font-bold text-slate-300">{err.verb}</span> ({err.subject}, {err.tense}) —
-                            esperaba <span className="text-emerald-400 font-mono">{err.expected}</span>, escribió{' '}
-                            <span className="text-rose-400 font-mono">{err.studentInput || '(vacío)'}</span>
+                            {item.kind === 'practica' ? (
+                              <>{err.prompt} — esperaba <span className="text-emerald-400 font-mono">{err.expected}</span>, escribió{' '}
+                              <span className="text-rose-400 font-mono">{err.studentInput || '(vacío)'}</span></>
+                            ) : (
+                              <><span className="font-bold text-slate-300">{err.verb}</span> ({err.subject}, {err.tense}) —
+                              esperaba <span className="text-emerald-400 font-mono">{err.expected}</span>, escribió{' '}
+                              <span className="text-rose-400 font-mono">{err.studentInput || '(vacío)'}</span></>
+                            )}
                           </p>
                         ))}
                       </div>

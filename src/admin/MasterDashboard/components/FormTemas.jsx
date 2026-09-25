@@ -17,6 +17,7 @@ const CARD_KEYS = [
   { key: 'tareas', label: 'Tareas (barra lateral)', texture: true },
   { key: 'countdown', label: 'Cuenta Regresiva', texture: true },
   { key: 'recursos', label: 'Panel de Recursos', texture: true },
+  { key: 'practicaCard', label: 'Práctica (Gustar, etc.)', texture: true },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
   { key: 'practica', label: 'Practice Hub' },

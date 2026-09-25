@@ -27,6 +27,7 @@ const DailyPlanHub = () => {
   // Decoupled Calentamiento States
   const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
   const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
+  const [allPracticeCards, setAllPracticeCards] = useState([]); // Small graded practice (Gustar, etc.)
 
   const MAX_DAYS = 80;
 
@@ -58,7 +59,7 @@ const DailyPlanHub = () => {
 
         // Fetch Sequences & Collections
         const [
-          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap
+          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap
         ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
@@ -70,7 +71,8 @@ const DailyPlanHub = () => {
           getDocs(collection(db, 'curiosidades')),
           getDocs(collection(db, 'calentamientos')),
           getDocs(collection(db, 'dailyVocabWarmups')),
-          getDocs(collection(db, 'conversaciones'))
+          getDocs(collection(db, 'conversaciones')),
+          getDocs(collection(db, 'practice_cards'))
         ]);
 
         if (tareasSnap.exists()) {
@@ -97,6 +99,7 @@ const DailyPlanHub = () => {
         setAllCalentamientos(calSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllConversaciones(convSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAllPracticeCards(practiceCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       } catch (error) {
         console.error('Error loading Daily Hub data:', error);
@@ -120,6 +123,7 @@ const DailyPlanHub = () => {
   
   const activeCalentamientosVerbs = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
   const activeCalentamientosVocab = allVocabWarmups.filter(v => v.course === activeCourse && Number(v.dia) === selectedDay);
+  const activePracticeCards = allPracticeCards.filter(p => p.course === activeCourse && Number(p.dia) === selectedDay);
 
   const activeCuriosidades = allCuriosidades.filter(c => {
     if (activeCourse === 's2') return c.s2_dia === selectedDay;
@@ -151,6 +155,7 @@ const DailyPlanHub = () => {
           <span>Vocab Activo: {activeVocabBundles.length}</span>
           <span>Destacados: {allDestacados.length}</span>
           <span>Calentamientos (V/Voc): {allCalentamientos.length}/{allVocabWarmups.length}</span>
+          <span>Tarjetas de Práctica: {allPracticeCards.length}</span>
           <span>Curiosidades: {allCuriosidades.length}</span>
           <span>Conversaciones: {allConversaciones.length}</span>
         </div>
@@ -280,6 +285,33 @@ const DailyPlanHub = () => {
                         <div className="text-right">
                           <span className="text-xs font-mono text-neutral-500">{voc.sequence?.length || 0} Términos</span>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-violet-400 flex items-center gap-2">✏️ Práctica</h2>
+                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activePracticeCards.length}</span>
+                </div>
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link to="/admin-secret-portal-practice-cards" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Editar</Link>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {activePracticeCards.length === 0 ? (
+                  <p className="text-neutral-500 text-sm italic">Sin práctica asignada para hoy.</p>
+                ) : (
+                  <div className="bg-neutral-950 p-4 rounded-xl border border-violet-900/30 flex flex-col gap-4">
+                    {activePracticeCards.map(card => (
+                      <div key={card.id} className="flex justify-between items-center">
+                        <h3 className="font-bold text-white text-md">{card.title}</h3>
+                        <span className="text-xs font-mono text-neutral-500">{card.questions?.length || 0} Preguntas &middot; {card.points || 1}pt</span>
                       </div>
                     ))}
                   </div>
