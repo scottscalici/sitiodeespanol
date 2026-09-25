@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 
 export default function VocabPage() {
   const { bundleId } = useParams();
@@ -179,7 +180,7 @@ export default function VocabPage() {
               {bundleData.textbook}
             </p>
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
-              Lección {bundleData.chapter}
+              {getVocabUnitWord(bundleData.textbook)} {bundleData.chapter}
             </h1>
             <p className="text-sm font-medium text-slate-500 mt-1">
               {sortedWords.length} Términos Totales

@@ -8,6 +8,7 @@ import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, buildWarmupBreakdown, averageFromBreakdown } from '../utils/warmupBreakdown';
+import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 
 // Components
 import Header from '../components/Header';
@@ -498,12 +499,8 @@ const Dashboard = () => {
             {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE */}
             {activeVocabBundles.map(bundleId => {
               const bundleDetails = vocabBundleDetails[bundleId];
-              // "Unidad" for Reporteros (S4), "Lección" for Descubre (S2)
-              // and anything else — keyed off the textbook name itself so
-              // it's still right if a course ever mixes textbooks.
-              const unitWord = /reporteros/i.test(bundleDetails?.textbook || '') ? 'Unidad' : 'Lección';
               const bundleTitle = bundleDetails
-                ? `${bundleDetails.textbook} — ${unitWord} ${bundleDetails.chapter}`
+                ? `${bundleDetails.textbook} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
                 : bundleId.replace(/_/g, ' ');
 
               return (
