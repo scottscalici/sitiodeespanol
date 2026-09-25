@@ -58,8 +58,16 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   }, [timeLeft, isSpeedRound]);
 
   const handleTimeUp = () => {
-    const finalScore = Math.round((currentIndex / (initialCount || 1)) * 100);
-    alert(`¡Tiempo! ⏱️ Lograste completar ${currentIndex} de ${initialCount} preguntas.`);
+    // NOT currentIndex/initialCount — a wrong answer appends a fresh retry
+    // question onto the end of the queue (see handleCheck below), so the
+    // queue can grow past initialCount and currentIndex can walk past it
+    // too, pushing this over 100%. `attempts` only increments once per
+    // ORIGINAL question when it's finally answered correctly (retries of
+    // the same question don't double-count it), so it's naturally capped
+    // at initialCount — a real "how many of the assigned questions did you
+    // get right before time ran out" percentage.
+    const finalScore = Math.round((attempts / (initialCount || 1)) * 100);
+    alert(`¡Tiempo! ⏱️ Respondiste correctamente ${attempts} de ${initialCount} preguntas.`);
     onComplete(segment.id, finalScore, initialCount, initialRegularCount, initialSentenceCount);
   };
 
