@@ -501,7 +501,12 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                      for (let s of otherSubjects) {
                          if (options.length < 4 && tenseData[s]?.target) options.push(tenseData[s].target);
                      }
-                     generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
+                     // The options here are all conjugations of the SAME verb (different
+                     // subjects), so a student who doesn't already recognize the infinitive
+                     // has no way to tell them apart from engTrans alone — same reasoning
+                     // as the 'conjugate' recall format below.
+                     const infinitiveEnglish = target.fullData.translations?.infinitivo?.english || `to ${target.fullData.palabra}`;
+                     generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                 } else if (format === 'listen_verb') {
                      generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 } else if (format === 'speak_verb') {
@@ -880,6 +885,16 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           {currentQ.type === 'mc' && (
             <>
+              {currentQ.infinitive && (
+                <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+                  <span className="bg-emerald-100 text-emerald-800 font-black px-4 py-2 rounded-xl border border-emerald-300 shadow-sm text-lg">
+                    {currentQ.infinitive}
+                  </span>
+                  {currentQ.infinitiveEnglish && (
+                    <span className="text-slate-400 text-sm font-medium">{currentQ.infinitiveEnglish}</span>
+                  )}
+                </div>
+              )}
               <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-8">{currentQ.prompt}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                 {currentQ.options.map((opt, i) => {
