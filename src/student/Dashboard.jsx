@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
-import { getAssignedWarmups, buildWarmupBreakdown, averageFromBreakdown } from '../utils/warmupBreakdown';
+import { getAssignedWarmups, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 
 // Components
@@ -76,7 +76,7 @@ const Dashboard = () => {
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
   const [showWarmupModal, setShowWarmupModal] = useState(false);
   const [practiceCards, setPracticeCards] = useState([]);
-  const warmupAverage = averageFromBreakdown(warmupBreakdown);
+  const warmupAverage = weightedAverageFromBreakdown(warmupBreakdown);
 
   // Calentamiento promedio: a calentamiento counts once its day's date has
   // arrived; a missed one counts as a 0 instead of being skipped, so this
@@ -97,9 +97,10 @@ const Dashboard = () => {
 
         const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
         const assignedPractice = getAssignedWarmups(allPracticeCards, fechaByDia, course, todayStr, null);
+        const practicePossible = (c) => c.questions?.length || 1;
         setWarmupBreakdown([
           ...buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
-          ...buildWarmupBreakdown(assignedPractice, userData?.progress?.practiceCards || {}).map((b) => ({ ...b, kind: 'practica' })),
+          ...buildWarmupBreakdown(assignedPractice, userData?.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),
         ]);
       } catch (error) {
         console.error('Error computing warmup breakdown:', error);

@@ -9,7 +9,7 @@ import {
   getUnitSummary,
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
-import { getAssignedWarmups, buildWarmupBreakdown, averageFromBreakdown } from '../../utils/warmupBreakdown';
+import { getAssignedWarmups, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../../utils/warmupBreakdown';
 
 // Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
 const getFlagClasses = (percent) => {
@@ -227,9 +227,10 @@ export default function TeacherGradebook() {
   const getCombinedBreakdown = (student, quarter, todayStr) => {
     const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
     const assignedPractice = getAssignedWarmups(allPracticeCards, calendarFechaByDia, student.course, todayStr, quarter);
+    const practicePossible = (c) => c.questions?.length || 1;
     return [
       ...buildWarmupBreakdown(assigned, student.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
-      ...buildWarmupBreakdown(assignedPractice, student.progress?.practiceCards || {}).map((b) => ({ ...b, kind: 'practica' })),
+      ...buildWarmupBreakdown(assignedPractice, student.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),
     ];
   };
 
@@ -237,7 +238,7 @@ export default function TeacherGradebook() {
     const quarter = getSelectedQuarter();
     const todayStr = new Date().toLocaleDateString('en-CA');
     const breakdown = getCombinedBreakdown(student, quarter, todayStr);
-    return { percent: averageFromBreakdown(breakdown), quarterLabel: quarter?.label || null };
+    return { percent: weightedAverageFromBreakdown(breakdown), quarterLabel: quarter?.label || null };
   };
 
   // Full per-assignment breakdown for the popup — same assigned set and
