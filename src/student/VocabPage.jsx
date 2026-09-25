@@ -3,15 +3,30 @@ import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
+import { useAuth } from '../context/AuthContext';
+
+// Font/column sizing tuned so a section's word list fits a projector
+// screen in one glance without scrolling — fewer words means bigger text,
+// more words means more columns and smaller text.
+const projectorScaleFor = (count) => {
+  if (count <= 12) return { columns: 'columns-2', text: 'text-4xl' };
+  if (count <= 24) return { columns: 'columns-3', text: 'text-3xl' };
+  if (count <= 40) return { columns: 'columns-4', text: 'text-2xl' };
+  return { columns: 'columns-5', text: 'text-xl' };
+};
 
 export default function VocabPage() {
   const { bundleId } = useParams();
+  const { userData } = useAuth();
+  const isAdmin = userData?.role === 'admin';
   const [bundleData, setBundleData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // View Modes: 'lista', 'tarjetas', 'tabu'
   const [viewMode, setViewMode] = useState('lista');
-  
+  // Projector overlay: null when closed, otherwise the section key being shown.
+  const [projectorSection, setProjectorSection] = useState(null);
+
   // Interactive Deck States
   const [activeFilters, setActiveFilters] = useState([]);
   const [studyDeck, setStudyDeck] = useState([]);
@@ -207,12 +222,20 @@ export default function VocabPage() {
            >
              🗂️ Tarjetas
            </button>
-           <button 
+           <button
              onClick={() => handleModeChange('tabu')}
              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'tabu' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
            >
              🗣️ Tabú
            </button>
+           {isAdmin && allSections.length > 0 && (
+             <button
+               onClick={() => setProjectorSection(allSections[0])}
+               className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-slate-500 hover:bg-slate-100 border-l border-slate-200 ml-1 pl-5"
+             >
+               📽️ Proyector
+             </button>
+           )}
         </div>
 
         {/* STUDY DECK CONTROLS (Only visible in Tarjetas/Tabu) */}
@@ -403,6 +426,51 @@ export default function VocabPage() {
         )}
 
       </div>
+
+      {/* 📽️ PROYECTOR — full-section word wall, admin-only trigger above */}
+      {projectorSection && (
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col p-8 sm:p-12">
+          <div className="flex items-center justify-between gap-4 mb-8 shrink-0">
+            <select
+              value={projectorSection}
+              onChange={(e) => setProjectorSection(e.target.value)}
+              className="text-lg font-black text-slate-700 uppercase tracking-widest border-2 border-slate-200 rounded-xl px-4 py-2 bg-white focus:outline-none focus:border-indigo-400"
+            >
+              {allSections.map((sec) => (
+                <option key={sec} value={sec}>Sección {sec}</option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={() => document.documentElement.requestFullscreen?.()}
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 border-2 border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                ⛶ Pantalla Completa
+              </button>
+              <button
+                onClick={() => setProjectorSection(null)}
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+          </div>
+
+          {(() => {
+            const words = groupedWords[projectorSection] || [];
+            const { columns, text } = projectorScaleFor(words.length);
+            return (
+              <div className={`flex-1 overflow-hidden ${columns} gap-x-10`} style={{ columnFill: 'balance' }}>
+                {words.map((w, idx) => (
+                  <p key={idx} className={`font-black text-slate-800 tracking-tight break-inside-avoid mb-4 ${text}`}>
+                    {w.palabra}
+                  </p>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
