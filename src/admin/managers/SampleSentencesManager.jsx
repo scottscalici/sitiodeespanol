@@ -19,6 +19,7 @@ export default function SampleSentencesManager() {
   const [status, setStatus] = useState('');
 
   const [editingId, setEditingId] = useState(null);
+  const [title, setTitle] = useState('');
   const [linesText, setLinesText] = useState('');
   const [assignments, setAssignments] = useState([emptyAssignment()]);
 
@@ -43,6 +44,7 @@ export default function SampleSentencesManager() {
 
   const resetEditor = () => {
     setEditingId(null);
+    setTitle('');
     setLinesText('');
     setAssignments([emptyAssignment()]);
     setStatus('');
@@ -50,6 +52,7 @@ export default function SampleSentencesManager() {
 
   const loadIntoEditor = (set) => {
     setEditingId(set.id);
+    setTitle(set.title || '');
     setLinesText((set.lines || []).join('\n'));
     setAssignments(set.assignments?.length ? set.assignments.map((a) => ({ ...a })) : [emptyAssignment()]);
     setStatus('');
@@ -81,6 +84,7 @@ export default function SampleSentencesManager() {
     try {
       const id = editingId || `set-${crypto.randomUUID()}`;
       await setDoc(doc(db, 'sentence_sets', id), {
+        title: title.trim(),
         lines,
         assignments: validAssignments,
         createdAt: editingId ? sets.find((s) => s.id === editingId)?.createdAt : new Date().toISOString(),
@@ -135,6 +139,19 @@ export default function SampleSentencesManager() {
                 + Empezar Conjunto Nuevo
               </button>
             )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+              Título (aparece en el panel del estudiante)
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Oraciones"
+              className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 text-sm font-bold focus:outline-none focus:border-teal-500 transition-colors"
+            />
           </div>
 
           <div>
@@ -227,7 +244,7 @@ export default function SampleSentencesManager() {
             sets.map((set) => (
               <div key={set.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex justify-between items-center gap-4">
                 <div className="min-w-0">
-                  <p className="text-white font-bold text-sm truncate">{(set.lines || []).length} oraciones</p>
+                  <p className="text-white font-bold text-sm truncate">{set.title || 'Oraciones'} · {(set.lines || []).length} oraciones</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {(set.assignments || []).map((a, i) => (
                       <span key={i} className="text-[10px] font-black uppercase bg-teal-900/50 text-teal-300 px-2 py-0.5 rounded">

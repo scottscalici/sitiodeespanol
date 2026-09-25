@@ -72,7 +72,9 @@ const Dashboard = () => {
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
   const [vocabBundleDetails, setVocabBundleDetails] = useState({});
   const [activeLecturas, setActiveLecturas] = useState([]);
-  const [hasSentences, setHasSentences] = useState(false);
+  // null when no sentence set is assigned to this course/day; otherwise its
+  // (possibly blank) title, shown on the Dashboard card.
+  const [sentenceSetTitle, setSentenceSetTitle] = useState(null);
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
   const [showWarmupModal, setShowWarmupModal] = useState(false);
   const [practiceCards, setPracticeCards] = useState([]);
@@ -199,12 +201,12 @@ const Dashboard = () => {
       if (!course || !liveDia) return;
       try {
         const snap = await getDocs(collection(db, 'sentence_sets'));
-        const matches = snap.docs.some((docSnap) =>
-          (docSnap.data().assignments || []).some(
-            (a) => a.course === course && Number(a.dia) === Number(liveDia)
-          )
-        );
-        setHasSentences(matches);
+        const matchingSet = snap.docs
+          .map((docSnap) => docSnap.data())
+          .find((set) =>
+            (set.assignments || []).some((a) => a.course === course && Number(a.dia) === Number(liveDia))
+          );
+        setSentenceSetTitle(matchingSet ? matchingSet.title || '' : null);
       } catch (error) {
         console.error('Error checking sentence sets:', error);
       }
@@ -382,21 +384,21 @@ const Dashboard = () => {
               <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
   
               {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
-              {hasSentences && (
+              {sentenceSetTitle != null && (
                 <Link
                   to={`/practica/oraciones/${course}/${liveDia}`}
                   className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
                 >
                   <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
                       <span className="text-3xl drop-shadow">✍️</span>
                     </div>
-  
+
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-sky-100 mb-1">Día {liveDia}</span>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Oraciones</h3>
+                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{sentenceSetTitle || 'Oraciones'}</h3>
                       <p className="text-sky-50/90 text-sm font-medium mt-1 line-clamp-2">Completa oraciones con las palabras que faltan.</p>
                     </div>
                   </div>

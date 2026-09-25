@@ -14,6 +14,7 @@ const SampleSentencesPage = () => {
   const isAdmin = userData?.role === 'admin';
 
   const [sentences, setSentences] = useState([]);
+  const [title, setTitle] = useState('Oraciones');
   const [loading, setLoading] = useState(true);
   const [inputs, setInputs] = useState({});
   const [results, setResults] = useState({});
@@ -25,15 +26,20 @@ const SampleSentencesPage = () => {
         const snap = await getDocs(collection(db, 'sentence_sets'));
         const targetDiaNum = Number(targetDia);
         const matchingLines = [];
+        let firstTitle = null;
 
         snap.forEach((docSnap) => {
           const set = docSnap.data();
           const matches = (set.assignments || []).some(
             (a) => a.course === courseId && Number(a.dia) === targetDiaNum
           );
-          if (matches) matchingLines.push(...(set.lines || []));
+          if (matches) {
+            matchingLines.push(...(set.lines || []));
+            if (firstTitle == null) firstTitle = set.title || '';
+          }
         });
 
+        if (firstTitle) setTitle(firstTitle);
         setSentences(matchingLines.map(parseBlankSentence));
       } catch (error) {
         console.error('Error loading sample sentences:', error);
@@ -70,7 +76,7 @@ const SampleSentencesPage = () => {
         </div>
 
         <div className="text-center">
-          <h1 className="text-3xl font-black uppercase tracking-tight">Oraciones</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tight">{title}</h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
             {courseId?.toUpperCase()} · Día {targetDia}
           </p>
