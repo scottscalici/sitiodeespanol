@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getCachedCollection } from '../utils/firestoreCache';
 import { formatWeekLabel, formatMonthLabel } from '../utils/pointsHelper';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -20,21 +19,23 @@ const HallOfFamePage = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [historySnap, usersSnap] = await Promise.all([
-          getDocs(query(collection(db, 'leaderboard_history'), where('course', '==', courseId))),
-          getDocs(query(collection(db, 'users'), where('role', '==', 'student'), where('course', '==', courseId))),
+        // Shared cache — see HallOfFameCard/LeaderboardCard, which read
+        // these same collections on the Dashboard page this was linked
+        // from, so this reuses that cached fetch instead of re-querying.
+        const [allHistory, allUsers] = await Promise.all([
+          getCachedCollection('leaderboard_history'),
+          getCachedCollection('users'),
         ]);
 
-        const rows = historySnap.docs.map((d) => d.data());
+        const rows = allHistory.filter((h) => h.course === courseId);
         rows.sort((a, b) => b.key.localeCompare(a.key));
 
-        const leaders = usersSnap.docs
-          .filter((d) => !d.data().independent)
-          .map((d) => {
-            const s = d.data();
+        const leaders = allUsers
+          .filter((s) => s.role === 'student' && s.course === courseId && !s.independent)
+          .map((s) => {
             const lastInitial = s.lastName ? `${s.lastName.trim().charAt(0).toUpperCase()}.` : '';
             const name = [s.firstName, lastInitial].filter(Boolean).join(' ') || s.email || 'Estudiante';
-            return { uid: d.id, name, points: s.total_points || s.current_path_points || 0 };
+            return { uid: s.id, name, points: s.total_points || s.current_path_points || 0 };
           })
           .filter((s) => s.points > 0)
           .sort((a, b) => b.points - a.points)

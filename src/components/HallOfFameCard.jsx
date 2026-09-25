@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getCachedCollection } from '../utils/firestoreCache';
 import { formatWeekLabel, formatMonthLabel } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -22,20 +21,24 @@ const HallOfFameCard = ({ course }) => {
     const fetchHallOfFame = async () => {
       setLoading(true);
       try {
-        const [historySnap, usersSnap] = await Promise.all([
-          getDocs(query(collection(db, 'leaderboard_history'), where('course', '==', course))),
-          getDocs(query(collection(db, 'users'), where('role', '==', 'student'), where('course', '==', course))),
+        // Shared cache (see firestoreCache) — LeaderboardCard and the admin
+        // gradebook read this same full 'users' collection on the same
+        // page loads; sharing one 5-minute-cached fetch instead of each
+        // component running its own query cuts Firestore reads app-wide.
+        const [allHistory, allUsers] = await Promise.all([
+          getCachedCollection('leaderboard_history'),
+          getCachedCollection('users'),
         ]);
 
-        const weeklyDocs = historySnap.docs.filter((d) => d.data().period === 'weekly').map((d) => d.data());
-        const monthlyDocs = historySnap.docs.filter((d) => d.data().period === 'monthly').map((d) => d.data());
+        const forCourse = allHistory.filter((h) => h.course === course);
+        const weeklyDocs = forCourse.filter((h) => h.period === 'weekly');
+        const monthlyDocs = forCourse.filter((h) => h.period === 'monthly');
         weeklyDocs.sort((a, b) => b.key.localeCompare(a.key));
         monthlyDocs.sort((a, b) => b.key.localeCompare(a.key));
 
-        const leader = usersSnap.docs
-          .filter((d) => !d.data().independent)
-          .map((d) => {
-            const s = d.data();
+        const leader = allUsers
+          .filter((s) => s.role === 'student' && s.course === course && !s.independent)
+          .map((s) => {
             const lastInitial = s.lastName ? `${s.lastName.trim().charAt(0).toUpperCase()}.` : '';
             const name = [s.firstName, lastInitial].filter(Boolean).join(' ') || s.email || 'Estudiante';
             return { name, points: s.total_points || s.current_path_points || 0 };

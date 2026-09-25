@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { getCachedCollection } from '../utils/firestoreCache';
 import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -28,30 +27,31 @@ const LeaderboardCard = ({ course }) => {
     const fetchLeaders = async () => {
       setLoading(true);
       try {
-        const q = query(
-          collection(db, 'users'),
-          where('role', '==', 'student'),
-          where('course', '==', course)
-        );
-        const snap = await getDocs(q);
+        // Shared cache (see firestoreCache) — HallOfFameCard and the admin
+        // gradebook read this same full 'users' collection on the same
+        // page loads, so sharing one 5-minute-cached fetch instead of each
+        // running its own filtered query cuts Firestore reads app-wide
+        // rather than just moving the cost from server-side to client-side.
+        const allUsers = await getCachedCollection('users');
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
 
         // Independent accounts (former students using the site outside any
         // current class) share the course-wide leaderboard query but never
         // belong in a live class's ranking.
-        const rows = snap.docs.filter((docSnap) => !docSnap.data().independent).map((docSnap) => {
-          const d = docSnap.data();
-          const lastInitial = d.lastName ? `${d.lastName.trim().charAt(0).toUpperCase()}.` : '';
-          const name = [d.firstName, lastInitial].filter(Boolean).join(' ') || d.email || 'Estudiante';
-          return {
-            uid: docSnap.id,
-            name,
-            total: d.total_points || d.current_path_points || 0,
-            monthly: d.monthKey === monthKey ? (d.monthly_points || 0) : 0,
-            weekly: d.weekKey === weekKey ? (d.weekly_points || 0) : 0,
-          };
-        });
+        const rows = allUsers
+          .filter((d) => d.role === 'student' && d.course === course && !d.independent)
+          .map((d) => {
+            const lastInitial = d.lastName ? `${d.lastName.trim().charAt(0).toUpperCase()}.` : '';
+            const name = [d.firstName, lastInitial].filter(Boolean).join(' ') || d.email || 'Estudiante';
+            return {
+              uid: d.id,
+              name,
+              total: d.total_points || d.current_path_points || 0,
+              monthly: d.monthKey === monthKey ? (d.monthly_points || 0) : 0,
+              weekly: d.weekKey === weekKey ? (d.weekly_points || 0) : 0,
+            };
+          });
 
         if (!cancelled) setStudents(rows);
       } catch (err) {

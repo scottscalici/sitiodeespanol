@@ -186,8 +186,12 @@ export default function TeacherGradebook() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Quietly re-pull the roster every 20s while this tab is on-screen, so a
+  // Quietly re-pull the roster every 90s while this tab is on-screen, so a
   // teacher watching a student live doesn't have to remember to hit refresh.
+  // This forces a full, uncached read of every student doc each time it
+  // fires — previously every 20s, which (left open and visible for a full
+  // class period) was a major driver of Firestore read volume on its own.
+  // 90s keeps it reasonably live for classroom monitoring at ~1/4.5 the cost.
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -195,7 +199,7 @@ export default function TeacherGradebook() {
           .then((allUsers) => setStudents(allUsers.filter((u) => u.role === 'student' && !u.independent)))
           .catch((error) => console.error('Error auto-refreshing gradebook:', error));
       }
-    }, 20000);
+    }, 90000);
     return () => clearInterval(interval);
   }, []);
 

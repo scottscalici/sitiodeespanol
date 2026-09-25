@@ -46,7 +46,14 @@ export const bumpStreak = (data = {}) => {
 // Idempotent: setDoc on an id keyed by period+key+course, skipped entirely
 // if that id already exists, so a second student rolling into the new
 // period moments later is a no-op.
-const archivePeriodIfNeeded = async (period, key, course) => {
+//
+// `selfEntry` is the triggering student's OWN final score for the outgoing
+// period, captured from inside awardPoints' transaction before it moved
+// their doc onto the new period — by the time this query below runs, their
+// own doc no longer has the old weekKey/monthKey, so the query alone would
+// silently miss them (they're the one guaranteed candidate for this
+// period's top scores, since they're the one who just triggered it).
+const archivePeriodIfNeeded = async (period, key, course, selfEntry) => {
   const historyRef = doc(db, 'leaderboard_history', `${period}-${key}-${course}`);
   const existing = await getDoc(historyRef);
   if (existing.exists()) return;
@@ -60,14 +67,17 @@ const archivePeriodIfNeeded = async (period, key, course) => {
     where(keyField, '==', key)
   );
   const snap = await getDocs(q);
-  const top = snap.docs
-    .filter((d) => !d.data().independent)
+  const fromQuery = snap.docs
+    .filter((d) => !d.data().independent && d.id !== selfEntry?.uid)
     .map((d) => {
       const s = d.data();
       const lastInitial = s.lastName ? `${s.lastName.trim().charAt(0).toUpperCase()}.` : '';
       const name = [s.firstName, lastInitial].filter(Boolean).join(' ') || s.email || 'Estudiante';
       return { uid: d.id, name, points: s[pointsField] || 0 };
-    })
+    });
+
+  const candidates = selfEntry ? [...fromQuery, { uid: selfEntry.uid, name: selfEntry.name, points: selfEntry.points }] : fromQuery;
+  const top = candidates
     .filter((s) => s.points > 0)
     .sort((a, b) => b.points - a.points)
     .slice(0, 3);
@@ -95,25 +105,21 @@ export const formatMonthLabel = (monthKey) => {
 // Awards points to a user's own doc. total_points/daily_points always
 // accumulate; weekly_points/monthly_points reset to just this award when
 // the stored weekKey/monthKey doesn't match the current one.
+//
+// This is one of the most frequently-called functions in the app (every
+// point-earning action, across every activity type, for every student), so
+// it deliberately does exactly ONE Firestore read per call — reusing the
+// transaction's own tx.get(userRef) to ALSO detect a period rollover,
+// rather than a separate getDoc up front. The archive write for an
+// outgoing period (see archivePeriodIfNeeded) happens after the
+// transaction commits, using the rollover info captured during it — it
+// doesn't need to be atomic with the point award itself.
 export const awardPoints = async (uid, points) => {
   const userRef = doc(db, 'users', uid);
   const weekKey = getWeekKey();
   const monthKey = getMonthKey();
 
-  // Read once outside the transaction to detect a period rollover for this
-  // student. If the calendar has moved into a new week/month since they
-  // last earned points, archive the outgoing period's top 3 before the
-  // transaction below overwrites weekly_points/monthly_points.
-  const preSnap = await getDoc(userRef);
-  const preData = preSnap.exists() ? preSnap.data() : {};
-  if (preData.course && preData.role !== 'admin') {
-    if (preData.weekKey && preData.weekKey !== weekKey) {
-      await archivePeriodIfNeeded('weekly', preData.weekKey, preData.course);
-    }
-    if (preData.monthKey && preData.monthKey !== monthKey) {
-      await archivePeriodIfNeeded('monthly', preData.monthKey, preData.course);
-    }
-  }
+  let rollover = null;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(userRef);
@@ -121,6 +127,20 @@ export const awardPoints = async (uid, points) => {
 
     // Admins testing content shouldn't rack up scores meant for students.
     if (data.role === 'admin') return;
+
+    if (data.course) {
+      const lastInitial = data.lastName ? `${data.lastName.trim().charAt(0).toUpperCase()}.` : '';
+      const name = [data.firstName, lastInitial].filter(Boolean).join(' ') || data.email || 'Estudiante';
+      rollover = {
+        course: data.course,
+        weekly: data.weekKey && data.weekKey !== weekKey
+          ? { uid, name, key: data.weekKey, points: data.weekly_points || 0 }
+          : null,
+        monthly: data.monthKey && data.monthKey !== monthKey
+          ? { uid, name, key: data.monthKey, points: data.monthly_points || 0 }
+          : null,
+      };
+    }
 
     const weeklyPoints = data.weekKey === weekKey ? (data.weekly_points || 0) + points : points;
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
@@ -136,4 +156,7 @@ export const awardPoints = async (uid, points) => {
       ...bumpStreak(data),
     }, { merge: true });
   });
+
+  if (rollover?.weekly) await archivePeriodIfNeeded('weekly', rollover.weekly.key, rollover.course, rollover.weekly);
+  if (rollover?.monthly) await archivePeriodIfNeeded('monthly', rollover.monthly.key, rollover.course, rollover.monthly);
 };
