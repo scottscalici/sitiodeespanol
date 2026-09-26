@@ -614,27 +614,34 @@ const Dashboard = () => {
               {/* 🎓 PLATFORM TAREA (VHL/KWL) — SHOWN ONLY ON DAY ASSIGNED */}
               {activePlatformTareas.map((t) => {
                 const info = PLATFORM_TAREA_INFO[t.tipo];
+                // Only tareas with a link filled in become clickable — most
+                // assignment types don't have one, and stay a plain card.
+                const CardTag = t.url ? 'a' : 'div';
+                const cardProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
                 return (
-                  <div
+                  <CardTag
                     key={t.id}
-                    className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${info.gradient} p-6 shadow-xl`}
+                    {...cardProps}
+                    className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${info.gradient} p-6 shadow-xl block ${t.url ? 'hover:brightness-110 transition-all cursor-pointer' : ''}`}
                   >
                     <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 shrink-0 rounded-2xl bg-white flex items-center justify-center shadow-inner p-2">
                         <img src={info.logo} alt={t.tipo} className="w-full h-full object-contain" />
                       </div>
-  
+
                       <div className="min-w-0 flex-1">
                         <span className={`block text-xs font-black uppercase tracking-widest ${info.accent} mb-1`}>
                           {info.label} · Día {liveDia}
                         </span>
-                        <h3 className="text-xl font-black text-white leading-tight tracking-tight truncate">{t.titulo}</h3>
+                        <h3 className="text-xl font-black text-white leading-tight tracking-tight truncate">
+                          {t.titulo}{t.url && ' ↗'}
+                        </h3>
                         <p className="text-blue-50/80 text-sm font-medium mt-1">Vence: {formatDueDate(t.day_due)}</p>
                       </div>
                     </div>
-                  </div>
+                  </CardTag>
                 );
               })}
   
@@ -675,12 +682,20 @@ const Dashboard = () => {
                     {courseTasks.length === 0 ? (
                       <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
                     ) : (
-                      courseTasks.map((t, idx) => (
-                        <div key={idx} className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                          <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}</h4>
-                          <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: {formatDueDate(t.day_due)}</p>
-                        </div>
-                      ))
+                      courseTasks.map((t, idx) => {
+                        const TaskTag = t.url ? 'a' : 'div';
+                        const taskProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
+                        return (
+                          <TaskTag
+                            key={idx}
+                            {...taskProps}
+                            className={`block bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10 ${t.url ? 'hover:bg-white/20 transition-colors cursor-pointer' : ''}`}
+                          >
+                            <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}{t.url && ' ↗'}</h4>
+                            <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: {formatDueDate(t.day_due)}</p>
+                          </TaskTag>
+                        );
+                      })
                     )}
                   </div>
                 </div>

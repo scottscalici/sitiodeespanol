@@ -114,7 +114,8 @@ const TareasSequencer = () => {
       tipo: "Dominio",
       titulo: "Nueva tarea",
       notas_opcionales: "",
-      path_id: ""
+      path_id: "",
+      url: ""
     };
 
     const updated = [...activeTasks, newTask];
@@ -271,9 +272,9 @@ const TareasSequencer = () => {
                           {/* TITLE & DUE DATE CONTROLS */}
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1">
                             <div className="md:col-span-8">
-                              <input 
-                                type="text" 
-                                value={task.titulo} 
+                              <input
+                                type="text"
+                                value={task.titulo}
                                 onChange={(e) => handleTaskChange(globalIndex, 'titulo', e.target.value)}
                                 className="w-full bg-neutral-900 border border-neutral-800 focus:border-cyan-400 rounded-lg p-2 text-sm font-bold text-white outline-none transition-all"
                                 placeholder="Título o descripción de la tarea..."
@@ -290,6 +291,19 @@ const TareasSequencer = () => {
                                 value={task.day_due}
                                 onChange={(e) => handleTaskChange(globalIndex, 'day_due', e.target.value)}
                                 className="w-14 bg-black border border-neutral-700 text-cyan-400 text-center font-black rounded-md p-1.5 text-xs outline-none"
+                              />
+                            </div>
+
+                            {/* Optional — leave blank when this tarea has nowhere to link to.
+                                Only tareas with a url become clickable on the student Dashboard. */}
+                            <div className="md:col-span-12">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-sky-400 mb-1 block">Enlace (opcional)</span>
+                              <input
+                                type="text"
+                                value={task.url || ''}
+                                onChange={(e) => handleTaskChange(globalIndex, 'url', e.target.value)}
+                                className="w-full bg-neutral-900 border border-sky-900/50 focus:border-sky-400 text-sky-300 rounded-lg p-2 text-xs font-bold outline-none"
+                                placeholder="https://... (déjalo vacío si no hay enlace)"
                               />
                             </div>
 
