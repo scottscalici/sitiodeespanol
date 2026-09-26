@@ -11,7 +11,6 @@ export default function PracticeCardAdmin() {
   const [title, setTitle] = useState('Gustar');
   const [dia, setDia] = useState(1);
   const [course, setCourse] = useState('s2');
-  const [points, setPoints] = useState(1);
   const [gradeWeight, setGradeWeight] = useState(1);
   const [excused, setExcused] = useState(false);
   const [questions, setQuestions] = useState([emptyQuestion()]);
@@ -35,7 +34,6 @@ export default function PracticeCardAdmin() {
       setTitle(c.title || '');
       setDia(c.dia || 1);
       setCourse(c.course || 's2');
-      setPoints(c.points || 1);
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
       setQuestions(c.questions?.length ? c.questions : [emptyQuestion()]);
@@ -92,7 +90,6 @@ export default function PracticeCardAdmin() {
           title,
           dia: Number(dia),
           course,
-          points: Number(points) || 1,
           gradeWeight: Number(gradeWeight) || 1,
           excused,
           questions: cleanQuestions,
@@ -139,7 +136,7 @@ export default function PracticeCardAdmin() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-black text-slate-500 uppercase mb-1">ID Documento</label>
             <input type="text" value={cardId} onChange={(e) => setCardId(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold bg-slate-50" required />
@@ -158,12 +155,10 @@ export default function PracticeCardAdmin() {
               <input type="number" value={dia} onChange={(e) => setDia(e.target.value)} className="w-1/2 p-2.5 border rounded-xl font-bold text-center" />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-black text-slate-500 uppercase mb-1" title="Puntos de clasificación (XP) otorgados al completar por primera vez. Normalmente entre 1 y 5.">
-              Puntos
-            </label>
-            <input type="number" min="1" max="5" value={points} onChange={(e) => setPoints(e.target.value)} className="w-full p-2.5 border rounded-xl font-bold text-center" />
-          </div>
+        </div>
+
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-800 font-bold">
+          🏆 Puntos de clasificación (XP) = 1 punto por cada pregunta que el estudiante responda correctamente en su primer intento. Se otorgan una sola vez, al completar la tarjeta por primera vez.
         </div>
 
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-4">

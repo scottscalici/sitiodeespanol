@@ -56,13 +56,35 @@ const Dashboard = () => {
   // The day being viewed keeps ITS OWN calendar date's theme permanently —
   // browsing an old lesson day shows that day's era-correct theme instead of
   // whatever's seasonally active today.
+  //
+  // Cycle-aware: on an A/B block schedule, the SAME "día" number can appear
+  // twice in the calendar with two different actual dates, one per cycle
+  // (see `ciclo` on each entry) — e.g. día 42 might be an A-day on one date
+  // and a B-day on another. Skipping the entry that doesn't match this
+  // student's own cycle (same convention as maxAllowedDay below) means a
+  // día resolves to the date THEY will actually see it on, not whichever
+  // cycle's entry happened to come last in the calendar array.
   const fechaByDia = useMemo(() => {
+    const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
     const map = {};
     (data?.cal || []).forEach((c) => {
-      if (c.dia != null && c.fecha) map[Number(c.dia)] = c.fecha;
+      if (c.dia == null || !c.fecha) return;
+      if (c.ciclo && c.ciclo !== userCiclo) return;
+      map[Number(c.dia)] = c.fecha;
     });
     return map;
-  }, [data?.cal]);
+  }, [data?.cal, userData?.section]);
+
+  // A "día" shown as an actual calendar date where possible (e.g. "vie. 26
+  // sep"), falling back to the raw "Día N" when that día isn't in the
+  // calendar yet (a due date set further out than the calendar currently
+  // covers) — used for tarea due dates, which are otherwise just a día
+  // number with no obvious date to a student glancing at the card.
+  const formatDueDate = (diaNum) => {
+    const fecha = fechaByDia[Number(diaNum)];
+    if (!fecha) return `Día ${diaNum}`;
+    return new Date(`${fecha}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+  };
   const liveDiaFecha = liveDia ? fechaByDia[Number(liveDia)] : null;
   const theme = useMemo(() => {
     if (!liveDiaFecha || !resolveThemeForDate) return todayTheme;
@@ -605,7 +627,7 @@ const Dashboard = () => {
                           {info.label} · Día {liveDia}
                         </span>
                         <h3 className="text-xl font-black text-white leading-tight tracking-tight truncate">{t.titulo}</h3>
-                        <p className="text-blue-50/80 text-sm font-medium mt-1">Vence: Día {t.day_due}</p>
+                        <p className="text-blue-50/80 text-sm font-medium mt-1">Vence: {formatDueDate(t.day_due)}</p>
                       </div>
                     </div>
                   </div>
@@ -652,7 +674,7 @@ const Dashboard = () => {
                       courseTasks.map((t, idx) => (
                         <div key={idx} className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10">
                           <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}</h4>
-                          <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: Día {t.day_due}</p>
+                          <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: {formatDueDate(t.day_due)}</p>
                         </div>
                       ))
                     )}

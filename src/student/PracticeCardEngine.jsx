@@ -118,11 +118,12 @@ export default function PracticeCardEngine({ onClose }) {
       setSaveState('saving');
       const grade = Math.round((correctCount / questions.length) * 100);
       const rawScore = `${correctCount}/${questions.length}`;
-      // Ranking/XP points are a flat value the admin picks directly on the
-      // card (typically 1-5) — independent of question count, and
-      // independent of the card's grade-pool weight (gradeWeight, used only
+      // Ranking/XP points = however many questions were answered correctly
+      // on this (the first, since points only ever award once below) attempt
+      // — one point per correct answer, no admin-set rate or multiplier.
+      // Independent of the card's grade-pool weight (gradeWeight, used only
       // by warmupBreakdown.js for the classwork average).
-      const points = cardData.points || 1;
+      const points = correctCount;
 
       try {
         const alreadyCompleted = !!userData?.progress?.practiceCards?.[cardData.id]?.completed;
@@ -143,7 +144,7 @@ export default function PracticeCardEngine({ onClose }) {
               { merge: true }
             );
           }
-          if (!alreadyCompleted) {
+          if (!alreadyCompleted && points > 0) {
             await awardPoints(userData.uid, points);
             setPointsAwarded(points);
           }
