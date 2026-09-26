@@ -75,15 +75,19 @@ const Dashboard = () => {
     return map;
   }, [data?.cal, userData?.section]);
 
-  // A "día" shown as an actual calendar date where possible (e.g. "vie. 26
-  // sep"), falling back to the raw "Día N" when that día isn't in the
+  // "Día N" plus its actual calendar date where possible (e.g. "Día 9 (28
+  // sept)"), falling back to just "Día N" when that día isn't in the
   // calendar yet (a due date set further out than the calendar currently
-  // covers) — used for tarea due dates, which are otherwise just a día
-  // number with no obvious date to a student glancing at the card.
+  // covers). Keeping the día number is deliberate — it's still the label
+  // students know — with the real date as a parenthetical to disambiguate
+  // which day that is, especially on an A/B schedule where the same día
+  // resolves to a different date for each cycle (fechaByDia above already
+  // picks the one matching this student's own cycle).
   const formatDueDate = (diaNum) => {
     const fecha = fechaByDia[Number(diaNum)];
     if (!fecha) return `Día ${diaNum}`;
-    return new Date(`${fecha}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+    const formatted = new Date(`${fecha}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    return `Día ${diaNum} (${formatted})`;
   };
   const liveDiaFecha = liveDia ? fechaByDia[Number(liveDia)] : null;
   const theme = useMemo(() => {
