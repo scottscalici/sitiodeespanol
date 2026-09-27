@@ -54,11 +54,11 @@ const DestacadoUploader = () => {
       }
 
       if (isBundled) {
-        const merged = {};
-        Object.entries(newItemsMap).forEach(([id, data]) => {
-          merged[`items.${id}`] = data;
-        });
-        await setDoc(bundleRef, merged, { merge: true });
+        // A real nested object, not `items.<id>` dot-string keys — setDoc's
+        // merge:true treats a dotted object key as one literal field name,
+        // not a path into items, so dot-string keys here would silently
+        // write to bogus sibling fields instead of the real items map.
+        await setDoc(bundleRef, { items: newItemsMap }, { merge: true });
       }
       invalidateCollectionCache('destacado_diario');
 

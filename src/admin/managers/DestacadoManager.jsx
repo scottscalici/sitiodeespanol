@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { invalidateCollectionCache } from '../../utils/firestoreCache';
+import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -17,6 +17,33 @@ const DestacadoManager = () => {
   // 2 has, and both can be true/false independently across page reloads.
   const [legacyDocCount, setLegacyDocCount] = useState(0);
   const [migrationStatus, setMigrationStatus] = useState(null);
+
+  // Items sitting in a bogus "items.<id>" sibling field instead of the real
+  // items map — a bug in the uploader's merge writes (see
+  // repairSplitBucketFields in firestoreCache.js). Detected for free off
+  // the same read fetchData already does below.
+  const [repairableCount, setRepairableCount] = useState(0);
+  const [repairStatus, setRepairStatus] = useState(null);
+
+  const handleRepairSplitFields = async () => {
+    setRepairStatus('repairing');
+    try {
+      const { recoveredCount, bucketsTouched } = await repairSplitBucketFields('destacado_diario');
+      setRepairStatus('done');
+      setRepairableCount(0);
+      invalidateCollectionCache('destacado_diario');
+      alert(
+        bucketsTouched > 0
+          ? `✅ Recuperados ${recoveredCount} destacado(s) con ediciones que se habían guardado mal.`
+          : 'No se encontró nada que reparar.'
+      );
+      window.location.reload();
+    } catch (err) {
+      console.error('Error repairing split destacado fields:', err);
+      setRepairStatus('error');
+      alert('Error al reparar. Revisa la consola.');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,6 +92,9 @@ const DestacadoManager = () => {
 
         setIsBundled(!!bundleData);
         setLegacyDocCount(legacyItems.length);
+        setRepairableCount(
+          Object.keys(bundleData || {}).filter((k) => k.startsWith('items.') && k !== 'items').length
+        );
 
         const fetchedItems = bundleData
           ? Object.entries(bundleData.items || {}).map(([id, data]) => ({ id, ...data }))
@@ -215,6 +245,29 @@ const DestacadoManager = () => {
             {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
+
+        {/* ONE-TIME REPAIR TOOL for a fixed uploader bug — see
+            repairSplitBucketFields in firestoreCache.js. Remove once
+            repairableCount is always 0 in production. */}
+        {repairableCount > 0 && (
+          <div className="p-4 bg-rose-50 border-b-2 border-rose-300 flex flex-col gap-2">
+            <p className="text-xs font-black text-rose-800 uppercase tracking-widest">
+              🩹 {repairableCount} edición(es) guardadas mal por un bug — reparables
+            </p>
+            <p className="text-xs text-rose-700">
+              El subidor masivo guardaba ediciones en un campo equivocado en vez de actualizar el destacado real —
+              nada se borró, pero no aparecía en ningún lado. Este botón recupera esos datos. Es seguro repetirlo.
+            </p>
+            <button
+              type="button"
+              onClick={handleRepairSplitFields}
+              disabled={repairStatus === 'repairing'}
+              className="self-start px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {repairStatus === 'repairing' ? 'Reparando...' : '🩹 Reparar ahora'}
+            </button>
+          </div>
+        )}
 
         {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount
             is always 0 in production (i.e. once the migration has been run

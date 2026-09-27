@@ -87,15 +87,20 @@ export default function VerbAudit() {
     setApplying(true);
     setStatus('');
     try {
-      const bucketUpdates = {}; // bucketId -> { 'items.<id>': fullVerbObject }
+      const bucketUpdates = {}; // bucketId -> { items: { <id>: fullVerbObject } }
       let count = 0;
       rows.forEach(({ verb, suggestedTags }) => {
         if (!selected.has(verb.id) || suggestedTags.length === 0) return;
         const { id, ...verbData } = verb;
         const mergedTags = [...new Set([...(verb.tags || []), ...suggestedTags])];
         const bucketId = getBucketId(id);
-        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = {};
-        bucketUpdates[bucketId][`items.${id}`] = { ...verbData, tags: mergedTags };
+        // A real nested object, not a `items.<id>` dot-string key — setDoc's
+        // merge:true treats a dotted object key as one literal field name,
+        // not a path (that's only true for updateDoc), so a dot-string key
+        // here would silently write to a bogus sibling field instead of
+        // the real items map.
+        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = { items: {} };
+        bucketUpdates[bucketId].items[id] = { ...verbData, tags: mergedTags };
         count += 1;
       });
 

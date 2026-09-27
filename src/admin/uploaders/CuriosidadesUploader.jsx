@@ -51,7 +51,13 @@ const CuriosidadesUploader = () => {
         };
 
         if (isBundled) {
-          merged[`items.${item.id}`] = dataToSave;
+          // A real nested key, not a `items.<id>` dot-string key — setDoc's
+          // merge:true treats a dotted object key as one literal field
+          // name, not a path into items, so a dot-string key here would
+          // silently write to a bogus sibling field instead of the real
+          // items map.
+          if (!merged.items) merged.items = {};
+          merged.items[item.id] = dataToSave;
         } else {
           await setDoc(doc(db, 'curiosidades', String(item.id)), dataToSave);
         }

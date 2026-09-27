@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { invalidateCollectionCache } from '../../utils/firestoreCache';
+import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -27,6 +27,32 @@ const SenordleUploader = () => {
   const [legacyDocCount, setLegacyDocCount] = useState(0);
   const [migrationStatus, setMigrationStatus] = useState(null);
   const [previewCourse, setPreviewCourse] = useState('s2');
+
+  // Words sitting in a bogus "items.<id>" sibling field instead of the real
+  // items map — a bug in this uploader's merge writes (see
+  // repairSplitBucketFields in firestoreCache.js).
+  const [repairableCount, setRepairableCount] = useState(0);
+  const [repairStatus, setRepairStatus] = useState(null);
+
+  const handleRepairSplitFields = async () => {
+    setRepairStatus('repairing');
+    try {
+      const { recoveredCount, bucketsTouched } = await repairSplitBucketFields('juego_senordle');
+      setRepairStatus('done');
+      setRepairableCount(0);
+      invalidateCollectionCache('juego_senordle');
+      alert(
+        bucketsTouched > 0
+          ? `✅ Recuperadas ${recoveredCount} palabra(s) con ediciones que se habían guardado mal.`
+          : 'No se encontró nada que reparar.'
+      );
+      await handleLoadPreview();
+    } catch (err) {
+      console.error('Error repairing split señordle fields:', err);
+      setRepairStatus('error');
+      alert('Error al reparar. Revisa la consola.');
+    }
+  };
 
   const handleUpload = async () => {
     console.log("--- STARTING SEÑORDLE DICTIONARY UPLOAD ---");
@@ -66,7 +92,13 @@ const SenordleUploader = () => {
             };
 
             if (bundled) {
-              merged[`items.${docId}`] = wordData;
+              // A real nested key, not a `items.<id>` dot-string key —
+              // setDoc's merge:true treats a dotted object key as one
+              // literal field name, not a path into items, so a dot-string
+              // key here would silently write to a bogus sibling field
+              // instead of the real items map.
+              if (!merged.items) merged.items = {};
+              merged.items[docId] = wordData;
             } else {
               await setDoc(doc(db, "juego_senordle", docId), wordData);
             }
@@ -112,6 +144,9 @@ const SenordleUploader = () => {
 
       setIsBundled(!!bundleData);
       setLegacyDocCount(legacyItems.length);
+      setRepairableCount(
+        Object.keys(bundleData || {}).filter((k) => k.startsWith('items.') && k !== 'items').length
+      );
       setPreviewItems(items);
       setMigrationStatus(null);
     } catch (error) {
@@ -309,6 +344,28 @@ const SenordleUploader = () => {
           )}
         </div>
       </div>
+
+      {/* ONE-TIME REPAIR TOOL for a fixed uploader bug — see
+          repairSplitBucketFields in firestoreCache.js. */}
+      {repairableCount > 0 && (
+        <div className="mt-8 pt-6 border-t border-slate-700">
+          <p className="text-xs font-black text-rose-400 uppercase tracking-widest mb-2">
+            🩹 {repairableCount} edición(es) guardadas mal por un bug — reparables
+          </p>
+          <p className="text-xs text-rose-200 mb-3">
+            Este subidor guardaba ediciones en un campo equivocado en vez de actualizar la palabra real — nada se
+            borró, pero no aparecía en ningún lado. Este botón recupera esos datos. Es seguro repetirlo.
+          </p>
+          <button
+            type="button"
+            onClick={handleRepairSplitFields}
+            disabled={repairStatus === 'repairing'}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-600 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+          >
+            {repairStatus === 'repairing' ? 'Reparando...' : '🩹 Reparar ahora'}
+          </button>
+        </div>
+      )}
 
       {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
           always 0 in production. Only shows once the schedule preview

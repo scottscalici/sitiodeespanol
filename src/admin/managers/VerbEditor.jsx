@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId } from '../../utils/firestoreCache';
+import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId, repairSplitBucketFields } from '../../utils/firestoreCache';
 import { VERB_TENSES as TENSES, VERB_SUBJECTS as SUBJECTS } from '../../utils/verbTenses';
 import { inferVerbTags } from '../../utils/verbTagInference';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -32,11 +32,18 @@ export default function VerbEditor() {
   const [legacyDocCount, setLegacyDocCount] = useState(0);
   const [migrationStatus, setMigrationStatus] = useState(null);
 
+  // Verbs sitting in a bogus "items.<id>" sibling field instead of the real
+  // items map — see repairSplitBucketFields. Detected for free off the
+  // same read loadVerbs already does, no extra Firestore read.
+  const [repairableCount, setRepairableCount] = useState(0);
+  const [repairStatus, setRepairStatus] = useState(null);
+
   const loadVerbs = async () => {
     try {
       const rawDocs = await getCachedCollection('verbs');
       const byId = new Map();
       const legacyDocs = [];
+      let junkFieldCount = 0;
       // Bucket docs first — an already-edited-and-saved verb is "promoted"
       // into its bucket immediately, even before the old individual doc
       // gets cleaned up by the migration below, so the same verb can
@@ -48,6 +55,7 @@ export default function VerbEditor() {
         } else {
           legacyDocs.push(d);
         }
+        junkFieldCount += Object.keys(d).filter((k) => k.startsWith('items.') && k !== 'items').length;
       });
       legacyDocs.forEach((d) => {
         if (!byId.has(d.id)) {
@@ -59,10 +67,29 @@ export default function VerbEditor() {
       // Every legacy doc still counts toward the migration's cleanup total,
       // even one already shadowed by a bucket copy — it still needs deleting.
       setLegacyDocCount(legacyDocs.length);
+      setRepairableCount(junkFieldCount);
     } catch (err) {
       console.error('Error loading verbs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRepairSplitFields = async () => {
+    setRepairStatus('repairing');
+    try {
+      const { recoveredCount, bucketsTouched } = await repairSplitBucketFields('verbs');
+      setRepairStatus('done');
+      await loadVerbs();
+      alert(
+        bucketsTouched > 0
+          ? `✅ Recuperados ${recoveredCount} verbo(s) con ediciones que se habían guardado mal (etiquetas, traducciones, etc.).`
+          : 'No se encontró nada que reparar.'
+      );
+    } catch (err) {
+      console.error('Error repairing split verb fields:', err);
+      setRepairStatus('error');
+      alert('Error al reparar. Revisa la consola.');
     }
   };
 
@@ -201,8 +228,16 @@ export default function VerbEditor() {
       // Always writes into this verb's bucket document (see getBucketId) —
       // never creates a fresh individual doc, so new verbs are bucketed
       // from day one even before the migration tool below has been run.
+      //
+      // Must be a real nested object ({ items: { [id]: payload } }), NOT a
+      // dot-string key ({ [`items.${id}`]: payload }) — setDoc's merge:true
+      // parses a plain object's top-level keys LITERALLY (a key containing
+      // a dot becomes one field literally named "items.<id>", not a path
+      // into items), unlike updateDoc, which does split dot-string keys
+      // into nested paths. The dot-string form silently wrote to a bogus
+      // sibling field next to the real `items` map on every save.
       const bucketId = getBucketId(id);
-      await setDoc(doc(db, 'verbs', bucketId), { [`items.${id}`]: payload }, { merge: true });
+      await setDoc(doc(db, 'verbs', bucketId), { items: { [id]: payload } }, { merge: true });
       invalidateCollectionCache('verbs');
       invalidateDocCache('verbs', bucketId);
 
@@ -360,6 +395,30 @@ export default function VerbEditor() {
             </Link>
           </div>
         </div>
+
+        {/* ONE-TIME REPAIR TOOL for a fixed save bug — see
+            repairSplitBucketFields in firestoreCache.js. Remove once
+            repairableCount is always 0 in production. */}
+        {repairableCount > 0 && (
+          <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-2xl flex flex-col gap-2">
+            <p className="text-xs font-black text-rose-400 uppercase tracking-widest">
+              🩹 {repairableCount} edición(es) guardadas mal por un bug — reparables
+            </p>
+            <p className="text-xs text-rose-200">
+              Un bug en el guardado hacía que las ediciones (incluyendo etiquetas) se guardaran en un campo
+              equivocado en vez de actualizar el verbo real — nada se borró, pero no aparecía en ningún lado.
+              Este botón recupera esos datos y los aplica correctamente. Es seguro repetirlo.
+            </p>
+            <button
+              type="button"
+              onClick={handleRepairSplitFields}
+              disabled={repairStatus === 'repairing'}
+              className="self-start px-4 py-2 bg-rose-700 hover:bg-rose-600 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {repairStatus === 'repairing' ? 'Reparando...' : '🩹 Reparar ahora'}
+            </button>
+          </div>
+        )}
 
         {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
             always 0 in production. See DestacadoManager for the full
