@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { invalidateCollectionCache } from '../../../utils/firestoreCache';
@@ -53,9 +54,17 @@ const FormSenordle = () => {
 
   return (
     <div className="max-w-md mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-      <h2 className="text-xl font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-        <span>⚙️</span> Creador de Señordle
-      </h2>
+      <div className="flex justify-between items-start mb-6">
+        <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
+          <span>⚙️</span> Creador de Señordle
+        </h2>
+        <Link
+          to="/admin-secret-portal-senordle"
+          className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 border border-emerald-700/50 px-2 py-1 rounded uppercase tracking-widest whitespace-nowrap"
+        >
+          📅 Ver Calendario
+        </Link>
+      </div>
 
       <form onSubmit={handleSaveWord} className="space-y-4">
         {/* Course Selection */}

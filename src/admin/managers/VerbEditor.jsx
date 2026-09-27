@@ -1,35 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId } from '../../utils/firestoreCache';
-import { Link } from 'react-router-dom';
-
-// Same 11 tenses the calentamiento generator actually knows how to draw
-// questions from (src/admin/managers/CalentamientoAdmin.jsx keeps its own
-// copy of this list too — small and stable enough that duplicating it here
-// is simpler than threading a shared import through both admin tools).
-const TENSES = [
-  { id: 'presente', label: 'Presente' },
-  { id: 'pretérito', label: 'Pretérito' },
-  { id: 'imperfecto', label: 'Imperfecto' },
-  { id: 'futuro', label: 'Futuro' },
-  { id: 'condicional', label: 'Condicional' },
-  { id: 'subjuntivo_presente', label: 'Subjuntivo (Presente)' },
-  { id: 'subjuntivo_imperfecto_ra', label: 'Subjuntivo (Imperfecto -ra)' },
-  { id: 'imperativo_afirmativo', label: 'Mandatos Afirmativos' },
-  { id: 'imperativo_negativo', label: 'Mandatos Negativos' },
-  { id: 'presente_progresivo', label: 'Presente Progresivo' },
-  { id: 'pluscuamperfecto', label: 'Pluscuamperfecto' },
-];
-
-const SUBJECTS = [
-  { id: 'yo', label: 'yo' },
-  { id: 'tú', label: 'tú' },
-  { id: 'él_ella_ud', label: 'él / ella / Ud.' },
-  { id: 'nosotros', label: 'nosotros' },
-  { id: 'vosotros', label: 'vosotros' },
-  { id: 'ellos_ellas_uds', label: 'ellos / ellas / Uds.' },
-];
+import { VERB_TENSES as TENSES, VERB_SUBJECTS as SUBJECTS } from '../../utils/verbTenses';
+import { inferVerbTags } from '../../utils/verbTagInference';
+import { Link, useSearchParams } from 'react-router-dom';
 
 const slugify = (palabra) =>
   (palabra || '')
@@ -39,6 +14,7 @@ const slugify = (palabra) =>
     .toLowerCase();
 
 export default function VerbEditor() {
+  const [searchParams] = useSearchParams();
   const [verbs, setVerbs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,19 +35,30 @@ export default function VerbEditor() {
   const loadVerbs = async () => {
     try {
       const rawDocs = await getCachedCollection('verbs');
-      const flattened = [];
-      let legacyCount = 0;
+      const byId = new Map();
+      const legacyDocs = [];
+      // Bucket docs first — an already-edited-and-saved verb is "promoted"
+      // into its bucket immediately, even before the old individual doc
+      // gets cleaned up by the migration below, so the same verb can
+      // briefly exist in both places. The bucket copy wins on collision,
+      // since it's always at least as recent.
       rawDocs.forEach((d) => {
         if (d.items && typeof d.items === 'object') {
-          Object.entries(d.items).forEach(([id, data]) => flattened.push({ id, ...data }));
+          Object.entries(d.items).forEach(([id, data]) => byId.set(id, { id, ...data }));
         } else {
-          const { id, ...rest } = d;
-          flattened.push({ id, ...rest });
-          legacyCount += 1;
+          legacyDocs.push(d);
         }
       });
-      setVerbs(flattened.sort((a, b) => (a.palabra || '').localeCompare(b.palabra || '')));
-      setLegacyDocCount(legacyCount);
+      legacyDocs.forEach((d) => {
+        if (!byId.has(d.id)) {
+          const { id, ...rest } = d;
+          byId.set(id, { id, ...rest });
+        }
+      });
+      setVerbs([...byId.values()].sort((a, b) => (a.palabra || '').localeCompare(b.palabra || '')));
+      // Every legacy doc still counts toward the migration's cleanup total,
+      // even one already shadowed by a bucket copy — it still needs deleting.
+      setLegacyDocCount(legacyDocs.length);
     } catch (err) {
       console.error('Error loading verbs:', err);
     } finally {
@@ -101,6 +88,30 @@ export default function VerbEditor() {
     setActiveTense('presente');
     setStatus('');
     setTagDraft('');
+  };
+
+  // Deep-link support (e.g. from the Verb Audit tool's "Editar" links):
+  // ?verbo=<id> auto-selects that verb once the list has loaded. Only
+  // fires once per id, so manually picking a different verb afterward
+  // isn't overridden on the next render.
+  const autoSelectedRef = useRef(null);
+  useEffect(() => {
+    const targetId = searchParams.get('verbo');
+    if (!targetId || autoSelectedRef.current === targetId || verbs.length === 0) return;
+    const match = verbs.find((v) => v.id === targetId);
+    if (match) {
+      autoSelectedRef.current = targetId;
+      selectVerb(match);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbs, searchParams]);
+
+  const suggestTags = () => {
+    if (!draft) return;
+    const suggested = inferVerbTags(draft);
+    const existing = draft.tags || [];
+    const merged = [...new Set([...existing, ...suggested.filter((t) => !existing.includes(t))])];
+    setDraft((d) => ({ ...d, tags: merged }));
   };
 
   const startNewVerb = () => {
@@ -340,9 +351,14 @@ export default function VerbEditor() {
           <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
             <span>📖</span> Editor de Verbos
           </h2>
-          <Link to="/admin-daily-plan-hub" className="text-slate-400 hover:text-white text-xs font-bold border border-slate-700 px-3 py-1.5 rounded-lg">
-            ← Hub
-          </Link>
+          <div className="flex gap-2">
+            <Link to="/admin-secret-portal-verb-audit" className="text-emerald-400 hover:text-emerald-300 text-xs font-bold border border-emerald-700/50 px-3 py-1.5 rounded-lg">
+              🔍 Auditoría
+            </Link>
+            <Link to="/admin-daily-plan-hub" className="text-slate-400 hover:text-white text-xs font-bold border border-slate-700 px-3 py-1.5 rounded-lg">
+              ← Hub
+            </Link>
+          </div>
         </div>
 
         {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
@@ -488,9 +504,19 @@ export default function VerbEditor() {
 
               {/* TAGS */}
               <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-                  Etiquetas
-                </label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Etiquetas
+                  </label>
+                  <button
+                    type="button"
+                    onClick={suggestTags}
+                    title="Sugiere etiquetas comparando las conjugaciones de presente con el patrón regular — revísalas antes de guardar."
+                    className="text-[10px] font-bold text-amber-400 hover:text-amber-300 uppercase tracking-widest"
+                  >
+                    ✨ Sugerir
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {(draft.tags || []).length === 0 && (
                     <p className="text-xs text-slate-500 italic">Sin etiquetas todavía.</p>

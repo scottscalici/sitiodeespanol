@@ -646,7 +646,7 @@ const DailyPlanHub = () => {
                     <span>🎮</span> Arcade Diario
                   </h2>
                 </div>
-                <Link to="/admin-daily-plan-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
+                <Link to="/admin-secret-portal-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
                   ⚙️ Señordle
                 </Link>
               </div>
