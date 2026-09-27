@@ -11,8 +11,12 @@ const DestacadoManager = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isBundled, setIsBundled] = useState(false);
+  // Docs in the collection other than _bundle itself — the true "is there
+  // still cleanup to do" signal. Tracked separately from isBundled: the
+  // bundle existing only means step 1 has run at some point, not that step
+  // 2 has, and both can be true/false independently across page reloads.
+  const [legacyDocCount, setLegacyDocCount] = useState(0);
   const [migrationStatus, setMigrationStatus] = useState(null);
-  const [copiedCount, setCopiedCount] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,22 +46,29 @@ const DestacadoManager = () => {
           setCalendarMap(mapping);
         }
 
-        // 2. Fetch Destacado Diario — prefer the consolidated single document
-        // (see the migration tool below); fall back to reading every
-        // individual doc if that migration hasn't been run yet.
-        const bundleSnap = await getDoc(doc(db, 'destacado_diario', BUNDLE_DOC_ID));
-        let fetchedItems = [];
+        // 2. Fetch Destacado Diario. Always scans the whole collection (this
+        // is an admin-only page, not multiplied by every student's session,
+        // so the extra cost here is a non-issue) so it can tell apart "the
+        // bundle exists" from "the old docs are gone" — those are two
+        // different migration steps and can each be true or false
+        // independently across page reloads.
+        const querySnapshot = await getDocs(collection(db, 'destacado_diario'));
+        let bundleData = null;
+        const legacyItems = [];
+        querySnapshot.forEach((docSnap) => {
+          if (docSnap.id === BUNDLE_DOC_ID) {
+            bundleData = docSnap.data();
+          } else {
+            legacyItems.push({ id: docSnap.id, ...docSnap.data() });
+          }
+        });
 
-        if (bundleSnap.exists()) {
-          setIsBundled(true);
-          const itemsMap = bundleSnap.data().items || {};
-          fetchedItems = Object.entries(itemsMap).map(([id, data]) => ({ id, ...data }));
-        } else {
-          const querySnapshot = await getDocs(collection(db, 'destacado_diario'));
-          querySnapshot.forEach((docSnap) => {
-            fetchedItems.push({ id: docSnap.id, ...docSnap.data() });
-          });
-        }
+        setIsBundled(!!bundleData);
+        setLegacyDocCount(legacyItems.length);
+
+        const fetchedItems = bundleData
+          ? Object.entries(bundleData.items || {}).map(([id, data]) => ({ id, ...data }))
+          : legacyItems;
 
         // Sort items primarily by dia, putting unassigned (null) at the bottom
         fetchedItems.sort((a, b) => {
@@ -143,7 +154,8 @@ const DestacadoManager = () => {
 
       await setDoc(doc(db, 'destacado_diario', BUNDLE_DOC_ID), { items: itemsMap }, { merge: true });
       invalidateCollectionCache('destacado_diario');
-      setCopiedCount(count);
+      setIsBundled(true);
+      setLegacyDocCount(count);
       setMigrationStatus('copied');
       alert(`✅ Copiados ${count} destacados al documento único. Revisa la cuadrícula (recárgala) antes de borrar los documentos antiguos.`);
     } catch (error) {
@@ -155,7 +167,7 @@ const DestacadoManager = () => {
 
   const handleMigrateDelete = async () => {
     const confirmed = window.confirm(
-      `Esto borrará permanentemente los ${copiedCount ?? '~200'} documentos individuales antiguos de 'destacado_diario' (el documento único ya los tiene copiados). Esta acción NO se puede deshacer. ¿Continuar?`
+      `Esto borrará permanentemente los ${legacyDocCount || '~200'} documentos individuales antiguos de 'destacado_diario' (el documento único ya los tiene copiados). Esta acción NO se puede deshacer. ¿Continuar?`
     );
     if (!confirmed) return;
 
@@ -173,6 +185,7 @@ const DestacadoManager = () => {
       invalidateCollectionCache('destacado_diario');
       setMigrationStatus('done');
       setIsBundled(true);
+      setLegacyDocCount(0);
       alert(`✅ Borrados ${count} documentos antiguos. 'destacado_diario' ahora tiene un solo documento.`);
     } catch (error) {
       console.error('Error deleting old destacado docs:', error);
@@ -203,18 +216,22 @@ const DestacadoManager = () => {
           </button>
         </div>
 
-        {/* ONE-TIME MIGRATION TOOL — remove this block once isBundled is
-            always true (i.e. once the migration has been run in production
-            and confirmed). Not shown once already bundled. */}
-        {!isBundled && (
+        {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount
+            is always 0 in production (i.e. once the migration has been run
+            and confirmed). Shown whenever old individual docs still exist,
+            regardless of whether the bundle has already been created —
+            those are two independent steps that can persist across page
+            reloads in either combination. */}
+        {legacyDocCount > 0 && (
           <div className="p-4 bg-amber-50 border-b-2 border-amber-300 flex flex-col gap-2">
             <p className="text-xs font-black text-amber-800 uppercase tracking-widest">
               ⚠️ Migración disponible: consolidar en un solo documento
             </p>
             <p className="text-xs text-amber-700">
-              Actualmente cada destacado es su propio documento (~{items.length}). Paso 1 los copia a un solo
-              documento sin borrar nada — revisa que la cuadrícula se vea bien después. Paso 2 borra los
-              documentos antiguos (irreversible), y solo debe hacerse después de confirmar el Paso 1.
+              {isBundled
+                ? `El documento único ya existe con los destacados copiados. Quedan ${legacyDocCount} documentos individuales antiguos sin borrar.`
+                : `Actualmente cada destacado es su propio documento (~${legacyDocCount}). Paso 1 los copia a un solo documento sin borrar nada — revisa que la cuadrícula se vea bien después.`}
+              {' '}Paso 2 borra los documentos antiguos (irreversible), y solo debe hacerse después de confirmar el Paso 1.
             </p>
             <div className="flex gap-3">
               <button
@@ -223,16 +240,16 @@ const DestacadoManager = () => {
                 disabled={migrationStatus === 'copying'}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
               >
-                {migrationStatus === 'copying' ? 'Copiando...' : '1. Copiar a documento único'}
+                {migrationStatus === 'copying' ? 'Copiando...' : isBundled ? '1. Volver a copiar' : '1. Copiar a documento único'}
               </button>
               <button
                 type="button"
                 onClick={handleMigrateDelete}
-                disabled={migrationStatus !== 'copied' && migrationStatus !== 'error'}
+                disabled={!isBundled || migrationStatus === 'deleting'}
                 className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
-                title={migrationStatus === 'copied' ? '' : 'Primero completa el Paso 1 en esta sesión'}
+                title={isBundled ? '' : 'Primero completa el Paso 1'}
               >
-                2. Borrar documentos antiguos
+                {migrationStatus === 'deleting' ? 'Borrando...' : '2. Borrar documentos antiguos'}
               </button>
             </div>
           </div>
