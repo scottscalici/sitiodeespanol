@@ -3,7 +3,7 @@ import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
-import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 
@@ -398,7 +398,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       // CalentamientoAdmin; sentence_bank is also read by SentenceManager.
       const [groups, verbs, grammarList] = await Promise.all([
         getCachedCollection('verbGroups'),
-        getCachedCollection('verbs'),
+        getCachedBucketedCollection('verbs'),
         getCachedCollection('sentence_bank'),
       ]);
 

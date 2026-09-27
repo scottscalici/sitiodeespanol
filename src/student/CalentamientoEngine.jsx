@@ -14,7 +14,7 @@ import {
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedBucketedCollection } from '../utils/firestoreCache';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 
 export default function CalentamientoEngine({ onClose }) {
@@ -199,7 +199,7 @@ export default function CalentamientoEngine({ onClose }) {
     if (!resumed && alreadyCompletedThisVerbSet && warmupData.configBlocks?.length) {
       (async () => {
         try {
-          const verbsArray = await getCachedCollection('verbs');
+          const verbsArray = await getCachedBucketedCollection('verbs');
           const verbsMap = {};
           verbsArray.forEach((v) => {
             verbsMap[v.id] = v;

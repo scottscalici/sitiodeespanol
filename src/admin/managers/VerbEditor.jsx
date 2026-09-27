@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId } from '../../utils/firestoreCache';
 import { Link } from 'react-router-dom';
 
 // Same 11 tenses the calentamiento generator actually knows how to draw
@@ -47,20 +47,48 @@ export default function VerbEditor() {
   const [activeTense, setActiveTense] = useState('presente');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+  const [tagDraft, setTagDraft] = useState('');
+
+  // Docs in the collection still in the old one-doc-per-verb shape (not yet
+  // grouped into a bucket document — see getBucketId). Tracked so the
+  // migration banner (and its delete step) stays correct across reloads
+  // regardless of whether bucket docs already exist alongside them.
+  const [legacyDocCount, setLegacyDocCount] = useState(0);
+  const [migrationStatus, setMigrationStatus] = useState(null);
+
+  const loadVerbs = async () => {
+    try {
+      const rawDocs = await getCachedCollection('verbs');
+      const flattened = [];
+      let legacyCount = 0;
+      rawDocs.forEach((d) => {
+        if (d.items && typeof d.items === 'object') {
+          Object.entries(d.items).forEach(([id, data]) => flattened.push({ id, ...data }));
+        } else {
+          const { id, ...rest } = d;
+          flattened.push({ id, ...rest });
+          legacyCount += 1;
+        }
+      });
+      setVerbs(flattened.sort((a, b) => (a.palabra || '').localeCompare(b.palabra || '')));
+      setLegacyDocCount(legacyCount);
+    } catch (err) {
+      console.error('Error loading verbs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const list = await getCachedCollection('verbs');
-        setVerbs([...list].sort((a, b) => (a.palabra || '').localeCompare(b.palabra || '')));
-      } catch (err) {
-        console.error('Error loading verbs:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadVerbs();
   }, []);
+
+  // Every tag already in use on any verb, for a simple autocomplete list.
+  const allKnownTags = useMemo(() => {
+    const set = new Set();
+    verbs.forEach((v) => (v.tags || []).forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [verbs]);
 
   const filteredVerbs = useMemo(
     () => verbs.filter((v) => (v.palabra || '').toLowerCase().includes(search.toLowerCase())),
@@ -72,6 +100,7 @@ export default function VerbEditor() {
     setDraft(JSON.parse(JSON.stringify(verb)));
     setActiveTense('presente');
     setStatus('');
+    setTagDraft('');
   };
 
   const startNewVerb = () => {
@@ -87,9 +116,21 @@ export default function VerbEditor() {
       palabra: palabra.trim(),
       translations: { infinitivo: { target: palabra.trim(), english: '' } },
       tenses: {},
+      tags: [],
     });
     setActiveTense('presente');
     setStatus('');
+  };
+
+  const addTag = (raw) => {
+    const tag = raw.trim().toLowerCase();
+    if (!tag) return;
+    setDraft((d) => (d.tags || []).includes(tag) ? d : { ...d, tags: [...(d.tags || []), tag] });
+    setTagDraft('');
+  };
+
+  const removeTag = (tag) => {
+    setDraft((d) => ({ ...d, tags: (d.tags || []).filter((t) => t !== tag) }));
   };
 
   const updateCell = (subjectId, field, value) => {
@@ -142,11 +183,17 @@ export default function VerbEditor() {
           },
         },
         tenses: cleanedTenses,
+        tags: [...new Set((draft.tags || []).map((t) => t.trim().toLowerCase()).filter(Boolean))],
         lastUpdated: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'verbs', id), payload);
+      // Always writes into this verb's bucket document (see getBucketId) —
+      // never creates a fresh individual doc, so new verbs are bucketed
+      // from day one even before the migration tool below has been run.
+      const bucketId = getBucketId(id);
+      await setDoc(doc(db, 'verbs', bucketId), { [`items.${id}`]: payload }, { merge: true });
       invalidateCollectionCache('verbs');
+      invalidateDocCache('verbs', bucketId);
 
       const saved = { id, ...payload };
       setVerbs((prev) => {
@@ -168,13 +215,116 @@ export default function VerbEditor() {
     if (!draft?.id) return;
     if (!window.confirm(`¿Eliminar "${draft.palabra}" permanentemente? Esto no se puede deshacer.`)) return;
     try {
-      await deleteDoc(doc(db, 'verbs', draft.id));
+      // Removes it from wherever it currently lives — its bucket doc (the
+      // normal case) or, during the migration window, a leftover individual
+      // doc — without needing to know in advance which shape it's in.
+      const bucketId = getBucketId(draft.id);
+      await Promise.all([
+        updateDoc(doc(db, 'verbs', bucketId), { [`items.${draft.id}`]: deleteField() }).catch(() => {}),
+        deleteDoc(doc(db, 'verbs', draft.id)).catch(() => {}),
+      ]);
       invalidateCollectionCache('verbs');
+      invalidateDocCache('verbs', bucketId);
       setVerbs((prev) => prev.filter((v) => v.id !== draft.id));
       setDraft(null);
     } catch (err) {
       console.error('Error deleting verb:', err);
       setStatus('❌ Error al eliminar. Revisa la consola.');
+    }
+  };
+
+  // --- ONE-TIME MIGRATION: ~400 separate docs → ~12 bucket docs ---
+  // Bucket assignment is a pure function of each verb's own (immutable) ID
+  // (see getBucketId), so this needs no manual classification — it's a
+  // deterministic regroup, done in one pass. Still split into copy-then-
+  // confirmed-delete, same as every other collection migration this
+  // session, since the delete step is irreversible.
+  const handleMigrateCopy = async () => {
+    setMigrationStatus('copying');
+    try {
+      const querySnapshot = await getDocs(collection(db, 'verbs'));
+      const bucketMap = {};
+      let count = 0;
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.items && typeof data.items === 'object') return; // already a bucket doc
+        const bucketId = getBucketId(docSnap.id);
+        if (!bucketMap[bucketId]) bucketMap[bucketId] = {};
+        bucketMap[bucketId][docSnap.id] = data;
+        count += 1;
+      });
+
+      if (count === 0) {
+        setMigrationStatus('error');
+        alert('No se encontraron verbos individuales para copiar (¿ya se migró?).');
+        return;
+      }
+
+      const batch = writeBatch(db);
+      Object.entries(bucketMap).forEach(([bucketId, itemsMap]) => {
+        batch.set(doc(db, 'verbs', bucketId), { items: itemsMap }, { merge: true });
+      });
+      await batch.commit();
+      invalidateCollectionCache('verbs');
+      setLegacyDocCount(count);
+      setMigrationStatus('copied');
+      await loadVerbs();
+      alert(`✅ Copiados ${count} verbos en ${Object.keys(bucketMap).length} documentos agrupados. Revisa la lista antes de borrar los documentos antiguos.`);
+    } catch (err) {
+      console.error('Error migrating verbs:', err);
+      setMigrationStatus('error');
+      alert('Error al copiar. Nada se ha borrado.');
+    }
+  };
+
+  const handleMigrateDelete = async () => {
+    const confirmed = window.confirm(
+      `Esto borrará permanentemente los ${legacyDocCount || '~400'} documentos individuales antiguos de 'verbs' (ya copiados a los documentos agrupados). Esta acción NO se puede deshacer. ¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    setMigrationStatus('deleting');
+    try {
+      const querySnapshot = await getDocs(collection(db, 'verbs'));
+      const bucketItems = {}; // bucketId -> Set of verb IDs already copied there
+      const legacyDocs = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.items && typeof data.items === 'object') {
+          bucketItems[docSnap.id] = new Set(Object.keys(data.items));
+        } else {
+          legacyDocs.push(docSnap);
+        }
+      });
+
+      // Refuse to delete any legacy doc that isn't actually copied into its
+      // bucket yet — a stale bucket read, a partial copy failure, or a verb
+      // added after copy but before delete could all leave this true.
+      const uncopied = legacyDocs.filter(
+        (d) => !bucketItems[getBucketId(d.id)]?.has(d.id)
+      );
+      if (uncopied.length > 0) {
+        setMigrationStatus('error');
+        alert(`⚠️ ${uncopied.length} verbo(s) no están copiados todavía (p. ej. "${uncopied[0].id}"). Ejecuta el Paso 1 de nuevo antes de borrar.`);
+        return;
+      }
+
+      const batch = writeBatch(db);
+      let count = 0;
+      legacyDocs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+        count += 1;
+      });
+      await batch.commit();
+      invalidateCollectionCache('verbs');
+      setLegacyDocCount(0);
+      setMigrationStatus('done');
+      await loadVerbs();
+      alert(`✅ Borrados ${count} documentos individuales antiguos. 'verbs' ahora vive en documentos agrupados.`);
+    } catch (err) {
+      console.error('Error deleting old verb docs:', err);
+      setMigrationStatus('error');
+      alert('Error al borrar los documentos antiguos.');
     }
   };
 
@@ -189,6 +339,38 @@ export default function VerbEditor() {
             ← Hub
           </Link>
         </div>
+
+        {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
+            always 0 in production. See DestacadoManager for the full
+            rationale on the two-step copy/delete shape. */}
+        {legacyDocCount > 0 && (
+          <div className="p-4 bg-amber-950/40 border border-amber-800 rounded-2xl flex flex-col gap-2">
+            <p className="text-xs font-black text-amber-400 uppercase tracking-widest">
+              ⚠️ Migración disponible: agrupar en ~12 documentos
+            </p>
+            <p className="text-xs text-amber-200">
+              {`${legacyDocCount} verbos siguen en documentos individuales. Paso 1 los agrupa sin borrar nada — revisa la lista después. Paso 2 borra los documentos antiguos (irreversible), solo después de confirmar el Paso 1.`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleMigrateCopy}
+                disabled={migrationStatus === 'copying'}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+              >
+                {migrationStatus === 'copying' ? 'Agrupando...' : '1. Agrupar en documentos'}
+              </button>
+              <button
+                type="button"
+                onClick={handleMigrateDelete}
+                disabled={migrationStatus === 'deleting'}
+                className="px-4 py-2 bg-rose-800 hover:bg-rose-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+              >
+                {migrationStatus === 'deleting' ? 'Borrando...' : '2. Borrar documentos antiguos'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
           {/* SIDEBAR: SEARCH + LIST */}
@@ -297,6 +479,63 @@ export default function VerbEditor() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* TAGS */}
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Etiquetas
+                </label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {(draft.tags || []).length === 0 && (
+                    <p className="text-xs text-slate-500 italic">Sin etiquetas todavía.</p>
+                  )}
+                  {(draft.tags || []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="flex items-center gap-1.5 bg-slate-800 border border-slate-600 text-amber-300 text-xs font-bold px-3 py-1 rounded-full"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="text-slate-500 hover:text-rose-400 font-black"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={tagDraft}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTag(tagDraft);
+                      }
+                    }}
+                    list="known-verb-tags"
+                    placeholder="p. ej. stem_e_ie, reflexivo, comun..."
+                    className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-amber-500"
+                  />
+                  <datalist id="known-verb-tags">
+                    {allKnownTags.map((tag) => (
+                      <option key={tag} value={tag} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="button"
+                    onClick={() => addTag(tagDraft)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg text-xs uppercase tracking-widest"
+                  >
+                    + Añadir
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2 italic">
+                  Libres — úsalas para lo que te sea útil (patrón de conjugación, tema, dificultad...).
+                </p>
               </div>
 
               {/* TENSE TABS */}

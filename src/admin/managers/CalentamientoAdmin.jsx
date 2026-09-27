@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import {
   generateVerbQuestions,
   formatSubjectAndTranslation as formatSubjectAndTranslationShared,
@@ -57,7 +57,7 @@ export default function CalentamientoAdmin() {
         const [groups, cals, verbsArray] = await Promise.all([
           getCachedCollection('verbGroups'),
           getCachedCollection('calentamientos'),
-          getCachedCollection('verbs'),
+          getCachedBucketedCollection('verbs'),
         ]);
         setVerbGroups(groups);
         setSavedPractices([...cals].sort((a, b) => a.dia - b.dia));

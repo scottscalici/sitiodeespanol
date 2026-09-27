@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js'; 
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
-import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
+import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 
 const VerbVault = () => {
   const [activeTab, setActiveTab] = useState('curate'); 
@@ -60,7 +60,7 @@ const VerbVault = () => {
     const fetchData = async () => {
       try {
         const [verbData, groupData] = await Promise.all([
-          getCachedCollection("verbs"),
+          getCachedBucketedCollection("verbs"),
           getCachedCollection("verbGroups"),
         ]);
 

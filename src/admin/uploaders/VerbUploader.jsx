@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { db } from '../../firebase'; 
+import { db } from '../../firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getBucketId, invalidateCollectionCache } from '../../utils/firestoreCache';
 
 const VerbUploader = () => {
   const [jsonInput, setJsonInput] = useState('');
@@ -15,6 +16,12 @@ const VerbUploader = () => {
       
       setStatus(`⏳ Processing ${dataArray.length} verbs...`);
 
+      // Grouped by bucket (see getBucketId) so this writes each bucket
+      // document once instead of creating one fresh individual doc per
+      // verb, which would quietly bring back the per-verb-doc read cost
+      // the bucketing migration exists to remove.
+      const bucketUpdates = {};
+
       for (const verb of dataArray) {
         if (!verb.palabra) {
             console.warn("Skipping item: No 'palabra' field found.");
@@ -24,19 +31,27 @@ const VerbUploader = () => {
         // THE SLASH & SPACE FIX
         // Ensures verbs like "reír/reírse" become "reir-reirse" for safe Firestore IDs
         const docId = verb.palabra
-          .replace(/\//g, '-')    
-          .replace(/\s+/g, '_')   
-          .replace(/[()]/g, '')   
+          .replace(/\//g, '-')
+          .replace(/\s+/g, '_')
+          .replace(/[()]/g, '')
           .toLowerCase();
 
         console.log(`UPLOADING VERB: ${docId}`);
 
-        // Uploading to the "verbs" collection
-        await setDoc(doc(db, "verbs", docId), {
+        const bucketId = getBucketId(docId);
+        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = {};
+        bucketUpdates[bucketId][`items.${docId}`] = {
           ...verb,
           lastUpdated: serverTimestamp()
-        });
+        };
       }
+
+      await Promise.all(
+        Object.entries(bucketUpdates).map(([bucketId, updates]) =>
+          setDoc(doc(db, "verbs", bucketId), updates, { merge: true })
+        )
+      );
+      invalidateCollectionCache('verbs');
 
       setStatus(`✅ SUCCESS: ${dataArray.length} Verbs Synced`);
       setJsonInput(''); // Clear input on success

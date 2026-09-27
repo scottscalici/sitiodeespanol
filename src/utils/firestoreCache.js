@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -56,4 +56,86 @@ export const getCachedQuery = async (cacheKey, runQuery, { force = false, ttlMs 
 // cache — picks up the change instead of serving a stale snapshot.
 export const invalidateCollectionCache = (collectionName) => {
   cache.delete(collectionName);
+};
+
+// Same cache/in-flight machinery as getCachedCollection, but for ONE
+// document instead of a whole collection — for a collection that's been
+// split into a handful of bucket documents (see getBucketId below), this
+// is how a caller looks up just the ONE bucket it needs (e.g. a single
+// verb's conjugation data) without pulling every bucket in. Returns null
+// if the doc doesn't exist.
+export const getCachedDoc = async (collectionName, docId, { force = false, ttlMs = DEFAULT_TTL_MS } = {}) => {
+  const cacheKey = `doc:${collectionName}/${docId}`;
+  const cached = cache.get(cacheKey);
+  const isFresh = cached && (Date.now() - cached.fetchedAt < ttlMs);
+
+  if (!force && isFresh) return cached.data;
+  if (!force && inFlight.has(cacheKey)) return inFlight.get(cacheKey);
+
+  const promise = (async () => {
+    try {
+      const snap = await getDoc(doc(db, collectionName, docId));
+      const data = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      cache.set(cacheKey, { data, fetchedAt: Date.now() });
+      return data;
+    } finally {
+      inFlight.delete(cacheKey);
+    }
+  })();
+
+  if (!force) inFlight.set(cacheKey, promise);
+  return promise;
+};
+
+export const invalidateDocCache = (collectionName, docId) => {
+  cache.delete(`doc:${collectionName}/${docId}`);
+};
+
+// Deterministic bucket assignment for splitting a collection that was one
+// document per item (e.g. one per verb) into a small, fixed number of
+// documents instead — a pure function of the item's own (immutable, set
+// once at creation) ID, so a caller can always compute where an item lives
+// without needing a separate lookup index, and an item never needs to
+// "move" between buckets since its ID never changes after creation.
+export const getBucketId = (itemId, numBuckets = 12) => {
+  let hash = 0;
+  for (let i = 0; i < itemId.length; i++) {
+    hash = (hash * 31 + itemId.charCodeAt(i)) >>> 0;
+  }
+  return `bucket_${hash % numBuckets}`;
+};
+
+// Reads a bucketed collection (see getBucketId) back into the same flat
+// [{id, ...data}] shape callers used before bucketing — tolerant of a
+// PARTIALLY migrated collection, where some docs are already bucket
+// documents (an `items` map) and others are still one-doc-per-item, so
+// this works correctly before, during, and after a migration has run.
+export const getCachedBucketedCollection = async (collectionName, opts) => {
+  const docs = await getCachedCollection(collectionName, opts);
+  const items = [];
+  docs.forEach((d) => {
+    if (d.items && typeof d.items === 'object') {
+      Object.entries(d.items).forEach(([id, data]) => items.push({ id, ...data }));
+    } else {
+      const { id, ...rest } = d;
+      items.push({ id, ...rest });
+    }
+  });
+  return items;
+};
+
+// Looks up ONE item in a bucketed collection by its own ID — reads only
+// the one bucket doc it deterministically lives in (cached, so repeated
+// lookups landing in the same bucket within a session cost one real read
+// total), falling back to a legacy one-doc-per-item read for an item not
+// yet migrated into a bucket. Returns null if the item doesn't exist
+// anywhere. Use this instead of getCachedBucketedCollection whenever a
+// caller only needs one specific item, not the whole collection.
+export const getCachedBucketedItem = async (collectionName, itemId) => {
+  const bucketDoc = await getCachedDoc(collectionName, getBucketId(itemId));
+  if (bucketDoc?.items?.[itemId]) return bucketDoc.items[itemId];
+  const legacy = await getCachedDoc(collectionName, itemId);
+  if (!legacy) return null;
+  const { id, ...data } = legacy; // strip the wrapper id, matching the bucket branch's plain data shape
+  return data;
 };

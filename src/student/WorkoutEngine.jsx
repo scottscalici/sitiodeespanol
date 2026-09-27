@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { PAIR_MAP, POOL_MAP } from '../utils/distractorConfig';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
 import { playAudio } from '../utils/playAudio';
+import { getCachedBucketedItem } from '../utils/firestoreCache';
+
+// verbs is a bucketed collection — a verb's own ID deterministically says
+// which bucket document holds it, so a lookup needs no extra read to find
+// out where to look, and repeated lookups landing in the same bucket
+// within this session cost one real read total. Falls back to the old
+// one-doc-per-verb read for any verb not yet migrated into a bucket.
+const getVerbById = async (verbId) => {
+  try {
+    return await getCachedBucketedItem('verbs', verbId);
+  } catch (err) {
+    console.error('Error fetching verb', verbId, err);
+    return null;
+  }
+};
 
 export default function WorkoutEngine({ segment, history = [], podIndex = 0, onClose, onComplete }) {
   const { currentUser } = useAuth();
@@ -84,9 +97,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const pair = PAIR_MAP[meta.pairTag];
       if (pair) {
         try {
-          const verbSnap = await getDoc(doc(db, 'verbs', meta.targetLemma));
-          if (verbSnap.exists()) {
-            const verbData = verbSnap.data();
+          const verbData = await getVerbById(meta.targetLemma);
+          if (verbData) {
             const otherTense = pair.a === meta.targetTense ? pair.b : pair.a;
             const counterpart = verbData.tenses?.[otherTense]?.[meta.targetSubject]?.target;
             let options = [answer];
@@ -160,10 +172,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       for (const c of rawConcepts) {
         if (c.isGroup && c.verbIds) {
           for (const vid of c.verbIds) {
-            try {
-              const vDoc = await getDoc(doc(db, 'verbs', vid));
-              if (vDoc.exists()) concepts.push({ id: vDoc.id, label: vDoc.id, tags: c.tags, fullData: vDoc.data(), isVerbObj: true });
-            } catch (err) {}
+            const verbData = await getVerbById(vid);
+            if (verbData) concepts.push({ id: vid, label: vid, tags: c.tags, fullData: verbData, isVerbObj: true });
           }
         } else {
           concepts.push(c);
@@ -175,10 +185,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       for (const h of history) {
         if (h.isGroup && h.verbIds) {
           for (const vid of h.verbIds) {
-            try {
-              const vDoc = await getDoc(doc(db, 'verbs', vid));
-              if (vDoc.exists()) unpackedHistory.push({ id: vDoc.id, label: vDoc.id, tags: h.tags, fullData: vDoc.data(), isVerbObj: true });
-            } catch (err) {}
+            const verbData = await getVerbById(vid);
+            if (verbData) unpackedHistory.push({ id: vid, label: vid, tags: h.tags, fullData: verbData, isVerbObj: true });
           }
         } else {
           unpackedHistory.push(h);
