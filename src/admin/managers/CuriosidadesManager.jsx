@@ -1,21 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { invalidateCollectionCache } from '../../utils/firestoreCache';
+
+const BUNDLE_DOC_ID = '_bundle';
 
 const CuriosidadesManager = () => {
   const [items, setItems] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isBundled, setIsBundled] = useState(false);
+  // Docs in the collection other than _bundle itself — see DestacadoManager
+  // for why this is tracked separately from isBundled (they're two
+  // independent migration steps that can persist across page reloads).
+  const [legacyDocCount, setLegacyDocCount] = useState(0);
+  const [migrationStatus, setMigrationStatus] = useState(null);
 
   useEffect(() => {
     const fetchCuriosidades = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, 'curiosidades'));
-        let fetchedItems = [];
-        
+        let bundleData = null;
+        const legacyItems = [];
         querySnapshot.forEach((docSnap) => {
-          fetchedItems.push({ id: docSnap.id, ...docSnap.data() });
+          if (docSnap.id === BUNDLE_DOC_ID) {
+            bundleData = docSnap.data();
+          } else {
+            legacyItems.push({ id: docSnap.id, ...docSnap.data() });
+          }
         });
+
+        setIsBundled(!!bundleData);
+        setLegacyDocCount(legacyItems.length);
+
+        const fetchedItems = bundleData
+          ? Object.entries(bundleData.items || {}).map(([id, data]) => ({ id, ...data }))
+          : legacyItems;
 
         // Sort items primarily by s2_dia, putting unassigned (null) at the bottom
         fetchedItems.sort((a, b) => {
@@ -51,21 +71,92 @@ const CuriosidadesManager = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const batch = writeBatch(db);
-      
-      items.forEach(item => {
-        const docRef = doc(db, 'curiosidades', item.id);
-        const { id, ...dataToSave } = item;
-        batch.set(docRef, dataToSave, { merge: true });
-      });
-
-      await batch.commit();
+      if (isBundled) {
+        const itemsMap = {};
+        items.forEach((item) => {
+          const { id, ...dataToSave } = item;
+          itemsMap[id] = dataToSave;
+        });
+        await setDoc(doc(db, 'curiosidades', BUNDLE_DOC_ID), { items: itemsMap });
+      } else {
+        const batch = writeBatch(db);
+        items.forEach(item => {
+          const docRef = doc(db, 'curiosidades', item.id);
+          const { id, ...dataToSave } = item;
+          batch.set(docRef, dataToSave, { merge: true });
+        });
+        await batch.commit();
+      }
+      invalidateCollectionCache('curiosidades');
       alert("¡Curiosidades guardadas exitosamente!");
     } catch (error) {
       console.error("Error saving batch:", error);
       alert("Error al guardar.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // --- ONE-TIME MIGRATION: many separate docs → one consolidated doc ---
+  // See DestacadoManager for the full rationale — split into two deliberate
+  // steps so a teacher can verify the copy before anything old gets deleted.
+  const handleMigrateCopy = async () => {
+    setMigrationStatus('copying');
+    try {
+      const querySnapshot = await getDocs(collection(db, 'curiosidades'));
+      const itemsMap = {};
+      let count = 0;
+      querySnapshot.forEach((docSnap) => {
+        if (docSnap.id === BUNDLE_DOC_ID) return;
+        itemsMap[docSnap.id] = docSnap.data();
+        count += 1;
+      });
+
+      if (count === 0) {
+        setMigrationStatus('error');
+        alert('No se encontraron documentos individuales para copiar (¿ya se migró?).');
+        return;
+      }
+
+      await setDoc(doc(db, 'curiosidades', BUNDLE_DOC_ID), { items: itemsMap }, { merge: true });
+      invalidateCollectionCache('curiosidades');
+      setIsBundled(true);
+      setLegacyDocCount(count);
+      setMigrationStatus('copied');
+      alert(`✅ Copiadas ${count} curiosidades al documento único. Revisa la cuadrícula (recárgala) antes de borrar los documentos antiguos.`);
+    } catch (error) {
+      console.error('Error migrating curiosidades:', error);
+      setMigrationStatus('error');
+      alert('Error al copiar. Nada se ha borrado.');
+    }
+  };
+
+  const handleMigrateDelete = async () => {
+    const confirmed = window.confirm(
+      `Esto borrará permanentemente los ${legacyDocCount || '~200'} documentos individuales antiguos de 'curiosidades' (el documento único ya los tiene copiados). Esta acción NO se puede deshacer. ¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    setMigrationStatus('deleting');
+    try {
+      const querySnapshot = await getDocs(collection(db, 'curiosidades'));
+      const batch = writeBatch(db);
+      let count = 0;
+      querySnapshot.forEach((docSnap) => {
+        if (docSnap.id === BUNDLE_DOC_ID) return;
+        batch.delete(docSnap.ref);
+        count += 1;
+      });
+      await batch.commit();
+      invalidateCollectionCache('curiosidades');
+      setMigrationStatus('done');
+      setIsBundled(true);
+      setLegacyDocCount(0);
+      alert(`✅ Borrados ${count} documentos antiguos. 'curiosidades' ahora tiene un solo documento.`);
+    } catch (error) {
+      console.error('Error deleting old curiosidades docs:', error);
+      setMigrationStatus('error');
+      alert('Error al borrar los documentos antiguos.');
     }
   };
 
@@ -90,6 +181,42 @@ const CuriosidadesManager = () => {
             {isSaving ? 'Guardando...' : 'Guardar Cambios'}
           </button>
         </div>
+
+        {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount
+            is always 0 in production (i.e. once the migration has been run
+            and confirmed). See DestacadoManager for the full rationale. */}
+        {legacyDocCount > 0 && (
+          <div className="p-4 bg-amber-50 border-b-2 border-amber-300 flex flex-col gap-2">
+            <p className="text-xs font-black text-amber-800 uppercase tracking-widest">
+              ⚠️ Migración disponible: consolidar en un solo documento
+            </p>
+            <p className="text-xs text-amber-700">
+              {isBundled
+                ? `El documento único ya existe con las curiosidades copiadas. Quedan ${legacyDocCount} documentos individuales antiguos sin borrar.`
+                : `Actualmente cada curiosidad es su propio documento (~${legacyDocCount}). Paso 1 las copia a un solo documento sin borrar nada — revisa que la cuadrícula se vea bien después.`}
+              {' '}Paso 2 borra los documentos antiguos (irreversible), y solo debe hacerse después de confirmar el Paso 1.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleMigrateCopy}
+                disabled={migrationStatus === 'copying'}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+              >
+                {migrationStatus === 'copying' ? 'Copiando...' : isBundled ? '1. Volver a copiar' : '1. Copiar a documento único'}
+              </button>
+              <button
+                type="button"
+                onClick={handleMigrateDelete}
+                disabled={!isBundled || migrationStatus === 'deleting'}
+                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+                title={isBundled ? '' : 'Primero completa el Paso 1'}
+              >
+                {migrationStatus === 'deleting' ? 'Borrando...' : '2. Borrar documentos antiguos'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Updated Grid Headers for 12 columns */}
         <div className="grid grid-cols-12 gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">

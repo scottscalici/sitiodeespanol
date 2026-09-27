@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase'; // Adjust relative path to your firebase.js if needed
+import { invalidateCollectionCache } from '../../utils/firestoreCache';
+
+const BUNDLE_DOC_ID = '_bundle';
 
 const CuriosidadesUploader = () => {
   const [jsonInput, setJsonInput] = useState('');
@@ -23,21 +26,42 @@ const CuriosidadesUploader = () => {
         throw new Error('El JSON debe ser un arreglo [ ] de objetos.');
       }
 
+      // Once the "consolidate into one document" migration has run (see
+      // CuriosidadesManager), curiosidades should only ever hold that one
+      // doc — so new uploads merge into it instead of creating fresh
+      // individual docs, which would silently bring back the per-doc-read
+      // cost that migration exists to remove. Falls back to the original
+      // one-doc-per-item behavior if that migration hasn't run yet.
+      const bundleRef = doc(db, 'curiosidades', BUNDLE_DOC_ID);
+      const bundleSnap = await getDoc(bundleRef);
+      const isBundled = bundleSnap.exists();
+      const merged = {};
+
       let count = 0;
       for (const item of parsedData) {
         if (!item.id) continue;
 
-        // Write each curiosidad to the 'curiosidades' collection using its unique ID (e.g. cur-80)
-        await setDoc(doc(db, 'curiosidades', String(item.id)), {
+        const dataToSave = {
           title: item.title || '',
           img: item.img || '',
           student_note: item.student_note || '',
           teacher_notes: item.teacher_notes || '',
           s2_dia: item.s2_dia !== null ? Number(item.s2_dia) : null,
           s4_dia: item.s4_dia !== null ? Number(item.s4_dia) : null,
-        });
+        };
+
+        if (isBundled) {
+          merged[`items.${item.id}`] = dataToSave;
+        } else {
+          await setDoc(doc(db, 'curiosidades', String(item.id)), dataToSave);
+        }
         count++;
       }
+
+      if (isBundled && count > 0) {
+        await setDoc(bundleRef, merged, { merge: true });
+      }
+      invalidateCollectionCache('curiosidades');
 
       setStatus(`✅ ¡Éxito! Se subieron ${count} curiosidades a Firestore.`);
     } catch (error) {

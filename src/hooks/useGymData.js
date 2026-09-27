@@ -253,7 +253,7 @@ export const useGymData = (userCourse = 's2') => {
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
           fetchFirestoreArray('juego_senordle', 'words'),
           fetchEvalsMaster(),
-          fetchFirestoreArray('curiosidades'),
+          fetchBundledArray('curiosidades'),
           fetchGramaticaMaster() // <--- Added here
         ]);
 
