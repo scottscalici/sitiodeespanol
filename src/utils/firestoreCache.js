@@ -97,7 +97,7 @@ export const invalidateDocCache = (collectionName, docId) => {
 // once at creation) ID, so a caller can always compute where an item lives
 // without needing a separate lookup index, and an item never needs to
 // "move" between buckets since its ID never changes after creation.
-export const getBucketId = (itemId, numBuckets = 12) => {
+export const getBucketId = (itemId, numBuckets = 64) => {
   let hash = 0;
   for (let i = 0; i < itemId.length; i++) {
     hash = (hash * 31 + itemId.charCodeAt(i)) >>> 0;

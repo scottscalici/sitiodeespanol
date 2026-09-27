@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId } from '../../utils/firestoreCache';
 import { Link } from 'react-router-dom';
@@ -233,7 +233,7 @@ export default function VerbEditor() {
     }
   };
 
-  // --- ONE-TIME MIGRATION: ~400 separate docs → ~12 bucket docs ---
+  // --- ONE-TIME MIGRATION: ~400 separate docs → ~64 bucket docs ---
   // Bucket assignment is a pure function of each verb's own (immutable) ID
   // (see getBucketId), so this needs no manual classification — it's a
   // deterministic regroup, done in one pass. Still split into copy-then-
@@ -260,11 +260,18 @@ export default function VerbEditor() {
         return;
       }
 
-      const batch = writeBatch(db);
-      Object.entries(bucketMap).forEach(([bucketId, itemsMap]) => {
-        batch.set(doc(db, 'verbs', bucketId), { items: itemsMap }, { merge: true });
-      });
-      await batch.commit();
+      // One write PER BUCKET instead of one giant batch covering all of
+      // them — a single batch bundling every bucket's data hit Firestore's
+      // per-request payload limit with this much verb data. Each bucket on
+      // its own is comfortably small, and these writes don't need to be
+      // atomic with each other (a bucket already written is a bucket
+      // that's already safely copied, even if a later one fails and this
+      // gets re-run).
+      await Promise.all(
+        Object.entries(bucketMap).map(([bucketId, itemsMap]) =>
+          setDoc(doc(db, 'verbs', bucketId), { items: itemsMap }, { merge: true })
+        )
+      );
       invalidateCollectionCache('verbs');
       setLegacyDocCount(count);
       setMigrationStatus('copied');
@@ -309,13 +316,11 @@ export default function VerbEditor() {
         return;
       }
 
-      const batch = writeBatch(db);
-      let count = 0;
-      legacyDocs.forEach((docSnap) => {
-        batch.delete(docSnap.ref);
-        count += 1;
-      });
-      await batch.commit();
+      // Individual deletes rather than one batch — a batch is capped at 500
+      // operations, and this stays correct regardless of how large the
+      // collection grows.
+      await Promise.all(legacyDocs.map((docSnap) => deleteDoc(docSnap.ref)));
+      const count = legacyDocs.length;
       invalidateCollectionCache('verbs');
       setLegacyDocCount(0);
       setMigrationStatus('done');
@@ -346,7 +351,7 @@ export default function VerbEditor() {
         {legacyDocCount > 0 && (
           <div className="p-4 bg-amber-950/40 border border-amber-800 rounded-2xl flex flex-col gap-2">
             <p className="text-xs font-black text-amber-400 uppercase tracking-widest">
-              ⚠️ Migración disponible: agrupar en ~12 documentos
+              ⚠️ Migración disponible: agrupar en ~64 documentos
             </p>
             <p className="text-xs text-amber-200">
               {`${legacyDocCount} verbos siguen en documentos individuales. Paso 1 los agrupa sin borrar nada — revisa la lista después. Paso 2 borra los documentos antiguos (irreversible), solo después de confirmar el Paso 1.`}
