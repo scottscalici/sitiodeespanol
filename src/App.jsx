@@ -57,6 +57,7 @@ import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import VerbEditor from './admin/managers/VerbEditor';
+import VerbAudit from './admin/managers/VerbAudit';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
@@ -490,6 +491,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <VerbEditor />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-verb-audit"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <VerbAudit />
                 </AdminRoute>
               }
             />

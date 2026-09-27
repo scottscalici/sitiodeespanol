@@ -110,18 +110,30 @@ export const getBucketId = (itemId, numBuckets = 64) => {
 // PARTIALLY migrated collection, where some docs are already bucket
 // documents (an `items` map) and others are still one-doc-per-item, so
 // this works correctly before, during, and after a migration has run.
+//
+// An item can genuinely exist in BOTH places at once during that partial
+// window — e.g. an editor that always writes through the bucket "promotes"
+// an item into its bucket the moment someone edits and saves it, even
+// though its stale legacy twin doc hasn't been deleted by the migration
+// yet. Bucket docs are processed first and win on id collision, since a
+// bucket entry is always at least as recent as a legacy one.
 export const getCachedBucketedCollection = async (collectionName, opts) => {
   const docs = await getCachedCollection(collectionName, opts);
-  const items = [];
+  const byId = new Map();
+  const legacyDocs = [];
   docs.forEach((d) => {
     if (d.items && typeof d.items === 'object') {
-      Object.entries(d.items).forEach(([id, data]) => items.push({ id, ...data }));
+      Object.entries(d.items).forEach(([id, data]) => byId.set(id, { id, ...data }));
     } else {
-      const { id, ...rest } = d;
-      items.push({ id, ...rest });
+      legacyDocs.push(d);
     }
   });
-  return items;
+  legacyDocs.forEach((d) => {
+    if (byId.has(d.id)) return;
+    const { id, ...rest } = d;
+    byId.set(id, { id, ...rest });
+  });
+  return [...byId.values()];
 };
 
 // Looks up ONE item in a bucketed collection by its own ID — reads only

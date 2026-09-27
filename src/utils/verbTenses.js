@@ -26,3 +26,16 @@ export const VERB_TENSES = [
   { id: 'imperativo_afirmativo', label: 'Mandatos Afirmativos' },
   { id: 'imperativo_negativo', label: 'Mandatos Negativos' },
 ];
+
+// The 6 subject cells every tense is conjugated for. él/ella/Ud. and
+// ellos/ellas/Uds. are each ONE stored cell — grammatically correct even
+// for imperativo, since Ud./Uds. commands use the same form as the
+// (subjunctive-derived) él/ella and ellos/ellas forms.
+export const VERB_SUBJECTS = [
+  { id: 'yo', label: 'yo' },
+  { id: 'tú', label: 'tú' },
+  { id: 'él_ella_ud', label: 'él / ella / Ud.' },
+  { id: 'nosotros', label: 'nosotros' },
+  { id: 'vosotros', label: 'vosotros' },
+  { id: 'ellos_ellas_uds', label: 'ellos / ellas / Uds.' },
+];
