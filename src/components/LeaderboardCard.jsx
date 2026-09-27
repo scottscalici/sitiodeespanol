@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedQuery } from '../utils/firestoreCache';
 import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -27,12 +29,15 @@ const LeaderboardCard = ({ course }) => {
     const fetchLeaders = async () => {
       setLoading(true);
       try {
-        // Shared cache (see firestoreCache) — HallOfFameCard and the admin
-        // gradebook read this same full 'users' collection on the same
-        // page loads, so sharing one 5-minute-cached fetch instead of each
-        // running its own filtered query cuts Firestore reads app-wide
-        // rather than just moving the cost from server-side to client-side.
-        const allUsers = await getCachedCollection('users');
+        // Scoped query, not a full 'users' scan — that collection grows
+        // across every course/section/year a teacher has ever taught, so
+        // pulling it all in just to filter down to one course would cost
+        // every student's session (docs in collection) reads instead of
+        // (docs in THIS course) reads. Cached per-course (see
+        // firestoreCache) so HallOfFameCard reuses the same fetch.
+        const allUsers = await getCachedQuery(`users:course:${course}`, () =>
+          getDocs(query(collection(db, 'users'), where('role', '==', 'student'), where('course', '==', course)))
+        );
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
 
@@ -40,7 +45,7 @@ const LeaderboardCard = ({ course }) => {
         // current class) share the course-wide leaderboard query but never
         // belong in a live class's ranking.
         const rows = allUsers
-          .filter((d) => d.role === 'student' && d.course === course && !d.independent)
+          .filter((d) => !d.independent)
           .map((d) => {
             const lastInitial = d.lastName ? `${d.lastName.trim().charAt(0).toUpperCase()}.` : '';
             const name = [d.firstName, lastInitial].filter(Boolean).join(' ') || d.email || 'Estudiante';

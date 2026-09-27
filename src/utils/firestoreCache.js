@@ -20,25 +20,34 @@ const inFlight = new Map(); // collectionName -> Promise<data>, while a fetch is
 //
 // Pass { force: true } to bypass the cache (e.g. a manual refresh button),
 // or { ttlMs } to override how long a cached result stays fresh.
-export const getCachedCollection = async (collectionName, { force = false, ttlMs = DEFAULT_TTL_MS } = {}) => {
-  const cached = cache.get(collectionName);
+export const getCachedCollection = async (collectionName, opts = {}) =>
+  getCachedQuery(collectionName, () => getDocs(collection(db, collectionName)), opts);
+
+// Same cache/in-flight-dedup machinery as getCachedCollection, but for a
+// SCOPED query (e.g. only this course's students) instead of a full
+// collection scan — use this for any collection that grows across courses
+// or school years, so one student's session only pays for their own
+// course's docs, not every course a teacher has ever taught. `cacheKey`
+// must be unique per distinct query (e.g. `users:course:${course}`).
+export const getCachedQuery = async (cacheKey, runQuery, { force = false, ttlMs = DEFAULT_TTL_MS } = {}) => {
+  const cached = cache.get(cacheKey);
   const isFresh = cached && (Date.now() - cached.fetchedAt < ttlMs);
 
   if (!force && isFresh) return cached.data;
-  if (!force && inFlight.has(collectionName)) return inFlight.get(collectionName);
+  if (!force && inFlight.has(cacheKey)) return inFlight.get(cacheKey);
 
   const promise = (async () => {
     try {
-      const snap = await getDocs(collection(db, collectionName));
+      const snap = await runQuery();
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      cache.set(collectionName, { data, fetchedAt: Date.now() });
+      cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } finally {
-      inFlight.delete(collectionName);
+      inFlight.delete(cacheKey);
     }
   })();
 
-  if (!force) inFlight.set(collectionName, promise);
+  if (!force) inFlight.set(cacheKey, promise);
   return promise;
 };
 

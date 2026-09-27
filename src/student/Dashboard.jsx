@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useGymData } from '../hooks/useGymData';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -143,10 +143,14 @@ const Dashboard = () => {
     const fetchDailyMusic = async () => {
       if (!course || !liveDia) return;
       try {
-        const q = query(collection(db, 'musica'), where('course', 'array-contains', course));
-        const querySnapshot = await getDocs(q);
-        const allCourseSongs = querySnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const matchedSong = allCourseSongs.find((song) => song.dias && song.dias.includes(liveDia));
+        // Cached (see firestoreCache) — useGymData already pulls the whole
+        // 'musica' collection on this same mount, so this reuses that
+        // fetch instead of running its own uncached query on every
+        // liveDia/course change.
+        const allSongs = await getCachedCollection('musica');
+        const matchedSong = allSongs.find(
+          (song) => song.course?.includes(course) && song.dias?.includes(liveDia)
+        );
         setDailySong(matchedSong || null);
       } catch (error) {
         console.error('Error fetching daily music:', error);
@@ -227,12 +231,13 @@ const Dashboard = () => {
     const checkSentenceSets = async () => {
       if (!course || !liveDia) return;
       try {
-        const snap = await getDocs(collection(db, 'sentence_sets'));
-        const matchingSet = snap.docs
-          .map((docSnap) => docSnap.data())
-          .find((set) =>
-            (set.assignments || []).some((a) => a.course === course && Number(a.dia) === Number(liveDia))
-          );
+        // Cached (see firestoreCache) — was a raw getDocs re-reading the
+        // whole collection on every liveDia/course change (every click of
+        // the day-navigator); now only refetches once per 5-minute window.
+        const allSets = await getCachedCollection('sentence_sets');
+        const matchingSet = allSets.find((set) =>
+          (set.assignments || []).some((a) => a.course === course && Number(a.dia) === Number(liveDia))
+        );
         setSentenceSetTitle(matchingSet ? matchingSet.title || '' : null);
       } catch (error) {
         console.error('Error checking sentence sets:', error);

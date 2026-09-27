@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { getCachedCollection, getCachedQuery } from '../utils/firestoreCache';
 import { formatWeekLabel, formatMonthLabel } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -21,13 +23,15 @@ const HallOfFameCard = ({ course }) => {
     const fetchHallOfFame = async () => {
       setLoading(true);
       try {
-        // Shared cache (see firestoreCache) — LeaderboardCard and the admin
-        // gradebook read this same full 'users' collection on the same
-        // page loads; sharing one 5-minute-cached fetch instead of each
-        // component running its own query cuts Firestore reads app-wide.
+        // 'users' is a scoped, per-course query (not a full collection
+        // scan) since it grows across every course/section/year a teacher
+        // has ever taught — see LeaderboardCard for the same pattern.
+        // Cached per-course, so this reuses LeaderboardCard's fetch.
         const [allHistory, allUsers] = await Promise.all([
           getCachedCollection('leaderboard_history'),
-          getCachedCollection('users'),
+          getCachedQuery(`users:course:${course}`, () =>
+            getDocs(query(collection(db, 'users'), where('role', '==', 'student'), where('course', '==', course)))
+          ),
         ]);
 
         const forCourse = allHistory.filter((h) => h.course === course);
@@ -37,7 +41,7 @@ const HallOfFameCard = ({ course }) => {
         monthlyDocs.sort((a, b) => b.key.localeCompare(a.key));
 
         const leader = allUsers
-          .filter((s) => s.role === 'student' && s.course === course && !s.independent)
+          .filter((s) => !s.independent)
           .map((s) => {
             const lastInitial = s.lastName ? `${s.lastName.trim().charAt(0).toUpperCase()}.` : '';
             const name = [s.firstName, lastInitial].filter(Boolean).join(' ') || s.email || 'Estudiante';

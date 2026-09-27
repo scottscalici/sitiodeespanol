@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
@@ -18,8 +19,8 @@ const Estructura = ({ estructura = [], liveDia }) => {
   useEffect(() => {
     const fetchAllPages = async () => {
       try {
-        const snap = await getDocs(collection(db, 'grammar_pages'));
-        setAllPages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const pages = await getCachedCollection('grammar_pages');
+        setAllPages(pages);
       } catch (error) {
         console.error('Error fetching grammar pages:', error);
       }
