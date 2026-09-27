@@ -162,6 +162,24 @@ export const useGymData = (userCourse = 's2') => {
           }
         };
 
+        // For a collection that's been consolidated into one document (see
+        // DestacadoManager's migration tool) — reads a single doc's `items`
+        // map and unwraps it back into the same flat array shape callers
+        // already expect, so this collection's cost drops from (one read
+        // per historical entry) to (one read, period). Falls back to
+        // treating every doc as its own entry if the bundle doc doesn't
+        // exist yet, so this works before AND after that migration runs.
+        const fetchBundledArray = async (collectionName, bundleDocId = '_bundle') => {
+          try {
+            const docs = await getCachedCollection(collectionName);
+            const bundle = docs.find((d) => d.id === bundleDocId);
+            if (bundle) return Object.values(bundle.items || {});
+            return docs;
+          } catch (err) {
+            return [];
+          }
+        };
+
         const fetchEvalsMaster = async () => {
           try {
             const evalsRef = doc(db, 'curriculum_tracks', 'evaluaciones_master');
@@ -230,7 +248,7 @@ export const useGymData = (userCourse = 's2') => {
 
           fetchTareasMaster(),
           fetchFirestoreArray('vocab_bundles', 'bundles'),
-          fetchFirestoreArray('destacado_diario'),
+          fetchBundledArray('destacado_diario'),
           fetchFirestoreCategory('temas'),
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
           fetchFirestoreArray('juego_senordle', 'words'),
