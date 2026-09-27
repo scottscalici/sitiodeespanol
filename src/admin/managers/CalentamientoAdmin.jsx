@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -19,6 +19,10 @@ export default function CalentamientoAdmin() {
   const [savedPractices, setSavedPractices] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState('');
   const [selectedVerb, setSelectedVerb] = useState('');
+  // Tags picked for the ad-hoc "build a block from tags" adder — a verb
+  // must have ALL selected tags (narrows, rather than a plain "any tag"
+  // match that would only ever widen the list).
+  const [selectedTags, setSelectedTags] = useState([]);
   const [configBlocks, setConfigBlocks] = useState([]);
 
   // Master verb map cache for preview & baking
@@ -102,6 +106,42 @@ export default function CalentamientoAdmin() {
     // happens after removing a block: the dropdown keeps showing that group
     // selected, and re-picking it to add it back silently does nothing.
     setSelectedGroup('');
+  };
+
+  // Every tag any loaded verb currently has, for the tag-picker pills.
+  const allKnownTags = useMemo(() => {
+    const set = new Set();
+    Object.values(masterVerbsMap).forEach((v) => (v.tags || []).forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [masterVerbsMap]);
+
+  const toggleTagFilter = (tag) => {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
+  const matchingTaggedVerbs = useMemo(() => {
+    if (selectedTags.length === 0) return [];
+    return Object.values(masterVerbsMap).filter((v) =>
+      selectedTags.every((t) => (v.tags || []).includes(t))
+    );
+  }, [masterVerbsMap, selectedTags]);
+
+  // Builds a block straight from the current tag selection — no need to
+  // first save a named verbGroups document just to try a combination once.
+  const handleAddTagBlock = () => {
+    if (matchingTaggedVerbs.length === 0) return;
+    setConfigBlocks([
+      ...configBlocks,
+      {
+        label: selectedTags.join(' + '),
+        tense: 'presente',
+        allowedVerbs: matchingTaggedVerbs.map((v) => v.id),
+        count: 5,
+        specificVerb: 'any',
+        targetSubject: 'any',
+      },
+    ]);
+    setSelectedTags([]);
   };
 
   // Adds a single verb (not a whole group) as its own one-verb block — for
@@ -454,6 +494,54 @@ export default function CalentamientoAdmin() {
               </select>
             </div>
           </div>
+
+          {allKnownTags.length > 0 && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs font-black text-slate-500 uppercase">
+                  O Construir Bloque por Etiquetas
+                </label>
+                {selectedTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTags([])}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {allKnownTags.map((tag) => {
+                  const active = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTagFilter(tag)}
+                      className={`text-[11px] font-bold px-3 py-1 rounded-full border transition-colors ${
+                        active
+                          ? 'bg-amber-500 border-amber-500 text-white'
+                          : 'bg-white border-slate-300 text-slate-500 hover:border-slate-400'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedTags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAddTagBlock}
+                  disabled={matchingTaggedVerbs.length === 0}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-sm"
+                >
+                  + Añadir Bloque ({matchingTaggedVerbs.length} verbo{matchingTaggedVerbs.length === 1 ? '' : 's'})
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3 mt-4">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">

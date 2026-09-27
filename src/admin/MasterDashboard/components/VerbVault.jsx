@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../../firebase.js'; 
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
@@ -13,8 +13,13 @@ const VerbVault = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   // --- GROUP BUILDER (CURATE) STATE ---
-  const [draftGroup, setDraftGroup] = useState(null); 
-  const [librarySearch, setLibrarySearch] = useState(""); 
+  const [draftGroup, setDraftGroup] = useState(null);
+  const [librarySearch, setLibrarySearch] = useState("");
+  // Tags selected in the Master Library filter — a verb must have ALL of
+  // these (not just one) to match, so combining tags narrows the list
+  // instead of widening it (e.g. "ar" + "cambio_radical" → only -ar stem
+  // changers, not every -ar verb plus every stem changer).
+  const [selectedTags, setSelectedTags] = useState([]);
 
   // --- RECIPE BUILDER (BAKE) STATE ---
   const [diaNumber, setDiaNumber] = useState(1);
@@ -85,12 +90,42 @@ const VerbVault = () => {
 
   const addVerbToDraft = (palabra) => {
     if (!draftGroup) return alert("Click 'Create New Group' first!");
-    if (draftGroup.verbIds.includes(palabra)) return; 
+    if (draftGroup.verbIds.includes(palabra)) return;
     setDraftGroup({ ...draftGroup, verbIds: [...draftGroup.verbIds, palabra] });
   };
 
   const removeVerbFromDraft = (palabra) => {
     setDraftGroup({ ...draftGroup, verbIds: draftGroup.verbIds.filter(id => id !== palabra) });
+  };
+
+  // Every tag any verb in the library currently has, for the filter pills.
+  const allKnownTags = useMemo(() => {
+    const set = new Set();
+    fullLibrary.forEach((v) => (v.tags || []).forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [fullLibrary]);
+
+  const toggleTagFilter = (tag) => {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
+  // Library narrowed by BOTH the text search and the selected tags — the
+  // same list backs the manual "+Add" buttons below and the bulk-add
+  // button, so what you see is exactly what bulk-add would add.
+  const filteredLibrary = useMemo(() => {
+    return fullLibrary
+      .filter((v) => v.palabra.toLowerCase().includes(librarySearch.toLowerCase()))
+      .filter((v) => selectedTags.every((t) => (v.tags || []).includes(t)));
+  }, [fullLibrary, librarySearch, selectedTags]);
+
+  // Adds every verb currently matching the search + tag filters in one
+  // shot, instead of one "+Add" click per verb — the whole point of
+  // tagging verbs is to skip exactly this kind of manual curation.
+  const addFilteredToDraft = () => {
+    if (!draftGroup) return alert("Click 'Create New Group' first!");
+    const merged = new Set(draftGroup.verbIds);
+    filteredLibrary.forEach((v) => merged.add(v.palabra));
+    setDraftGroup({ ...draftGroup, verbIds: [...merged] });
   };
 
   const toggleTenseTag = (tenseId) => {
@@ -270,21 +305,55 @@ const VerbVault = () => {
           <div style={s.sidebar}>
             <h3 style={s.label}>Master Library ({fullLibrary.length})</h3>
             
-            <input 
-              type="text" 
-              placeholder="Filter verbs (e.g., 'ger')...." 
+            <input
+              type="text"
+              placeholder="Filter verbs (e.g., 'ger')...."
               value={librarySearch}
               onChange={(e) => setLibrarySearch(e.target.value)}
               style={{...s.searchBar, width: '100%', marginBottom: '15px'}}
             />
 
+            {allKnownTags.length > 0 && (
+              <div style={{ marginBottom: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h4 style={s.label}>Filtrar por Etiquetas {selectedTags.length > 0 ? `(${filteredLibrary.length} coinciden)` : ''}</h4>
+                  {selectedTags.length > 0 && (
+                    <button style={s.clearTagsBtn} onClick={() => setSelectedTags([])}>Limpiar</button>
+                  )}
+                </div>
+                <div style={s.pillContainer}>
+                  {allKnownTags.map((tag) => {
+                    const active = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTagFilter(tag)}
+                        style={active ? s.tagPillActive : s.tagPill}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={addFilteredToDraft}
+                    disabled={!draftGroup || filteredLibrary.length === 0}
+                    style={draftGroup && filteredLibrary.length > 0 ? s.addAllBtnActive : s.addAllBtnDisabled}
+                  >
+                    + Añadir los {filteredLibrary.length} verbo{filteredLibrary.length === 1 ? '' : 's'} que coinciden
+                  </button>
+                )}
+              </div>
+            )}
+
             <div style={s.scrollList}>
-              {fullLibrary
-                .filter(v => v.palabra.toLowerCase().includes(librarySearch.toLowerCase()))
-                .map(v => (
+              {filteredLibrary.map(v => (
                 <div key={v.palabra} style={s.verbItem}>
                   <span>{v.palabra}</span>
-                  <button 
+                  <button
                     style={draftGroup ? s.addBtnActive : s.addBtnDisabled}
                     onClick={() => addVerbToDraft(v.palabra)}
                   >
@@ -623,7 +692,12 @@ const s = {
   draftVerbsArea: { background: '#000', padding: '15px', borderRadius: '6px', minHeight: '100px', marginBottom: '20px' },
   pillContainer: { display: 'flex', flexWrap: 'wrap', gap: '10px' },
   pill: { background: '#1a1a1a', color: '#deff9a', padding: '5px 10px', borderRadius: '15px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #333' },
-  removePillBtn: { background: 'none', border: 'none', color: '#f44', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', padding: 0 }
+  removePillBtn: { background: 'none', border: 'none', color: '#f44', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', padding: 0 },
+  tagPill: { background: 'none', color: '#888', padding: '4px 10px', borderRadius: '15px', fontSize: '11px', border: '1px solid #333', cursor: 'pointer' },
+  tagPillActive: { background: '#deff9a', color: '#000', padding: '4px 10px', borderRadius: '15px', fontSize: '11px', border: '1px solid #deff9a', cursor: 'pointer', fontWeight: 'bold' },
+  clearTagsBtn: { background: 'none', border: 'none', color: '#666', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' },
+  addAllBtnActive: { width: '100%', marginTop: '10px', background: 'none', border: '1px dashed #deff9a', color: '#deff9a', padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' },
+  addAllBtnDisabled: { width: '100%', marginTop: '10px', background: 'none', border: '1px dashed #333', color: '#444', padding: '8px', borderRadius: '4px', cursor: 'not-allowed', fontSize: '12px' },
 };
 
 export default VerbVault;
