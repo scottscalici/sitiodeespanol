@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
 
 const BUNDLE_DOC_ID = '_bundle';
+
+const todayStr = () => new Date().toLocaleDateString('en-CA');
 
 const SenordleUploader = () => {
   const [jsonInput, setJsonInput] = useState('');
@@ -12,6 +14,7 @@ const SenordleUploader = () => {
   const [isBundled, setIsBundled] = useState(false);
   const [legacyDocCount, setLegacyDocCount] = useState(0);
   const [migrationStatus, setMigrationStatus] = useState(null);
+  const [previewCourse, setPreviewCourse] = useState('s2');
 
   const handleUpload = async () => {
     console.log("--- STARTING SEÑORDLE DICTIONARY UPLOAD ---");
@@ -105,6 +108,23 @@ const SenordleUploader = () => {
     }
   };
 
+  // Loads automatically so the schedule preview below is always up to
+  // date, not just a byproduct of clicking into the migration tool.
+  useEffect(() => {
+    handleLoadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const scheduleForCourse = useMemo(
+    () =>
+      (previewItems || [])
+        .filter((item) => (item.course || item.id?.split('_')[0]) === previewCourse)
+        .sort((a, b) => (a.date || '').localeCompare(b.date || '')),
+    [previewItems, previewCourse]
+  );
+
+  const todayScheduled = scheduleForCourse.some((item) => item.date === todayStr());
+
   const handleMigrateCopy = async () => {
     setMigrationStatus('copying');
     try {
@@ -191,57 +211,100 @@ const SenordleUploader = () => {
         <span className="font-bold text-sm text-emerald-300">{status}</span>
       </div>
 
-      {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
-          always 0 in production. Unlike Destacado/Curiosidades there's no
-          existing grid for this collection, so "load preview" stands in for
-          "look at the grid" as the pre-delete sanity check. */}
+      {/* SCHEDULE PREVIEW — always on, so you can check whether a word is
+          already scheduled for a given day before/after uploading. */}
       <div className="mt-8 pt-6 border-t border-slate-700">
-        <p className="text-xs font-black text-amber-400 uppercase tracking-widest mb-2">
-          ⚠️ Migración: consolidar en un solo documento
-        </p>
-        <button
-          type="button"
-          onClick={handleLoadPreview}
-          disabled={migrationStatus === 'loading'}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50 mb-3"
-        >
-          {migrationStatus === 'loading' ? 'Cargando...' : 'Cargar palabras actuales'}
-        </button>
-
-        {previewItems && (
-          <>
-            <p className="text-xs text-amber-200 mb-2">
-              {isBundled
-                ? `Documento único ya existe. Quedan ${legacyDocCount} documentos individuales antiguos sin borrar.`
-                : `${legacyDocCount} documentos individuales. Paso 1 los copia sin borrar nada — revisa la lista después.`}
-              {' '}Paso 2 borra los antiguos (irreversible), solo después de confirmar el Paso 1.
-            </p>
-            <div className="max-h-48 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg p-3 mb-3 font-mono text-[10px] text-slate-300 grid grid-cols-2 md:grid-cols-3 gap-1">
-              {previewItems.map((item) => (
-                <div key={item.id}>{item.id}: <span className="text-emerald-400">{item.word}</span></div>
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest">
+            📅 Calendario Programado
+          </h3>
+          <div className="flex items-center gap-3">
+            <div className="flex bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+              {['s2', 's4'].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setPreviewCourse(c)}
+                  className={`px-3 py-1.5 text-xs font-black uppercase ${
+                    previewCourse === c ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {c}
+                </button>
               ))}
             </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleMigrateCopy}
-                disabled={migrationStatus === 'copying' || legacyDocCount === 0}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
-              >
-                {migrationStatus === 'copying' ? 'Copiando...' : isBundled ? '1. Volver a copiar' : '1. Copiar a documento único'}
-              </button>
-              <button
-                type="button"
-                onClick={handleMigrateDelete}
-                disabled={!isBundled || legacyDocCount === 0 || migrationStatus === 'deleting'}
-                className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
-              >
-                {migrationStatus === 'deleting' ? 'Borrando...' : '2. Borrar documentos antiguos'}
-              </button>
-            </div>
-          </>
+            <button
+              onClick={handleLoadPreview}
+              disabled={migrationStatus === 'loading'}
+              className="text-xs font-bold text-slate-400 hover:text-white disabled:opacity-50"
+            >
+              {migrationStatus === 'loading' ? 'Cargando...' : '🔄 Actualizar'}
+            </button>
+          </div>
+        </div>
+
+        {!todayScheduled && previewItems && (
+          <p className="text-xs font-bold text-rose-400 bg-rose-950/40 border border-rose-800 rounded-lg px-3 py-2 mb-3">
+            ⚠️ No hay palabra programada para hoy ({todayStr()}, {previewCourse.toUpperCase()}) — el juego usará "LIBRO" como respaldo.
+          </p>
         )}
+
+        <div className="max-h-64 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg divide-y divide-slate-700/60">
+          {scheduleForCourse.length === 0 ? (
+            <p className="text-xs text-slate-500 italic p-3">
+              {previewItems ? `Sin palabras programadas para ${previewCourse.toUpperCase()}.` : 'Cargando...'}
+            </p>
+          ) : (
+            scheduleForCourse.map((item) => (
+              <div
+                key={item.id}
+                className={`flex justify-between items-center px-3 py-1.5 text-xs ${
+                  item.date === todayStr() ? 'bg-emerald-950/50' : ''
+                }`}
+              >
+                <span className={`font-mono ${item.date === todayStr() ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
+                  {item.date} {item.date === todayStr() ? '(Hoy)' : ''}
+                </span>
+                <span className="font-bold text-white">{item.word}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      {/* ONE-TIME MIGRATION TOOL — remove this block once legacyDocCount is
+          always 0 in production. Only shows once the schedule preview
+          above has loaded AND found individual docs left to migrate. */}
+      {legacyDocCount > 0 && (
+        <div className="mt-8 pt-6 border-t border-slate-700">
+          <p className="text-xs font-black text-amber-400 uppercase tracking-widest mb-2">
+            ⚠️ Migración: consolidar en un solo documento
+          </p>
+          <p className="text-xs text-amber-200 mb-3">
+            {isBundled
+              ? `Documento único ya existe. Quedan ${legacyDocCount} documentos individuales antiguos sin borrar.`
+              : `${legacyDocCount} documentos individuales. Paso 1 los copia sin borrar nada — revisa el calendario de arriba después.`}
+            {' '}Paso 2 borra los antiguos (irreversible), solo después de confirmar el Paso 1.
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleMigrateCopy}
+              disabled={migrationStatus === 'copying'}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {migrationStatus === 'copying' ? 'Copiando...' : isBundled ? '1. Volver a copiar' : '1. Copiar a documento único'}
+            </button>
+            <button
+              type="button"
+              onClick={handleMigrateDelete}
+              disabled={!isBundled || migrationStatus === 'deleting'}
+              className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {migrationStatus === 'deleting' ? 'Borrando...' : '2. Borrar documentos antiguos'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
