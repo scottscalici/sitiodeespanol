@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -189,9 +190,17 @@ const SenordleUploader = () => {
 
   return (
     <div className="p-10 max-w-4xl mx-auto bg-slate-900 text-white rounded-2xl shadow-2xl border-4 border-emerald-500">
-      <h2 className="text-2xl font-black mb-4 uppercase text-emerald-500">
-        🧩 SEÑORDLE ARCHITECT
-      </h2>
+      <div className="flex justify-between items-start mb-4">
+        <h2 className="text-2xl font-black uppercase text-emerald-500">
+          🧩 SEÑORDLE ARCHITECT
+        </h2>
+        <Link
+          to="/admin-daily-plan-senordle"
+          className="text-xs font-bold text-emerald-400 hover:text-emerald-300 border border-emerald-700/50 px-3 py-1.5 rounded-lg uppercase tracking-widest whitespace-nowrap"
+        >
+          + Añadir una palabra →
+        </Link>
+      </div>
       <p className="mb-4 text-sm text-slate-400">Migrate word-to-date mappings to the <code className="text-emerald-300">juego_senordle</code> collection.</p>
       
       <textarea
