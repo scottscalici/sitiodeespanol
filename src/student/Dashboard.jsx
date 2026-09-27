@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useGymData } from '../hooks/useGymData';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedQuery } from '../utils/firestoreCache';
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
@@ -117,9 +117,18 @@ const Dashboard = () => {
     const computeWarmupBreakdown = async () => {
       if (!course || !data?.cal?.length) return;
       try {
+        // Scoped by course — this collection has one doc per class day for
+        // BOTH s2 and s4, and only grows over the school year, so pulling
+        // the whole thing (as getCachedCollection would) costs every
+        // student's session (docs for both courses) reads instead of just
+        // (docs for their own course).
+        const scopedQuery = (name) =>
+          getCachedQuery(`${name}:course:${course}`, () =>
+            getDocs(query(collection(db, name), where('course', '==', course)))
+          );
         const [calentamientos, allPracticeCards] = await Promise.all([
-          getCachedCollection('calentamientos'),
-          getCachedCollection('practice_cards'),
+          scopedQuery('calentamientos'),
+          scopedQuery('practice_cards'),
         ]);
         setPracticeCards(allPracticeCards);
         const todayStr = new Date().toLocaleDateString('en-CA');
