@@ -6,6 +6,7 @@ import {
   generateVerbQuestions,
   formatSubjectAndTranslation as formatSubjectAndTranslationShared,
 } from '../../utils/verbQuestionGenerator';
+import { VERB_TENSES } from '../../utils/verbTenses';
 
 export default function CalentamientoAdmin() {
   const [calId, setCalId] = useState('cal_s2_d26');
@@ -34,19 +35,7 @@ export default function CalentamientoAdmin() {
   const [saving, setSaving] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(true);
 
-  const availableTenses = [
-    { id: 'presente', label: 'Presente' },
-    { id: 'pretérito', label: 'Pretérito' },
-    { id: 'imperfecto', label: 'Imperfecto' },
-    { id: 'futuro', label: 'Futuro' },
-    { id: 'condicional', label: 'Condicional' },
-    { id: 'subjuntivo_presente', label: 'Subjuntivo (Presente)' },
-    { id: 'subjuntivo_imperfecto_ra', label: 'Subjuntivo (Imperfecto -ra)' },
-    { id: 'imperativo_afirmativo', label: 'Mandatos Afirmativos (Tú/Ud/Uds)' },
-    { id: 'imperativo_negativo', label: 'Mandatos Negativos' },
-    { id: 'presente_progresivo', label: 'Presente Progresivo' },
-    { id: 'pluscuamperfecto', label: 'Pluscuamperfecto' },
-  ];
+  const availableTenses = VERB_TENSES;
 
   useEffect(() => {
     const fetchMetaData = async () => {

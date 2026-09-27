@@ -2,25 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache, invalidateDocCache, getBucketId } from '../../utils/firestoreCache';
+import { VERB_TENSES as TENSES } from '../../utils/verbTenses';
 import { Link } from 'react-router-dom';
-
-// Same 11 tenses the calentamiento generator actually knows how to draw
-// questions from (src/admin/managers/CalentamientoAdmin.jsx keeps its own
-// copy of this list too — small and stable enough that duplicating it here
-// is simpler than threading a shared import through both admin tools).
-const TENSES = [
-  { id: 'presente', label: 'Presente' },
-  { id: 'pretérito', label: 'Pretérito' },
-  { id: 'imperfecto', label: 'Imperfecto' },
-  { id: 'futuro', label: 'Futuro' },
-  { id: 'condicional', label: 'Condicional' },
-  { id: 'subjuntivo_presente', label: 'Subjuntivo (Presente)' },
-  { id: 'subjuntivo_imperfecto_ra', label: 'Subjuntivo (Imperfecto -ra)' },
-  { id: 'imperativo_afirmativo', label: 'Mandatos Afirmativos' },
-  { id: 'imperativo_negativo', label: 'Mandatos Negativos' },
-  { id: 'presente_progresivo', label: 'Presente Progresivo' },
-  { id: 'pluscuamperfecto', label: 'Pluscuamperfecto' },
-];
 
 const SUBJECTS = [
   { id: 'yo', label: 'yo' },

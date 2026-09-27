@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js'; 
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
+import { VERB_TENSES } from '../../../utils/verbTenses';
 
 const VerbVault = () => {
   const [activeTab, setActiveTab] = useState('curate'); 
@@ -30,28 +31,10 @@ const VerbVault = () => {
   const [isSearching, setIsSearching] = useState(null); 
   const [searchTerm, setSearchTerm] = useState("");
 
-  // All Available Tenses for Tagging & Baking
-  const AVAILABLE_TENSES = [
-    { id: 'presente', label: 'Presente' },
-    { id: 'pretérito', label: 'Pretérito' },
-    { id: 'imperfecto', label: 'Imperfecto' },
-    { id: 'futuro', label: 'Futuro' },
-    { id: 'condicional', label: 'Condicional' },
-    { id: 'pretérito_perfecto', label: 'Pretérito Perfecto' },
-    { id: 'pluscuamperfecto', label: 'Pluscuamperfecto' },
-    { id: 'futuro_perfecto', label: 'Futuro Perfecto' },
-    { id: 'condicional_perfecto', label: 'Condicional Perfecto' },
-    { id: 'presente_progresivo', label: 'Presente Progresivo' },
-    { id: 'imperfecto_progresivo', label: 'Imperfecto Progresivo' },
-    { id: 'subjuntivo_presente', label: 'Presente de Subjuntivo' },
-    { id: 'subjuntivo_imperfecto_ra', label: 'Imperfecto de Subjuntivo (-ra)' },
-    { id: 'subjuntivo_imperfecto_se', label: 'Subjuntivo Imperfecto (-se)' },
-    { id: 'subjuntivo_perfecto', label: 'Pretérito Perfecto de Subjuntivo' },
-    { id: 'pluscuamperfecto_subjuntivo_ra', label: 'Pluscuamperfecto Subjuntivo (hubiera)' },
-    { id: 'pluscuamperfecto_subjuntivo_se', label: 'Pluscuamperfecto Subjuntivo (hubiese)' },
-    { id: 'imperativo_afirmativo', label: 'Mandatos (+)' },
-    { id: 'imperativo_negativo', label: 'Mandatos (-)' }
-  ];
+  // All Available Tenses for Tagging & Baking — shared with VerbEditor and
+  // CalentamientoAdmin (see src/utils/verbTenses.js) so this list can't
+  // silently drift out of sync with theirs again.
+  const AVAILABLE_TENSES = VERB_TENSES;
 
   // Load EVERYTHING from Firestore on mount — shared cache means repeat
   // visits (and other admin tools reading verbs/verbGroups, like
