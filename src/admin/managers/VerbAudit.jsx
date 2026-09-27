@@ -5,6 +5,15 @@ import { db } from '../../firebase';
 import { getCachedBucketedCollection, invalidateCollectionCache, getBucketId } from '../../utils/firestoreCache';
 import { VERB_TENSES, VERB_SUBJECTS } from '../../utils/verbTenses';
 import { inferVerbTags } from '../../utils/verbTagInference';
+import { deriveFormalCommands } from '../../utils/verbCommandInference';
+
+// No "yo" command exists in Spanish — imperativo_afirmativo/negativo are
+// the only tenses where a subject cell is EXPECTED to always stay blank,
+// so they're excluded here rather than perpetually flagged as a gap.
+const SUBJECTS_NOT_EXPECTED = {
+  imperativo_afirmativo: ['yo'],
+  imperativo_negativo: ['yo'],
+};
 
 // A tense only counts as a gap if it's PARTIALLY filled (some subjects
 // done, others not) — a tense nobody has touched yet for this verb isn't
@@ -17,8 +26,9 @@ const auditVerb = (verb) => {
   VERB_TENSES.forEach((tense) => {
     const cells = verb.tenses?.[tense.id];
     if (!cells) return;
-    const missingSubjects = VERB_SUBJECTS.filter((s) => !cells[s.id]?.target?.trim());
-    const filledCount = VERB_SUBJECTS.length - missingSubjects.length;
+    const notExpected = SUBJECTS_NOT_EXPECTED[tense.id] || [];
+    const missingSubjects = VERB_SUBJECTS.filter((s) => !notExpected.includes(s.id) && !cells[s.id]?.target?.trim());
+    const filledCount = VERB_SUBJECTS.length - notExpected.length - missingSubjects.length;
     if (filledCount > 0 && missingSubjects.length > 0) {
       partialTenses.push({ tenseId: tense.id, tenseLabel: tense.label, missing: missingSubjects.map((s) => s.label) });
     }
@@ -35,6 +45,8 @@ export default function VerbAudit() {
   const [selected, setSelected] = useState(new Set());
   const [applying, setApplying] = useState(false);
   const [status, setStatus] = useState('');
+  const [applyingCommands, setApplyingCommands] = useState(false);
+  const [commandStatus, setCommandStatus] = useState('');
 
   const loadVerbs = async () => {
     try {
@@ -63,6 +75,14 @@ export default function VerbAudit() {
       })
       .filter((r) => !onlyGaps || r.hasGap || r.suggestedTags.length > 0);
   }, [verbs, search, onlyGaps]);
+
+  // Scans the FULL list, not the filtered/searched `rows` — this bulk fill
+  // is meant to catch every eligible verb in one click regardless of the
+  // current search box or "only gaps" toggle.
+  const derivableCommandCount = useMemo(
+    () => verbs.filter((verb) => Object.keys(deriveFormalCommands(verb)).length > 0).length,
+    [verbs]
+  );
 
   const toggleSelected = (id) => {
     setSelected((prev) => {
@@ -126,6 +146,55 @@ export default function VerbAudit() {
     }
   };
 
+  // Fills in usted/ustedes command cells from each verb's own subjunctive
+  // data — a deterministic grammar rule, not a guess (see
+  // verbCommandInference.js), so this applies to every eligible verb at
+  // once rather than needing a per-verb review/selection step like tags.
+  const applyFormalCommandsToAll = async () => {
+    setApplyingCommands(true);
+    setCommandStatus('');
+    try {
+      const bucketUpdates = {}; // bucketId -> { items: { <id>: fullVerbObject } }
+      let count = 0;
+      verbs.forEach((verb) => {
+        const patch = deriveFormalCommands(verb);
+        if (Object.keys(patch).length === 0) return;
+
+        const { id, ...verbData } = verb;
+        const mergedTenses = { ...verbData.tenses };
+        Object.entries(patch).forEach(([tenseId, subjectCells]) => {
+          mergedTenses[tenseId] = { ...(mergedTenses[tenseId] || {}), ...subjectCells };
+        });
+
+        const bucketId = getBucketId(id);
+        // A real nested object, not a `items.<id>` dot-string key — see
+        // applySuggestedTagsToSelected above for why that matters.
+        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = { items: {} };
+        bucketUpdates[bucketId].items[id] = { ...verbData, tenses: mergedTenses };
+        count += 1;
+      });
+
+      if (count === 0) {
+        setCommandStatus('No hay nada que rellenar.');
+        return;
+      }
+
+      await Promise.all(
+        Object.entries(bucketUpdates).map(([bucketId, updates]) =>
+          setDoc(doc(db, 'verbs', bucketId), updates, { merge: true })
+        )
+      );
+      invalidateCollectionCache('verbs');
+      await loadVerbs();
+      setCommandStatus(`✅ Mandatos formales rellenados en ${count} verbo(s).`);
+    } catch (err) {
+      console.error('Error applying formal commands:', err);
+      setCommandStatus('❌ Error al rellenar. Revisa la consola.');
+    } finally {
+      setApplyingCommands(false);
+    }
+  };
+
   const gapCount = rows.filter((r) => r.hasGap).length;
   const suggestionCount = rows.filter((r) => r.suggestedTags.length > 0).length;
 
@@ -179,6 +248,29 @@ export default function VerbAudit() {
               </button>
               {status && <span className="text-xs font-bold text-slate-300">{status}</span>}
             </div>
+
+            {derivableCommandCount > 0 && (
+              <div className="bg-slate-900 border border-emerald-700/50 rounded-2xl p-4 flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[240px]">
+                  <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">
+                    📋 {derivableCommandCount} verbo(s) con mandatos de Ud./Uds. derivables
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Los mandatos de usted/ustedes son siempre idénticos al presente de subjuntivo — se rellenan
+                    directamente desde esos datos, sin adivinar. No toca "yo" (no existe) ni tú/nosotros/vosotros.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={applyFormalCommandsToAll}
+                  disabled={applyingCommands}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+                >
+                  {applyingCommands ? 'Rellenando...' : `Rellenar mandatos formales (${derivableCommandCount})`}
+                </button>
+                {commandStatus && <span className="text-xs font-bold text-slate-300">{commandStatus}</span>}
+              </div>
+            )}
 
             <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden">
               <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800 text-[10px] font-black text-slate-400 uppercase tracking-widest">
