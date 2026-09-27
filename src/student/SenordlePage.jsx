@@ -36,16 +36,21 @@ useEffect(() => {
   const fetchGameData = async () => {
     setLoading(true);
     try {
-      // A. Get Target Word from Firestore
+      // A. Get Target Word from Firestore — prefers the consolidated single
+      // document (see the migration tool in SenordleUploader); falls back
+      // to reading this day's own individual doc if that hasn't run yet.
       const docId = `${course}_${selectedDate}`;
-      const docRef = doc(db, "juego_senordle", docId);
-      const docSnap = await getDoc(docRef);
+      const bundleSnap = await getDoc(doc(db, "juego_senordle", "_bundle"));
+      let wordData = null;
 
-      if (docSnap.exists()) {
-        setTargetWord(docSnap.data().word.toUpperCase());
+      if (bundleSnap.exists()) {
+        wordData = bundleSnap.data().items?.[docId] || null;
       } else {
-        setTargetWord("LIBRO"); // Fallback
+        const docSnap = await getDoc(doc(db, "juego_senordle", docId));
+        wordData = docSnap.exists() ? docSnap.data() : null;
       }
+
+      setTargetWord(wordData?.word ? wordData.word.toUpperCase() : "LIBRO");
 
       // B. Get Validation Dictionaries (Using Promise.all to fetch both at the exact same time)
       const [dictResponse1, dictResponse2] = await Promise.all([

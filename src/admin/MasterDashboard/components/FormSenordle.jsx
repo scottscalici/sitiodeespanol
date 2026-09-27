@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { invalidateCollectionCache } from '../../../utils/firestoreCache';
+
+const BUNDLE_DOC_ID = '_bundle';
 
 const FormSenordle = () => {
   const [course, setCourse] = useState('s2');
@@ -20,17 +23,26 @@ const FormSenordle = () => {
 
     // 2. Format the Document ID to match your SenordlePage logic
     const docId = `${course}_${date}`;
-    const docRef = doc(db, 'juego_senordle', docId);
+    const wordData = {
+      word: cleanWord,
+      course: course,
+      date: date,
+      createdAt: new Date().toISOString()
+    };
 
-    // 3. Save to Firestore
+    // 3. Save to Firestore — merges into the consolidated single document
+    // once that migration has run (see SenordleUploader), otherwise saves
+    // its own individual doc as before.
     try {
       setStatus('Guardando...');
-      await setDoc(docRef, {
-        word: cleanWord,
-        course: course,
-        date: date,
-        createdAt: new Date().toISOString()
-      });
+      const bundleRef = doc(db, 'juego_senordle', BUNDLE_DOC_ID);
+      const bundleSnap = await getDoc(bundleRef);
+      if (bundleSnap.exists()) {
+        await setDoc(bundleRef, { [`items.${docId}`]: wordData }, { merge: true });
+      } else {
+        await setDoc(doc(db, 'juego_senordle', docId), wordData);
+      }
+      invalidateCollectionCache('juego_senordle');
       setStatus(`¡Éxito! "${cleanWord}" programada para S2 el ${date}.`);
       setWord(''); // Clear input for the next one
     } catch (error) {

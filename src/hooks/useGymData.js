@@ -227,7 +227,6 @@ export const useGymData = (userCourse = 's2') => {
           destacado,
           temas,
           atando,
-          words,
           evalsMaster,
           curios,
           gramaticaMaster // <--- New Fetcher Executed
@@ -251,7 +250,6 @@ export const useGymData = (userCourse = 's2') => {
           fetchBundledArray('destacado_diario'),
           fetchFirestoreCategory('temas'),
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
-          fetchFirestoreArray('juego_senordle', 'words'),
           fetchEvalsMaster(),
           fetchBundledArray('curiosidades'),
           fetchGramaticaMaster() // <--- Added here
@@ -292,7 +290,6 @@ export const useGymData = (userCourse = 's2') => {
           cal: calendarArray,
           vocab,
           anuncios,
-          words,
           dictionary: validDictionary,
           evals: evalsMaster,
           curios,
