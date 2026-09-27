@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -150,4 +150,46 @@ export const getCachedBucketedItem = async (collectionName, itemId) => {
   if (!legacy) return null;
   const { id, ...data } = legacy; // strip the wrapper id, matching the bucket branch's plain data shape
   return data;
+};
+
+// One-time repair for a bug in earlier bucket-write code: several call
+// sites wrote a single item into a bucket doc using a DOT-STRING object key
+// (`{ [\`items.${id}\`]: data }`) instead of a real nested object
+// (`{ items: { [id]: data } }`). Under setDoc's merge:true, a plain
+// object's top-level keys are taken LITERALLY — a key containing a dot
+// becomes one field literally named "items.<id>", not a path into the
+// `items` map (that dot-splitting behavior is unique to updateDoc). Every
+// affected write therefore landed in a bogus sibling field next to the
+// real `items` map instead of updating it — invisible to every reader,
+// but also never destroying whatever the real `items` map already held.
+//
+// This recovers that data: for each bucket doc, any top-level key matching
+// `items.<id>` is merged into the real `items` map (last-written-wins) and
+// then removed, in one atomic per-document write. Safe to run repeatedly —
+// a bucket with nothing to repair is left untouched.
+export const repairSplitBucketFields = async (collectionName) => {
+  const querySnapshot = await getDocs(collection(db, collectionName));
+  const writes = [];
+  let recoveredCount = 0;
+  const recoveredIds = [];
+
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const junkKeys = Object.keys(data).filter((k) => k.startsWith('items.') && k !== 'items');
+    if (junkKeys.length === 0) return;
+
+    const payload = { items: {} };
+    junkKeys.forEach((key) => {
+      const itemId = key.slice('items.'.length);
+      payload.items[itemId] = data[key];
+      payload[key] = deleteField(); // removes the literal "items.<id>" field, same key shape it was written with
+      recoveredCount += 1;
+      recoveredIds.push(itemId);
+    });
+    writes.push(setDoc(docSnap.ref, payload, { merge: true }));
+  });
+
+  await Promise.all(writes);
+  if (writes.length > 0) invalidateCollectionCache(collectionName);
+  return { recoveredCount, recoveredIds, bucketsTouched: writes.length };
 };

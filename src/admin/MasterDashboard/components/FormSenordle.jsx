@@ -39,7 +39,11 @@ const FormSenordle = () => {
       const bundleRef = doc(db, 'juego_senordle', BUNDLE_DOC_ID);
       const bundleSnap = await getDoc(bundleRef);
       if (bundleSnap.exists()) {
-        await setDoc(bundleRef, { [`items.${docId}`]: wordData }, { merge: true });
+        // A real nested key, not a `items.<id>` dot-string key — setDoc's
+        // merge:true treats a dotted object key as one literal field name,
+        // not a path into items, so a dot-string key here would silently
+        // write to a bogus sibling field instead of the real items map.
+        await setDoc(bundleRef, { items: { [docId]: wordData } }, { merge: true });
       } else {
         await setDoc(doc(db, 'juego_senordle', docId), wordData);
       }

@@ -39,8 +39,13 @@ const VerbUploader = () => {
         console.log(`UPLOADING VERB: ${docId}`);
 
         const bucketId = getBucketId(docId);
-        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = {};
-        bucketUpdates[bucketId][`items.${docId}`] = {
+        // A real nested object, not a `items.<id>` dot-string key — setDoc's
+        // merge:true treats a dotted object key as one literal field name,
+        // not a path into items (that's only true for updateDoc), so a
+        // dot-string key here would silently write to a bogus sibling
+        // field instead of the real items map.
+        if (!bucketUpdates[bucketId]) bucketUpdates[bucketId] = { items: {} };
+        bucketUpdates[bucketId].items[docId] = {
           ...verb,
           lastUpdated: serverTimestamp()
         };
