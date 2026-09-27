@@ -223,9 +223,7 @@ export const useGymData = (userCourse = 's2') => {
           cultura,
           videos,
           tareas,
-          vocab,
           destacado,
-          temas,
           atando,
           evalsMaster,
           curios,
@@ -246,9 +244,7 @@ export const useGymData = (userCourse = 's2') => {
           fetchFirestoreArray('videos', 'daily_tags'),
 
           fetchTareasMaster(),
-          fetchFirestoreArray('vocab_bundles', 'bundles'),
           fetchBundledArray('destacado_diario'),
-          fetchFirestoreCategory('temas'),
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
           fetchEvalsMaster(),
           fetchBundledArray('curiosidades'),
@@ -288,7 +284,6 @@ export const useGymData = (userCourse = 's2') => {
         setData({
           tareas,
           cal: calendarArray,
-          vocab,
           anuncios,
           dictionary: validDictionary,
           evals: evalsMaster,
@@ -296,7 +291,6 @@ export const useGymData = (userCourse = 's2') => {
           estructura: gramaticaMaster, // <--- Passing the structure data to dashboard
           destacado,
           apuntes,
-          temas,
           atando,
           activities: allActivities,
         });
