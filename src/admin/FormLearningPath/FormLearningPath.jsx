@@ -76,6 +76,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       badgeAward: null,
       evalLink: null,
       gateConfig: null,
+      isBonus: false,
       segments: [makeDefaultSegment()],
     },
   ]);
@@ -158,6 +159,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     badgeAward: p.badgeAward || null,
     evalLink: p.evalLink || null,
     gateConfig: p.gateConfig || null,
+    isBonus: p.isBonus || false,
     segments: (p.segments || []).map(sanitizeSegment),
   }));
 
@@ -310,7 +312,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setPods([...pods, {
       id: `pod_${Date.now()}`,
       title: isPracticeHub ? `Círculo ${pods.length + 1}` : `Pod ${pods.length + 1}`,
-      isExpanded: true, badgeAward: null, evalLink: null, gateConfig: null,
+      isExpanded: true, badgeAward: null, evalLink: null, gateConfig: null, isBonus: false,
       segments: [newSeg],
     }]);
     setActiveSegmentId(newSeg.id);

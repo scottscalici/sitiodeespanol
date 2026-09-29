@@ -4,7 +4,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import {
-  fetchUnitTotalPods,
+  fetchUnitProgressMeta,
   getAssignedDominioTasks,
   getUnitSummary,
 } from '../../utils/learningPathProgress';
@@ -33,7 +33,7 @@ export default function TeacherGradebook() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('gradebook'); // 'gradebook' or 'diagnostics'
   const [unitColumns, setUnitColumns] = useState([]); // [{ path_id, titulo, day_due, courses: Set }]
-  const [unitTotals, setUnitTotals] = useState({}); // { [path_id]: totalPods }
+  const [unitMeta, setUnitMeta] = useState({}); // { [path_id]: { isFlat, pods, totalPods } }
 
   // course -> today's assigned calentamiento docId (or null)
   const [todaysWarmupByCourse, setTodaysWarmupByCourse] = useState({});
@@ -169,10 +169,10 @@ export default function TeacherGradebook() {
         const columns = Object.values(columnsByPathId);
         setUnitColumns(columns);
 
-        const totalsEntries = await Promise.all(
-          columns.map(async (col) => [col.path_id, await fetchUnitTotalPods(col.path_id)])
+        const metaEntries = await Promise.all(
+          columns.map(async (col) => [col.path_id, await fetchUnitProgressMeta(col.path_id)])
         );
-        setUnitTotals(Object.fromEntries(totalsEntries));
+        setUnitMeta(Object.fromEntries(metaEntries));
       } catch (error) {
         console.error('Error fetching learning path columns:', error);
       }
@@ -325,9 +325,9 @@ export default function TeacherGradebook() {
   // the cell can render a blank dash) rather than a misleading 0%.
   const getUnitPercentForStudent = (student, col) => {
     if (!col.courses.has(student.course)) return null;
-    const totalPods = unitTotals[col.path_id] || 0;
-    if (totalPods === 0) return null;
-    return getUnitSummary(student.progress, col.path_id, totalPods).percent;
+    const meta = unitMeta[col.path_id];
+    if (!meta || meta.totalPods === 0) return null;
+    return getUnitSummary(student.progress, col.path_id, meta).percent;
   };
 
   const saveQuarters = async () => {

@@ -167,14 +167,20 @@ export default function StudentLearningPath() {
   const theme = themeColors[contentConfig.theme] || themeColors.indigo;
 
   // --- MATH: STANDARD PROGRESS & GRADES ---
-  const totalSegments = pods.reduce((acc, pod) => acc + (pod.segments?.length || 0), 0);
+  // A pod marked "🎁 Bonificación" in the Pod Creator (pod.isBonus) never
+  // counts toward the total or the completed count — a unit with, say, 6
+  // graded pods plus a 7th bonus pod hits 100% at the end of pod 6, and the
+  // bonus pod is pure extra credit (see the multiplier bump in onComplete
+  // below) that can't push the percent past 100.
+  const totalSegments = pods.reduce((acc, pod) => acc + (pod.isBonus ? 0 : (pod.segments?.length || 0)), 0);
   const completedSegments = pods.reduce((acc, pod, pIdx) => {
+    if (pod.isBonus) return acc;
     if (pIdx < activePodIndex) return acc + (pod.segments?.length || 0);
     if (pIdx === activePodIndex) return acc + activeSegmentIndex;
     return acc;
   }, 0);
 
-  const progressPercent = totalSegments > 0 ? Math.round((completedSegments / totalSegments) * 100) : 0;
+  const progressPercent = totalSegments > 0 ? Math.min(100, Math.round((completedSegments / totalSegments) * 100)) : 0;
 
   const getLetterGrade = (percent) => {
     if (percent >= 90) return 'A';
@@ -434,6 +440,15 @@ export default function StudentLearningPath() {
             if (score === 100) multiplier = 3;
             else if (score >= 90) multiplier = 2;
             else if (score >= 80) multiplier = 1.5;
+
+            // A qualifying score inside a "🎁 Bonificación" pod (segments
+            // beyond the graded 100% goal — see progressPercent above) earns
+            // a +0.5 bump on top of its mastery multiplier: 3x becomes 3.5x,
+            // 2x becomes 2.5x, 1.5x becomes 2x. A sub-80% attempt (multiplier
+            // stays 1, no tier reached) doesn't get the bump.
+            const completedSegPodIdx = pods.findIndex((pod) => (pod.segments || []).some((s) => s.id === segId));
+            const isBonusCompletion = completedSegPodIdx >= 0 && !!pods[completedSegPodIdx]?.isBonus;
+            if (isBonusCompletion && multiplier >= 1.5) multiplier += 0.5;
 
             // 10-point floor applies to every activity
             const totalPointsEarned = Math.max(10, Math.round(baseScore * multiplier));

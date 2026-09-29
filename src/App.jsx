@@ -24,6 +24,7 @@ import WorkoutEngine from './student/WorkoutEngine';
 import GrammarNoteViewer from './student/GrammarNoteViewer';
 import VocabPage from './student/VocabPage';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
+import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
 import ConectoresEngine from './student/ConectoresEngine';
@@ -182,6 +183,7 @@ function App() {
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
+            <Route path="/glosario-idiomatico" element={<GlosarioIdiomaticoPage />} />
             <Route path="/fotos-azar" element={<FotosAzarPage />} />
             <Route path="/practica/conectores" element={<ConectoresEngine />} />
             <Route path="/salon-de-la-fama/:courseId" element={<HallOfFamePage />} />

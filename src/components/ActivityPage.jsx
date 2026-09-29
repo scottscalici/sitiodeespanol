@@ -637,6 +637,15 @@ const ConversacionLayout = ({ activity }) => {
           </div>
         )}
 
+        {/* Referencia permanente — no viene de los datos de esta actividad,
+            siempre disponible en cualquier conversación. */}
+        <Link
+          to="/glosario-idiomatico"
+          className="self-start text-xs font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-4 py-2 rounded-full shadow-sm transition-colors inline-flex items-center gap-1.5 w-fit"
+        >
+          📚 Glosario de Expresiones Idiomáticas
+        </Link>
+
         {/* Timer engine */}
         {!isOpenFormat && (
           <div className="bg-slate-900 rounded-xl p-8 text-center flex flex-col items-center gap-4">
