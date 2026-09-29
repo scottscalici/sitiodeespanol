@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchUnitTotalPods, getUnitSummary, getAssignedDominioTasks } from '../utils/learningPathProgress';
+import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks } from '../utils/learningPathProgress';
 import { getPathCardTheme } from '../utils/pathThemes';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -12,7 +12,7 @@ import { useActiveTheme } from '../context/ThemeContext';
 const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
   const { userData } = useAuth();
   const { theme } = useActiveTheme() || {};
-  const [totalPodsByPath, setTotalPodsByPath] = useState({});
+  const [progressMetaByPath, setProgressMetaByPath] = useState({});
 
   // getAssignedDominioTasks sorts newest-first; reverse for oldest-on-top.
   const assignedTasks = [...getAssignedDominioTasks(courseTasks, liveDia)].reverse();
@@ -25,10 +25,10 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
   useEffect(() => {
     let cancelled = false;
     Promise.all(
-      assignedTasks.map((task) => fetchUnitTotalPods(task.path_id).then((total) => [task.path_id, total]))
+      assignedTasks.map((task) => fetchUnitProgressMeta(task.path_id).then((meta) => [task.path_id, meta]))
     )
       .then((entries) => {
-        if (!cancelled) setTotalPodsByPath(Object.fromEntries(entries));
+        if (!cancelled) setProgressMetaByPath(Object.fromEntries(entries));
       })
       .catch((error) => console.error('Error fetching unit totals:', error));
     return () => { cancelled = true; };
@@ -41,8 +41,8 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
   return (
     <div className="space-y-3">
       {assignedTasks.map((task, idx) => {
-        const totalPods = totalPodsByPath[task.path_id] || 0;
-        const { completedPods, percent } = getUnitSummary(userData?.progress, task.path_id, totalPods);
+        const meta = progressMetaByPath[task.path_id] || { isFlat: true, pods: [], totalPods: 0 };
+        const { completedPods, totalPods, percent } = getUnitSummary(userData?.progress, task.path_id, meta);
         const cardTheme = getPathCardTheme(idx);
 
         return (

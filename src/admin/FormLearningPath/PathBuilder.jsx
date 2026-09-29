@@ -91,6 +91,16 @@ export default function PathBuilder({
     setPods(copy);
   };
 
+  // A bonus pod's segments don't count toward the grade percent (see
+  // learningPathProgress.js) — for a unit like "6 graded pods + 1 bonus
+  // pod of extra topics", finishing pod 6 is 100%, and pod 7 exists purely
+  // for the badge/extra-credit multiplier bump in StudentLearningPath.jsx.
+  const handleBonusToggle = (podIndex, isBonus) => {
+    const copy = [...pods];
+    copy[podIndex].isBonus = isBonus;
+    setPods(copy);
+  };
+
   // Bumping a quota count keeps total_questions in sync automatically — it's
   // no longer an independently-editable field, since it's just the sum.
   const updateQuestionMix = (podIndex, segIndex, type, value) => {
@@ -233,6 +243,11 @@ export default function PathBuilder({
                 <span className="bg-blue-600 px-3 py-1 rounded-lg text-xs font-black tracking-wider uppercase">
                   {podLabel} {podIndex + 1}
                 </span>
+                {!isPracticeHub && pod.isBonus && (
+                  <span className="bg-amber-500 px-2 py-1 rounded-lg text-[10px] font-black tracking-wider uppercase">
+                    🎁 Bonus
+                  </span>
+                )}
                 <input
                   type="text"
                   value={pod.title}
@@ -292,6 +307,15 @@ export default function PathBuilder({
                     <option value="gold">🥇 Oro</option>
                   </select>
                 )}
+
+                <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700 ml-auto cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!pod.isBonus}
+                    onChange={(e) => handleBonusToggle(podIndex, e.target.checked)}
+                  />
+                  🎁 Bonificación (no cuenta para la nota)
+                </label>
               </div>
             )}
 
