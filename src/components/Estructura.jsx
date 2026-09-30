@@ -4,12 +4,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
+import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
 const Estructura = ({ estructura = [], liveDia }) => {
   const { theme } = useActiveTheme() || {};
-  const themeColor = theme?.styles?.cardOverrides?.estructura;
+  const themeStyle = getThemedCardStyle(
+    theme?.styles?.cardOverrides?.estructura,
+    theme?.styles?.accent,
+    theme?.styles?.textures?.estructura
+  );
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
   const [linkTitles, setLinkTitles] = useState({});
   const [allPages, setAllPages] = useState([]);
@@ -63,16 +68,24 @@ const Estructura = ({ estructura = [], liveDia }) => {
 
   return (
     <div
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 border-l-[6px] border-l-emerald-500 p-6 sm:p-8 space-y-6"
-      style={themeColor ? { borderLeftColor: themeColor } : undefined}
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-700 to-slate-900 p-6 sm:p-8 shadow-xl space-y-6"
+      style={themeStyle}
     >
-      <h3 className="font-black text-2xl text-slate-800 flex items-center gap-3">
-        <span
-          className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0"
-          style={themeColor ? { backgroundColor: `${themeColor}1A`, color: themeColor } : undefined}
-        >📚</span>
-        Estructura y Gramática
-      </h3>
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="flex justify-between items-center gap-3">
+        <h3 className="font-black text-2xl text-white flex items-center gap-3">
+          <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0">📚</span>
+          Estructura y Gramática
+        </h3>
+        <Link
+          to="/gramatica"
+          className="shrink-0 text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
+          title="Buscar cualquier tema de gramática"
+        >
+          Índice
+        </Link>
+      </div>
 
       <div className="space-y-6">
         {todaysLessons.map((lesson, idx) => {
@@ -83,33 +96,33 @@ const Estructura = ({ estructura = [], liveDia }) => {
             <div key={idx} className="flex flex-col gap-4">
 
               {lesson.introText && (
-                <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-5">
-                  <span className="text-[10px] font-black uppercase text-emerald-700 tracking-widest block mb-2">
+                <div className="bg-white/10 border border-white/15 rounded-xl p-5">
+                  <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
                     Introducir
                   </span>
-                  <p className="text-lg text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-lg text-white leading-relaxed whitespace-pre-wrap">
                     {lesson.introText}
                   </p>
                 </div>
               )}
 
               {lesson.repasoText && (
-                <div className="bg-sky-50/60 border border-sky-100 rounded-xl p-5">
-                  <span className="text-[10px] font-black uppercase text-sky-700 tracking-widest block mb-2">
+                <div className="bg-white/10 border border-white/15 rounded-xl p-5">
+                  <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
                     Repasar
                   </span>
-                  <p className="text-lg text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-lg text-white leading-relaxed whitespace-pre-wrap">
                     {lesson.repasoText}
                   </p>
                 </div>
               )}
 
               {(enlacesArr.length > 0 || recursosArr.length > 0) && (
-                <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="pt-4 border-t border-white/15 space-y-3">
 
                   {enlacesArr.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mr-1">
+                      <span className="text-indigo-200 font-bold uppercase tracking-widest text-[10px] mr-1">
                         Enlaces
                       </span>
                       {enlacesArr.map((enlace, i) => {
@@ -121,7 +134,7 @@ const Estructura = ({ estructura = [], liveDia }) => {
                           <Link
                             key={i}
                             to={`/gramatica/${encodeURIComponent(docId)}`}
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                            className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
                           >
                             {linkTitles[enlace] || enlace}
                           </Link>
@@ -132,7 +145,7 @@ const Estructura = ({ estructura = [], liveDia }) => {
 
                   {recursosArr.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mr-1">
+                      <span className="text-indigo-200 font-bold uppercase tracking-widest text-[10px] mr-1">
                         Recursos
                       </span>
                       {recursosArr.map((recurso, i) => (
@@ -140,7 +153,7 @@ const Estructura = ({ estructura = [], liveDia }) => {
                           key={i}
                           type="button"
                           onClick={() => setActiveCategory(recurso)}
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                          className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
                         >
                           {recurso}
                         </button>
