@@ -445,7 +445,11 @@ export default function TeacherGradebook() {
     if (activeTab === 'diagnostics' && selectedWarmupId) {
       const errorList = [];
 
-      students.forEach((student) => {
+      // Scoped to the same roster filter as the Gradebook tab (rosterFilter,
+      // via visibleStudents) — previously this always scanned every student
+      // regardless of block, so two different sections' errors for the same
+      // warmup (e.g. 4A and 1B) showed up mixed together in one list.
+      visibleStudents.forEach((student) => {
         const warmupData = student.progress?.warmups?.[selectedWarmupId];
         if (warmupData && warmupData.errors && warmupData.errors.length > 0) {
           warmupData.errors.forEach((err) => {
@@ -468,11 +472,11 @@ export default function TeacherGradebook() {
     } else {
       setAggregatedErrors([]);
     }
-  }, [activeTab, selectedWarmupId, students]);
+  }, [activeTab, selectedWarmupId, visibleStudents]);
 
   const getAvailableWarmupIds = () => {
     const ids = new Set();
-    students.forEach((student) => {
+    visibleStudents.forEach((student) => {
       if (student.progress?.warmups) {
         Object.keys(student.progress.warmups).forEach((id) => ids.add(id));
       }
@@ -608,12 +612,13 @@ const handleResetPassword = async () => {
           </button>
         </div>
 
-        {activeTab === 'gradebook' && (
+        {(activeTab === 'gradebook' || activeTab === 'diagnostics') && (
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={rosterFilter}
               onChange={(e) => setRosterFilter(e.target.value)}
               className="bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+              title="Filtra por bloque/sección — también se usa en Diagnósticos"
             >
               <option value="all">Todos los estudiantes</option>
               {Array.from(
@@ -634,46 +639,50 @@ const handleResetPassword = async () => {
                 })}
             </select>
 
-            <select
-              value={viewQuarterId}
-              onChange={(e) => setViewQuarterId(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
-              title="Qué periodo muestra el Promedio Calentamientos"
-            >
-              <option value="current">Promedio: Trimestre Actual</option>
-              {quarters.map((q, idx) => (
-                <option key={idx} value={idx}>Promedio: {q.label || `Trimestre ${idx + 1}`}</option>
-              ))}
-              <option value="all">Promedio: Todo el Año</option>
-            </select>
+            {activeTab === 'gradebook' && (
+              <>
+                <select
+                  value={viewQuarterId}
+                  onChange={(e) => setViewQuarterId(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 text-white rounded-lg p-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  title="Qué periodo muestra el Promedio Calentamientos"
+                >
+                  <option value="current">Promedio: Trimestre Actual</option>
+                  {quarters.map((q, idx) => (
+                    <option key={idx} value={idx}>Promedio: {q.label || `Trimestre ${idx + 1}`}</option>
+                  ))}
+                  <option value="all">Promedio: Todo el Año</option>
+                </select>
 
-            <button
-              onClick={() => {
-                setQuarterDraft(quarters.length ? quarters : [{ label: 'Trimestre 1', startDate: '', endDate: '' }]);
-                setQuarterModalOpen(true);
-              }}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
-              title="Configurar fechas de trimestres"
-            >
-              📅 Trimestres
-            </button>
+                <button
+                  onClick={() => {
+                    setQuarterDraft(quarters.length ? quarters : [{ label: 'Trimestre 1', startDate: '', endDate: '' }]);
+                    setQuarterModalOpen(true);
+                  }}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+                  title="Configurar fechas de trimestres"
+                >
+                  📅 Trimestres
+                </button>
 
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
-              title="Volver a cargar los datos más recientes"
-            >
-              {refreshing ? '⏳' : '🔄'} Actualizar
-            </button>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+                  title="Volver a cargar los datos más recientes"
+                >
+                  {refreshing ? '⏳' : '🔄'} Actualizar
+                </button>
 
-            <button
-              onClick={handleExportCsv}
-              className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/50 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
-              title="Descargar CSV para importar en Schoology"
-            >
-              📤 Exportar CSV
-            </button>
+                <button
+                  onClick={handleExportCsv}
+                  className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/50 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+                  title="Descargar CSV para importar en Schoology"
+                >
+                  📤 Exportar CSV
+                </button>
+              </>
+            )}
           </div>
         )}
 
