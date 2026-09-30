@@ -81,6 +81,7 @@ import DestacadoUploader from './admin/uploaders/DestacadoUploader';
 import SenordleUploader from './admin/uploaders/SenordleUploader';
 import TieredCulturaUploader from './admin/uploaders/TieredCulturaUploader';
 import VerbUploader from './admin/uploaders/VerbUploader';
+import IdiomPracticeImporter from './admin/uploaders/IdiomPracticeImporter';
 import VocabUploader from './admin/uploaders/VocabUploader';
 
 // 🛡️ ADMIN BOUNCER COMPONENT
@@ -327,6 +328,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SenordleUploader />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-idioms"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <IdiomPracticeImporter />
                 </AdminRoute>
               }
             />

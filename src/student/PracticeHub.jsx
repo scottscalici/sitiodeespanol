@@ -17,6 +17,7 @@ import WorkoutEngine from './WorkoutEngine';
 const CONTENT_TYPES = {
   vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo' },
   verb: { label: 'Verbos', icon: '⚡', theme: 'emerald' },
+  idiom: { label: 'Modismos', icon: '💬', theme: 'amber' },
 };
 
 const TENSE_LABELS = {
@@ -35,6 +36,7 @@ const TENSE_LABELS = {
 const THEME_CLASSES = {
   indigo: { ring: 'ring-indigo-400', bg: 'bg-indigo-600', hoverBg: 'hover:bg-indigo-500', text: 'text-indigo-700', chip: 'bg-indigo-100 text-indigo-800' },
   emerald: { ring: 'ring-emerald-400', bg: 'bg-emerald-600', hoverBg: 'hover:bg-emerald-500', text: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800' },
+  amber: { ring: 'ring-amber-400', bg: 'bg-amber-600', hoverBg: 'hover:bg-amber-500', text: 'text-amber-700', chip: 'bg-amber-100 text-amber-800' },
 };
 
 export default function PracticeHub() {
@@ -67,7 +69,10 @@ export default function PracticeHub() {
         ]);
         const flattened = [];
         docs
-          .filter((d) => d.course === course && Array.isArray(d.pods))
+          // 'all' is for content that isn't tied to one course's textbook
+          // (e.g. idioms) — it shows up for every student regardless of
+          // their S2/S4 course.
+          .filter((d) => (d.course === course || d.course === 'all') && Array.isArray(d.pods))
           .forEach((d) => {
             d.pods.forEach((pod) => {
               const segment = pod.segments?.[0];
@@ -83,7 +88,7 @@ export default function PracticeHub() {
               flattened.push({
                 id: `${d.path_id}__${pod.id}`,
                 title: pod.title,
-                contentType: d.contentType === 'verb' ? 'verb' : 'vocab',
+                contentType: d.contentType === 'verb' ? 'verb' : d.contentType === 'idiom' ? 'idiom' : 'vocab',
                 textbook: d.textbook || '',
                 chapter: d.chapter || '',
                 targetTense: segment.targetTense || 'ALL',
@@ -109,6 +114,10 @@ export default function PracticeHub() {
   const sequenceGroups = useMemo(() => {
     const vocabByBook = new Map();
     const verbByTense = new Map();
+    // Idioms aren't tied to a book/chapter or a tense — each circle is
+    // already its own theme (one per practice_pods pod), so they just list
+    // flat, no further subgrouping needed.
+    const idiomCircles = [];
 
     circles.forEach((c) => {
       if (c.contentType === 'vocab') {
@@ -118,6 +127,8 @@ export default function PracticeHub() {
         const chapterKey = `Cap. ${c.chapter || '?'}`;
         if (!chapterMap.has(chapterKey)) chapterMap.set(chapterKey, { key: chapterKey, sortKey: Number(c.chapter) || 0, circles: [] });
         chapterMap.get(chapterKey).circles.push(c);
+      } else if (c.contentType === 'idiom') {
+        idiomCircles.push(c);
       } else {
         const key = TENSE_LABELS[c.targetTense] || c.targetTense;
         if (!verbByTense.has(key)) verbByTense.set(key, { key, sortKey: Object.keys(TENSE_LABELS).indexOf(c.targetTense), circles: [] });
@@ -132,7 +143,7 @@ export default function PracticeHub() {
       }))
       .sort((a, b) => a.book.localeCompare(b.book));
     const verbGroups = Array.from(verbByTense.values()).sort((a, b) => a.sortKey - b.sortKey);
-    return { vocabBooks, verbGroups };
+    return { vocabBooks, verbGroups, idiomCircles };
   }, [circles]);
 
   // --- QUIZ-ORDER VIEW: every linked circle sorted by its evaluación día,
@@ -270,9 +281,15 @@ export default function PracticeHub() {
               </div>
             )}
             {sequenceGroups.verbGroups.length > 0 && (
-              <div>
+              <div className="mb-4">
                 <h2 className="text-lg font-black text-emerald-700 mb-2">⚡ Verbos</h2>
                 {sequenceGroups.verbGroups.map(renderGroup)}
+              </div>
+            )}
+            {sequenceGroups.idiomCircles.length > 0 && (
+              <div>
+                <h2 className="text-lg font-black text-amber-700 mb-2">💬 Modismos</h2>
+                {renderGroup({ key: 'Expresiones Idiomáticas', circles: sequenceGroups.idiomCircles })}
               </div>
             )}
           </>
