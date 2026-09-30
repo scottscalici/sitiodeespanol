@@ -221,9 +221,14 @@ export default function VocabPage() {
               {sortedWords.length} Términos Totales
             </p>
           </div>
-          <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
-            Volver al Inicio ↗
-          </Link>
+          <div className="flex gap-2">
+            <Link to="/vocabulario" className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 px-5 py-2.5 rounded-xl transition-colors">
+              📚 Ver Índice Completo
+            </Link>
+            <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
+              Volver al Inicio ↗
+            </Link>
+          </div>
         </header>
 
         {/* STUDY MODES TOGGLE */}

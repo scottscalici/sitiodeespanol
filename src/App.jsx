@@ -23,6 +23,7 @@ import TicoTalk from './student/TicoTalk';
 import WorkoutEngine from './student/WorkoutEngine';
 import GrammarNoteViewer from './student/GrammarNoteViewer';
 import VocabPage from './student/VocabPage';
+import VocabIndexPage from './student/VocabIndexPage';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import FotosAzarPage from './student/FotosAzarPage';
@@ -181,6 +182,7 @@ function App() {
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
+            <Route path="/vocabulario" element={<VocabIndexPage />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
             <Route path="/glosario-idiomatico" element={<GlosarioIdiomaticoPage />} />
