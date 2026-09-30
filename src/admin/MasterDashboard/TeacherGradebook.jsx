@@ -337,6 +337,13 @@ export default function TeacherGradebook() {
     students
       .filter((s) => rosterFilter === 'all' || `${s.course}|${s.section}` === rosterFilter)
       .sort((a, b) => {
+        // Viewing a single block already has one course/section, so this is
+        // a no-op there — it only matters for "Todos los estudiantes",
+        // where it groups everyone by block instead of mixing them
+        // alphabetically, which is what you actually want while entering
+        // Schoology IDs block by block.
+        const blockCompare = `${a.course || ''}|${a.section || ''}`.localeCompare(`${b.course || ''}|${b.section || ''}`);
+        if (blockCompare !== 0) return blockCompare;
         const lastCompare = (a.lastName || '').localeCompare(b.lastName || '');
         return lastCompare !== 0 ? lastCompare : (a.firstName || '').localeCompare(b.firstName || '');
       })
