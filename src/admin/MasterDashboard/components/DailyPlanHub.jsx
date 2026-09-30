@@ -635,6 +635,9 @@ const DailyPlanHub = () => {
                 <Link to="/admin-secret-portal-practice-hub" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
                   🎯 Practice Circle Builder
                 </Link>
+                <Link to="/admin-secret-portal-idioms" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
+                  💬 Modismos
+                </Link>
               </div>
             </div>
 

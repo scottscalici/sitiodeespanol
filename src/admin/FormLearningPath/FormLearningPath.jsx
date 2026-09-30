@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
+import VocabPodGeneratorModal from './VocabPodGeneratorModal';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
-import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
+import { QUESTION_TYPE_DEFAULTS, PRACTICE_BOSS_BATTLE_MIX, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 
 // mode='learningPath' (default): the graded, sequential Dominio builder,
@@ -57,16 +58,23 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [availableGrammarTags, setAvailableGrammarTags] = useState([]);
 
   // --- POD BUILDER STATE — one flat pod list for the whole path ---
-  const makeDefaultSegment = () => ({
-    id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    total_questions: sumMix(QUESTION_TYPE_DEFAULTS),
-    questionMix: { ...QUESTION_TYPE_DEFAULTS },
-    isSpeedRound: false,
-    timeLimit: 60,
-    targetTense: 'ALL',
-    introduced_concepts: [],
-    pinned_sentences: [],
-  });
+  // A new Practice Hub segment defaults to a "boss battle" — 120s speed
+  // round, 15 questions. A new graded Learning Path segment keeps the
+  // original untimed default — 60s (unused unless later switched to a
+  // speed round), 10 questions. Applies to both vocab and verb paths.
+  const makeDefaultSegment = () => {
+    const mix = isPracticeHub ? PRACTICE_BOSS_BATTLE_MIX : QUESTION_TYPE_DEFAULTS;
+    return {
+      id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      total_questions: sumMix(mix),
+      questionMix: { ...mix },
+      isSpeedRound: isPracticeHub,
+      timeLimit: isPracticeHub ? 120 : 60,
+      targetTense: 'ALL',
+      introduced_concepts: [],
+      pinned_sentences: [],
+    };
+  };
 
   const makeDefaultPods = () => ([
     {
@@ -90,6 +98,12 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
 
   const [pendingGroupAssign, setPendingGroupAssign] = useState(null);
   const [selectedGroupVerbs, setSelectedGroupVerbs] = useState([]);
+
+  const [showPodGenerator, setShowPodGenerator] = useState(false);
+  const handleGeneratedPods = (newPods) => {
+    setPods([...pods, ...newPods]);
+    setShowPodGenerator(false);
+  };
 
   // Badge catalog (config/gamification.badges) — pods reference these by id
   // via pod.badgeAward to say "finishing this pod awards X badge/tier".
@@ -538,7 +552,19 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         selectedBook={selectedBook} selectedChapter={selectedChapter}
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
         isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
+        onOpenPodGenerator={() => setShowPodGenerator(true)}
       />
+
+      {showPodGenerator && (
+        <VocabPodGeneratorModal
+          rawChapterData={rawChapterData}
+          availableSections={availableSections}
+          selectedChapter={selectedChapter}
+          existingPodCount={pods.length}
+          onGenerate={handleGeneratedPods}
+          onClose={() => setShowPodGenerator(false)}
+        />
+      )}
 
       {pendingGroupAssign && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100]">

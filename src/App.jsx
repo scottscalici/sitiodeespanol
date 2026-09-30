@@ -23,6 +23,8 @@ import TicoTalk from './student/TicoTalk';
 import WorkoutEngine from './student/WorkoutEngine';
 import GrammarNoteViewer from './student/GrammarNoteViewer';
 import VocabPage from './student/VocabPage';
+import VocabIndexPage from './student/VocabIndexPage';
+import GrammarIndexPage from './student/GrammarIndexPage';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import FotosAzarPage from './student/FotosAzarPage';
@@ -80,6 +82,7 @@ import DestacadoUploader from './admin/uploaders/DestacadoUploader';
 import SenordleUploader from './admin/uploaders/SenordleUploader';
 import TieredCulturaUploader from './admin/uploaders/TieredCulturaUploader';
 import VerbUploader from './admin/uploaders/VerbUploader';
+import IdiomPracticeImporter from './admin/uploaders/IdiomPracticeImporter';
 import VocabUploader from './admin/uploaders/VocabUploader';
 
 // 🛡️ ADMIN BOUNCER COMPONENT
@@ -180,7 +183,9 @@ function App() {
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
+            <Route path="/gramatica" element={<GrammarIndexPage />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
+            <Route path="/vocabulario" element={<VocabIndexPage />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
             <Route path="/glosario-idiomatico" element={<GlosarioIdiomaticoPage />} />
@@ -325,6 +330,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SenordleUploader />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-idioms"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <IdiomPracticeImporter />
                 </AdminRoute>
               }
             />

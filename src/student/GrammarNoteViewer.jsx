@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -48,12 +48,20 @@ export default function GrammarNoteViewer() {
         
         {/* TOP NAVIGATION BAR */}
         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700"
-          >
-            ← Volver
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700"
+            >
+              ← Volver
+            </button>
+            <Link
+              to="/gramatica"
+              className="px-4 py-2 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-indigo-800/50"
+            >
+              📚 Índice Completo
+            </Link>
+          </div>
           {noteData?.category && (
             <span className="text-xs font-black uppercase tracking-widest text-emerald-400 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-900/50">
               {noteData.category}

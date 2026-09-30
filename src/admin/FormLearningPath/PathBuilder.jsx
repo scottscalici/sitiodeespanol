@@ -34,6 +34,7 @@ export default function PathBuilder({
   onCreateBadge,
   isPracticeHub = false,
   evaluacionOptions = [],
+  onOpenPodGenerator,
 }) {
   const podLabel = isPracticeHub ? 'Círculo' : 'Pod';
 
@@ -213,6 +214,16 @@ export default function PathBuilder({
             >
               <span>+ Add {podLabel} ({pods.length}/20)</span>
             </button>
+
+            {!isPracticeHub && contentType === 'vocab' && onOpenPodGenerator && (
+              <button
+                onClick={onOpenPodGenerator}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow transition-all flex items-center gap-1.5"
+                title="Genera pares de niveles (introducción + batalla final) directamente desde las secciones de vocabulario del capítulo seleccionado."
+              >
+                🪄 Generar desde Vocabulario
+              </button>
+            )}
 
             <button
               onClick={handleSavePathToFirestore}

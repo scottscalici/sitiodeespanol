@@ -19,6 +19,14 @@ const getVerbById = async (verbId) => {
   }
 };
 
+// Last-resort MC filler for "reverse engineering" (statement → question)
+// sentences when the sentence bank doesn't yet have enough authored
+// "|| question" pairs to source 3 real distractor questions from.
+const GENERIC_QUESTION_FILLERS = [
+  '¿Qué hora es?', '¿Cómo te llamas?', '¿De dónde eres?', '¿Qué día es hoy?',
+  '¿Cuántos años tienes?', '¿Qué tiempo hace hoy?',
+];
+
 export default function WorkoutEngine({ segment, history = [], podIndex = 0, onClose, onComplete }) {
   const { currentUser } = useAuth();
 
@@ -39,6 +47,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   const [selectedOption, setSelectedOption] = useState(null);
   const [builtSentence, setBuiltSentence] = useState([]);
   const [complexPhase, setComplexPhase] = useState('build');
+  const [multiClozeSelections, setMultiClozeSelections] = useState([]);
 
   // Speech Recognition State
   const [isListening, setIsListening] = useState(false);
@@ -149,6 +158,52 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const rawConcepts = segment.introduced_concepts || [];
       const grammar = segment.pinned_sentences || [];
       const targetTense = segment.targetTense || 'ALL';
+
+      // Every authored grammar sentence's own [[answer]], paired with its
+      // grammarTags — a same-register distractor source (e.g. another
+      // adverbial/idiom phrase like "tal vez" or "sin duda") for a phrase
+      // blank like "a lo mejor", instead of generic single vocab/verb words
+      // ("de", "hacer") that are obviously the wrong part of speech.
+      const grammarAnswerPool = grammar
+        .map((s) => {
+          const twoPart = s.label.match(/\[\[(.*?)\|(.*?)\]\]/);
+          const onePart = s.label.match(/\[\[(.*?)\]\]/);
+          const rawAnswer = twoPart ? twoPart[1] : onePart ? onePart[1] : null;
+          if (!rawAnswer) return null;
+          return { value: rawAnswer.replace(/[.,!?¿¡]/g, '').trim(), tags: s.grammarTags || [] };
+        })
+        .filter(Boolean);
+
+      // Authored "reverse engineering" pairs (statement || question) — the
+      // question halves double as a distractor pool for each other, same
+      // shape as grammarAnswerPool above.
+      const reverseQuestionPool = grammar
+        .filter((s) => s.label.includes('||'))
+        .map((s) => {
+          const [, q] = s.label.split('||');
+          return q ? { value: q.trim(), tags: s.grammarTags || [] } : null;
+        })
+        .filter(Boolean);
+
+      // Shared sibling-pool picker: prefers entries sharing a grammarTag
+      // with the current target, falls back to the rest of the pool.
+      const pickFromSiblingPool = (pool, excludeValues, tags, count) => {
+        const excludeLower = excludeValues.map((a) => a.trim().toLowerCase());
+        const candidates = pool.filter((s) => !excludeLower.includes(s.value.toLowerCase()));
+        const tagMatches = tags.length > 0 ? candidates.filter((s) => s.tags.some((t) => tags.includes(t))) : [];
+        const rest = candidates.filter((s) => !tagMatches.includes(s));
+        const ordered = [...shuffle(tagMatches), ...shuffle(rest)];
+        const seen = new Set();
+        const picked = [];
+        for (const s of ordered) {
+          if (picked.length === count) break;
+          const key = s.value.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          picked.push(s.value);
+        }
+        return picked;
+      };
 
       // Admin-set quota (e.g. { recall: 5, mc: 3, matching: 1, listen: 1,
       // speak: 0, sentence: 0 }) replaces the old random pick among allowed
@@ -267,6 +322,26 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           return options;
       };
 
+      // Word-tile version of pickFromSiblingPool, for the sentence-builder
+      // word bank: splits sibling grammar answers into individual words so
+      // the decoy tiles read as plausible alternatives (other adverbs,
+      // connectors, etc.) instead of unrelated vocab/verb infinitives.
+      const getGrammarWordDistractors = (count, excludeWords, tags) => {
+        const excludeLower = excludeWords.map((w) => w.trim().toLowerCase());
+        const tagMatches = tags.length > 0 ? grammarAnswerPool.filter((s) => s.tags.some((t) => tags.includes(t))) : [];
+        const rest = grammarAnswerPool.filter((s) => !tagMatches.includes(s));
+        const orderedWords = [...shuffle(tagMatches), ...shuffle(rest)].flatMap((s) => s.value.split(' '));
+        const picked = [];
+        for (const w of orderedWords) {
+          if (picked.length === count) break;
+          const clean = w.replace(/[.,!?¿¡]/g, '').toLowerCase();
+          if (!clean || excludeLower.includes(clean) || picked.includes(clean)) continue;
+          picked.push(clean);
+        }
+        if (picked.length < count) picked.push(...getWordDistractors(count - picked.length, [...excludeWords, ...picked]));
+        return picked;
+      };
+
       for (let i = 0; i < totalQs; i++) {
 
         // --- 1. REPASO DE ORACIONES (HISTORY) ---
@@ -302,8 +377,50 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           const twoPartMatch = spaSentence.match(/\[\[(.*?)\|(.*?)\]\]/);
           const onePartMatch = spaSentence.match(/\[\[(.*?)\]\]/);
+          const onePartMatches = [...spaSentence.matchAll(/\[\[(.*?)\]\]/g)];
+          const swapMatches = [...spaSentence.matchAll(/\{\{(.*?)\}\}/g)];
 
-          if (twoPartMatch) {
+          if (spaSentence.includes('||')) {
+              // --- REVERSE ENGINEERING (MC): "STATEMENT || correct question" ---
+              const [statement, correctQuestion] = spaSentence.split('||').map((s) => s.trim());
+              const tags = target.grammarTags || [];
+              let distractors = pickFromSiblingPool(reverseQuestionPool, [correctQuestion], tags, 3);
+              if (distractors.length < 3) {
+                  const filler = shuffle(GENERIC_QUESTION_FILLERS).filter(
+                      (f) => f.toLowerCase() !== correctQuestion.toLowerCase() && !distractors.includes(f)
+                  );
+                  distractors = [...distractors, ...filler].slice(0, 3);
+              }
+              const options = shuffle([correctQuestion, ...distractors]);
+              generatedQueue.push({
+                  id: `q_${i}`, type: 'mc', prompt: statement, engTrans: engTrans,
+                  options, correctAnswer: correctQuestion,
+                  topic: target.tags || 'Formula la Pregunta', _pointCategory: 'sentence'
+              });
+          } else if (swapMatches.length === 2 && !twoPartMatch) {
+              // --- LÓGICO O ILÓGICO: "{{word}} ... {{word}}" — 50/50 swap the two marked words ---
+              const parts = spaSentence.split(/\{\{(.*?)\}\}/);
+              const isLogical = Math.random() < 0.5;
+              const wordA = parts[1].trim();
+              const wordB = parts[3].trim();
+              const displayWords = isLogical ? [wordA, wordB] : [wordB, wordA];
+              const displaySentence = parts[0] + displayWords[0] + parts[2] + displayWords[1] + parts[4];
+              generatedQueue.push({
+                  id: `q_${i}`, type: 'logic_judgment', prompt: displaySentence.trim(), engTrans: engTrans,
+                  correctAnswer: isLogical ? 'lógico' : 'ilógico',
+                  topic: target.tags || 'Lógico o Ilógico', _pointCategory: 'sentence'
+              });
+          } else if (onePartMatches.length >= 2 && !isSpeedRound) {
+              // --- MULTI-CLOZE (inline dropdowns): 2+ "[[word]]" blanks, no distractors ---
+              const parts = spaSentence.split(/\[\[(.*?)\]\]/);
+              const answers = [];
+              for (let idx = 1; idx < parts.length; idx += 2) answers.push(parts[idx].trim());
+              generatedQueue.push({
+                  id: `q_${i}`, type: 'multi_cloze', parts, answers, options: shuffle([...answers]),
+                  prompt: engTrans, engTrans: engTrans, correctAnswer: answers.join(', '),
+                  topic: target.tags || 'Cloze Múltiple', _pointCategory: 'sentence'
+              });
+          } else if (twoPartMatch) {
               const targetVerb = twoPartMatch[1].trim();
               const infinitive = twoPartMatch[2].trim();
 
@@ -331,15 +448,34 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               }
           } else if (onePartMatch && !isSpeedRound) {
               const answer = onePartMatch[1];
-              const options = await buildGrammarOptions(target, answer, getWordDistractors);
+              // Prefer other authored answers (same grammarTag first) over
+              // generic vocab words — a phrase blank like "a lo mejor" needs
+              // other adverbial/idiom phrases as distractors, not "de"/"hacer".
+              const smartFallback = (count, exclude) => {
+                const tags = target.grammarTags || [];
+                const siblings = pickFromSiblingPool(grammarAnswerPool, exclude, tags, count);
+                if (siblings.length >= count) return siblings.slice(0, count);
+                return [...siblings, ...getWordDistractors(count - siblings.length, [...exclude, ...siblings])];
+              };
+              const options = await buildGrammarOptions(target, answer, smartFallback);
               generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
           } else {
               let cleanDisplay = spaSentence.replace(/[.,!?¿¡]/g, '').trim();
               if (isSpeedRound) {
                   generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Gramática (Velocidad)', _pointCategory: 'sentence' });
+              } else if (requestedType === 'listen') {
+                  // Full-sentence dictation: hear it, type it. Reuses the
+                  // existing 'listen' UI (audio button + opt-out) unchanged.
+                  generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Dictado', _pointCategory: 'sentence' });
+              } else if (requestedType === 'speak') {
+                  // Full-sentence dictation: hear it, say it back — text
+                  // stays hidden (isDictation) so it's blind listening, not
+                  // reading aloud. Reuses the existing 'speak' UI (mic +
+                  // opt-out) unchanged.
+                  generatedQueue.push({ id: `q_${i}`, type: 'speak', isDictation: true, prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Dictado (Hablar)', _pointCategory: 'sentence' });
               } else {
                   let correctWords = cleanDisplay.split(' ');
-                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getWordDistractors(2, correctWords)]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               }
           }
         }
@@ -557,7 +693,11 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   }, [matchedPairs, currentIndex, questions]);
 
   useEffect(() => {
-    if (questions[currentIndex]?.type === 'listen') playAudio(questions[currentIndex].prompt);
+    const q = questions[currentIndex];
+    // A dictation-mode 'speak' question hides its text (see isDictation
+    // below), so — unlike the normal "read this aloud" speak format — it
+    // needs to autoplay too, or the student has nothing to go on.
+    if (q?.type === 'listen' || (q?.type === 'speak' && q?.isDictation)) playAudio(q.prompt);
   }, [currentIndex, questions]);
 
   // ========================================================================
@@ -567,7 +707,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
     setUserAnswer(''); setSelectedOption(null); setBuiltSentence([]);
     setMatchSelEs(null); setMatchSelEn(null); setMatchedPairs([]);
     setIsChecked(false); setIsCorrect(false); setMissedArticle(false); setMissedAccent(false);
-    setComplexPhase(fallbackPhase);
+    setComplexPhase(fallbackPhase); setMultiClozeSelections([]);
   };
 
   const handleCheck = () => {
@@ -600,8 +740,23 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
         }
     }
 
+    // 🚀 MULTI-CLOZE CHECK LOGIC — every blank must match its own slot
+    if (currentQ.type === 'multi_cloze') {
+        const correct = currentQ.answers.every(
+            (a, idx) => (multiClozeSelections[idx] || '').trim().toLowerCase() === a.trim().toLowerCase()
+        );
+        setIsCorrect(correct); setIsChecked(true);
+        if (!correct) {
+            setRetries(prev => prev + 1);
+            setQuestions(prev => [...prev, { ...currentQ, id: currentQ.id + '_retry_' + Date.now() }]);
+        } else {
+            setAttempts(prev => prev + 1);
+        }
+        return;
+    }
+
     let userString = '';
-    if (currentQ.type === 'mc') userString = selectedOption || '';
+    if (currentQ.type === 'mc' || currentQ.type === 'logic_judgment') userString = selectedOption || '';
     else if (currentQ.type === 'sentence_builder') userString = builtSentence.join(' ');
     else userString = userAnswer;
 
@@ -644,7 +799,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
   const isButtonDisabled = (!isChecked && currentQ.type === 'matching') ||
                            (currentQ.type === 'sentence_builder_complex' && complexPhase === 'build' && builtSentence.length === 0 && !isChecked) ||
                            (currentQ.type === 'sentence_builder_complex' && complexPhase === 'conjugate' && !userAnswer.trim() && !isChecked) ||
-                           (!selectedOption && !userAnswer.trim() && builtSentence.length === 0 && currentQ.type !== 'matching' && currentQ.type !== 'sentence_builder_complex' && !isChecked) ||
+                           (currentQ.type === 'multi_cloze' && multiClozeSelections.filter(Boolean).length < currentQ.answers.length && !isChecked) ||
+                           (!selectedOption && !userAnswer.trim() && builtSentence.length === 0 && currentQ.type !== 'matching' && currentQ.type !== 'sentence_builder_complex' && currentQ.type !== 'multi_cloze' && !isChecked) ||
                            isListening;
 
   return (
@@ -812,19 +968,31 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
           {currentQ.type === 'speak' && (
             <>
-              <p className="text-slate-500 font-bold mb-2">Lee en voz alta:</p>
+              <p className="text-slate-500 font-bold mb-2">
+                {currentQ.isDictation ? 'Escucha y repite en voz alta:' : 'Lee en voz alta:'}
+              </p>
 
               <div className="flex flex-col items-center justify-center mb-8">
-                  <div className="flex items-center gap-4">
-                      <h2 className="text-4xl md:text-5xl font-black text-slate-800">{currentQ.prompt}</h2>
-                      <button
-                        onClick={() => playAudio(currentQ.correctAnswer)}
-                        className="p-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-all active:scale-95"
-                        title="Escuchar pronunciación"
-                      >
-                          🔊
-                      </button>
-                  </div>
+                  {currentQ.isDictation ? (
+                    <button
+                      onClick={() => playAudio(currentQ.correctAnswer)}
+                      className="w-20 h-20 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-3xl shadow-lg transition-transform active:scale-95"
+                      title="Escuchar de nuevo"
+                    >
+                        🔊
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-800">{currentQ.prompt}</h2>
+                        <button
+                          onClick={() => playAudio(currentQ.correctAnswer)}
+                          className="p-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-all active:scale-95"
+                          title="Escuchar pronunciación"
+                        >
+                            🔊
+                        </button>
+                    </div>
+                  )}
                   {currentQ.engTrans && <p className="text-slate-400 font-medium mt-2">{currentQ.engTrans}</p>}
               </div>
 
@@ -911,6 +1079,60 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe en español..."
                 className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
+            </>
+          )}
+
+          {currentQ.type === 'multi_cloze' && (
+            <div className="animate-fade-in text-left max-w-2xl mx-auto">
+              <p className="text-2xl md:text-3xl font-bold text-slate-800 leading-relaxed">
+                {currentQ.parts.map((part, idx) => {
+                  if (idx % 2 === 0) return <span key={idx}>{part}</span>;
+                  const blankIdx = (idx - 1) / 2;
+                  const isBlankCorrect = (multiClozeSelections[blankIdx] || '').trim().toLowerCase() === currentQ.answers[blankIdx].trim().toLowerCase();
+                  return (
+                    <select
+                      key={idx}
+                      value={multiClozeSelections[blankIdx] || ''}
+                      disabled={isChecked}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setMultiClozeSelections((prev) => {
+                          const next = [...prev];
+                          next[blankIdx] = val;
+                          return next;
+                        });
+                      }}
+                      className={`mx-1 border-b-4 rounded-t-lg px-2 py-1 font-black outline-none bg-white ${
+                        isChecked
+                          ? (isBlankCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-800' : 'border-red-500 bg-red-50 text-red-800')
+                          : 'border-blue-400 bg-blue-50 text-blue-900'
+                      }`}
+                    >
+                      <option value="" disabled>—</option>
+                      {currentQ.options.map((opt, oi) => <option key={oi} value={opt}>{opt}</option>)}
+                    </select>
+                  );
+                })}
+              </p>
+              {currentQ.engTrans && <p className="text-slate-400 font-medium mt-6">{currentQ.engTrans}</p>}
+            </div>
+          )}
+
+          {currentQ.type === 'logic_judgment' && (
+            <>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-10 leading-relaxed">{currentQ.prompt}</h2>
+              <div className="grid grid-cols-2 gap-4 w-full max-w-md mx-auto">
+                {['lógico', 'ilógico'].map((opt) => (
+                  <button key={opt} disabled={isChecked} onClick={() => setSelectedOption(opt)}
+                    className={`p-5 rounded-2xl border-2 font-black text-lg uppercase tracking-wide transition-all ${
+                      isChecked && opt === currentQ.correctAnswer ? 'bg-emerald-100 border-emerald-500 text-emerald-800' :
+                      isChecked && selectedOption === opt && opt !== currentQ.correctAnswer ? 'bg-red-100 border-red-500 text-red-800' :
+                      selectedOption === opt ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >{opt === 'lógico' ? '✅ Lógico' : '❌ Ilógico'}</button>
+                ))}
+              </div>
+              {currentQ.engTrans && <p className="text-slate-400 font-medium mt-6">{currentQ.engTrans}</p>}
             </>
           )}
         </div>

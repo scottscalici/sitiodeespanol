@@ -5,7 +5,15 @@
 // "conjugate" for a verb target or "write" for a vocab target — the engine
 // decides that per-question based on what kind of concept got drawn, so one
 // key covers both content types.
+// 10 questions total — the standing default for a new graded Learning Path
+// segment (60s, untimed unless later switched to a speed round — see
+// makeDefaultSegment in FormLearningPath.jsx). Also the sanitize-fallback
+// for any existing segment missing a questionMix entirely.
 export const QUESTION_TYPE_DEFAULTS = { recall: 5, mc: 3, matching: 1, listen: 1, speak: 0, sentence: 0 };
+
+// 15 questions total — the standing "boss battle" default for a new
+// Practice Hub segment (120s speed round).
+export const PRACTICE_BOSS_BATTLE_MIX = { recall: 7, mc: 5, matching: 2, listen: 1, speak: 0, sentence: 0 };
 
 export const QUESTION_TYPE_LABELS = {
   vocab: { recall: 'Escribir', mc: 'Opción Múltiple', matching: 'Emparejar', listen: 'Escuchar', speak: 'Hablar', sentence: 'Oraciones' },

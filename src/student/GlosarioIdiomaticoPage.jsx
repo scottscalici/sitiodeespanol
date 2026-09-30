@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 // Static reference content — no Firestore read needed, so this page costs
 // nothing per visit and never goes stale from a caching TTL. Update this
 // array directly to add/edit expressions.
-const CATEGORIES = [
+export const CATEGORIES = [
   {
     id: 'motivacion',
     emoji: '🔋',

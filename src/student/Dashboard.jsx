@@ -423,7 +423,22 @@ const Dashboard = () => {
   
               {/* 🏗️ ESTRUCTURA */}
               <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
-  
+
+              {/* 📚 GRAMMAR INDEX — always available, not tied to today's lesson */}
+              <Link
+                to="/gramatica"
+                className="group flex items-center gap-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-indigo-300 p-5 shadow-sm hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center text-2xl shrink-0 transition-colors">
+                  📚
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-black text-slate-800">Índice de Gramática</h3>
+                  <p className="text-slate-400 text-xs font-medium">Busca cualquier tema de gramática que hayamos visto</p>
+                </div>
+                <span className="text-slate-300 group-hover:text-indigo-500 transition-colors">→</span>
+              </Link>
+
               {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
               {sentenceSetTitle != null && (
                 <Link
@@ -622,7 +637,22 @@ const Dashboard = () => {
                 </Link>
                 );
               })}
-  
+
+              {/* 📚 VOCAB INDEX — always available, not tied to today's assigned chapter */}
+              <Link
+                to={`/vocabulario${isAdmin ? `?course=${course}` : ''}`}
+                className="group flex items-center gap-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-indigo-300 p-5 shadow-sm hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center text-2xl shrink-0 transition-colors">
+                  📚
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-black text-slate-800">Índice de Vocabulario</h3>
+                  <p className="text-slate-400 text-xs font-medium">Busca cualquier palabra de cualquier capítulo</p>
+                </div>
+                <span className="text-slate-300 group-hover:text-indigo-500 transition-colors">→</span>
+              </Link>
+
               <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
   
               {/* 🎓 PLATFORM TAREA (VHL/KWL) — SHOWN ONLY ON DAY ASSIGNED */}

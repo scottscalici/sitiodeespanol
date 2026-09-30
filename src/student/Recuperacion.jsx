@@ -103,12 +103,14 @@ export default function Recuperacion() {
     load();
   }, [course, uid]);
 
-  // Only past quizzes make sense for recuperación — the newest one (closest
-  // to today) is what a student most likely cares about right now, so it
-  // sits at top, trailing off to older ones further down.
+  // Today's quiz counts too — a teacher grading same-day wants strugglers
+  // able to start reflecting/practicing right away, not wait for the next
+  // school day. The newest one (closest to today) is what a student most
+  // likely cares about right now, so it sits at top, trailing off to older
+  // ones further down.
   const pastEntries = useMemo(() => {
     return gateCircles
-      .filter((c) => c.evalDia != null && c.evalDia < liveDia)
+      .filter((c) => c.evalDia != null && c.evalDia <= liveDia)
       .sort((a, b) => b.evalDia - a.evalDia);
   }, [gateCircles, liveDia]);
 
