@@ -6,6 +6,13 @@ import { getCachedCollection, invalidateCollectionCache } from '../../utils/fire
 import { AVAILABLE_TENSES, SUBJECTS, PAIR_MAP, POOL_MAP, DISTRACTOR_MODES } from '../../utils/distractorConfig';
 
 const BLANK_EXAMPLE = 'Yo [[fui]] a la tienda ayer.';
+const SYNTAX_HELP = [
+  '[[respuesta]] → un solo hueco (opción múltiple o constructor de oraciones).',
+  '[[verbo|infinitivo]] → hueco de verbo (ordena y conjuga).',
+  '[[a]] ... [[b]] ... [[c]] (2 o más) → cloze múltiple con menús desplegables, sin distractores.',
+  '{{palabra}} ... {{palabra}} (exactamente 2) → Lógico o Ilógico: intercambia las dos palabras la mitad de las veces.',
+  'Afirmación || ¿Pregunta correcta? → opción múltiple de "formula la pregunta".',
+].join('\n');
 
 const emptyDraft = () => ({
   spanish: '',
@@ -96,8 +103,11 @@ export default function SentenceManager() {
   const updateDraft = (field, value) => setDraft((prev) => ({ ...prev, [field]: value }));
 
   const saveDraft = async () => {
-    if (!draft.spanish.includes('[[') || !draft.spanish.includes(']]')) {
-      setStatus('❌ La oración necesita la respuesta marcada así: [[respuesta]]');
+    const hasCloze = draft.spanish.includes('[[') && draft.spanish.includes(']]');
+    const hasSwap = draft.spanish.includes('{{') && draft.spanish.includes('}}');
+    const hasReverse = draft.spanish.includes('||');
+    if (!hasCloze && !hasSwap && !hasReverse) {
+      setStatus('❌ Marca la oración con [[respuesta]], {{palabra}}...{{palabra}}, o "afirmación || pregunta".');
       return;
     }
     if (draft.distractorMode === 'binary_verb' || draft.distractorMode === 'quad_verb') {
@@ -283,7 +293,8 @@ export default function SentenceManager() {
                 </h3>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Oración (marca la respuesta con [[así]])</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Oración</label>
+                  <p className="text-[10px] text-slate-500 whitespace-pre-line leading-relaxed">{SYNTAX_HELP}</p>
                   <textarea
                     value={draft.spanish}
                     onChange={(e) => updateDraft('spanish', e.target.value)}
