@@ -5,7 +5,9 @@
 // "conjugate" for a verb target or "write" for a vocab target — the engine
 // decides that per-question based on what kind of concept got drawn, so one
 // key covers both content types.
-export const QUESTION_TYPE_DEFAULTS = { recall: 5, mc: 3, matching: 1, listen: 1, speak: 0, sentence: 0 };
+// 15 questions total — the standing "boss battle" default for any new
+// segment (120s speed round, see makeDefaultSegment in FormLearningPath.jsx).
+export const QUESTION_TYPE_DEFAULTS = { recall: 7, mc: 5, matching: 2, listen: 1, speak: 0, sentence: 0 };
 
 export const QUESTION_TYPE_LABELS = {
   vocab: { recall: 'Escribir', mc: 'Opción Múltiple', matching: 'Emparejar', listen: 'Escuchar', speak: 'Hablar', sentence: 'Oraciones' },

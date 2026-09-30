@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
+import VocabPodGeneratorModal from './VocabPodGeneratorModal';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
@@ -57,12 +58,14 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [availableGrammarTags, setAvailableGrammarTags] = useState([]);
 
   // --- POD BUILDER STATE — one flat pod list for the whole path ---
+  // A new segment defaults to a "boss battle" — 120s speed round, 15
+  // questions — for both vocab and verb paths.
   const makeDefaultSegment = () => ({
     id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     total_questions: sumMix(QUESTION_TYPE_DEFAULTS),
     questionMix: { ...QUESTION_TYPE_DEFAULTS },
-    isSpeedRound: false,
-    timeLimit: 60,
+    isSpeedRound: true,
+    timeLimit: 120,
     targetTense: 'ALL',
     introduced_concepts: [],
     pinned_sentences: [],
@@ -90,6 +93,12 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
 
   const [pendingGroupAssign, setPendingGroupAssign] = useState(null);
   const [selectedGroupVerbs, setSelectedGroupVerbs] = useState([]);
+
+  const [showPodGenerator, setShowPodGenerator] = useState(false);
+  const handleGeneratedPods = (newPods) => {
+    setPods([...pods, ...newPods]);
+    setShowPodGenerator(false);
+  };
 
   // Badge catalog (config/gamification.badges) — pods reference these by id
   // via pod.badgeAward to say "finishing this pod awards X badge/tier".
@@ -538,7 +547,19 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         selectedBook={selectedBook} selectedChapter={selectedChapter}
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
         isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
+        onOpenPodGenerator={() => setShowPodGenerator(true)}
       />
+
+      {showPodGenerator && (
+        <VocabPodGeneratorModal
+          rawChapterData={rawChapterData}
+          availableSections={availableSections}
+          selectedChapter={selectedChapter}
+          existingPodCount={pods.length}
+          onGenerate={handleGeneratedPods}
+          onClose={() => setShowPodGenerator(false)}
+        />
+      )}
 
       {pendingGroupAssign && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100]">
