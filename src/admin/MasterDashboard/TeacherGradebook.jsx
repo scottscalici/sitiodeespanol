@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { doc, getDoc, setDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
@@ -330,6 +330,103 @@ export default function TeacherGradebook() {
     return getUnitSummary(student.progress, col.path_id, meta).percent;
   };
 
+  // Hoisted out of the gradebook table's render block so the CSV export
+  // button (in the filter bar above the table) can build rows from exactly
+  // what's on screen, instead of recomputing the same filter/sort twice.
+  const visibleStudents = useMemo(() => (
+    students
+      .filter((s) => rosterFilter === 'all' || `${s.course}|${s.section}` === rosterFilter)
+      .sort((a, b) => {
+        const lastCompare = (a.lastName || '').localeCompare(b.lastName || '');
+        return lastCompare !== 0 ? lastCompare : (a.firstName || '').localeCompare(b.firstName || '');
+      })
+  ), [students, rosterFilter]);
+
+  // One column per Dominio unit relevant to a currently-visible student's
+  // course, oldest-due first. Past-due units stay listed (unitColumns has
+  // no upper due-date bound), so old grades remain visible/retrievable.
+  const visibleUnitColumns = useMemo(() => (
+    unitColumns
+      .filter((col) => visibleStudents.some((s) => col.courses.has(s.course)))
+      .sort((a, b) => Number(a.day_due) - Number(b.day_due))
+  ), [unitColumns, visibleStudents]);
+
+  const getStudentDisplayName = (student) => (
+    student.firstName || student.lastName
+      ? `${student.firstName || ''} ${student.lastName || ''}`.trim()
+      : student.email
+  );
+
+  const csvEscape = (val) => {
+    const s = String(val ?? '');
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  // Schoology's grade CSV import matches students by "Unique User ID" (the
+  // SIS/PowerSchool ID Schoology already has synced in) and updates scores
+  // on assignments that must already exist in that course's gradebook —
+  // there's no "category" field in the import itself, since a category is a
+  // property of the assignment, set when the teacher creates it in
+  // Schoology. So each column here is prefixed with the category it should
+  // be created under, to make that one-time Schoology-side setup
+  // unambiguous and keep it consistent every time this is re-exported.
+  const handleExportCsv = () => {
+    const header = [
+      'ID de Schoology', 'Nombre', 'Email', 'Curso', 'Sección',
+      ...visibleUnitColumns.map((col) => `[Dominio] ${col.titulo}`),
+      '[Práctica] Promedio Calentamientos y Práctica',
+    ];
+    const rows = [header];
+    const missingIds = [];
+
+    visibleStudents.forEach((student) => {
+      const displayName = getStudentDisplayName(student);
+      if (!student.schoologyId) missingIds.push(displayName);
+      const { percent: avgPercent } = getWarmupAverage(student);
+      const unitCells = visibleUnitColumns.map((col) => {
+        const p = getUnitPercentForStudent(student, col);
+        return p == null ? '' : Math.round(p);
+      });
+      rows.push([
+        student.schoologyId || '',
+        displayName,
+        student.email || '',
+        student.course?.toUpperCase() || '',
+        student.section || '',
+        ...unitCells,
+        avgPercent == null ? '' : Math.round(avgPercent),
+      ]);
+    });
+
+    if (missingIds.length > 0) {
+      alert(`⚠️ ${missingIds.length} estudiante(s) no tienen ID de Schoology (se exportan con esa celda en blanco, Schoology no podrá emparejarlos):\n\n${missingIds.join(', ')}`);
+    }
+
+    const csvContent = rows.map((r) => r.map(csvEscape).join(',')).join('\r\n');
+    // Leading BOM keeps accented characters (á, ñ...) intact when the file
+    // is opened in Excel instead of showing up as mojibake.
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const scope = rosterFilter === 'all' ? 'todos' : rosterFilter.replace('|', '_');
+    link.download = `notas_${scope}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSchoologyIdChange = (uid, value) => {
+    setStudents((prev) => prev.map((s) => (s.uid === uid ? { ...s, schoologyId: value } : s)));
+  };
+
+  const handleSchoologyIdBlur = async (uid, value) => {
+    try {
+      await setDoc(doc(db, 'users', uid), { schoologyId: value.trim() }, { merge: true });
+    } catch (err) {
+      console.error('Error saving Schoology ID:', err);
+    }
+  };
+
   const saveQuarters = async () => {
     await setDoc(doc(db, 'config', 'academic_quarters'), { quarters: quarterDraft }, { merge: true });
     setQuarters(quarterDraft);
@@ -562,7 +659,24 @@ const handleResetPassword = async () => {
             >
               {refreshing ? '⏳' : '🔄'} Actualizar
             </button>
+
+            <button
+              onClick={handleExportCsv}
+              className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/50 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+              title="Descargar CSV para importar en Schoology"
+            >
+              📤 Exportar CSV
+            </button>
           </div>
+        )}
+
+        {activeTab === 'gradebook' && (
+          <p className="text-[11px] text-slate-500 mt-2 max-w-3xl">
+            Para Schoology: crea primero las tareas <span className="text-slate-300 font-bold">[Dominio]</span> y{' '}
+            <span className="text-slate-300 font-bold">[Práctica]</span> con esos mismos nombres (Puntos Máximos = 100) bajo
+            esas categorías, luego en Gradebook → ⋮ → Import sube este archivo sin abrirlo/guardarlo antes en Excel
+            (puede borrar ceros a la izquierda del ID) y empareja cada columna en la vista previa.
+          </p>
         )}
       </header>
 
@@ -652,20 +766,6 @@ const handleResetPassword = async () => {
 
       {/* --- GRADEBOOK: NAME, SECTION, WARMUP AVERAGE, TODAY, LEARNING PATH --- */}
       {activeTab === 'gradebook' && (() => {
-        const visibleStudents = students
-          .filter((s) => rosterFilter === 'all' || `${s.course}|${s.section}` === rosterFilter)
-          .sort((a, b) => {
-            const lastCompare = (a.lastName || '').localeCompare(b.lastName || '');
-            return lastCompare !== 0 ? lastCompare : (a.firstName || '').localeCompare(b.firstName || '');
-          });
-
-        // One column per Dominio unit relevant to a currently-visible student's
-        // course, oldest-due first. Past-due units stay listed (unitColumns has
-        // no upper due-date bound), so old grades remain visible/retrievable.
-        const visibleUnitColumns = unitColumns
-          .filter((col) => visibleStudents.some((s) => col.courses.has(s.course)))
-          .sort((a, b) => Number(a.day_due) - Number(b.day_due));
-
         return (
           <main className="max-w-6xl mx-auto bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -673,6 +773,7 @@ const handleResetPassword = async () => {
                 <tr className="bg-slate-950/50 border-b border-slate-700 text-xs font-black text-slate-400 uppercase tracking-widest">
                   <th className="p-4 pl-6 sticky left-0 bg-slate-950/50">Estudiante</th>
                   <th className="p-4">Sección</th>
+                  <th className="p-4">ID Schoology</th>
                   <th className="p-4">Puntos</th>
                   <th className="p-4">
                     Promedio Calentamientos
@@ -692,7 +793,7 @@ const handleResetPassword = async () => {
               <tbody className="divide-y divide-slate-700/50">
                 {visibleStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={6 + visibleUnitColumns.length} className="p-8 text-center text-slate-500 font-bold">
+                    <td colSpan={7 + visibleUnitColumns.length} className="p-8 text-center text-slate-500 font-bold">
                       No hay estudiantes en este filtro.
                     </td>
                   </tr>
@@ -715,6 +816,18 @@ const handleResetPassword = async () => {
                           <span className="inline-block bg-slate-900 border border-slate-700 text-slate-300 font-bold px-2.5 py-1 rounded-lg text-xs">
                             {student.course?.toUpperCase() || '?'} {student.section || ''}
                           </span>
+                        </td>
+
+                        <td className="p-4">
+                          <input
+                            type="text"
+                            value={student.schoologyId || ''}
+                            onChange={(e) => handleSchoologyIdChange(student.uid, e.target.value)}
+                            onBlur={(e) => handleSchoologyIdBlur(student.uid, e.target.value)}
+                            placeholder="—"
+                            title="ID único de Schoology (viene de PowerSchool) — se usa para emparejar al exportar notas"
+                            className="w-24 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          />
                         </td>
 
                         <td className="p-4">
