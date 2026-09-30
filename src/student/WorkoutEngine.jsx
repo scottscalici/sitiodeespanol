@@ -150,6 +150,39 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const grammar = segment.pinned_sentences || [];
       const targetTense = segment.targetTense || 'ALL';
 
+      // Every authored grammar sentence's own [[answer]], paired with its
+      // grammarTags — a same-register distractor source (e.g. another
+      // adverbial/idiom phrase like "tal vez" or "sin duda") for a phrase
+      // blank like "a lo mejor", instead of generic single vocab/verb words
+      // ("de", "hacer") that are obviously the wrong part of speech.
+      const grammarAnswerPool = grammar
+        .map((s) => {
+          const twoPart = s.label.match(/\[\[(.*?)\|(.*?)\]\]/);
+          const onePart = s.label.match(/\[\[(.*?)\]\]/);
+          const rawAnswer = twoPart ? twoPart[1] : onePart ? onePart[1] : null;
+          if (!rawAnswer) return null;
+          return { answer: rawAnswer.replace(/[.,!?¿¡]/g, '').trim(), tags: s.grammarTags || [] };
+        })
+        .filter(Boolean);
+
+      const pickSiblingAnswers = (excludeAnswers, tags, count) => {
+        const excludeLower = excludeAnswers.map((a) => a.trim().toLowerCase());
+        const candidates = grammarAnswerPool.filter((s) => !excludeLower.includes(s.answer.toLowerCase()));
+        const tagMatches = tags.length > 0 ? candidates.filter((s) => s.tags.some((t) => tags.includes(t))) : [];
+        const rest = candidates.filter((s) => !tagMatches.includes(s));
+        const ordered = [...shuffle(tagMatches), ...shuffle(rest)];
+        const seen = new Set();
+        const picked = [];
+        for (const s of ordered) {
+          if (picked.length === count) break;
+          const key = s.answer.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          picked.push(s.answer);
+        }
+        return picked;
+      };
+
       // Admin-set quota (e.g. { recall: 5, mc: 3, matching: 1, listen: 1,
       // speak: 0, sentence: 0 }) replaces the old random pick among allowed
       // "modalities" — expand it into one shuffled slot per question, then
@@ -267,6 +300,26 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           return options;
       };
 
+      // Word-tile version of pickSiblingAnswers, for the sentence-builder
+      // word bank: splits sibling grammar answers into individual words so
+      // the decoy tiles read as plausible alternatives (other adverbs,
+      // connectors, etc.) instead of unrelated vocab/verb infinitives.
+      const getGrammarWordDistractors = (count, excludeWords, tags) => {
+        const excludeLower = excludeWords.map((w) => w.trim().toLowerCase());
+        const tagMatches = tags.length > 0 ? grammarAnswerPool.filter((s) => s.tags.some((t) => tags.includes(t))) : [];
+        const rest = grammarAnswerPool.filter((s) => !tagMatches.includes(s));
+        const orderedWords = [...shuffle(tagMatches), ...shuffle(rest)].flatMap((s) => s.answer.split(' '));
+        const picked = [];
+        for (const w of orderedWords) {
+          if (picked.length === count) break;
+          const clean = w.replace(/[.,!?¿¡]/g, '').toLowerCase();
+          if (!clean || excludeLower.includes(clean) || picked.includes(clean)) continue;
+          picked.push(clean);
+        }
+        if (picked.length < count) picked.push(...getWordDistractors(count - picked.length, [...excludeWords, ...picked]));
+        return picked;
+      };
+
       for (let i = 0; i < totalQs; i++) {
 
         // --- 1. REPASO DE ORACIONES (HISTORY) ---
@@ -331,7 +384,16 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               }
           } else if (onePartMatch && !isSpeedRound) {
               const answer = onePartMatch[1];
-              const options = await buildGrammarOptions(target, answer, getWordDistractors);
+              // Prefer other authored answers (same grammarTag first) over
+              // generic vocab words — a phrase blank like "a lo mejor" needs
+              // other adverbial/idiom phrases as distractors, not "de"/"hacer".
+              const smartFallback = (count, exclude) => {
+                const tags = target.grammarTags || [];
+                const siblings = pickSiblingAnswers(exclude, tags, count);
+                if (siblings.length >= count) return siblings.slice(0, count);
+                return [...siblings, ...getWordDistractors(count - siblings.length, [...exclude, ...siblings])];
+              };
+              const options = await buildGrammarOptions(target, answer, smartFallback);
               generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
           } else {
               let cleanDisplay = spaSentence.replace(/[.,!?¿¡]/g, '').trim();
@@ -339,7 +401,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Gramática (Velocidad)', _pointCategory: 'sentence' });
               } else {
                   let correctWords = cleanDisplay.split(' ');
-                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getWordDistractors(2, correctWords)]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               }
           }
         }
