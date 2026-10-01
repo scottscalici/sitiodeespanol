@@ -398,28 +398,64 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   topic: target.tags || 'Formula la Pregunta', _pointCategory: 'sentence'
               });
           } else if (swapMatches.length === 2 && !twoPartMatch) {
-              // --- LÓGICO O ILÓGICO: "{{word}} ... {{word}}" — 50/50 swap the two marked words ---
+              // "{{word}} ... {{word}}" — same two marked words, two possible
+              // presentations, coin flip each time it's drawn.
               const parts = spaSentence.split(/\{\{(.*?)\}\}/);
-              const isLogical = Math.random() < 0.5;
               const wordA = parts[1].trim();
               const wordB = parts[3].trim();
-              const displayWords = isLogical ? [wordA, wordB] : [wordB, wordA];
-              const displaySentence = parts[0] + displayWords[0] + parts[2] + displayWords[1] + parts[4];
-              generatedQueue.push({
-                  id: `q_${i}`, type: 'logic_judgment', prompt: displaySentence.trim(), engTrans: engTrans,
-                  correctAnswer: isLogical ? 'lógico' : 'ilógico',
-                  topic: target.tags || 'Lógico o Ilógico', _pointCategory: 'sentence'
-              });
+              if (Math.random() < 0.5) {
+                  // --- LÓGICO O ILÓGICO: 50/50 swap the two marked words.
+                  // No English translation shown — translating it would give
+                  // away whether the swap happened.
+                  const isLogical = Math.random() < 0.5;
+                  const displayWords = isLogical ? [wordA, wordB] : [wordB, wordA];
+                  const displaySentence = parts[0] + displayWords[0] + parts[2] + displayWords[1] + parts[4];
+                  generatedQueue.push({
+                      id: `q_${i}`, type: 'logic_judgment', prompt: displaySentence.trim(),
+                      correctAnswer: isLogical ? 'lógico' : 'ilógico',
+                      topic: target.tags || 'Lógico o Ilógico', _pointCategory: 'sentence'
+                  });
+              } else {
+                  // --- SCRAMBLED SENTENCE: always the logical order (a
+                  // reconstruction puzzle needs one correct target), drag the
+                  // word tiles into place. Translation shown, same as any
+                  // other sentence_builder.
+                  const cleanDisplay = (parts[0] + wordA + parts[2] + wordB + parts[4]).replace(/[.,!?¿¡]/g, '').trim();
+                  const correctWords = cleanDisplay.split(' ');
+                  generatedQueue.push({
+                      id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans,
+                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]),
+                      correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
+                  });
+              }
           } else if (onePartMatches.length >= 2 && !isSpeedRound) {
-              // --- MULTI-CLOZE (inline dropdowns): 2+ "[[word]]" blanks, no distractors ---
+              // "[[a]] ... [[b]] ... [[c]]" (2+ blanks) — same sentence, two
+              // possible presentations, coin flip each time it's drawn.
               const parts = spaSentence.split(/\[\[(.*?)\]\]/);
               const answers = [];
               for (let idx = 1; idx < parts.length; idx += 2) answers.push(parts[idx].trim());
-              generatedQueue.push({
-                  id: `q_${i}`, type: 'multi_cloze', parts, answers, options: shuffle([...answers]),
-                  prompt: engTrans, engTrans: engTrans, correctAnswer: answers.join(', '),
-                  topic: target.tags || 'Cloze Múltiple', _pointCategory: 'sentence'
-              });
+              if (Math.random() < 0.5) {
+                  // --- MULTI-CLOZE (inline dropdowns), no distractors. No
+                  // English translation shown — the Spanish sentence IS the
+                  // dropdown puzzle, and translating it would give every
+                  // blank's answer away.
+                  generatedQueue.push({
+                      id: `q_${i}`, type: 'multi_cloze', parts, answers, options: shuffle([...answers]),
+                      correctAnswer: answers.join(', '),
+                      topic: target.tags || 'Cloze Múltiple', _pointCategory: 'sentence'
+                  });
+              } else {
+                  // --- SCRAMBLED SENTENCE: every blank filled in correctly,
+                  // whole sentence shuffled into word tiles. Translation
+                  // shown, same as any other sentence_builder.
+                  const cleanDisplay = parts.map((p, idx) => (idx % 2 === 1 ? answers[(idx - 1) / 2] : p)).join('').replace(/[.,!?¿¡]/g, '').trim();
+                  const correctWords = cleanDisplay.split(' ');
+                  generatedQueue.push({
+                      id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans,
+                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]),
+                      correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
+                  });
+              }
           } else if (twoPartMatch) {
               const targetVerb = twoPartMatch[1].trim();
               const infinitive = twoPartMatch[2].trim();
@@ -1125,7 +1161,6 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   );
                 })}
               </p>
-              {currentQ.engTrans && <p className="text-slate-400 font-medium mt-6">{currentQ.engTrans}</p>}
             </div>
           )}
 
@@ -1143,7 +1178,6 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   >{opt === 'lógico' ? '✅ Lógico' : '❌ Ilógico'}</button>
                 ))}
               </div>
-              {currentQ.engTrans && <p className="text-slate-400 font-medium mt-6">{currentQ.engTrans}</p>}
             </>
           )}
         </div>
