@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
-import { getAllowedTextbooks, getDefaultTextbook } from '../utils/textbookAccess';
+import { getAllowedTextbooks, getDefaultTextbook, textbookMatches } from '../utils/textbookAccess';
 
 // Landing view is a table of contents — every chapter of the student's
 // default book (their course's current textbook), so they can jump
@@ -35,7 +35,7 @@ export default function VocabIndexPage() {
       setLoading(true);
       try {
         const all = await getCachedCollection('vocab_bundles');
-        setBundles(all.filter((b) => allowedTextbooks.includes(b.textbook)));
+        setBundles(all.filter((b) => allowedTextbooks.some((tb) => textbookMatches(tb, b.textbook))));
       } catch (err) {
         console.error('Error loading vocab index:', err);
       }
@@ -45,7 +45,7 @@ export default function VocabIndexPage() {
   }, [allowedTextbooks]);
 
   const bundlesInScope = useMemo(
-    () => bundles.filter((b) => textbookFilter === 'Todos' || b.textbook === textbookFilter),
+    () => bundles.filter((b) => textbookFilter === 'Todos' || textbookMatches(b.textbook, textbookFilter)),
     [bundles, textbookFilter]
   );
 
