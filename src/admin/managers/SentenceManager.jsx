@@ -7,11 +7,12 @@ import { AVAILABLE_TENSES, SUBJECTS, PAIR_MAP, POOL_MAP, DISTRACTOR_MODES } from
 
 const BLANK_EXAMPLE = 'Yo [[fui]] a la tienda ayer.';
 const SYNTAX_HELP = [
-  '[[respuesta]] → un solo hueco (opción múltiple o constructor de oraciones).',
+  '[[respuesta]] → un solo hueco: la mitad de las veces sale como opción múltiple, la otra mitad como oración desordenada (reconstruye la oración completa) — el "Modo de Distractores" de abajo solo cambia DE DÓNDE salen las opciones/palabras incorrectas en ambos casos.',
   '[[verbo|infinitivo]] → hueco de verbo (ordena y conjuga).',
   '[[a]] ... [[b]] ... [[c]] (2 o más) → cloze múltiple con menús desplegables, sin distractores.',
   '{{palabra}} ... {{palabra}} (exactamente 2) → Lógico o Ilógico: intercambia las dos palabras la mitad de las veces.',
   'Afirmación || ¿Pregunta correcta? → opción múltiple de "formula la pregunta".',
+  'Sin ninguna marca → constructor de oraciones (arrastra las palabras en orden) — o escritura/dictado si el segmento pide ese tipo de pregunta.',
 ].join('\n');
 
 const emptyDraft = () => ({

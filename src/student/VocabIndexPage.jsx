@@ -5,11 +5,12 @@ import { getCachedCollection } from '../utils/firestoreCache';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { getAllowedTextbooks, getDefaultTextbook } from '../utils/textbookAccess';
 
-// A cross-chapter browsable reference — every word the student's course is
-// allowed to see (their current book plus earlier ones), searchable, so
-// "what was that word from last year" doesn't require re-opening a specific
-// chapter bundle. Distinct from VocabPage, which is one chapter's full study
-// modes (flashcards, Tabú, etc.) — this is a flat lookup across all of them.
+// Landing view is a table of contents — every chapter of the student's
+// default book (their course's current textbook), so they can jump
+// straight into any chapter's full study page (VocabPage). The book
+// dropdown lets them look back at earlier books. Typing in the search box
+// swaps to a flat word lookup instead, like a small Spanish dictionary,
+// scoped to whichever book is selected.
 export default function VocabIndexPage() {
   const { userData } = useAuth();
   const [searchParams] = useSearchParams();
@@ -43,27 +44,33 @@ export default function VocabIndexPage() {
     load();
   }, [allowedTextbooks]);
 
-  const words = useMemo(() => {
-    const flattened = [];
-    bundles
-      .filter((b) => textbookFilter === 'Todos' || b.textbook === textbookFilter)
-      .forEach((b) => {
-        (b.words || []).forEach((w) => {
-          flattened.push({
-            palabra: w.palabra,
-            traduccion: w.traduccion,
-            textbook: b.textbook,
-            chapter: b.chapter,
-            bundleId: b.id,
-          });
-        });
-      });
+  const bundlesInScope = useMemo(
+    () => bundles.filter((b) => textbookFilter === 'Todos' || b.textbook === textbookFilter),
+    [bundles, textbookFilter]
+  );
+
+  const chapters = useMemo(
+    () => [...bundlesInScope].sort((a, b) => (
+      (a.textbook || '').localeCompare(b.textbook || '') || (Number(a.chapter) || 0) - (Number(b.chapter) || 0)
+    )),
+    [bundlesInScope]
+  );
+
+  const isSearching = search.trim().length > 0;
+
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
     const q = search.trim().toLowerCase();
-    const filtered = q
-      ? flattened.filter((w) => w.palabra?.toLowerCase().includes(q) || w.traduccion?.toLowerCase().includes(q))
-      : flattened;
-    return filtered.sort((a, b) => (a.palabra || '').localeCompare(b.palabra || ''));
-  }, [bundles, textbookFilter, search]);
+    const flattened = [];
+    bundlesInScope.forEach((b) => {
+      (b.words || []).forEach((w) => {
+        if (w.palabra?.toLowerCase().includes(q) || w.traduccion?.toLowerCase().includes(q)) {
+          flattened.push({ palabra: w.palabra, traduccion: w.traduccion, textbook: b.textbook, chapter: b.chapter, bundleId: b.id });
+        }
+      });
+    });
+    return flattened.sort((a, b) => (a.palabra || '').localeCompare(b.palabra || ''));
+  }, [bundlesInScope, search, isSearching]);
 
   if (loading) {
     return (
@@ -80,7 +87,9 @@ export default function VocabIndexPage() {
           <div>
             <p className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">Referencia</p>
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">📚 Índice de Vocabulario</h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">{words.length} palabras encontradas</p>
+            <p className="text-sm font-medium text-slate-500 mt-1">
+              {isSearching ? `${searchResults.length} palabras encontradas` : `${chapters.length} capítulos`}
+            </p>
           </div>
           <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
             Volver al Inicio ↗
@@ -107,25 +116,45 @@ export default function VocabIndexPage() {
           </select>
         </div>
 
-        {words.length === 0 ? (
+        {isSearching ? (
+          searchResults.length === 0 ? (
+            <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">
+              No se encontraron palabras.
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y divide-slate-100">
+              {searchResults.map((w, i) => (
+                <Link
+                  key={`${w.bundleId}_${w.palabra}_${i}`}
+                  to={`/vocabulario/${w.bundleId}`}
+                  className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="font-black text-slate-800 truncate">{w.palabra}</p>
+                    <p className="text-sm text-slate-500 truncate">{w.traduccion}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
+                    {w.textbook} · {getVocabUnitWord(w.textbook)} {w.chapter}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )
+        ) : chapters.length === 0 ? (
           <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">
-            No se encontraron palabras.
+            Todavía no hay capítulos para este libro.
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y divide-slate-100">
-            {words.map((w, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {chapters.map((b) => (
               <Link
-                key={`${w.bundleId}_${w.palabra}_${i}`}
-                to={`/vocabulario/${w.bundleId}`}
-                className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-50 transition-colors"
+                key={b.id}
+                to={`/vocabulario/${b.id}`}
+                className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md hover:-translate-y-0.5 transition-all p-5 flex flex-col gap-1"
               >
-                <div className="min-w-0">
-                  <p className="font-black text-slate-800 truncate">{w.palabra}</p>
-                  <p className="text-sm text-slate-500 truncate">{w.traduccion}</p>
-                </div>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
-                  {w.textbook} · {getVocabUnitWord(w.textbook)} {w.chapter}
-                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">{b.textbook}</span>
+                <span className="text-lg font-black text-slate-800">{getVocabUnitWord(b.textbook)} {b.chapter}</span>
+                <span className="text-xs text-slate-400 font-medium">{(b.words || []).length} palabras</span>
               </Link>
             ))}
           </div>

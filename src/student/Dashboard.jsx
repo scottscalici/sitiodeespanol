@@ -421,23 +421,8 @@ const Dashboard = () => {
               {/* 💡 CURIOSIDAD */}
               <Curiosidad curiosidades={activeCuriosidades} />
   
-              {/* 🏗️ ESTRUCTURA */}
+              {/* 🏗️ ESTRUCTURA — its own "Índice" button lives in the card's header */}
               <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
-
-              {/* 📚 GRAMMAR INDEX — always available, not tied to today's lesson */}
-              <Link
-                to="/gramatica"
-                className="group flex items-center gap-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-indigo-300 p-5 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="w-12 h-12 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center text-2xl shrink-0 transition-colors">
-                  📚
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-black text-slate-800">Índice de Gramática</h3>
-                  <p className="text-slate-400 text-xs font-medium">Busca cualquier tema de gramática que hayamos visto</p>
-                </div>
-                <span className="text-slate-300 group-hover:text-indigo-500 transition-colors">→</span>
-              </Link>
 
               {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
               {sentenceSetTitle != null && (
@@ -602,16 +587,16 @@ const Dashboard = () => {
                 const bundleTitle = bundleDetails
                   ? `${bundleDetails.textbook} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
                   : bundleId.replace(/_/g, ' ');
-  
+
                 return (
+                <div key={bundleId} className="relative group">
                 <Link
-                  key={bundleId}
                   to={`/vocabulario/${bundleId}`}
-                  className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                  className="block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
                   style={themeGradientStyle('vocabulario')}
                 >
                   <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                   <div className="flex items-center gap-5">
                     {/* Layered Flashcard Deck Visual */}
                     <div className="relative w-16 h-16 shrink-0">
@@ -621,37 +606,31 @@ const Dashboard = () => {
                         <span className="text-2xl drop-shadow">🧠</span>
                       </div>
                     </div>
-  
+
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
                       <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleTitle}</h3>
                       <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Aquí puedes ver una lista de palabras y usar tarjetas de estudio.</p>
                     </div>
                   </div>
-  
+
                   <div className="mt-5 flex justify-end">
                     <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
                       Estudiar <span>→</span>
                     </span>
                   </div>
                 </Link>
+
+                <Link
+                  to={`/vocabulario${isAdmin ? `?course=${course}` : ''}`}
+                  className="absolute top-4 right-4 bg-white/15 hover:bg-white/30 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-black uppercase tracking-widest text-white transition-colors"
+                  title="Buscar cualquier palabra de cualquier capítulo"
+                >
+                  📚 Índice
+                </Link>
+                </div>
                 );
               })}
-
-              {/* 📚 VOCAB INDEX — always available, not tied to today's assigned chapter */}
-              <Link
-                to={`/vocabulario${isAdmin ? `?course=${course}` : ''}`}
-                className="group flex items-center gap-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-indigo-300 p-5 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="w-12 h-12 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center text-2xl shrink-0 transition-colors">
-                  📚
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-black text-slate-800">Índice de Vocabulario</h3>
-                  <p className="text-slate-400 text-xs font-medium">Busca cualquier palabra de cualquier capítulo</p>
-                </div>
-                <span className="text-slate-300 group-hover:text-indigo-500 transition-colors">→</span>
-              </Link>
 
               <ActivityGrid activities={data?.activities} liveDia={liveDia} course={course} />
   

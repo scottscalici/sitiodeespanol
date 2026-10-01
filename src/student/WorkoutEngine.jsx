@@ -448,17 +448,28 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               }
           } else if (onePartMatch && !isSpeedRound) {
               const answer = onePartMatch[1];
-              // Prefer other authored answers (same grammarTag first) over
-              // generic vocab words — a phrase blank like "a lo mejor" needs
-              // other adverbial/idiom phrases as distractors, not "de"/"hacer".
-              const smartFallback = (count, exclude) => {
-                const tags = target.grammarTags || [];
-                const siblings = pickFromSiblingPool(grammarAnswerPool, exclude, tags, count);
-                if (siblings.length >= count) return siblings.slice(0, count);
-                return [...siblings, ...getWordDistractors(count - siblings.length, [...exclude, ...siblings])];
-              };
-              const options = await buildGrammarOptions(target, answer, smartFallback);
-              generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+              // Same authored [[blank]] sentence, two possible presentations
+              // — a coin flip each time it's drawn, so one sentence gives
+              // real variety instead of always being the same question type.
+              if (Math.random() < 0.5) {
+                  // --- MULTIPLE CHOICE: pick the right word/phrase for the blank ---
+                  // Prefer other authored answers (same grammarTag first) over
+                  // generic vocab words — a phrase blank like "a lo mejor" needs
+                  // other adverbial/idiom phrases as distractors, not "de"/"hacer".
+                  const smartFallback = (count, exclude) => {
+                      const tags = target.grammarTags || [];
+                      const siblings = pickFromSiblingPool(grammarAnswerPool, exclude, tags, count);
+                      if (siblings.length >= count) return siblings.slice(0, count);
+                      return [...siblings, ...getWordDistractors(count - siblings.length, [...exclude, ...siblings])];
+                  };
+                  const options = await buildGrammarOptions(target, answer, smartFallback);
+                  generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+              } else {
+                  // --- SCRAMBLED SENTENCE: rebuild the whole sentence, blank filled in ---
+                  let cleanDisplay = spaSentence.replace(onePartMatch[0], answer).replace(/[.,!?¿¡]/g, '').trim();
+                  let correctWords = cleanDisplay.split(' ');
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+              }
           } else {
               let cleanDisplay = spaSentence.replace(/[.,!?¿¡]/g, '').trim();
               if (isSpeedRound) {

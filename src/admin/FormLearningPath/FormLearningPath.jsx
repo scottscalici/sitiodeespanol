@@ -99,9 +99,24 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [pendingGroupAssign, setPendingGroupAssign] = useState(null);
   const [selectedGroupVerbs, setSelectedGroupVerbs] = useState([]);
 
+  // A brand-new path always starts with one placeholder pod (handleDeletePod
+  // refuses to drop the very last pod, so it can't just be removed by hand
+  // first) — if the generator ran while that's still the ONLY pod and it's
+  // never actually been touched, both the level numbering ("Nivel 1" should
+  // mean the first generated pod, not the second) and the leftover empty
+  // pod itself are the generator's problem to absorb, not something the
+  // teacher has to clean up afterward.
+  const isUntouchedPlaceholderPod = (pod) => (
+    pod.title === (isPracticeHub ? 'Círculo 1' : 'Pod 1: Introducción') &&
+    pod.segments.length === 1 &&
+    (pod.segments[0].introduced_concepts || []).length === 0 &&
+    (pod.segments[0].pinned_sentences || []).length === 0
+  );
+  const hasOnlyPlaceholderPod = pods.length === 1 && isUntouchedPlaceholderPod(pods[0]);
+
   const [showPodGenerator, setShowPodGenerator] = useState(false);
   const handleGeneratedPods = (newPods) => {
-    setPods([...pods, ...newPods]);
+    setPods(hasOnlyPlaceholderPod ? newPods : [...pods, ...newPods]);
     setShowPodGenerator(false);
   };
 
@@ -560,7 +575,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
           rawChapterData={rawChapterData}
           availableSections={availableSections}
           selectedChapter={selectedChapter}
-          existingPodCount={pods.length}
+          existingPodCount={hasOnlyPlaceholderPod ? 0 : pods.length}
           onGenerate={handleGeneratedPods}
           onClose={() => setShowPodGenerator(false)}
         />
