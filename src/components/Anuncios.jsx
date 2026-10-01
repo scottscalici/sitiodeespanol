@@ -1,6 +1,14 @@
 import React from 'react';
+import { useActiveTheme } from '../context/ThemeContext';
+import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
+  const { theme } = useActiveTheme() || {};
+  const themeStyle = getThemedCardStyle(
+    theme?.styles?.cardOverrides?.anuncios,
+    theme?.styles?.accent,
+    theme?.styles?.textures?.anuncios
+  );
   // 1. Find the actual date string (YYYY-MM-DD) for the current liveDia
   const currentEntry = cal.find(c => c.dia == liveDia);
   const currentDateStr = currentEntry ? currentEntry.fecha : new Date().toLocaleDateString('en-CA');
@@ -40,8 +48,18 @@ const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
           titleText = "Viaje";
         }
 
+        // Seasonal theme only re-skins the routine announcement — warning
+        // and trip keep their fixed semantic colors (red = urgent, emerald
+        // = travel) regardless of season, so a holiday skin never dulls
+        // down something meant to stand out.
+        const isDefaultType = note.type !== 'warning' && note.type !== 'trip';
+
         return (
-          <div key={idx} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} shadow-xl flex items-stretch`}>
+          <div
+            key={idx}
+            className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} shadow-xl flex items-stretch`}
+            style={isDefaultType ? themeStyle : undefined}
+          >
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
             {/* Image Column — stretches to the card's full height */}
