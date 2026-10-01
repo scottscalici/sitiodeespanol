@@ -591,7 +591,7 @@ const Dashboard = () => {
                 return (
                 <div key={bundleId} className="relative group">
                 <Link
-                  to={`/vocabulario/${bundleId}`}
+                  to={`/vocabulario/${bundleId}${isAdmin ? `?course=${course}` : ''}`}
                   className="block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
                   style={themeGradientStyle('vocabulario')}
                 >

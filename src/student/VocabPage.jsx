@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
@@ -35,8 +35,15 @@ const projectorScaleFor = (count) => {
 
 export default function VocabPage() {
   const { bundleId } = useParams();
+  const [searchParams] = useSearchParams();
   const { userData } = useAuth();
   const isAdmin = userData?.role === 'admin';
+  // An admin previewing a course via the Dashboard's S2/S4 toggle arrives
+  // here with that course in the URL (see Dashboard's vocab card Link) —
+  // carry it forward into the index link below too, so "Ver Índice
+  // Completo" from a Reporteros 4 page doesn't fall back to the admin's
+  // own profile course and land on the wrong book.
+  const courseOverride = searchParams.get('course');
   const [bundleData, setBundleData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -222,7 +229,10 @@ export default function VocabPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link to="/vocabulario" className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 px-5 py-2.5 rounded-xl transition-colors">
+            <Link
+              to={`/vocabulario${isAdmin && courseOverride ? `?course=${courseOverride}` : ''}`}
+              className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 px-5 py-2.5 rounded-xl transition-colors"
+            >
               📚 Ver Índice Completo
             </Link>
             <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
