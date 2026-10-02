@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
+import ImageUploadField from '../shared/ImageUploadField';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -334,12 +335,11 @@ const CuriosidadesManager = () => {
                     <span className="text-[9px] font-black text-slate-400">N/A</span>
                   )}
                 </div>
-                <input 
-                  type="text" 
-                  value={item.img || ''}
-                  onChange={(e) => handleInputChange(item.id, 'img', e.target.value)}
-                  className="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
-                  placeholder="https://..."
+                <ImageUploadField
+                  value={item.img}
+                  onChange={(url) => handleInputChange(item.id, 'img', url)}
+                  folder="curiosidades"
+                  inputClassName="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
                 />
               </div>
 
