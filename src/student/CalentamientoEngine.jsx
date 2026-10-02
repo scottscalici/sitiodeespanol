@@ -9,7 +9,6 @@ import {
   query,
   where,
   setDoc,
-  deleteField,
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +59,11 @@ export default function CalentamientoEngine({ onClose }) {
   // In-app feedback modal (replaces native alert() popups)
   const [feedbackModal, setFeedbackModal] = useState(null); // { tone, emoji, title, message }
   const closeFeedbackModal = () => setFeedbackModal(null);
+
+  // When a student reopens an already-graded warmup and we have their
+  // submitted answers saved, we ask whether they want to review/edit them
+  // or practice with a brand new set — rather than silently picking for them.
+  const [restartChoice, setRestartChoice] = useState(null); // null | { draft, grade }
 
   // Reset Vocab States when moving to a new module
   useEffect(() => {
@@ -173,9 +177,22 @@ export default function CalentamientoEngine({ onClose }) {
 
     const draft = userData?.progress?.warmups_draft?.[warmupData.docId];
     const alreadyCompletedThisVerbSet = !!userData?.progress?.warmups?.[warmupData.docId]?.completed;
+
+    // Already graded, AND we have the actual submitted answers saved — let
+    // the student pick review-and-edit vs. a fresh set instead of deciding
+    // for them. (See handleFinishSession: a finished session's draft is kept,
+    // not deleted, specifically so this is possible.)
+    if (alreadyCompletedThisVerbSet && draft?.submitted) {
+      setRestartChoice({
+        draft,
+        grade: userData?.progress?.warmups?.[warmupData.docId]?.grade,
+      });
+      return;
+    }
+
     let resumed = false;
 
-    if (draft) {
+    if (draft && !draft.submitted) {
       const resume = window.confirm(
         'Encontramos respuestas guardadas de un intento anterior de este calentamiento. ¿Quieres continuar donde lo dejaste?'
       );
@@ -194,9 +211,11 @@ export default function CalentamientoEngine({ onClose }) {
       }
     }
 
-    // A fresh redo (no draft resumed) of a verb set already completed before
-    // gets a brand new random set from the same admin-authored configBlocks.
-    if (!resumed && alreadyCompletedThisVerbSet && warmupData.configBlocks?.length) {
+    // A fresh redo (no draft to resume or review) of a verb set already
+    // completed before — e.g. older data saved before submitted answers were
+    // kept — gets a brand new random set from the same admin-authored
+    // configBlocks, same as always.
+    if (!resumed && !draft && alreadyCompletedThisVerbSet && warmupData.configBlocks?.length) {
       (async () => {
         try {
           const verbsArray = await getCachedBucketedCollection('verbs');
@@ -215,6 +234,41 @@ export default function CalentamientoEngine({ onClose }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warmupData]);
+
+  // Student chose "review my answers" from the restart-choice modal. Answers
+  // and diagnostic history come back, but verbResults/completedModules are
+  // left blank on purpose — that forces a fresh "Revisar Bloque" click per
+  // page, which is what actually re-grades anything they edit instead of
+  // silently leaving the old correct/incorrect status next to a changed input.
+  const handleReviewSavedAnswers = () => {
+    const { draft } = restartChoice;
+    if (draft.verbInputs) setVerbInputs(draft.verbInputs);
+    if (draft.checkedOnce) setCheckedOnce(draft.checkedOnce);
+    if (draft.firstAttemptErrors) setFirstAttemptErrors(draft.firstAttemptErrors);
+    if (draft.sessionVerbs?.length) setSessionVerbs(draft.sessionVerbs);
+    setCurrentModule(1);
+    setRestartChoice(null);
+  };
+
+  // Student chose "practice a new set" — identical to the original
+  // auto-redo behavior: a brand new random verb set, blank answers.
+  const handlePracticeNewSet = async () => {
+    setRestartChoice(null);
+    if (!warmupData.configBlocks?.length) return;
+    try {
+      const verbsArray = await getCachedBucketedCollection('verbs');
+      const verbsMap = {};
+      verbsArray.forEach((v) => {
+        verbsMap[v.id] = v;
+      });
+      const fresh = generateVerbQuestions(warmupData.configBlocks, verbsMap, {
+        includeVosotros: warmupData.includeVosotros,
+      });
+      if (fresh.length) setSessionVerbs(fresh);
+    } catch (err) {
+      console.error('Error generating a fresh verb set for redo:', err);
+    }
+  };
 
   const formatTime = (secs) => {
     const mins = Math.floor(secs / 60);
@@ -512,10 +566,22 @@ export default function CalentamientoEngine({ onClose }) {
           ...bumpStreak(existingData),
         };
 
-        // 2. Always clear the in-progress draft now that the session is finished
+        // 2. Keep a snapshot of the submitted answers (marked `submitted`)
+        // instead of deleting the draft — this is what lets a student reopen
+        // an already-graded warmup later to review or edit their answers.
         updatePayload.progress = {
           warmups_draft: {
-            [warmupData.docId]: deleteField(),
+            [warmupData.docId]: {
+              verbInputs,
+              verbResults,
+              checkedOnce,
+              firstAttemptErrors,
+              completedModules,
+              currentModule,
+              ...(sessionVerbs ? { sessionVerbs } : {}),
+              submitted: true,
+              savedAt: new Date().toISOString(),
+            },
           },
         };
 
@@ -544,6 +610,20 @@ export default function CalentamientoEngine({ onClose }) {
     } else {
       setSaveState('saved');
     }
+  };
+
+  // Lets a student move freely backward through every module — verb pages
+  // and vocab sections alike — all the way from the last vocab section back
+  // to the first verb set. Forward navigation (the "Siguiente" buttons) is
+  // unchanged. Stepping back off the final results screen re-arms the
+  // auto-save so that editing an answer and reaching the end again actually
+  // resubmits the grade (see the auto-save effect below).
+  const goToPreviousModule = () => {
+    setCurrentModule((m) => {
+      if (m <= 1) return m;
+      if (m === totalModules) autoSavedRef.current = false;
+      return m - 1;
+    });
   };
 
   // Just navigates away — the score is already auto-saved by the time this
@@ -597,6 +677,15 @@ export default function CalentamientoEngine({ onClose }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {currentModule > 1 && (
+            <button
+              onClick={goToPreviousModule}
+              className="text-slate-300 hover:text-white font-black text-xs uppercase tracking-widest px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg"
+              title="Volver al módulo anterior"
+            >
+              ⬅ Anterior
+            </button>
+          )}
           {isAdmin && currentModule < totalModules && (
             <button
               onClick={() => setCurrentModule((m) => Math.min(m + 1, totalModules))}
@@ -937,6 +1026,37 @@ export default function CalentamientoEngine({ onClose }) {
           </div>
         )}
       </main>
+
+      {/* RESTART CHOICE MODAL — shown when reopening an already-graded warmup */}
+      {restartChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+          <div className="w-full max-w-sm rounded-3xl border-2 border-sky-500 bg-slate-800 p-8 text-center shadow-2xl">
+            <div className="text-5xl mb-4">📋</div>
+            <h3 className="text-xl font-black uppercase tracking-tight mb-2 text-sky-400">
+              Ya completaste este calentamiento
+            </h3>
+            <p className="text-sm text-slate-300 font-medium mb-6">
+              {typeof restartChoice.grade === 'number' &&
+                `Tu nota guardada es ${restartChoice.grade.toFixed(1)}%. `}
+              ¿Quieres revisar y editar tus respuestas, o practicar con un set nuevo?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleReviewSavedAnswers}
+                className="px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md transition-all"
+              >
+                📝 Revisar Mis Respuestas
+              </button>
+              <button
+                onClick={handlePracticeNewSet}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md transition-all"
+              >
+                🔄 Practicar con Set Nuevo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FEEDBACK MODAL (replaces native alert() popups) */}
       {feedbackModal && (
