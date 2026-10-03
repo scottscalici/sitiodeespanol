@@ -78,10 +78,17 @@ export default function CuriosidadQuizEngine() {
   const [shuffledAnswers, setShuffledAnswers] = useState([]);
   const [wrongFlashIdx, setWrongFlashIdx] = useState(null); // answer tile index to briefly flash red
 
-  // --- Image-select-type state ---
+  // --- Image-select-type state (also reused by multiple_choice below — both
+  // are "click one option, lock in on correct" single-select interactions,
+  // just over images vs. plain text) ---
   const [selectedImageIdx, setSelectedImageIdx] = useState([]); // currently toggled option indices
   const [imageSelectDone, setImageSelectDone] = useState(false); // locked in as correct
   const [imageWrongFlash, setImageWrongFlash] = useState(false);
+
+  // --- Category picker (for curiosidades whose questions are tagged with a
+  // `category`, e.g. a Jeopardy-style lightning round) ---
+  const [selectedCategory, setSelectedCategory] = useState(null); // null = show the picker
+  const [completedCategories, setCompletedCategories] = useState([]); // session-only, not persisted
 
   // --- Dropdown-cloze-type state ---
   const [clozeSelections, setClozeSelections] = useState([]); // current dropdown value per blank
@@ -167,6 +174,29 @@ export default function CuriosidadQuizEngine() {
     ? curiosidad.questions.reduce((sum, q) => sum + getItemCount(q), 0)
     : 0;
 
+  // Groups question indices by `category` (first-seen order), uncategorized
+  // questions falling into a shared "Otras" bucket so a curiosidad that
+  // mixes tagged and untagged questions still works. Entirely absent when
+  // no question carries a category — those curiosidades play exactly as
+  // before, straight through in one sequence.
+  const categoryGroups = curiosidad
+    ? (() => {
+        const indicesByCategory = {};
+        curiosidad.questions.forEach((q, idx) => {
+          const cat = q.category || 'Otras';
+          (indicesByCategory[cat] = indicesByCategory[cat] || []).push(idx);
+        });
+        const orderedNames = [...new Set(curiosidad.questions.map((q) => q.category || 'Otras'))];
+        return orderedNames.map((category) => ({ category, indices: indicesByCategory[category] }));
+      })()
+    : [];
+  const hasCategories = curiosidad ? curiosidad.questions.some((q) => q.category) : false;
+  const showCategoryPicker = hasCategories && selectedCategory === null;
+  const currentCategoryIndices = hasCategories
+    ? categoryGroups.find((g) => g.category === selectedCategory)?.indices || []
+    : [];
+  const posInCategory = currentCategoryIndices.indexOf(currentQuestion);
+
   const handleSelectLeft = (pairIdx) => {
     if (matchedPairIdx.includes(pairIdx)) return;
     setSelectedLeftIdx(pairIdx);
@@ -231,6 +261,27 @@ export default function CuriosidadQuizEngine() {
     recordImageSelectAttempt(selectedImageIdx, question);
   };
 
+  // Multiple-choice resolves the instant you click an option, same as
+  // image-select's single-correct-answer mode — reuses that same lock/flash
+  // state since the interaction is identical, just over text instead of images.
+  const handleSelectMC = (oIdx, question) => {
+    if (imageSelectDone) return;
+    const key = `${currentQuestion}-0`;
+    const isCorrect = question.options[oIdx] === question.answer;
+
+    if (!(key in firstAttemptRef.current)) {
+      firstAttemptRef.current[key] = isCorrect;
+    }
+
+    setSelectedImageIdx([oIdx]);
+    if (isCorrect) {
+      setImageSelectDone(true);
+    } else {
+      setImageWrongFlash(true);
+      setTimeout(() => setImageWrongFlash(false), 400);
+    }
+  };
+
   // Each blank grades independently and locks once correct, same first-
   // attempt-only principle as the other types (one key per blank index).
   const handleSelectClozeBlank = (blankIdx, value, question) => {
@@ -253,6 +304,10 @@ export default function CuriosidadQuizEngine() {
   };
 
   const goToPreviousQuestion = () => {
+    if (hasCategories) {
+      if (posInCategory > 0) setCurrentQuestion(currentCategoryIndices[posInCategory - 1]);
+      return;
+    }
     setCurrentQuestion((q) => Math.max(0, q - 1));
   };
 
@@ -344,10 +399,24 @@ export default function CuriosidadQuizEngine() {
   };
 
   const handleAdvance = () => {
-    const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
-    if (!isLastQuestion) {
-      setCurrentQuestion((q) => q + 1);
-      return;
+    if (hasCategories) {
+      if (posInCategory < currentCategoryIndices.length - 1) {
+        setCurrentQuestion(currentCategoryIndices[posInCategory + 1]);
+        return;
+      }
+      // Finished every question in this category — lock it and go back to
+      // the picker, unless that was the last category left, in which case
+      // the whole curiosidad is done (fall through to the finish check below).
+      const newCompleted = [...new Set([...completedCategories, selectedCategory])];
+      setCompletedCategories(newCompleted);
+      setSelectedCategory(null);
+      if (newCompleted.length < categoryGroups.length) return;
+    } else {
+      const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
+      if (!isLastQuestion) {
+        setCurrentQuestion((q) => q + 1);
+        return;
+      }
     }
 
     const minSeconds = curiosidad.minSeconds ?? 60;
@@ -466,14 +535,17 @@ export default function CuriosidadQuizEngine() {
 
   const question = curiosidad.questions[currentQuestion];
   const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
+  const isLastInCategory = hasCategories && posInCategory === currentCategoryIndices.length - 1;
+  const isLastCategoryRemaining = hasCategories && completedCategories.length === categoryGroups.length - 1;
   const isMatching = question.type === 'matching';
   const isImageSelect = question.type === 'image_select';
   const isDropdownCloze = question.type === 'dropdown_cloze';
+  const isMultipleChoice = question.type === 'multiple_choice';
   const isMultiSelect = isImageSelect && (question.correctIndices || []).length > 1;
 
   const allMatched = isMatching
     ? matchedPairIdx.length === question.pairs.length
-    : isImageSelect
+    : isImageSelect || isMultipleChoice
     ? imageSelectDone
     : isDropdownCloze
     ? clozeCorrect.length > 0 && clozeCorrect.every(Boolean)
@@ -484,7 +556,11 @@ export default function CuriosidadQuizEngine() {
       <header className="w-full max-w-3xl bg-slate-800 border border-slate-700 p-4 rounded-2xl flex justify-between items-center mb-6 shadow-md">
         <div>
           <span className="text-xs font-black text-sky-400 uppercase tracking-widest">
-            Curiosidad • Pregunta {currentQuestion + 1} de {curiosidad.questions.length}
+            {showCategoryPicker
+              ? 'Curiosidad • Elige una categoría'
+              : hasCategories
+              ? `${selectedCategory} • Pregunta ${posInCategory + 1} de ${currentCategoryIndices.length}`
+              : `Curiosidad • Pregunta ${currentQuestion + 1} de ${curiosidad.questions.length}`}
           </span>
           <h1 className="text-xl font-black text-white uppercase tracking-tight">
             {curiosidad.title}
@@ -506,6 +582,39 @@ export default function CuriosidadQuizEngine() {
 
       <main className="w-full max-w-3xl bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl min-h-[400px] flex flex-col justify-between">
         <div>
+          {showCategoryPicker && (
+            <div>
+              <p className="text-sm text-slate-300 font-bold mb-6 text-center">
+                Elige una categoría para comenzar
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {categoryGroups.map(({ category, indices }) => {
+                  const isDone = completedCategories.includes(category);
+                  return (
+                    <button
+                      key={category}
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        setCurrentQuestion(indices[0]);
+                      }}
+                      disabled={isDone}
+                      className={`p-5 rounded-xl border-2 font-black uppercase tracking-wide text-xs text-center transition-all ${
+                        isDone
+                          ? 'opacity-30 pointer-events-none bg-slate-950 border-slate-900 text-slate-600'
+                          : 'bg-slate-900 border-slate-700 hover:border-sky-400 text-slate-100'
+                      }`}
+                    >
+                      {isDone && '✅ '}
+                      {category}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!showCategoryPicker && (
+          <>
           <p className="text-sm text-slate-300 font-bold mb-2 text-center">{question.prompt}</p>
           {isMatching && question.pairs.length > 1 && (
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
@@ -642,10 +751,43 @@ export default function CuriosidadQuizEngine() {
               </p>
             </div>
           )}
+
+          {isMultipleChoice && (
+            <div
+              className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}
+            >
+              {question.options.map((opt, oIdx) => {
+                const isSelected = selectedImageIdx.includes(oIdx);
+                const showWrong = imageWrongFlash && isSelected;
+                const showCorrect = imageSelectDone && isSelected;
+                return (
+                  <button
+                    key={oIdx}
+                    onClick={() => handleSelectMC(oIdx, question)}
+                    disabled={imageSelectDone}
+                    className={`p-4 border-2 rounded-xl font-bold text-sm transition-all ${
+                      showWrong
+                        ? 'border-rose-500 bg-rose-950 text-rose-300'
+                        : showCorrect
+                        ? 'border-emerald-500 bg-emerald-950 text-emerald-300'
+                        : isSelected
+                        ? 'border-sky-400 bg-sky-950 text-slate-100'
+                        : 'bg-slate-900 border-slate-700 text-slate-200 hover:border-amber-400'
+                    } ${imageSelectDone && !isSelected ? 'opacity-40' : ''}`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          </>
+          )}
         </div>
 
+        {!showCategoryPicker && (
         <div className="flex items-center justify-between pt-6 border-t border-slate-700 mt-6">
-          {currentQuestion > 0 ? (
+          {(hasCategories ? posInCategory > 0 : currentQuestion > 0) ? (
             <button
               onClick={goToPreviousQuestion}
               className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-xs uppercase tracking-widest"
@@ -661,10 +803,19 @@ export default function CuriosidadQuizEngine() {
               onClick={handleAdvance}
               className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md animate-pulse"
             >
-              {isLastQuestion ? 'Terminar ✅' : 'Siguiente ➡'}
+              {hasCategories
+                ? isLastInCategory
+                  ? isLastCategoryRemaining
+                    ? 'Terminar ✅'
+                    : 'Categoría Completa ✅'
+                  : 'Siguiente ➡'
+                : isLastQuestion
+                ? 'Terminar ✅'
+                : 'Siguiente ➡'}
             </button>
           )}
         </div>
+        )}
       </main>
     </div>
   );

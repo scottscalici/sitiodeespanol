@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import ImageUploadField from '../shared/ImageUploadField';
+import { addPoolQuestion } from '../../utils/questionPool';
+
+// Shuffles a copy of the array (same simple approach as the student engine's
+// own shuffle — order just needs to vary, not be cryptographically random).
+const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
 // Each question type gets its own editor block below, picked by the same
 // `type` field the student engine branches on.
@@ -22,10 +27,39 @@ const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
 const emptyClozeBlank = () => ({ options: ['', ''], answer: '' });
 const emptyDropdownClozeQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
 
+// A single clue with 2-4 text options, one correct — the "Jeopardy-style"
+// question type. `category` groups questions into the student-facing
+// category picker (see CuriosidadQuizEngine); questions with no category
+// just play in the normal linear sequence like any other type. Every
+// multiple_choice question gets mirrored into the shared question_pool
+// collection on save (see handleSave below) so it's reusable in future
+// activities beyond this one curiosidad.
+const emptyMultipleChoiceQuestion = () => ({ type: 'multiple_choice', prompt: '', category: '', options: ['', ''], answer: '' });
+
 const TYPE_LABELS = {
   matching: 'Emparejar',
   image_select: 'Selección de Imagen',
   dropdown_cloze: 'Cloze con Menús',
+  multiple_choice: 'Opción Múltiple',
+};
+
+// Bulk-paste format, one clue per line: categoría | pregunta | respuesta | distractor1 | distractor2 | distractor3
+// (1 to 3 distractors — 2 to 4 total options). Point values aren't part of
+// this at all: they're purely cosmetic on a future Jeopardy board and have
+// no bearing on grading, so there's nothing to assign here.
+const parseBulkRow = (line) => {
+  const parts = line.split('|').map((s) => s.trim());
+  if (parts.length < 4) return null;
+  const [category, clue, answer, ...rest] = parts;
+  const distractors = rest.map((d) => d.trim()).filter(Boolean).slice(0, 3);
+  if (!category || !clue || !answer || distractors.length === 0) return null;
+  return {
+    type: 'multiple_choice',
+    prompt: clue,
+    category,
+    options: shuffle([answer, ...distractors]),
+    answer,
+  };
 };
 
 const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
@@ -191,6 +225,69 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     );
   };
 
+  // --- Multiple-choice-type helpers ---
+  const addMCOption = (qIdx) => {
+    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q)));
+  };
+
+  const updateMCOption = (qIdx, oIdx, value) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const oldValue = q.options[oIdx];
+        return {
+          ...q,
+          options: q.options.map((o, j) => (j === oIdx ? value : o)),
+          answer: q.answer === oldValue ? value : q.answer,
+        };
+      })
+    );
+  };
+
+  const removeMCOption = (qIdx, oIdx) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const removedValue = q.options[oIdx];
+        return {
+          ...q,
+          options: q.options.filter((_, j) => j !== oIdx),
+          answer: q.answer === removedValue ? '' : q.answer,
+        };
+      })
+    );
+  };
+
+  const setMCAnswer = (qIdx, value) => {
+    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, answer: value } : q)));
+  };
+
+  // --- Bulk import (multiple_choice only) ---
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkStatus, setBulkStatus] = useState('');
+
+  const handleBulkImport = () => {
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    const parsed = lines.map(parseBulkRow);
+    const valid = parsed.filter(Boolean);
+    const invalidCount = parsed.length - valid.length;
+
+    if (valid.length === 0) {
+      setBulkStatus('No se pudo leer ninguna línea. Formato: categoría | pregunta | respuesta | distractor1 | distractor2');
+      return;
+    }
+
+    setQuestions((prev) => [...prev, ...valid]);
+    setBulkText('');
+    setBulkImportOpen(false);
+    setBulkStatus(
+      invalidCount > 0
+        ? `Se importaron ${valid.length} pregunta(s). ${invalidCount} línea(s) no se pudieron leer y se omitieron.`
+        : ''
+    );
+  };
+
   // Saves straight to the database (see CuriosidadesManager's
   // handleSaveQuestions) — the modal stays open and shows an error on
   // failure instead of closing and losing the unsaved edits, and only
@@ -199,7 +296,31 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setSaving(true);
     setError('');
     try {
-      await onSave({ questions, minSeconds: Number(minSeconds) || 60, gradeWeight: Number(gradeWeight) || 1 });
+      // Mirror every not-yet-pooled multiple_choice question into the
+      // shared question_pool, so it's reusable later even outside this
+      // curiosidad — a blank question the admin added but never filled in
+      // is skipped rather than pooling junk. Written here (at save time)
+      // rather than the moment each question is created, so a typo fixed
+      // before saving is what actually lands in the pool.
+      const poolSyncedQuestions = await Promise.all(
+        questions.map(async (q) => {
+          if (q.type !== 'multiple_choice' || q.poolId || !q.prompt || !q.answer) return q;
+          const poolId = await addPoolQuestion({
+            clue: q.prompt,
+            answer: q.answer,
+            distractors: q.options.filter((o) => o && o !== q.answer),
+            category: q.category || '',
+            sourceCuriosidadId: curiosidad.id,
+          });
+          return { ...q, poolId };
+        })
+      );
+      setQuestions(poolSyncedQuestions);
+      await onSave({
+        questions: poolSyncedQuestions,
+        minSeconds: Number(minSeconds) || 60,
+        gradeWeight: Number(gradeWeight) || 1,
+      });
       onClose();
     } catch (err) {
       setError('No se pudo guardar. Revisa tu conexión e intenta de nuevo — tus cambios aquí no se perdieron.');
@@ -506,6 +627,65 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                   )}
                 </>
               )}
+
+              {q.type === 'multiple_choice' && (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
+                      Categoría
+                    </label>
+                    <input
+                      type="text"
+                      value={q.category}
+                      onChange={(e) => updateQuestion(qIdx, { category: e.target.value })}
+                      placeholder="p. ej. Geografía Extrema (opcional — agrupa preguntas por categoría)"
+                      className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
+                    />
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Marca con el círculo cuál opción es la correcta (2 a 4 opciones).
+                  </p>
+                  <div className="space-y-1.5">
+                    {q.options.map((opt, oIdx) => (
+                      <div key={oIdx} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`mc-${qIdx}-answer`}
+                          checked={q.answer === opt && opt !== ''}
+                          onChange={() => setMCAnswer(qIdx, opt)}
+                          title="Marcar como respuesta correcta"
+                        />
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => updateMCOption(qIdx, oIdx, e.target.value)}
+                          placeholder="Opción"
+                          className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
+                        />
+                        <button
+                          onClick={() => removeMCOption(qIdx, oIdx)}
+                          className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {q.options.length < 4 && (
+                    <button
+                      onClick={() => addMCOption(qIdx)}
+                      className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                    >
+                      + Agregar opción
+                    </button>
+                  )}
+                  {!q.answer && (
+                    <p className="text-[10px] text-amber-600 font-bold mt-1">
+                      Marca con el círculo cuál opción es la correcta.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           ))}
 
@@ -528,6 +708,61 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             >
               + Pregunta de Cloze con Menús
             </button>
+            <button
+              onClick={() => setQuestions((prev) => [...prev, emptyMultipleChoiceQuestion()])}
+              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
+            >
+              + Pregunta de Opción Múltiple
+            </button>
+          </div>
+
+          <div className="border-t border-slate-200 pt-4">
+            {!bulkImportOpen ? (
+              <button
+                onClick={() => setBulkImportOpen(true)}
+                className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+              >
+                📋 Importar en Lote (Opción Múltiple)
+              </button>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Una pregunta por línea — útil para pegar muchas de una vez
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                  categoría | pregunta | respuesta correcta | distractor 1 | distractor 2 | distractor 3
+                </p>
+                <textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={5}
+                  placeholder={
+                    'Geografía Extrema | El salar más grande del mundo | Salar de Uyuni | Atacama | Sahara\n' +
+                    'Gastronomía | Plato peruano con pescado marinado en limón | Ceviche | Mole | Paella'
+                  }
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={handleBulkImport}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+                  >
+                    Importar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setBulkImportOpen(false);
+                      setBulkText('');
+                      setBulkStatus('');
+                    }}
+                    className="text-xs font-bold text-slate-500 uppercase"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            {bulkStatus && <p className="text-xs text-slate-600 font-bold mt-2">{bulkStatus}</p>}
           </div>
         </div>
 
