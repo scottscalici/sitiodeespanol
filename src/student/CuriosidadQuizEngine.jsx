@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
+import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
 
 // Shuffles a copy of the array (Fisher-Yates would be overkill here — a
 // simple random sort is fine for a handful of answer tiles).
@@ -48,6 +49,7 @@ export default function CuriosidadQuizEngine() {
   const [waitingForMinTime, setWaitingForMinTime] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [finalGrade, setFinalGrade] = useState(null);
+  const [pointsAwarded, setPointsAwarded] = useState(null);
 
   const isAdmin = userData?.role === 'admin';
 
@@ -192,21 +194,49 @@ export default function CuriosidadQuizEngine() {
     try {
       const userRef = doc(db, 'users', userData.uid);
       const snap = await getDoc(userRef);
-      const existingGrade = snap.exists() ? snap.data().progress?.curiosidades?.[curiosidadId]?.grade ?? -1 : -1;
+      const data = snap.exists() ? snap.data() : {};
+      const existingEntry = data.progress?.curiosidades?.[curiosidadId];
+      const existingGrade = existingEntry?.grade ?? -1;
+      const alreadyCompletedBefore = !!existingEntry?.completed;
+      const bestGrade = Math.max(grade, existingGrade);
 
-      if (grade > existingGrade) {
-        await setDoc(
-          userRef,
-          {
-            progress: {
-              curiosidades: {
-                [curiosidadId]: { completed: true, grade, timestamp: new Date().toISOString() },
-              },
-            },
+      // Generous on purpose: half of your first-attempt percentage becomes
+      // class-ranking points (100% -> 50, 50% -> 25). Unlike Calentamiento,
+      // the grade here is just a flat completion credit, so this is what
+      // pushes kids to actually try the first time through. Only ever
+      // awarded once per curiosidad — same anti-farming rule as
+      // Calentamiento — so replaying it for a better grade can't also farm
+      // more points.
+      const pointsEarned = alreadyCompletedBefore ? 0 : Math.round(grade / 2);
+      setPointsAwarded(pointsEarned);
+
+      const updatePayload = {
+        progress: {
+          curiosidades: {
+            [curiosidadId]: { completed: true, grade: bestGrade, timestamp: new Date().toISOString() },
           },
-          { merge: true }
-        );
+        },
+      };
+
+      if (pointsEarned > 0) {
+        const weekKey = getWeekKey();
+        const monthKey = getMonthKey();
+        let newTotal = pointsEarned + (data.total_points || data.current_path_points || 0);
+        let newMonthly = pointsEarned + (data.monthKey === monthKey ? data.monthly_points || 0 : 0);
+        let newWeekly = pointsEarned + (data.weekKey === weekKey ? data.weekly_points || 0 : 0);
+        let newDaily = pointsEarned + (data.daily_points || 0);
+
+        updatePayload.total_points = newTotal;
+        updatePayload.current_path_points = newTotal;
+        updatePayload.monthly_points = newMonthly;
+        updatePayload.weekly_points = newWeekly;
+        updatePayload.daily_points = newDaily;
+        updatePayload.weekKey = weekKey;
+        updatePayload.monthKey = monthKey;
+        Object.assign(updatePayload, bumpStreak(data));
       }
+
+      await setDoc(userRef, updatePayload, { merge: true });
       setSaveState('saved');
     } catch (err) {
       console.error('Error saving curiosidad quiz grade:', err);
@@ -301,6 +331,19 @@ export default function CuriosidadQuizEngine() {
         <p className="text-xs font-bold text-slate-400">
           {correctCount} de {totalItems} correctas en el primer intento
         </p>
+
+        {!isAdmin && (
+          <div className="p-4 bg-amber-950/30 rounded-2xl border border-amber-900/50 max-w-xs mx-auto">
+            {pointsAwarded === null ? (
+              <p className="text-sm text-slate-400 italic animate-pulse">Calculando recompensa...</p>
+            ) : pointsAwarded === 0 ? (
+              <p className="text-sm font-black text-slate-400">Ya ganaste tus puntos la primera vez</p>
+            ) : (
+              <p className="text-2xl font-black text-amber-400">🏆 +{pointsAwarded} Puntos</p>
+            )}
+          </div>
+        )}
+
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
           {saveState === 'saving' && '💾 Guardando tu progreso...'}
           {saveState === 'saved' && '✅ Progreso guardado'}
