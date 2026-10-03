@@ -11,6 +11,7 @@ const CuriosidadesManager = () => {
   const [items, setItems] = useState([]);
   // The curiosidad currently open in the question-authoring modal, or null.
   const [questionsModalItem, setQuestionsModalItem] = useState(null);
+  const [savingQuestions, setSavingQuestions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isBundled, setIsBundled] = useState(false);
@@ -99,6 +100,43 @@ const CuriosidadesManager = () => {
       }
       return item;
     }));
+  };
+
+  // Saving a curiosidad's questions used to only update this page's local
+  // state, relying on a separate top-level "Guardar Cambios" click to
+  // actually reach Firestore — easy to miss, and a refresh (or a stale
+  // screen restored by the browser's back/forward buttons) would silently
+  // lose it with no error shown. This writes immediately and re-reads the
+  // bundle doc fresh first, merging in just this one item's change, so a
+  // stale local `items` snapshot can't clobber anyone else's edits either.
+  const handleSaveQuestions = async (itemId, { questions, minSeconds }) => {
+    setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, questions, minSeconds } : item)));
+    setSavingQuestions(true);
+    try {
+      if (isBundled) {
+        const querySnapshot = await getDocs(collection(db, 'curiosidades'));
+        let bundleData = null;
+        querySnapshot.forEach((docSnap) => {
+          if (docSnap.id === BUNDLE_DOC_ID) bundleData = docSnap.data();
+        });
+        const liveItems = bundleData?.items || {};
+        const updatedItems = {
+          ...liveItems,
+          [itemId]: { ...(liveItems[itemId] || {}), questions, minSeconds },
+        };
+        await setDoc(doc(db, 'curiosidades', BUNDLE_DOC_ID), { items: updatedItems });
+      } else {
+        await setDoc(doc(db, 'curiosidades', itemId), { questions, minSeconds }, { merge: true });
+      }
+      invalidateCollectionCache('curiosidades');
+    } catch (error) {
+      console.error('Error saving curiosidad questions:', error);
+      // Re-thrown so the modal can show its own inline error and stay open
+      // (instead of closing and silently losing the unsaved edits).
+      throw error;
+    } finally {
+      setSavingQuestions(false);
+    }
   };
 
   const handleSave = async () => {
@@ -378,10 +416,7 @@ const CuriosidadesManager = () => {
         <CuriosidadQuestionsModal
           curiosidad={questionsModalItem}
           onClose={() => setQuestionsModalItem(null)}
-          onSave={({ questions, minSeconds }) => {
-            handleInputChange(questionsModalItem.id, 'questions', questions);
-            handleInputChange(questionsModalItem.id, 'minSeconds', minSeconds);
-          }}
+          onSave={(payload) => handleSaveQuestions(questionsModalItem.id, payload)}
         />
       )}
     </div>
