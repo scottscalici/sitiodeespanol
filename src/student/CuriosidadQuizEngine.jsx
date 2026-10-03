@@ -452,7 +452,11 @@ export default function CuriosidadQuizEngine() {
                     }`}
                   >
                     {pair.left.type === 'image' ? (
-                      <img src={pair.left.value} alt="" className="w-full h-20 object-cover rounded-lg" />
+                      <img
+                        src={pair.left.value}
+                        alt=""
+                        className="w-full h-32 object-contain bg-slate-950 rounded-lg"
+                      />
                     ) : (
                       <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
                     )}
