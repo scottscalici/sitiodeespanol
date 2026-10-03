@@ -553,13 +553,13 @@ export default function CuriosidadQuizEngine() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">
-      <header className="w-full max-w-3xl bg-slate-800 border border-slate-700 p-4 rounded-2xl flex justify-between items-center mb-6 shadow-md">
+      <header className={`w-full ${showCategoryPicker ? 'max-w-5xl' : 'max-w-3xl'} bg-slate-800 border border-slate-700 p-4 rounded-2xl flex justify-between items-center mb-6 shadow-md`}>
         <div>
           <span className="text-xs font-black text-sky-400 uppercase tracking-widest">
             {showCategoryPicker
               ? 'Curiosidad • Elige una categoría'
               : hasCategories
-              ? `${selectedCategory} • Pregunta ${posInCategory + 1} de ${currentCategoryIndices.length}`
+              ? `${selectedCategory} • ${(posInCategory + 1) * 100} puntos`
               : `Curiosidad • Pregunta ${currentQuestion + 1} de ${curiosidad.questions.length}`}
           </span>
           <h1 className="text-xl font-black text-white uppercase tracking-tight">
@@ -580,14 +580,23 @@ export default function CuriosidadQuizEngine() {
         </button>
       </header>
 
-      <main className="w-full max-w-3xl bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl min-h-[400px] flex flex-col justify-between">
+      <main className={`w-full ${showCategoryPicker ? 'max-w-5xl' : 'max-w-3xl'} bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl min-h-[400px] flex flex-col justify-between`}>
         <div>
           {showCategoryPicker && (
             <div>
               <p className="text-sm text-slate-300 font-bold mb-6 text-center">
                 Elige una categoría para comenzar
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {/* A real Jeopardy-style board: one column per category, its
+                  name as a header and a stack of point-value cells below it
+                  sized to however many questions that category actually has
+                  (categories don't need to match in size — a "Potpourri"
+                  catch-all with a different count works the same way). The
+                  whole column is one click target — order within a category
+                  is still fixed/sequential once inside, this is a visual
+                  upgrade over the plain category list, not a cell-by-cell
+                  pick-any-question board. */}
+              <div className="flex flex-wrap justify-center items-start gap-3">
                 {categoryGroups.map(({ category, indices }) => {
                   const isDone = completedCategories.includes(category);
                   return (
@@ -598,14 +607,32 @@ export default function CuriosidadQuizEngine() {
                         setCurrentQuestion(indices[0]);
                       }}
                       disabled={isDone}
-                      className={`p-5 rounded-xl border-2 font-black uppercase tracking-wide text-xs text-center transition-all ${
+                      className={`flex flex-col w-28 rounded-xl overflow-hidden border-2 transition-all ${
                         isDone
-                          ? 'opacity-30 pointer-events-none bg-slate-950 border-slate-900 text-slate-600'
-                          : 'bg-slate-900 border-slate-700 hover:border-sky-400 text-slate-100'
+                          ? 'opacity-40 pointer-events-none border-slate-900'
+                          : 'border-slate-700 hover:border-sky-400'
                       }`}
                     >
-                      {isDone && '✅ '}
-                      {category}
+                      <div
+                        className={`font-black uppercase tracking-wide text-[10px] text-center p-2 leading-tight ${
+                          isDone ? 'bg-slate-900 text-slate-500' : 'bg-indigo-700 text-white'
+                        }`}
+                      >
+                        {isDone && '✅ '}
+                        {category}
+                      </div>
+                      <div className="flex flex-col divide-y divide-slate-700">
+                        {indices.map((_, i) => (
+                          <div
+                            key={i}
+                            className={`py-3 text-center font-black text-lg ${
+                              isDone ? 'bg-slate-950 text-slate-700' : 'bg-slate-900 text-amber-400'
+                            }`}
+                          >
+                            {isDone ? '✓' : (i + 1) * 100}
+                          </div>
+                        ))}
+                      </div>
                     </button>
                   );
                 })}
@@ -780,6 +807,16 @@ export default function CuriosidadQuizEngine() {
                 );
               })}
             </div>
+          )}
+
+          {/* Purely a fun flourish mirroring the board's point values — the
+              real ranking points (pointsAwarded, shown on the results
+              screen) are computed the same accuracy-based way as every
+              other curiosidad type, completely independent of this number. */}
+          {isMultipleChoice && hasCategories && imageSelectDone && (
+            <p className="text-center text-amber-400 font-black text-lg mt-4 animate-pulse">
+              🎉 +{(posInCategory + 1) * 100} puntos
+            </p>
           )}
           </>
           )}
