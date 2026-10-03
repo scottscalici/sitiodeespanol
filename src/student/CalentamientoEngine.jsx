@@ -677,15 +677,6 @@ export default function CalentamientoEngine({ onClose }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {currentModule > 1 && (
-            <button
-              onClick={goToPreviousModule}
-              className="text-slate-300 hover:text-white font-black text-xs uppercase tracking-widest px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg"
-              title="Volver al módulo anterior"
-            >
-              ⬅ Anterior
-            </button>
-          )}
           {isAdmin && currentModule < totalModules && (
             <button
               onClick={() => setCurrentModule((m) => Math.min(m + 1, totalModules))}
@@ -773,14 +764,24 @@ export default function CalentamientoEngine({ onClose }) {
                 Revisar Bloque
               </button>
 
-              {completedModules >= currentModule && (
-                <button
-                  onClick={() => setCurrentModule(currentModule + 1)}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md transition-all animate-pulse"
-                >
-                  Siguiente ➡
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {currentModule > 1 && (
+                  <button
+                    onClick={goToPreviousModule}
+                    className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md transition-all"
+                  >
+                    ⬅ Anterior
+                  </button>
+                )}
+                {completedModules >= currentModule && (
+                  <button
+                    onClick={() => setCurrentModule(currentModule + 1)}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md transition-all animate-pulse"
+                  >
+                    Siguiente ➡
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -841,6 +842,15 @@ export default function CalentamientoEngine({ onClose }) {
                           className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl uppercase tracking-widest text-xs transition-all border border-slate-600"
                         >
                           Saltar Vocabulario (Ya Completado) ⏭️
+                        </button>
+                      )}
+
+                      {currentModule > 1 && (
+                        <button
+                          onClick={goToPreviousModule}
+                          className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold rounded-xl uppercase tracking-widest text-xs transition-all border border-slate-600"
+                        >
+                          ⬅ Anterior
                         </button>
                       )}
                     </div>
@@ -910,12 +920,22 @@ export default function CalentamientoEngine({ onClose }) {
                     <h3 className="text-2xl font-black text-emerald-400 uppercase tracking-tighter mb-6">
                       ¡Módulo Completado!
                     </h3>
-                    <button
-                      onClick={() => setCurrentModule(currentModule + 1)}
-                      className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl uppercase tracking-widest shadow-md transition-all animate-pulse"
-                    >
-                      Siguiente ➡
-                    </button>
+                    <div className="flex items-center justify-center gap-3">
+                      {currentModule > 1 && (
+                        <button
+                          onClick={goToPreviousModule}
+                          className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl uppercase tracking-widest text-xs transition-all"
+                        >
+                          ⬅ Anterior
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setCurrentModule(currentModule + 1)}
+                        className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl uppercase tracking-widest shadow-md transition-all animate-pulse"
+                      >
+                        Siguiente ➡
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1017,12 +1037,21 @@ export default function CalentamientoEngine({ onClose }) {
               {saveState === 'error' && '⚠️ Hubo un problema guardando. Intenta de nuevo antes de salir.'}
             </p>
 
-            <button
-              onClick={handleReturnHome}
-              className="px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest text-xs transition-transform hover:scale-105"
-            >
-              🚀 Volver
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={goToPreviousModule}
+                className="px-6 py-4 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs transition-all"
+                title="Volver atrás para revisar o ajustar una respuesta"
+              >
+                ⬅ Anterior
+              </button>
+              <button
+                onClick={handleReturnHome}
+                className="px-8 py-4 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest text-xs transition-transform hover:scale-105"
+              >
+                🚀 Volver
+              </button>
+            </div>
           </div>
         )}
       </main>
