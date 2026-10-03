@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ImageUploadField from '../shared/ImageUploadField';
+import QuestionPoolPickerModal from '../shared/QuestionPoolPickerModal';
 import { addPoolQuestion } from '../../utils/questionPool';
 
 // Shuffles a copy of the array (same simple approach as the student engine's
@@ -72,6 +73,18 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
   const [gradeWeight, setGradeWeight] = useState(curiosidad.gradeWeight ?? 1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Explicit, deliberate choice between a normal sequential curiosidad (even
+  // one made of several multiple_choice questions, e.g. a few MC questions
+  // about Las Fallas) and a Jeopardy-style board grouped into categories —
+  // rather than leaving the student engine's category picker to switch on by
+  // accident just because a Categoría field happened to get typed into.
+  // Defaults to whatever this curiosidad's existing questions already imply,
+  // so reopening a real Jeopardy board doesn't reset it to Secuencial.
+  const [jeopardyMode, setJeopardyMode] = useState(
+    (curiosidad.questions || []).some((q) => q.type === 'multiple_choice' && q.category)
+  );
+  const [poolPickerOpen, setPoolPickerOpen] = useState(false);
 
   const updateQuestion = (qIdx, patch) => {
     setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, ...patch } : q)));
@@ -288,6 +301,22 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     );
   };
 
+  // Entries picked from the shared pool already carry a real pool doc id —
+  // passed through as `poolId` so handleSave's sync step (below) recognizes
+  // them as already-pooled and skips writing a duplicate.
+  const handlePoolPicked = (pickedEntries) => {
+    const newQuestions = pickedEntries.map((entry) => ({
+      type: 'multiple_choice',
+      prompt: entry.clue,
+      category: entry.category || '',
+      options: shuffle([entry.answer, ...(entry.distractors || [])]),
+      answer: entry.answer,
+      poolId: entry.id,
+    }));
+    setQuestions((prev) => [...prev, ...newQuestions]);
+    setPoolPickerOpen(false);
+  };
+
   // Saves straight to the database (see CuriosidadesManager's
   // handleSaveQuestions) — the modal stays open and shows an error on
   // failure instead of closing and losing the unsaved edits, and only
@@ -296,6 +325,15 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setSaving(true);
     setError('');
     try {
+      // In Secuencial mode, a category — however it got there (typed in
+      // earlier, or carried over from a pool entry) — would wrongly trip the
+      // student engine's category picker, which only checks whether ANY
+      // question has one. Stripping it here keeps that check in sync with
+      // the explicit mode choice instead of an incidental field value.
+      const modeCorrectedQuestions = jeopardyMode
+        ? questions
+        : questions.map((q) => (q.type === 'multiple_choice' ? { ...q, category: '' } : q));
+
       // Mirror every not-yet-pooled multiple_choice question into the
       // shared question_pool, so it's reusable later even outside this
       // curiosidad — a blank question the admin added but never filled in
@@ -303,7 +341,7 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
       // rather than the moment each question is created, so a typo fixed
       // before saving is what actually lands in the pool.
       const poolSyncedQuestions = await Promise.all(
-        questions.map(async (q) => {
+        modeCorrectedQuestions.map(async (q) => {
           if (q.type !== 'multiple_choice' || q.poolId || !q.prompt || !q.answer) return q;
           const poolId = await addPoolQuestion({
             clue: q.prompt,
@@ -371,6 +409,35 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
         </div>
 
         <div className="p-5 space-y-6">
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div>
+              <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Modo de la Curiosidad</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {jeopardyMode
+                  ? 'Los estudiantes eligen una categoría a la vez, estilo Jeopardy.'
+                  : 'Las preguntas corren en una sola secuencia, como cualquier otra curiosidad.'}
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => setJeopardyMode(false)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  !jeopardyMode ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-300 text-slate-500'
+                }`}
+              >
+                Secuencial
+              </button>
+              <button
+                onClick={() => setJeopardyMode(true)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  jeopardyMode ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-300 text-slate-500'
+                }`}
+              >
+                🏆 Jeopardy (categorías)
+              </button>
+            </div>
+          </div>
+
           {questions.length === 0 && (
             <p className="text-sm text-slate-400 italic text-center py-6">
               Todavía no hay preguntas. Agrega una abajo.
@@ -630,18 +697,20 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
 
               {q.type === 'multiple_choice' && (
                 <>
-                  <div className="flex items-center gap-2 mb-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
-                      Categoría
-                    </label>
-                    <input
-                      type="text"
-                      value={q.category}
-                      onChange={(e) => updateQuestion(qIdx, { category: e.target.value })}
-                      placeholder="p. ej. Geografía Extrema (opcional — agrupa preguntas por categoría)"
-                      className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
-                    />
-                  </div>
+                  {jeopardyMode && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
+                        Categoría
+                      </label>
+                      <input
+                        type="text"
+                        value={q.category}
+                        onChange={(e) => updateQuestion(qIdx, { category: e.target.value })}
+                        placeholder="p. ej. Geografía Extrema — igual en cada pregunta de esta categoría"
+                        className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
+                      />
+                    </div>
+                  )}
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
                     Marca con el círculo cuál opción es la correcta (2 a 4 opciones).
                   </p>
@@ -716,14 +785,23 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             </button>
           </div>
 
+          {jeopardyMode && (
           <div className="border-t border-slate-200 pt-4">
             {!bulkImportOpen ? (
-              <button
-                onClick={() => setBulkImportOpen(true)}
-                className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
-              >
-                📋 Importar en Lote (Opción Múltiple)
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setBulkImportOpen(true)}
+                  className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                >
+                  📋 Importar en Lote (Opción Múltiple)
+                </button>
+                <button
+                  onClick={() => setPoolPickerOpen(true)}
+                  className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                >
+                  🗂️ Elegir de la Reserva
+                </button>
+              </div>
             ) : (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
@@ -764,6 +842,7 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             )}
             {bulkStatus && <p className="text-xs text-slate-600 font-bold mt-2">{bulkStatus}</p>}
           </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 flex items-center justify-end gap-3">
@@ -779,6 +858,10 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             {saving ? 'Guardando...' : 'Guardar Preguntas'}
           </button>
         </div>
+
+        {poolPickerOpen && (
+          <QuestionPoolPickerModal onSelect={handlePoolPicked} onClose={() => setPoolPickerOpen(false)} />
+        )}
       </div>
     </div>
   );

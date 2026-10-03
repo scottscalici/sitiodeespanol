@@ -1,4 +1,4 @@
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // A reusable bank of atomic trivia facts (clue + answer + optional
@@ -17,4 +17,14 @@ export const addPoolQuestion = async ({ clue, answer, distractors = [], category
     createdAt: serverTimestamp(),
   });
   return docRef.id;
+};
+
+// Lists every fact in the pool, newest first, so an admin can reuse one
+// instead of retyping it — read fresh on every call (no caching) since the
+// admin's own just-saved clues should show up immediately.
+export const listPoolQuestions = async () => {
+  const snapshot = await getDocs(collection(db, 'question_pool'));
+  const entries = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  entries.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return entries;
 };
