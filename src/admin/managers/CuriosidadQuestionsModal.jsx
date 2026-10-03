@@ -7,10 +7,20 @@ import { addPoolQuestion } from '../../utils/questionPool';
 // own shuffle — order just needs to vary, not be cryptographically random).
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
+// Turns a raw, freely-typed textarea value into a clean list — one entry per
+// non-empty line, trimmed. Used at save time, never while typing: a textarea
+// whose `value` is always re-derived from an already-filtered array (e.g.
+// re-joining with '\n' after stripping blank lines on every keystroke) can't
+// let you press Enter to start a new blank line, since the empty line you
+// just created gets silently stripped right back out before the next
+// render — the cursor appears stuck. Keeping the raw text as its own field
+// and only parsing it into a real list on save avoids that entirely.
+const parseLines = (text) => (text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+
 // Each question type gets its own editor block below, picked by the same
 // `type` field the student engine branches on.
 const emptyPair = () => ({ left: { type: 'text', value: '' }, answer: '' });
-const emptyMatchingQuestion = () => ({ type: 'matching', prompt: '', pairs: [emptyPair()], distractors: [] });
+const emptyMatchingQuestion = () => ({ type: 'matching', prompt: '', pairs: [emptyPair()], distractorsText: '' });
 const emptyImageOption = () => ({ img: '', label: '' });
 const emptyImageSelectQuestion = () => ({
   type: 'image_select',
@@ -28,13 +38,23 @@ const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
 const emptyClozeBlank = () => ({ options: ['', ''], answer: '' });
 const emptyDropdownClozeQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
 
-// Same "{{blank}}"-tagged passage, but every blank shares ONE word bank
-// (typed once) instead of each blank getting its own option list — the
-// classic "fill in the blanks using the word bank" worksheet, where a word
-// already used correctly in one blank disappears from the others. Admin
-// types the shared bank once (correct answers + any extra distractors all
-// together) and just assigns which bank word is correct for each blank.
-const emptyWordBankClozeQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', text: '', wordBank: [], answers: [] });
+// Same shared-word-bank cloze idea, but authored by writing the actual
+// correct word directly in the passage inside double braces — e.g.
+// "El pato nada en {{agua}}." — instead of a generic "{{blank}}" token plus
+// a separate per-blank answer picker. parseAnswerTokens turns that into the
+// blank-tokenized text the student engine renders, plus the answers in
+// order; any extra distractors are typed separately and merged in at save
+// time (see handleSave) into the final, alphabetized wordBank.
+const ANSWER_TOKEN_REGEX = /\{\{([^{}]+)\}\}/g;
+const parseAnswerTokens = (rawText) => {
+  const answers = [];
+  const text = (rawText || '').replace(ANSWER_TOKEN_REGEX, (match, word) => {
+    answers.push(word.trim());
+    return '{{blank}}';
+  });
+  return { text, answers };
+};
+const emptyWordBankClozeQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', rawText: '', distractorsText: '' });
 
 // A single clue with 2-4 text options, one correct — the "Jeopardy-style"
 // question type. `category` groups questions into the student-facing
@@ -72,8 +92,29 @@ const parseBulkRow = (line) => {
   };
 };
 
+// Reopening an already-saved curiosidad only has the final, persisted shape
+// (matching's plain `distractors` array; word_bank_cloze's blank-tokenized
+// `text` + `answers`) — never the raw, freely-typed text these editors
+// actually edit. Reconstructs that raw text once on load so editing an
+// existing question starts from something that reads naturally, instead of
+// a blank textarea next to already-filled-in data.
+const reconstructEditableFields = (rawQuestions) =>
+  (rawQuestions || []).map((q) => {
+    if (q.type === 'matching' && q.distractorsText === undefined) {
+      return { ...q, distractorsText: (q.distractors || []).join('\n') };
+    }
+    if (q.type === 'word_bank_cloze' && q.rawText === undefined) {
+      const answers = q.answers || [];
+      let i = 0;
+      const rawText = (q.text || '').replace(/\{\{blank\}\}/g, () => `{{${answers[i++] ?? ''}}}`);
+      const distractorsText = (q.wordBank || []).filter((w) => !answers.includes(w)).join('\n');
+      return { ...q, rawText, distractorsText };
+    }
+    return q;
+  });
+
 const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
-  const [questions, setQuestions] = useState(curiosidad.questions || []);
+  const [questions, setQuestions] = useState(() => reconstructEditableFields(curiosidad.questions));
   const [minSeconds, setMinSeconds] = useState(curiosidad.minSeconds ?? 60);
   // How many points this is worth toward the pooled "Promedio Calentamientos"
   // class grade (completion-only, same as practice cards' own gradeWeight) —
@@ -247,37 +288,6 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     );
   };
 
-  // --- Word-bank-cloze-type helpers ---
-  // Same token-counting idea as updateClozeText, but keeps a flat `answers`
-  // array (one correct word per blank) instead of growing/shrinking a full
-  // blanks array, since all blanks share the one wordBank list below.
-  const updateWordBankClozeText = (qIdx, text) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const needed = countBlanks(text);
-        let answers = q.answers || [];
-        if (needed > answers.length) {
-          answers = [...answers, ...Array(needed - answers.length).fill('')];
-        } else if (needed < answers.length) {
-          answers = answers.slice(0, needed);
-        }
-        return { ...q, text, answers };
-      })
-    );
-  };
-
-  const updateWordBank = (qIdx, text) => {
-    const wordBank = text.split('\n').map((w) => w.trim()).filter(Boolean);
-    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, wordBank } : q)));
-  };
-
-  const setWordBankAnswer = (qIdx, bIdx, value) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === qIdx ? { ...q, answers: q.answers.map((a, j) => (j === bIdx ? value : a)) } : q))
-    );
-  };
-
   // --- Multiple-choice-type helpers ---
   const addMCOption = (qIdx) => {
     setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q)));
@@ -357,6 +367,28 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setPoolPickerOpen(false);
   };
 
+  // Converts the raw, freely-typed editing fields (distractorsText, rawText)
+  // into the final shape the student engine actually reads — matching's
+  // `distractors` array, word_bank_cloze's blank-tokenized `text` + ordered
+  // `answers` + alphabetized `wordBank` (answers and distractors merged,
+  // deduped). The raw fields are dropped from what gets persisted; they're
+  // reconstructed from this same final shape if the question is edited again
+  // (see reconstructEditableFields above).
+  const finalizeQuestion = (q) => {
+    if (q.type === 'matching') {
+      const { distractorsText, ...rest } = q;
+      return { ...rest, distractors: parseLines(distractorsText) };
+    }
+    if (q.type === 'word_bank_cloze') {
+      const { rawText, distractorsText, ...rest } = q;
+      const { text, answers } = parseAnswerTokens(rawText);
+      const distractors = parseLines(distractorsText);
+      const wordBank = [...new Set([...answers, ...distractors])].sort((a, b) => a.localeCompare(b, 'es'));
+      return { ...rest, text, answers, wordBank };
+    }
+    return q;
+  };
+
   // Saves straight to the database (see CuriosidadesManager's
   // handleSaveQuestions) — the modal stays open and shows an error on
   // failure instead of closing and losing the unsaved edits, and only
@@ -365,23 +397,18 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setSaving(true);
     setError('');
     try {
-      // In Secuencial mode, a category — however it got there (typed in
-      // earlier, or carried over from a pool entry) — would wrongly trip the
-      // student engine's category picker, which only checks whether ANY
-      // question has one. Stripping it here keeps that check in sync with
-      // the explicit mode choice instead of an incidental field value.
-      const modeCorrectedQuestions = jeopardyMode
-        ? questions
-        : questions.map((q) => (q.type === 'multiple_choice' ? { ...q, category: '' } : q));
-
       // Mirror every not-yet-pooled multiple_choice question into the
       // shared question_pool, so it's reusable later even outside this
       // curiosidad — a blank question the admin added but never filled in
       // is skipped rather than pooling junk. Written here (at save time)
       // rather than the moment each question is created, so a typo fixed
-      // before saving is what actually lands in the pool.
+      // before saving is what actually lands in the pool. Mapped over the
+      // RAW questions (not yet finalized) and written back to local state
+      // as-is — multiple_choice questions have no raw editable fields to
+      // lose, so this never clobbers another type's in-progress edits if a
+      // later step in this same save fails.
       const poolSyncedQuestions = await Promise.all(
-        modeCorrectedQuestions.map(async (q) => {
+        questions.map(async (q) => {
           if (q.type !== 'multiple_choice' || q.poolId || !q.prompt || !q.answer) return q;
           const poolId = await addPoolQuestion({
             clue: q.prompt,
@@ -394,8 +421,20 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
         })
       );
       setQuestions(poolSyncedQuestions);
+
+      const finalizedQuestions = poolSyncedQuestions.map(finalizeQuestion);
+
+      // In Secuencial mode, a category — however it got there (typed in
+      // earlier, or carried over from a pool entry) — would wrongly trip the
+      // student engine's category picker, which only checks whether ANY
+      // question has one. Stripping it here keeps that check in sync with
+      // the explicit mode choice instead of an incidental field value.
+      const modeCorrectedQuestions = jeopardyMode
+        ? finalizedQuestions
+        : finalizedQuestions.map((q) => (q.type === 'multiple_choice' ? { ...q, category: '' } : q));
+
       await onSave({
-        questions: poolSyncedQuestions,
+        questions: modeCorrectedQuestions,
         minSeconds: Number(minSeconds) || 60,
         gradeWeight: Number(gradeWeight) || 1,
       });
@@ -579,12 +618,8 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                       Distractores extra (opcional, uno por línea)
                     </label>
                     <textarea
-                      value={(q.distractors || []).join('\n')}
-                      onChange={(e) =>
-                        updateQuestion(qIdx, {
-                          distractors: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean),
-                        })
-                      }
+                      value={q.distractorsText || ''}
+                      onChange={(e) => updateQuestion(qIdx, { distractorsText: e.target.value })}
                       rows={2}
                       className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
                       placeholder="Respuestas incorrectas extra que aparecerán en el banco de opciones"
@@ -735,81 +770,63 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                 </>
               )}
 
-              {q.type === 'word_bank_cloze' && (
-                <>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Escribe el párrafo y pon <code className="bg-slate-200 px-1 rounded">{BLANK_TOKEN}</code> donde
-                    va cada espacio en blanco — todos comparten el mismo banco de palabras de abajo.
-                  </p>
-
-                  <div className="flex items-start gap-2 mb-3">
-                    {q.img && (
-                      <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
-                    )}
-                    <ImageUploadField
-                      value={q.img}
-                      onChange={(url) => updateQuestion(qIdx, { img: url })}
-                      folder="curiosidades"
-                      placeholder="Imagen opcional"
-                      inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
-                    />
-                  </div>
-
-                  <textarea
-                    value={q.text}
-                    onChange={(e) => updateWordBankClozeText(qIdx, e.target.value)}
-                    rows={3}
-                    placeholder={`El pato nada en ${BLANK_TOKEN} y come ${BLANK_TOKEN}.`}
-                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
-                  />
-
-                  <div className="mt-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      Banco de palabras (una por línea — incluye las respuestas correctas y cualquier distractor extra)
-                    </label>
-                    <textarea
-                      value={(q.wordBank || []).join('\n')}
-                      onChange={(e) => updateWordBank(qIdx, e.target.value)}
-                      rows={4}
-                      className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
-                      placeholder={'agua\npan\nlago\n...'}
-                    />
-                  </div>
-
-                  {q.answers.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic mt-2">
-                      Agrega al menos un {BLANK_TOKEN} al texto para crear un espacio en blanco.
+              {q.type === 'word_bank_cloze' && (() => {
+                const preview = parseAnswerTokens(q.rawText);
+                return (
+                  <>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      Escribe el párrafo y pon la respuesta correcta entre llaves dobles, como{' '}
+                      <code className="bg-slate-200 px-1 rounded">{'{{agua}}'}</code>, donde va cada espacio en
+                      blanco — todos comparten un banco de palabras generado automáticamente.
                     </p>
-                  ) : (
-                    <div className="space-y-2 mt-3">
-                      {q.answers.map((answer, bIdx) => (
-                        <div key={bIdx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
-                            Espacio {bIdx + 1}
-                          </span>
-                          <select
-                            value={answer}
-                            onChange={(e) => setWordBankAnswer(qIdx, bIdx, e.target.value)}
-                            className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
-                          >
-                            <option value="">— Elige la palabra correcta —</option>
-                            {(q.wordBank || []).map((word, wIdx) => (
-                              <option key={wIdx} value={word}>
-                                {word}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
+
+                    <div className="flex items-start gap-2 mb-3">
+                      {q.img && (
+                        <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
+                      )}
+                      <ImageUploadField
+                        value={q.img}
+                        onChange={(url) => updateQuestion(qIdx, { img: url })}
+                        folder="curiosidades"
+                        placeholder="Imagen opcional"
+                        inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+                      />
                     </div>
-                  )}
-                  {(q.wordBank || []).length === 0 && (
-                    <p className="text-[10px] text-amber-600 font-bold mt-1">
-                      Agrega palabras al banco arriba antes de asignar respuestas.
-                    </p>
-                  )}
-                </>
-              )}
+
+                    <textarea
+                      value={q.rawText || ''}
+                      onChange={(e) => updateQuestion(qIdx, { rawText: e.target.value })}
+                      rows={3}
+                      placeholder={'El pato nada en {{agua}} y come {{pan}}. Vive cerca del {{lago}}.'}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
+                    />
+
+                    {preview.answers.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic mt-2">
+                        Agrega al menos una respuesta entre llaves dobles, como {'{{agua}}'}.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-2">
+                        {preview.answers.length} espacio{preview.answers.length === 1 ? '' : 's'} en blanco: {preview.answers.join(', ')}
+                      </p>
+                    )}
+
+                    <div className="mt-3">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                        Distractores extra (opcional, uno por línea — palabras incorrectas que también aparecerán
+                        en el banco)
+                      </label>
+                      <textarea
+                        value={q.distractorsText || ''}
+                        onChange={(e) => updateQuestion(qIdx, { distractorsText: e.target.value })}
+                        rows={2}
+                        className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
+                        placeholder={'sol\nnube'}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
 
               {q.type === 'multiple_choice' && (
                 <>
