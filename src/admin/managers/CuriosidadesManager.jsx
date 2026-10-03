@@ -109,8 +109,8 @@ const CuriosidadesManager = () => {
   // lose it with no error shown. This writes immediately and re-reads the
   // bundle doc fresh first, merging in just this one item's change, so a
   // stale local `items` snapshot can't clobber anyone else's edits either.
-  const handleSaveQuestions = async (itemId, { questions, minSeconds }) => {
-    setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, questions, minSeconds } : item)));
+  const handleSaveQuestions = async (itemId, { questions, minSeconds, gradeWeight }) => {
+    setItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, questions, minSeconds, gradeWeight } : item)));
     setSavingQuestions(true);
     try {
       if (isBundled) {
@@ -122,11 +122,11 @@ const CuriosidadesManager = () => {
         const liveItems = bundleData?.items || {};
         const updatedItems = {
           ...liveItems,
-          [itemId]: { ...(liveItems[itemId] || {}), questions, minSeconds },
+          [itemId]: { ...(liveItems[itemId] || {}), questions, minSeconds, gradeWeight },
         };
         await setDoc(doc(db, 'curiosidades', BUNDLE_DOC_ID), { items: updatedItems });
       } else {
-        await setDoc(doc(db, 'curiosidades', itemId), { questions, minSeconds }, { merge: true });
+        await setDoc(doc(db, 'curiosidades', itemId), { questions, minSeconds, gradeWeight }, { merge: true });
       }
       invalidateCollectionCache('curiosidades');
     } catch (error) {

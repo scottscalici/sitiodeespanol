@@ -21,6 +21,11 @@ const TYPE_LABELS = {
 const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
   const [questions, setQuestions] = useState(curiosidad.questions || []);
   const [minSeconds, setMinSeconds] = useState(curiosidad.minSeconds ?? 60);
+  // How many points this is worth toward the pooled "Promedio Calentamientos"
+  // class grade (completion-only, same as practice cards' own gradeWeight) —
+  // separate from the ranking points students earn, which are computed from
+  // accuracy in CuriosidadQuizEngine regardless of this value.
+  const [gradeWeight, setGradeWeight] = useState(curiosidad.gradeWeight ?? 1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -104,7 +109,7 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setSaving(true);
     setError('');
     try {
-      await onSave({ questions, minSeconds: Number(minSeconds) || 60 });
+      await onSave({ questions, minSeconds: Number(minSeconds) || 60, gradeWeight: Number(gradeWeight) || 1 });
       onClose();
     } catch (err) {
       setError('No se pudo guardar. Revisa tu conexión e intenta de nuevo — tus cambios aquí no se perdieron.');
@@ -129,6 +134,16 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2" title="Puntos hacia el Promedio Calentamientos (crédito por completar, no por precisión)">
+              Puntos de clase
+              <input
+                type="number"
+                min="1"
+                value={gradeWeight}
+                onChange={(e) => setGradeWeight(e.target.value)}
+                className="w-14 border border-slate-300 rounded-md p-1.5 text-center"
+              />
+            </label>
             <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
               Tiempo mínimo (seg)
               <input

@@ -18,6 +18,22 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 };
 
+// Every curiosidad that actually has interactive questions attached AND
+// applies to `course` (via its s2_dia/s4_dia field) — unlike calentamientos
+// and practice cards, curiosidades have no due date, so there's no
+// "assigned once its day arrives" gate and no quarter-date filtering: once
+// an interactive curiosidad exists for a course, it counts toward every
+// quarter's average equally, for the life of the course.
+export const getAssignedCuriosidades = (curiosidades, course) => {
+  // Matches Curiosidad.jsx's own field-per-course convention (s2_dia,
+  // s4_dia, ib_dia, ...) with a plain `dia` fallback for anything generic.
+  const getDia = (c) => c[`${course}_dia`] ?? c.dia;
+  return curiosidades
+    .filter((c) => getDia(c) != null && c.questions?.length > 0)
+    .map((c) => ({ ...c, dia: getDia(c) }))
+    .sort((a, b) => (a.dia ?? 0) - (b.dia ?? 0));
+};
+
 // Merges each assigned calentamiento with the student's own progress —
 // a never-completed one grades as 0 (matching the gradebook average), and
 // carries along the stored first-attempt errors so a caller can show
@@ -42,13 +58,19 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
 // student submitted (or didn't). Stored as `teacherOverride` alongside the
 // student's own submission, so undoing it just deletes that one field and
 // their original work (if any) still stands.
-export const buildWarmupBreakdown = (assignedWarmups, studentWarmups = {}, getPossible = () => 5) => {
+// `getGrade(entry)` says what percentage a student's own submission (before
+// any teacher override) is worth — defaults to the stored percentage grade,
+// which is what calentamientos and practice cards both use. Curiosidades
+// pass `entry => entry?.completed ? 100 : 0` instead: the class grade there
+// is a flat completion credit, deliberately independent of the accuracy
+// percentage used for ranking points (see CuriosidadQuizEngine).
+export const buildWarmupBreakdown = (assignedWarmups, studentWarmups = {}, getPossible = () => 5, getGrade = (entry) => (typeof entry?.grade === 'number' ? entry.grade : 0)) => {
   return assignedWarmups.map((c) => {
     const entry = studentWarmups[c.id];
     const override = entry?.teacherOverride;
     const excusedByTeacher = !!override?.excused;
     const hasOverrideGrade = !excusedByTeacher && typeof override?.grade === 'number';
-    const grade = excusedByTeacher ? 0 : hasOverrideGrade ? override.grade : (typeof entry?.grade === 'number' ? entry.grade : 0);
+    const grade = excusedByTeacher ? 0 : hasOverrideGrade ? override.grade : getGrade(entry);
     const possible = excusedByTeacher ? 0 : getPossible(c);
     return {
       id: c.id,

@@ -9,7 +9,12 @@ import {
   getUnitSummary,
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
-import { getAssignedWarmups, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../../utils/warmupBreakdown';
+import {
+  getAssignedWarmups,
+  getAssignedCuriosidades,
+  buildWarmupBreakdown,
+  weightedAverageFromBreakdown,
+} from '../../utils/warmupBreakdown';
 
 // Below 50 = flag red, below 70 = flag yellow, otherwise no flag.
 const getFlagClasses = (percent) => {
@@ -45,6 +50,11 @@ export default function TeacherGradebook() {
   // assignment/grading shape as calentamientos, folded into the same
   // "Promedio Calentamientos" average.
   const [allPracticeCards, setAllPracticeCards] = useState([]);
+  // Every curiosidad (flattened from the single curiosidades/_bundle doc) —
+  // only the ones with interactive questions attached are gradable; see
+  // getAssignedCuriosidades. No due-date concept, so unlike the two above
+  // these fold into every quarter's average equally, not just the current one.
+  const [allCuriosidades, setAllCuriosidades] = useState([]);
   // school calendar "dia" number -> fecha, to know when a given warmup's
   // dia was actually assigned/due
   const [calendarFechaByDia, setCalendarFechaByDia] = useState({});
@@ -115,9 +125,10 @@ export default function TeacherGradebook() {
 
     const fetchCalendarAndWarmups = async (liveDia) => {
       try {
-        const [calentamientos, practiceCards] = await Promise.all([
+        const [calentamientos, practiceCards, curiosidadesBundleSnap] = await Promise.all([
           getCachedCollection('calentamientos', { force }),
           getCachedCollection('practice_cards', { force }),
+          getDoc(doc(db, 'curiosidades', '_bundle')),
         ]);
         const todaysByCourse = {};
         calentamientos.forEach((c) => {
@@ -128,6 +139,9 @@ export default function TeacherGradebook() {
         setAllCalentamientos(calentamientos);
         setAllPracticeCards(practiceCards);
         setTodaysWarmupByCourse(todaysByCourse);
+
+        const curiosidadItems = curiosidadesBundleSnap.exists() ? curiosidadesBundleSnap.data()?.items || {} : {};
+        setAllCuriosidades(Object.entries(curiosidadItems).map(([id, data]) => ({ id, ...data })));
       } catch (error) {
         console.error('Error fetching calentamientos for gradebook:', error);
       }
@@ -241,10 +255,19 @@ export default function TeacherGradebook() {
   const getCombinedBreakdown = (student, quarter, todayStr) => {
     const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
     const assignedPractice = getAssignedWarmups(allPracticeCards, calendarFechaByDia, student.course, todayStr, quarter);
+    const assignedCuriosidades = getAssignedCuriosidades(allCuriosidades, student.course);
     const practicePossible = (c) => c.gradeWeight || 1;
+    const curiosidadPossible = (c) => c.gradeWeight || 1;
+    // Flat completion credit — the accuracy percentage stored alongside
+    // `completed` drives ranking points elsewhere, never the class grade.
+    const curiosidadGrade = (entry) => (entry?.completed ? 100 : 0);
     return [
       ...buildWarmupBreakdown(assigned, student.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
       ...buildWarmupBreakdown(assignedPractice, student.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),
+      ...buildWarmupBreakdown(assignedCuriosidades, student.progress?.curiosidades || {}, curiosidadPossible, curiosidadGrade).map((b) => ({
+        ...b,
+        kind: 'curiosidad',
+      })),
     ];
   };
 
@@ -269,11 +292,12 @@ export default function TeacherGradebook() {
   // `{ grade: <0-100> }` (replaces whatever they scored, or lack of a
   // submission, with a specific grade). Lives alongside the student's own
   // submission under the same progress entry, so clearing it simply
-  // un-hides their original work. `kind` ('calentamiento' | 'practica')
-  // picks the matching progress map — see getCombinedBreakdown above for
-  // why the two share this shape.
+  // un-hides their original work. `kind` ('calentamiento' | 'practica' |
+  // 'curiosidad') picks the matching progress map — see getCombinedBreakdown
+  // above for why they share this shape.
+  const PROGRESS_FIELD_BY_KIND = { practica: 'practiceCards', curiosidad: 'curiosidades' };
   const applyTeacherOverride = async (uid, kind, itemId, overridePatch) => {
-    const progressField = kind === 'practica' ? 'practiceCards' : 'warmups';
+    const progressField = PROGRESS_FIELD_BY_KIND[kind] || 'warmups';
     await setDoc(
       doc(db, 'users', uid),
       { progress: { [progressField]: { [itemId]: { teacherOverride: overridePatch === null ? deleteField() : overridePatch } } } },
@@ -1249,9 +1273,9 @@ const handleResetPassword = async () => {
                     <div className="flex justify-between items-center gap-3">
                       <div className="min-w-0">
                         <p className="font-bold text-white text-sm truncate">
-                          {item.kind === 'practica' ? '✏️' : '🔥'} Día {item.dia}: {item.title}
+                          {item.kind === 'practica' ? '✏️' : item.kind === 'curiosidad' ? '💡' : '🔥'} Día {item.dia}: {item.title}
                         </p>
-                        <p className="text-[10px] text-slate-500 font-mono">{item.fecha}</p>
+                        {item.fecha && <p className="text-[10px] text-slate-500 font-mono">{item.fecha}</p>}
                       </div>
                       <button
                         type="button"
