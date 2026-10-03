@@ -71,7 +71,13 @@ export default function TeacherGradebook() {
 
   // Diagnostic specific states
   const [selectedWarmupId, setSelectedWarmupId] = useState('');
+  // Grouped by exact item missed (verb+subject+tense) — NOT one entry per
+  // student, so the list reads as "what's going wrong" ranked by frequency.
   const [aggregatedErrors, setAggregatedErrors] = useState([]);
+  // Students whose first-attempt verb accuracy on the selected warmup was
+  // below 70% — named here (unlike aggregatedErrors above) since the whole
+  // point is knowing who to follow up with.
+  const [strugglingStudents, setStrugglingStudents] = useState([]);
 
   // 🔑 Password Reset Modal State
   const [resetModal, setResetModal] = useState(null); // { uid, email, newPassword, status }
@@ -441,38 +447,76 @@ export default function TeacherGradebook() {
   };
 
   // --- DIAGNOSTIC AGGREGATION LOGIC ---
+  // Scoped to the same roster filter as the Gradebook tab (rosterFilter, via
+  // visibleStudents) — previously this always scanned every student
+  // regardless of block, so two different sections' errors for the same
+  // warmup (e.g. 4A and 1B) showed up mixed together in one list.
   useEffect(() => {
     if (activeTab === 'diagnostics' && selectedWarmupId) {
-      const errorList = [];
+      // Group every first-attempt miss by the exact item it was on (verb +
+      // subject + tense) instead of one entry per individual wrong answer —
+      // the list below ranks items by how many students missed them, with
+      // no student names (that's what strugglingStudents is for).
+      const groups = new Map();
+      const totalVerbs = allCalentamientos.find((c) => c.id === selectedWarmupId)?.bakedQuestions?.length || 0;
+      const struggling = [];
 
-      // Scoped to the same roster filter as the Gradebook tab (rosterFilter,
-      // via visibleStudents) — previously this always scanned every student
-      // regardless of block, so two different sections' errors for the same
-      // warmup (e.g. 4A and 1B) showed up mixed together in one list.
       visibleStudents.forEach((student) => {
         const warmupData = student.progress?.warmups?.[selectedWarmupId];
-        if (warmupData && warmupData.errors && warmupData.errors.length > 0) {
-          warmupData.errors.forEach((err) => {
-            errorList.push({
-              studentName: student.firstName
-                ? `${student.firstName} ${student.lastName}`
-                : student.email.split('@')[0],
+        if (!warmupData?.completed) return;
+
+        const errors = warmupData.errors || [];
+        errors.forEach((err) => {
+          const key = `${err.verb}|${err.subject}|${err.tense}`;
+          if (!groups.has(key)) {
+            groups.set(key, {
               verb: err.verb,
               subject: err.subject,
               tense: err.tense,
               expected: err.expected,
-              studentInput: err.studentInput,
+              count: 0,
+              answerCounts: new Map(),
             });
-          });
+          }
+          const g = groups.get(key);
+          g.count += 1;
+          const given = err.studentInput || '(vacío)';
+          g.answerCounts.set(given, (g.answerCounts.get(given) || 0) + 1);
+        });
+
+        // Total verb count comes from the warmup's own configBlocks-driven
+        // size, which stays constant across every student's redo (even a
+        // freshly-generated set draws the same number of verbs) — so it's a
+        // safe denominator even for a student who redid this warmup.
+        if (totalVerbs > 0) {
+          const firstTryAccuracy = Math.round(((totalVerbs - errors.length) / totalVerbs) * 100);
+          if (firstTryAccuracy < 70) {
+            struggling.push({
+              name: student.firstName ? `${student.firstName} ${student.lastName}` : student.email.split('@')[0],
+              accuracy: firstTryAccuracy,
+            });
+          }
         }
       });
 
-      errorList.sort((a, b) => a.verb.localeCompare(b.verb));
-      setAggregatedErrors(errorList);
+      const grouped = Array.from(groups.values())
+        .map((g) => ({
+          ...g,
+          answers: Array.from(g.answerCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([answer, n]) => (n > 1 ? `${answer} (×${n})` : answer)),
+        }))
+        .sort((a, b) => b.count - a.count || a.verb.localeCompare(b.verb));
+
+      struggling.sort((a, b) => a.accuracy - b.accuracy);
+
+      setAggregatedErrors(grouped);
+      setStrugglingStudents(struggling);
     } else {
       setAggregatedErrors([]);
+      setStrugglingStudents([]);
     }
-  }, [activeTab, selectedWarmupId, visibleStudents]);
+  }, [activeTab, selectedWarmupId, visibleStudents, allCalentamientos]);
 
   const getAvailableWarmupIds = () => {
     const ids = new Set();
@@ -732,46 +776,50 @@ const handleResetPassword = async () => {
               ¡No se registraron errores de primer intento para esta práctica!
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {aggregatedErrors.map((err, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-900 border border-rose-900/50 p-4 rounded-xl relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 bg-rose-950/50 text-rose-500 text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg">
-                    {err.tense}
-                  </div>
-                  <p className="text-xs text-slate-400 font-bold mb-1">
-                    {err.studentName}
-                  </p>
-                  <div className="flex gap-2 items-end mb-3">
-                    <span className="text-lg font-black text-white">
-                      {err.verb}
-                    </span>
-                    <span className="text-xs text-sky-400 font-bold mb-1">
-                      ({err.subject})
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1 text-sm bg-slate-950 p-2 rounded-lg border border-slate-800">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 text-[10px] uppercase font-bold">
-                        Esperado:
-                      </span>
-                      <span className="text-emerald-400 font-mono font-bold">
-                        {err.expected}
+            <div className="space-y-6">
+              <div className="space-y-2">
+                {aggregatedErrors.map((g, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-slate-900 border border-rose-900/40 rounded-xl px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-sm font-black text-white">{g.verb}</span>
+                      <span className="text-xs text-sky-400 font-bold">{g.subject}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold">({g.tense})</span>
+                      <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-rose-400 bg-rose-950/40 border border-rose-900/60 rounded-full px-2 py-0.5">
+                        {g.count} fallo{g.count === 1 ? '' : 's'}
                       </span>
                     </div>
-                    <div className="flex justify-between border-t border-slate-800 pt-1">
-                      <span className="text-slate-500 text-[10px] uppercase font-bold">
-                        Escribió:
-                      </span>
-                      <span className="text-rose-400 font-mono font-bold line-through">
-                        {err.studentInput}
-                      </span>
-                    </div>
+                    <p className="text-xs text-slate-400">
+                      <span className="text-slate-500 text-[10px] uppercase font-bold">Esperado:</span>{' '}
+                      <span className="text-emerald-400 font-mono">{g.expected}</span>
+                      <span className="mx-2 text-slate-700">·</span>
+                      <span className="text-slate-500 text-[10px] uppercase font-bold">Escribieron:</span>{' '}
+                      <span className="text-rose-400 font-mono">{g.answers.join(', ')}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {strugglingStudents.length > 0 && (
+                <div className="pt-4 border-t border-slate-700">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-amber-400 mb-3">
+                    ⚠️ Para seguimiento — menos de 70% en el primer intento ({strugglingStudents.length})
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {strugglingStudents.map((s, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex justify-between items-center rounded-lg border px-3 py-2 text-xs font-bold ${getFlagClasses(s.accuracy)}`}
+                      >
+                        <span>{s.name}</span>
+                        <span className="font-mono">{s.accuracy}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </main>
