@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
 
 const Curiosidad = ({ curiosidades = [] }) => {
@@ -49,6 +50,17 @@ const Curiosidad = ({ curiosidades = [] }) => {
                   {item.student_note || item.teacher_notes || item.caption || item.descripcion}
                 </p>
               </div>
+            )}
+
+            {/* Interactive quiz entry point — only shown once this curiosidad
+                actually has questions attached (see CuriosidadQuestionsModal) */}
+            {item.questions?.length > 0 && (
+              <Link
+                to={`/curiosidad-quiz/${item.id}`}
+                className="mt-5 inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-black uppercase tracking-widest text-xs px-5 py-3 rounded-xl shadow-sm transition-colors"
+              >
+                🎮 Jugar
+              </Link>
             )}
           </article>
         );

@@ -11,6 +11,7 @@ import Dashboard from './student/Dashboard';
 import MusicaEngine from './student/MusicaEngine';
 import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
+import CuriosidadQuizEngine from './student/CuriosidadQuizEngine';
 import PracticeCardEngine from './student/PracticeCardEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
@@ -182,6 +183,7 @@ function App() {
             <Route path="/recuperacion" element={<Recuperacion />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
+            <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/gramatica" element={<GrammarIndexPage />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />

@@ -3,11 +3,14 @@ import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore
 import { db } from '../../firebase';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
 import ImageUploadField from '../shared/ImageUploadField';
+import CuriosidadQuestionsModal from './CuriosidadQuestionsModal';
 
 const BUNDLE_DOC_ID = '_bundle';
 
 const CuriosidadesManager = () => {
   const [items, setItems] = useState([]);
+  // The curiosidad currently open in the question-authoring modal, or null.
+  const [questionsModalItem, setQuestionsModalItem] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isBundled, setIsBundled] = useState(false);
@@ -270,19 +273,20 @@ const CuriosidadesManager = () => {
           </div>
         )}
 
-        {/* Updated Grid Headers for 12 columns */}
-        <div className="grid grid-cols-12 gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
+        {/* Updated Grid Headers for 13 columns */}
+        <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
           <div className="col-span-1 text-center">Día S2</div>
           <div className="col-span-1 text-center">Día S4</div>
           <div className="col-span-1 text-indigo-600">ID</div>
           <div className="col-span-2">Título</div>
           <div className="col-span-4">Imagen (Vista Previa & URL)</div>
           <div className="col-span-3">Notas del Maestro</div>
+          <div className="col-span-1 text-center">Preguntas</div>
         </div>
 
         <div className="divide-y divide-slate-100">
           {items.map((item) => (
-            <div key={item.id} className="grid grid-cols-12 gap-4 p-2 hover:bg-slate-50 transition-colors items-center">
+            <div key={item.id} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-4 p-2 hover:bg-slate-50 transition-colors items-center">
               
               <div className="col-span-1">
                 <input 
@@ -344,8 +348,8 @@ const CuriosidadesManager = () => {
               </div>
 
               <div className="col-span-3">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={item.teacher_notes || ''}
                   onChange={(e) => handleInputChange(item.id, 'teacher_notes', e.target.value)}
                   className="w-full bg-transparent border-none focus:ring-2 focus:ring-indigo-500 rounded-md p-2 text-xs font-medium outline-none transition-all text-slate-500 placeholder-slate-300"
@@ -353,11 +357,33 @@ const CuriosidadesManager = () => {
                 />
               </div>
 
+              <div className="col-span-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => setQuestionsModalItem(item)}
+                  className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-lg px-2 py-1.5 border border-indigo-200 transition-colors"
+                  title="Editar preguntas interactivas (convierte esta curiosidad en un juego jugable)"
+                >
+                  🧩 {item.questions?.length || 0}
+                </button>
+              </div>
+
             </div>
           ))}
         </div>
 
       </div>
+
+      {questionsModalItem && (
+        <CuriosidadQuestionsModal
+          curiosidad={questionsModalItem}
+          onClose={() => setQuestionsModalItem(null)}
+          onSave={({ questions, minSeconds }) => {
+            handleInputChange(questionsModalItem.id, 'questions', questions);
+            handleInputChange(questionsModalItem.id, 'minSeconds', minSeconds);
+          }}
+        />
+      )}
     </div>
   );
 };
