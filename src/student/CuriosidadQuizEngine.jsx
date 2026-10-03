@@ -750,7 +750,11 @@ export default function CuriosidadQuizEngine() {
                           : 'border-slate-700 hover:border-slate-500'
                       } ${imageSelectDone && !isSelected ? 'opacity-40' : ''}`}
                     >
-                      <img src={opt.img} alt={opt.label || ''} className="w-full h-28 object-cover" />
+                      <img
+                        src={opt.img}
+                        alt={opt.label || ''}
+                        className="w-full h-32 object-contain bg-slate-950"
+                      />
                       {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
                     </button>
                   );
