@@ -13,9 +13,19 @@ const emptyImageSelectQuestion = () => ({
   correctIndices: [],
 });
 
+// A passage of text with one or more blanks, each blank getting its OWN
+// dropdown of options (unlike a shared word bank) — the admin types the
+// literal token "{{blank}}" wherever a blank belongs, and the blanks array
+// below is kept in sync with however many tokens are currently in the text.
+const BLANK_TOKEN = '{{blank}}';
+const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
+const emptyClozeBlank = () => ({ options: ['', ''], answer: '' });
+const emptyDropdownClozeQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
+
 const TYPE_LABELS = {
   matching: 'Emparejar',
   image_select: 'Selección de Imagen',
+  dropdown_cloze: 'Cloze con Menús',
 };
 
 const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
@@ -98,6 +108,86 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
           correctIndices: isCorrect ? current.filter((idx) => idx !== oIdx) : [...current, oIdx],
         };
       })
+    );
+  };
+
+  // --- Dropdown-cloze-type helpers ---
+  // Changing the passage text re-counts "{{blank}}" tokens and grows/shrinks
+  // the blanks array to match, preserving existing blanks by position so
+  // editing text before/after an existing blank doesn't lose its options.
+  const updateClozeText = (qIdx, text) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const needed = countBlanks(text);
+        let blanks = q.blanks || [];
+        if (needed > blanks.length) {
+          blanks = [...blanks, ...Array.from({ length: needed - blanks.length }, emptyClozeBlank)];
+        } else if (needed < blanks.length) {
+          blanks = blanks.slice(0, needed);
+        }
+        return { ...q, text, blanks };
+      })
+    );
+  };
+
+  const addClozeBlankOption = (qIdx, bIdx) => {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === qIdx
+          ? { ...q, blanks: q.blanks.map((b, j) => (j === bIdx ? { ...b, options: [...b.options, ''] } : b)) }
+          : q
+      )
+    );
+  };
+
+  const updateClozeBlankOption = (qIdx, bIdx, oIdx, value) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        return {
+          ...q,
+          blanks: q.blanks.map((b, j) => {
+            if (j !== bIdx) return b;
+            const oldValue = b.options[oIdx];
+            return {
+              ...b,
+              options: b.options.map((o, k) => (k === oIdx ? value : o)),
+              // The correct answer is stored by value, not index — keep it
+              // pointing at the same option if that's the one being edited.
+              answer: b.answer === oldValue ? value : b.answer,
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const removeClozeBlankOption = (qIdx, bIdx, oIdx) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        return {
+          ...q,
+          blanks: q.blanks.map((b, j) => {
+            if (j !== bIdx) return b;
+            const removedValue = b.options[oIdx];
+            return {
+              ...b,
+              options: b.options.filter((_, k) => k !== oIdx),
+              answer: b.answer === removedValue ? '' : b.answer,
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const setClozeBlankAnswer = (qIdx, bIdx, value) => {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i === qIdx ? { ...q, blanks: q.blanks.map((b, j) => (j === bIdx ? { ...b, answer: value } : b)) } : q
+      )
     );
   };
 
@@ -333,6 +423,89 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                   </button>
                 </>
               )}
+
+              {q.type === 'dropdown_cloze' && (
+                <>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Escribe el párrafo y pon <code className="bg-slate-200 px-1 rounded">{BLANK_TOKEN}</code> donde
+                    va cada espacio en blanco — cada uno tendrá su propio menú de opciones.
+                  </p>
+
+                  <div className="flex items-start gap-2 mb-3">
+                    {q.img && (
+                      <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
+                    )}
+                    <ImageUploadField
+                      value={q.img}
+                      onChange={(url) => updateQuestion(qIdx, { img: url })}
+                      folder="curiosidades"
+                      placeholder="Imagen opcional (p. ej. foto del cóndor)"
+                      inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+                    />
+                  </div>
+
+                  <textarea
+                    value={q.text}
+                    onChange={(e) => updateClozeText(qIdx, e.target.value)}
+                    rows={3}
+                    placeholder={`El cóndor es ${BLANK_TOKEN} de las aves más grandes del mundo.`}
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
+                  />
+
+                  {q.blanks.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic mt-2">
+                      Agrega al menos un {BLANK_TOKEN} al texto para crear un espacio en blanco.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 mt-3">
+                      {q.blanks.map((blank, bIdx) => (
+                        <div key={bIdx} className="bg-white border border-slate-200 rounded-lg p-3">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                            Espacio en blanco {bIdx + 1}
+                          </p>
+                          <div className="space-y-1.5">
+                            {blank.options.map((opt, oIdx) => (
+                              <div key={oIdx} className="flex items-center gap-2">
+                                <input
+                                  type="radio"
+                                  name={`cloze-${qIdx}-${bIdx}-answer`}
+                                  checked={blank.answer === opt && opt !== ''}
+                                  onChange={() => setClozeBlankAnswer(qIdx, bIdx, opt)}
+                                  title="Marcar como respuesta correcta"
+                                />
+                                <input
+                                  type="text"
+                                  value={opt}
+                                  onChange={(e) => updateClozeBlankOption(qIdx, bIdx, oIdx, e.target.value)}
+                                  placeholder="Opción"
+                                  className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
+                                />
+                                <button
+                                  onClick={() => removeClozeBlankOption(qIdx, bIdx, oIdx)}
+                                  className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => addClozeBlankOption(qIdx, bIdx)}
+                            className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                          >
+                            + Agregar opción
+                          </button>
+                          {!blank.answer && (
+                            <p className="text-[10px] text-amber-600 font-bold mt-1">
+                              Marca con el círculo cuál opción es la correcta.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ))}
 
@@ -348,6 +521,12 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
               className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
             >
               + Pregunta de Selección de Imagen
+            </button>
+            <button
+              onClick={() => setQuestions((prev) => [...prev, emptyDropdownClozeQuestion()])}
+              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
+            >
+              + Pregunta de Cloze con Menús
             </button>
           </div>
         </div>

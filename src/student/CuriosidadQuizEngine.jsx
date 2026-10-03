@@ -14,7 +14,52 @@ const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 // champion comparison) reflects how much was actually in it, not how many
 // question blocks the admin happened to group them into. Every other type
 // is a single yes/no unit.
-const getItemCount = (q) => (q.type === 'matching' ? q.pairs.length : 1);
+const getItemCount = (q) => {
+  if (q.type === 'matching') return q.pairs.length;
+  if (q.type === 'dropdown_cloze') return q.blanks.length;
+  return 1;
+};
+
+// Splits a cloze passage on its "{{blank}}" tokens, interleaving the plain
+// text with one inline <select> per blank. Index-based keys are fine here —
+// the segments never reorder within a render.
+const renderClozeText = (text, blanks, selections, correctArr, wrongFlashIdx, onSelect) => {
+  const parts = (text || '').split('{{blank}}');
+  const nodes = [];
+  parts.forEach((part, i) => {
+    if (part) nodes.push(<span key={`t-${i}`}>{part}</span>);
+    if (i < parts.length - 1) {
+      const blank = blanks[i];
+      const isCorrect = correctArr[i];
+      const isWrong = wrongFlashIdx === i;
+      nodes.push(
+        <select
+          key={`b-${i}`}
+          value={selections[i] || ''}
+          onChange={(e) => onSelect(i, e.target.value)}
+          disabled={isCorrect}
+          className={`mx-1 border-b-2 bg-slate-900 font-bold rounded px-2 py-1 text-sm align-middle ${
+            isCorrect
+              ? 'border-emerald-500 text-emerald-400'
+              : isWrong
+              ? 'border-rose-500 text-rose-300'
+              : 'border-slate-500 text-sky-300'
+          }`}
+        >
+          <option value="" disabled>
+            ?
+          </option>
+          {(blank?.options || []).map((opt, oIdx) => (
+            <option key={oIdx} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      );
+    }
+  });
+  return nodes;
+};
 
 export default function CuriosidadQuizEngine() {
   const { curiosidadId } = useParams();
@@ -37,6 +82,11 @@ export default function CuriosidadQuizEngine() {
   const [selectedImageIdx, setSelectedImageIdx] = useState([]); // currently toggled option indices
   const [imageSelectDone, setImageSelectDone] = useState(false); // locked in as correct
   const [imageWrongFlash, setImageWrongFlash] = useState(false);
+
+  // --- Dropdown-cloze-type state ---
+  const [clozeSelections, setClozeSelections] = useState([]); // current dropdown value per blank
+  const [clozeCorrect, setClozeCorrect] = useState([]); // which blanks are locked in as correct
+  const [clozeWrongFlash, setClozeWrongFlash] = useState(null); // blank index currently flashing red
 
   // First-attempt correctness per gradable item, keyed `${questionIdx}-${itemIdx}`
   // (itemIdx is the pair index for matching, always 0 for single-unit types)
@@ -106,6 +156,11 @@ export default function CuriosidadQuizEngine() {
     setSelectedLeftIdx(null);
     setSelectedImageIdx([]);
     setImageSelectDone(false);
+    if (q.type === 'dropdown_cloze') {
+      setClozeSelections(Array(q.blanks.length).fill(''));
+      setClozeCorrect(Array(q.blanks.length).fill(false));
+    }
+    setClozeWrongFlash(null);
   }, [curiosidad, currentQuestion]);
 
   const totalItems = curiosidad
@@ -174,6 +229,27 @@ export default function CuriosidadQuizEngine() {
   const handleConfirmImageSelect = (question) => {
     if (imageSelectDone || selectedImageIdx.length === 0) return;
     recordImageSelectAttempt(selectedImageIdx, question);
+  };
+
+  // Each blank grades independently and locks once correct, same first-
+  // attempt-only principle as the other types (one key per blank index).
+  const handleSelectClozeBlank = (blankIdx, value, question) => {
+    if (clozeCorrect[blankIdx]) return;
+    const key = `${currentQuestion}-${blankIdx}`;
+    const isCorrect = question.blanks[blankIdx].answer === value;
+
+    if (!(key in firstAttemptRef.current)) {
+      firstAttemptRef.current[key] = isCorrect;
+    }
+
+    setClozeSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
+
+    if (isCorrect) {
+      setClozeCorrect((prev) => prev.map((c, i) => (i === blankIdx ? true : c)));
+    } else {
+      setClozeWrongFlash(blankIdx);
+      setTimeout(() => setClozeWrongFlash(null), 400);
+    }
   };
 
   const goToPreviousQuestion = () => {
@@ -392,12 +468,15 @@ export default function CuriosidadQuizEngine() {
   const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
   const isMatching = question.type === 'matching';
   const isImageSelect = question.type === 'image_select';
+  const isDropdownCloze = question.type === 'dropdown_cloze';
   const isMultiSelect = isImageSelect && (question.correctIndices || []).length > 1;
 
   const allMatched = isMatching
     ? matchedPairIdx.length === question.pairs.length
     : isImageSelect
     ? imageSelectDone
+    : isDropdownCloze
+    ? clozeCorrect.length > 0 && clozeCorrect.every(Boolean)
     : false;
 
   return (
@@ -433,7 +512,14 @@ export default function CuriosidadQuizEngine() {
               {matchedPairIdx.length} de {question.pairs.length} emparejados
             </p>
           )}
-          {!(isMatching && question.pairs.length > 1) && <div className="mb-6" />}
+          {isDropdownCloze && question.blanks.length > 1 && (
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
+              {clozeCorrect.filter(Boolean).length} de {question.blanks.length} completados
+            </p>
+          )}
+          {!(isMatching && question.pairs.length > 1) && !(isDropdownCloze && question.blanks.length > 1) && (
+            <div className="mb-6" />
+          )}
 
           {isMatching && (
             <div className="grid grid-cols-2 gap-6">
@@ -532,6 +618,28 @@ export default function CuriosidadQuizEngine() {
                   Confirmar Selección
                 </button>
               )}
+            </div>
+          )}
+
+          {isDropdownCloze && (
+            <div>
+              {question.img && (
+                <img
+                  src={question.img}
+                  alt=""
+                  className="w-full max-h-64 object-contain bg-slate-950 rounded-lg mb-6"
+                />
+              )}
+              <p className="text-base text-slate-200 leading-loose text-center">
+                {renderClozeText(
+                  question.text,
+                  question.blanks,
+                  clozeSelections,
+                  clozeCorrect,
+                  clozeWrongFlash,
+                  (blankIdx, value) => handleSelectClozeBlank(blankIdx, value, question)
+                )}
+              </p>
             </div>
           )}
         </div>
