@@ -2,16 +2,18 @@ import React from 'react';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
-const Anuncios = ({ anuncios = [], cal = [], liveDia, course }) => {
+const Anuncios = ({ anuncios = [], fecha, course }) => {
   const { theme } = useActiveTheme() || {};
   const themeStyle = getThemedCardStyle(
     theme?.styles?.cardOverrides?.anuncios,
     theme?.styles?.accent,
     theme?.styles?.textures?.anuncios
   );
-  // 1. Find the actual date string (YYYY-MM-DD) for the current liveDia
-  const currentEntry = cal.find(c => c.dia == liveDia);
-  const currentDateStr = currentEntry ? currentEntry.fecha : new Date().toLocaleDateString('en-CA');
+  // `fecha` is the student's own cycle-correct date for the día being viewed
+  // (Dashboard's fechaByDia already resolves the A/B ciclo ambiguity — the
+  // same día number can land on two different actual dates, one per cycle).
+  // Falls back to today's real date if that día isn't in the calendar yet.
+  const currentDateStr = fecha || new Date().toLocaleDateString('en-CA');
 
   // 2. Filter the announcements based on course and date
   const activeAnuncios = anuncios.filter(note => {
