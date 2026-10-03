@@ -51,9 +51,9 @@ export default function TeacherGradebook() {
   // "Promedio Calentamientos" average.
   const [allPracticeCards, setAllPracticeCards] = useState([]);
   // Every curiosidad (flattened from the single curiosidades/_bundle doc) —
-  // only the ones with interactive questions attached are gradable; see
-  // getAssignedCuriosidades. No due-date concept, so unlike the two above
-  // these fold into every quarter's average equally, not just the current one.
+  // only the ones with interactive questions attached are gradable, and due
+  // the same way calentamientos are (their own day field, via
+  // calendarFechaByDia) — see getAssignedCuriosidades.
   const [allCuriosidades, setAllCuriosidades] = useState([]);
   // school calendar "dia" number -> fecha, to know when a given warmup's
   // dia was actually assigned/due
@@ -255,7 +255,7 @@ export default function TeacherGradebook() {
   const getCombinedBreakdown = (student, quarter, todayStr) => {
     const assigned = getAssignedWarmups(allCalentamientos, calendarFechaByDia, student.course, todayStr, quarter);
     const assignedPractice = getAssignedWarmups(allPracticeCards, calendarFechaByDia, student.course, todayStr, quarter);
-    const assignedCuriosidades = getAssignedCuriosidades(allCuriosidades, student.course);
+    const assignedCuriosidades = getAssignedCuriosidades(allCuriosidades, calendarFechaByDia, student.course, todayStr, quarter);
     const practicePossible = (c) => c.gradeWeight || 1;
     const curiosidadPossible = (c) => c.gradeWeight || 1;
     // Flat completion credit — the accuracy percentage stored alongside

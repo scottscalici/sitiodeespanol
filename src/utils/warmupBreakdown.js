@@ -18,20 +18,30 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 };
 
-// Every curiosidad that actually has interactive questions attached AND
-// applies to `course` (via its s2_dia/s4_dia field) — unlike calentamientos
-// and practice cards, curiosidades have no due date, so there's no
-// "assigned once its day arrives" gate and no quarter-date filtering: once
-// an interactive curiosidad exists for a course, it counts toward every
-// quarter's average equally, for the life of the course.
-export const getAssignedCuriosidades = (curiosidades, course) => {
+// Every curiosidad that actually has interactive questions attached, applies
+// to `course` (via its s2_dia/s4_dia/etc. field), and is due on or before
+// `todayStr` — same "assigned once its day arrives" gate and quarter-date
+// filtering as getAssignedWarmups above, just resolving the day number from
+// a course-specific field (one curiosidad doc covers every course, unlike
+// calentamientos which are separate per-course docs) instead of a plain
+// `dia` + `course` pair. The curiosidad's own day field IS its due date —
+// the same number the Dashboard card already uses to decide when to show it.
+export const getAssignedCuriosidades = (curiosidades, fechaByDia, course, todayStr, dateRange) => {
   // Matches Curiosidad.jsx's own field-per-course convention (s2_dia,
   // s4_dia, ib_dia, ...) with a plain `dia` fallback for anything generic.
   const getDia = (c) => c[`${course}_dia`] ?? c.dia;
   return curiosidades
     .filter((c) => getDia(c) != null && c.questions?.length > 0)
-    .map((c) => ({ ...c, dia: getDia(c) }))
-    .sort((a, b) => (a.dia ?? 0) - (b.dia ?? 0));
+    .map((c) => {
+      const dia = getDia(c);
+      return { ...c, dia, fecha: fechaByDia[Number(dia)] };
+    })
+    .filter((c) => {
+      if (!c.fecha || c.fecha > todayStr) return false;
+      if (dateRange && !(c.fecha >= dateRange.startDate && c.fecha <= dateRange.endDate)) return false;
+      return true;
+    })
+    .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 };
 
 // Merges each assigned calentamiento with the student's own progress —
