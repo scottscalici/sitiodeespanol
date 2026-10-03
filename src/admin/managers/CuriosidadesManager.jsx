@@ -7,6 +7,29 @@ import CuriosidadQuestionsModal from './CuriosidadQuestionsModal';
 
 const BUNDLE_DOC_ID = '_bundle';
 
+// A short, readable id from the title (e.g. "Las Fallas" -> "las-fallas-k3j9f2")
+// plus a base-36 timestamp suffix so two curiosidades added back to back, or
+// one typed with no title yet, never collide.
+const slugify = (text) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+const generateCuriosidadId = (title) => `${slugify(title) || 'curiosidad'}-${Date.now().toString(36)}`;
+
+const emptyCuriosidad = () => ({
+  id: generateCuriosidadId(''),
+  title: '',
+  img: '',
+  student_note: '',
+  teacher_notes: '',
+  s2_dia: null,
+  s4_dia: null,
+});
+
 const CuriosidadesManager = () => {
   const [items, setItems] = useState([]);
   // The curiosidad currently open in the question-authoring modal, or null.
@@ -100,6 +123,21 @@ const CuriosidadesManager = () => {
       }
       return item;
     }));
+  };
+
+  // New rows only exist in local state until the top-level "Guardar
+  // Cambios" click, same as any other field edit here (title, image, día) —
+  // there's nothing curiosidad-creation-specific to persist separately.
+  const handleAddCuriosidad = () => {
+    setItems((prev) => [emptyCuriosidad(), ...prev]);
+  };
+
+  const handleRemoveCuriosidad = (item) => {
+    const confirmed = window.confirm(
+      `¿Quitar "${item.title || item.id}"? Esto no se guarda hasta que hagas clic en "Guardar Cambios".`
+    );
+    if (!confirmed) return;
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
   };
 
   // Saving a curiosidad's questions used to only update this page's local
@@ -244,13 +282,21 @@ const CuriosidadesManager = () => {
             <h1 className="text-2xl font-black text-slate-800 tracking-tight">Curiosidades Manager</h1>
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Gestor de base de datos</p>
           </div>
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
-          >
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleAddCuriosidad}
+              className="bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              + Agregar Curiosidad
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors disabled:opacity-50"
+            >
+              {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
         </div>
 
         {/* ONE-TIME REPAIR TOOL for a fixed uploader bug — see
@@ -311,8 +357,8 @@ const CuriosidadesManager = () => {
           </div>
         )}
 
-        {/* Updated Grid Headers for 13 columns */}
-        <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
+        {/* Updated Grid Headers for 14 columns */}
+        <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
           <div className="col-span-1 text-center">Día S2</div>
           <div className="col-span-1 text-center">Día S4</div>
           <div className="col-span-1 text-indigo-600">ID</div>
@@ -320,11 +366,12 @@ const CuriosidadesManager = () => {
           <div className="col-span-4">Imagen (Vista Previa & URL)</div>
           <div className="col-span-3">Notas del Maestro</div>
           <div className="col-span-1 text-center">Preguntas</div>
+          <div className="col-span-1 text-center">Quitar</div>
         </div>
 
         <div className="divide-y divide-slate-100">
           {items.map((item) => (
-            <div key={item.id} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-4 p-2 hover:bg-slate-50 transition-colors items-center">
+            <div key={item.id} className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-4 p-2 hover:bg-slate-50 transition-colors items-center">
               
               <div className="col-span-1">
                 <input 
@@ -403,6 +450,17 @@ const CuriosidadesManager = () => {
                   title="Editar preguntas interactivas (convierte esta curiosidad en un juego jugable)"
                 >
                   🧩 {item.questions?.length || 0}
+                </button>
+              </div>
+
+              <div className="col-span-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveCuriosidad(item)}
+                  className="text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg px-2 py-1.5 border border-rose-200 transition-colors"
+                  title="Quitar esta curiosidad (no se guarda hasta hacer clic en Guardar Cambios)"
+                >
+                  🗑️
                 </button>
               </div>
 
