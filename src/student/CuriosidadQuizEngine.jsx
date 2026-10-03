@@ -17,19 +17,27 @@ const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 const getItemCount = (q) => {
   if (q.type === 'matching') return q.pairs.length;
   if (q.type === 'dropdown_cloze') return q.blanks.length;
+  if (q.type === 'word_bank_cloze') return q.answers.length;
   return 1;
 };
 
+// The correct value for a given blank, regardless of which cloze type this
+// is — dropdown_cloze keeps a per-blank answer alongside its own options,
+// word_bank_cloze keeps a flat answers array matched against one shared bank.
+const getClozeBlankAnswer = (question, blankIdx) =>
+  question.type === 'word_bank_cloze' ? question.answers[blankIdx] : question.blanks[blankIdx].answer;
+
 // Splits a cloze passage on its "{{blank}}" tokens, interleaving the plain
 // text with one inline <select> per blank. Index-based keys are fine here —
-// the segments never reorder within a render.
-const renderClozeText = (text, blanks, selections, correctArr, wrongFlashIdx, onSelect) => {
+// the segments never reorder within a render. `optionsForBlank(i)` decouples
+// this from whether each blank has its own option list (dropdown_cloze) or
+// all blanks share one word bank (word_bank_cloze).
+const renderClozeText = (text, selections, correctArr, wrongFlashIdx, onSelect, optionsForBlank) => {
   const parts = (text || '').split('{{blank}}');
   const nodes = [];
   parts.forEach((part, i) => {
     if (part) nodes.push(<span key={`t-${i}`}>{part}</span>);
     if (i < parts.length - 1) {
-      const blank = blanks[i];
       const isCorrect = correctArr[i];
       const isWrong = wrongFlashIdx === i;
       nodes.push(
@@ -49,7 +57,7 @@ const renderClozeText = (text, blanks, selections, correctArr, wrongFlashIdx, on
           <option value="" disabled>
             ?
           </option>
-          {(blank?.options || []).map((opt, oIdx) => (
+          {optionsForBlank(i).map((opt, oIdx) => (
             <option key={oIdx} value={opt}>
               {opt}
             </option>
@@ -163,9 +171,10 @@ export default function CuriosidadQuizEngine() {
     setSelectedLeftIdx(null);
     setSelectedImageIdx([]);
     setImageSelectDone(false);
-    if (q.type === 'dropdown_cloze') {
-      setClozeSelections(Array(q.blanks.length).fill(''));
-      setClozeCorrect(Array(q.blanks.length).fill(false));
+    if (q.type === 'dropdown_cloze' || q.type === 'word_bank_cloze') {
+      const blankCount = getItemCount(q);
+      setClozeSelections(Array(blankCount).fill(''));
+      setClozeCorrect(Array(blankCount).fill(false));
     }
     setClozeWrongFlash(null);
   }, [curiosidad, currentQuestion]);
@@ -287,7 +296,7 @@ export default function CuriosidadQuizEngine() {
   const handleSelectClozeBlank = (blankIdx, value, question) => {
     if (clozeCorrect[blankIdx]) return;
     const key = `${currentQuestion}-${blankIdx}`;
-    const isCorrect = question.blanks[blankIdx].answer === value;
+    const isCorrect = getClozeBlankAnswer(question, blankIdx) === value;
 
     if (!(key in firstAttemptRef.current)) {
       firstAttemptRef.current[key] = isCorrect;
@@ -540,6 +549,8 @@ export default function CuriosidadQuizEngine() {
   const isMatching = question.type === 'matching';
   const isImageSelect = question.type === 'image_select';
   const isDropdownCloze = question.type === 'dropdown_cloze';
+  const isWordBankCloze = question.type === 'word_bank_cloze';
+  const isAnyCloze = isDropdownCloze || isWordBankCloze;
   const isMultipleChoice = question.type === 'multiple_choice';
   const isMultiSelect = isImageSelect && (question.correctIndices || []).length > 1;
 
@@ -547,7 +558,7 @@ export default function CuriosidadQuizEngine() {
     ? matchedPairIdx.length === question.pairs.length
     : isImageSelect || isMultipleChoice
     ? imageSelectDone
-    : isDropdownCloze
+    : isAnyCloze
     ? clozeCorrect.length > 0 && clozeCorrect.every(Boolean)
     : false;
 
@@ -648,12 +659,12 @@ export default function CuriosidadQuizEngine() {
               {matchedPairIdx.length} de {question.pairs.length} emparejados
             </p>
           )}
-          {isDropdownCloze && question.blanks.length > 1 && (
+          {isAnyCloze && getItemCount(question) > 1 && (
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
-              {clozeCorrect.filter(Boolean).length} de {question.blanks.length} completados
+              {clozeCorrect.filter(Boolean).length} de {getItemCount(question)} completados
             </p>
           )}
-          {!(isMatching && question.pairs.length > 1) && !(isDropdownCloze && question.blanks.length > 1) && (
+          {!(isMatching && question.pairs.length > 1) && !(isAnyCloze && getItemCount(question) > 1) && (
             <div className="mb-6" />
           )}
 
@@ -757,7 +768,7 @@ export default function CuriosidadQuizEngine() {
             </div>
           )}
 
-          {isDropdownCloze && (
+          {isAnyCloze && (
             <div>
               {question.img && (
                 <img
@@ -769,11 +780,19 @@ export default function CuriosidadQuizEngine() {
               <p className="text-base text-slate-200 leading-loose text-center">
                 {renderClozeText(
                   question.text,
-                  question.blanks,
                   clozeSelections,
                   clozeCorrect,
                   clozeWrongFlash,
-                  (blankIdx, value) => handleSelectClozeBlank(blankIdx, value, question)
+                  (blankIdx, value) => handleSelectClozeBlank(blankIdx, value, question),
+                  isWordBankCloze
+                    ? (blankIdx) => {
+                        // A word already correctly placed in a DIFFERENT
+                        // blank is used up — hide it from every other
+                        // blank's dropdown, same as a paper word bank.
+                        const usedElsewhere = question.answers.filter((_, j) => j !== blankIdx && clozeCorrect[j]);
+                        return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
+                      }
+                    : (blankIdx) => question.blanks[blankIdx]?.options || []
                 )}
               </p>
             </div>

@@ -28,6 +28,14 @@ const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
 const emptyClozeBlank = () => ({ options: ['', ''], answer: '' });
 const emptyDropdownClozeQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
 
+// Same "{{blank}}"-tagged passage, but every blank shares ONE word bank
+// (typed once) instead of each blank getting its own option list — the
+// classic "fill in the blanks using the word bank" worksheet, where a word
+// already used correctly in one blank disappears from the others. Admin
+// types the shared bank once (correct answers + any extra distractors all
+// together) and just assigns which bank word is correct for each blank.
+const emptyWordBankClozeQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', text: '', wordBank: [], answers: [] });
+
 // A single clue with 2-4 text options, one correct — the "Jeopardy-style"
 // question type. `category` groups questions into the student-facing
 // category picker (see CuriosidadQuizEngine); questions with no category
@@ -41,6 +49,7 @@ const TYPE_LABELS = {
   matching: 'Emparejar',
   image_select: 'Selección de Imagen',
   dropdown_cloze: 'Cloze con Menús',
+  word_bank_cloze: 'Cloze con Banco de Palabras',
   multiple_choice: 'Opción Múltiple',
 };
 
@@ -235,6 +244,37 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
       prev.map((q, i) =>
         i === qIdx ? { ...q, blanks: q.blanks.map((b, j) => (j === bIdx ? { ...b, answer: value } : b)) } : q
       )
+    );
+  };
+
+  // --- Word-bank-cloze-type helpers ---
+  // Same token-counting idea as updateClozeText, but keeps a flat `answers`
+  // array (one correct word per blank) instead of growing/shrinking a full
+  // blanks array, since all blanks share the one wordBank list below.
+  const updateWordBankClozeText = (qIdx, text) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qIdx) return q;
+        const needed = countBlanks(text);
+        let answers = q.answers || [];
+        if (needed > answers.length) {
+          answers = [...answers, ...Array(needed - answers.length).fill('')];
+        } else if (needed < answers.length) {
+          answers = answers.slice(0, needed);
+        }
+        return { ...q, text, answers };
+      })
+    );
+  };
+
+  const updateWordBank = (qIdx, text) => {
+    const wordBank = text.split('\n').map((w) => w.trim()).filter(Boolean);
+    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, wordBank } : q)));
+  };
+
+  const setWordBankAnswer = (qIdx, bIdx, value) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => (i === qIdx ? { ...q, answers: q.answers.map((a, j) => (j === bIdx ? value : a)) } : q))
     );
   };
 
@@ -695,6 +735,82 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                 </>
               )}
 
+              {q.type === 'word_bank_cloze' && (
+                <>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Escribe el párrafo y pon <code className="bg-slate-200 px-1 rounded">{BLANK_TOKEN}</code> donde
+                    va cada espacio en blanco — todos comparten el mismo banco de palabras de abajo.
+                  </p>
+
+                  <div className="flex items-start gap-2 mb-3">
+                    {q.img && (
+                      <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
+                    )}
+                    <ImageUploadField
+                      value={q.img}
+                      onChange={(url) => updateQuestion(qIdx, { img: url })}
+                      folder="curiosidades"
+                      placeholder="Imagen opcional"
+                      inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+                    />
+                  </div>
+
+                  <textarea
+                    value={q.text}
+                    onChange={(e) => updateWordBankClozeText(qIdx, e.target.value)}
+                    rows={3}
+                    placeholder={`El pato nada en ${BLANK_TOKEN} y come ${BLANK_TOKEN}.`}
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
+                  />
+
+                  <div className="mt-3">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      Banco de palabras (una por línea — incluye las respuestas correctas y cualquier distractor extra)
+                    </label>
+                    <textarea
+                      value={(q.wordBank || []).join('\n')}
+                      onChange={(e) => updateWordBank(qIdx, e.target.value)}
+                      rows={4}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
+                      placeholder={'agua\npan\nlago\n...'}
+                    />
+                  </div>
+
+                  {q.answers.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic mt-2">
+                      Agrega al menos un {BLANK_TOKEN} al texto para crear un espacio en blanco.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 mt-3">
+                      {q.answers.map((answer, bIdx) => (
+                        <div key={bIdx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
+                            Espacio {bIdx + 1}
+                          </span>
+                          <select
+                            value={answer}
+                            onChange={(e) => setWordBankAnswer(qIdx, bIdx, e.target.value)}
+                            className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
+                          >
+                            <option value="">— Elige la palabra correcta —</option>
+                            {(q.wordBank || []).map((word, wIdx) => (
+                              <option key={wIdx} value={word}>
+                                {word}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(q.wordBank || []).length === 0 && (
+                    <p className="text-[10px] text-amber-600 font-bold mt-1">
+                      Agrega palabras al banco arriba antes de asignar respuestas.
+                    </p>
+                  )}
+                </>
+              )}
+
               {q.type === 'multiple_choice' && (
                 <>
                   {jeopardyMode && (
@@ -776,6 +892,12 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
               className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
             >
               + Pregunta de Cloze con Menús
+            </button>
+            <button
+              onClick={() => setQuestions((prev) => [...prev, emptyWordBankClozeQuestion()])}
+              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
+            >
+              + Pregunta de Cloze con Banco de Palabras
             </button>
             <button
               onClick={() => setQuestions((prev) => [...prev, emptyMultipleChoiceQuestion()])}
