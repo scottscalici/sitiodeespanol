@@ -8,6 +8,13 @@ import { useAuth } from '../context/AuthContext';
 // simple random sort is fine for a handful of answer tiles).
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
+// How many gradable "items" one question is worth — a 9-pair matching
+// question is 9 items, not 1, so the final grade (and eventually the
+// champion comparison) reflects how much was actually in it, not how many
+// question blocks the admin happened to group them into. Every other type
+// is a single yes/no unit.
+const getItemCount = (q) => (q.type === 'matching' ? q.pairs.length : 1);
+
 export default function CuriosidadQuizEngine() {
   const { curiosidadId } = useParams();
   const { userData } = useAuth();
@@ -18,14 +25,22 @@ export default function CuriosidadQuizEngine() {
   const [notFound, setNotFound] = useState(false);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
+
+  // --- Matching-type state ---
   const [matchedPairIdx, setMatchedPairIdx] = useState([]); // indices into pairs matched so far, this question
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
   const [shuffledAnswers, setShuffledAnswers] = useState([]);
   const [wrongFlashIdx, setWrongFlashIdx] = useState(null); // answer tile index to briefly flash red
 
-  // First-attempt correctness per pair, keyed `${questionIdx}-${pairIdx}` —
-  // only ever set once per pair, so a retry after a miss doesn't change the
-  // recorded grade (same "first attempt" principle as Calentamiento).
+  // --- Image-select-type state ---
+  const [selectedImageIdx, setSelectedImageIdx] = useState([]); // currently toggled option indices
+  const [imageSelectDone, setImageSelectDone] = useState(false); // locked in as correct
+  const [imageWrongFlash, setImageWrongFlash] = useState(false);
+
+  // First-attempt correctness per gradable item, keyed `${questionIdx}-${itemIdx}`
+  // (itemIdx is the pair index for matching, always 0 for single-unit types)
+  // — only ever set once per item, so a retry after a miss doesn't change
+  // the recorded grade (same "first attempt" principle as Calentamiento).
   const firstAttemptRef = useRef({});
 
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -72,19 +87,26 @@ export default function CuriosidadQuizEngine() {
     return () => clearInterval(interval);
   }, [finished]);
 
-  // 3. Shuffle this question's answer bank whenever we land on a new question
+  // 3. Reset per-question state whenever we land on a new question —
+  // matching gets a freshly shuffled answer bank, image-select starts
+  // unselected/unlocked.
   useEffect(() => {
     if (!curiosidad) return;
     const q = curiosidad.questions[currentQuestion];
     if (!q) return;
-    const answers = q.pairs.map((p) => p.answer).concat(q.distractors || []);
-    setShuffledAnswers(shuffle(answers));
+
+    if (q.type === 'matching') {
+      const answers = q.pairs.map((p) => p.answer).concat(q.distractors || []);
+      setShuffledAnswers(shuffle(answers));
+    }
     setMatchedPairIdx([]);
     setSelectedLeftIdx(null);
+    setSelectedImageIdx([]);
+    setImageSelectDone(false);
   }, [curiosidad, currentQuestion]);
 
-  const totalPairs = curiosidad
-    ? curiosidad.questions.reduce((sum, q) => sum + q.pairs.length, 0)
+  const totalItems = curiosidad
+    ? curiosidad.questions.reduce((sum, q) => sum + getItemCount(q), 0)
     : 0;
 
   const handleSelectLeft = (pairIdx) => {
@@ -112,13 +134,52 @@ export default function CuriosidadQuizEngine() {
     }
   };
 
+  // Records (once) whether THIS attempt at the whole image-select question
+  // was correct, then either locks it in (correct) or flashes an error so
+  // the student can adjust their selection and try again.
+  const recordImageSelectAttempt = (selection, question) => {
+    const key = `${currentQuestion}-0`;
+    const correct = [...question.correctIndices].sort().join(',') === [...selection].sort().join(',');
+
+    if (!(key in firstAttemptRef.current)) {
+      firstAttemptRef.current[key] = correct;
+    }
+
+    if (correct) {
+      setImageSelectDone(true);
+    } else {
+      setImageWrongFlash(true);
+      setTimeout(() => setImageWrongFlash(false), 400);
+    }
+  };
+
+  // Single-correct-answer questions resolve the instant you click one
+  // option — no separate confirm step needed.
+  const handleSelectSingleImage = (oIdx, question) => {
+    if (imageSelectDone) return;
+    setSelectedImageIdx([oIdx]);
+    recordImageSelectAttempt([oIdx], question);
+  };
+
+  // Multi-correct-answer questions let you toggle several options, then
+  // confirm the whole set at once.
+  const handleToggleImageOption = (oIdx) => {
+    if (imageSelectDone) return;
+    setSelectedImageIdx((prev) => (prev.includes(oIdx) ? prev.filter((i) => i !== oIdx) : [...prev, oIdx]));
+  };
+
+  const handleConfirmImageSelect = (question) => {
+    if (imageSelectDone || selectedImageIdx.length === 0) return;
+    recordImageSelectAttempt(selectedImageIdx, question);
+  };
+
   const goToPreviousQuestion = () => {
     setCurrentQuestion((q) => Math.max(0, q - 1));
   };
 
   const handleFinishQuiz = async () => {
     const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
-    const grade = totalPairs > 0 ? Math.round((correctCount / totalPairs) * 100) : 0;
+    const grade = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
     setFinalGrade(grade);
 
     if (!userData || !userData.uid || isAdmin) {
@@ -230,12 +291,16 @@ export default function CuriosidadQuizEngine() {
   }
 
   if (finished) {
+    const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center gap-6 text-center">
         <h2 className="text-3xl font-black text-emerald-400 uppercase tracking-tighter">
           ¡Curiosidad Completada!
         </h2>
         <p className="text-5xl font-black text-white">{finalGrade}%</p>
+        <p className="text-xs font-bold text-slate-400">
+          {correctCount} de {totalItems} correctas en el primer intento
+        </p>
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
           {saveState === 'saving' && '💾 Guardando tu progreso...'}
           {saveState === 'saved' && '✅ Progreso guardado'}
@@ -252,8 +317,16 @@ export default function CuriosidadQuizEngine() {
   }
 
   const question = curiosidad.questions[currentQuestion];
-  const allMatched = matchedPairIdx.length === question.pairs.length;
   const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
+  const isMatching = question.type === 'matching';
+  const isImageSelect = question.type === 'image_select';
+  const isMultiSelect = isImageSelect && (question.correctIndices || []).length > 1;
+
+  const allMatched = isMatching
+    ? matchedPairIdx.length === question.pairs.length
+    : isImageSelect
+    ? imageSelectDone
+    : false;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">
@@ -282,54 +355,109 @@ export default function CuriosidadQuizEngine() {
 
       <main className="w-full max-w-3xl bg-slate-800 border border-slate-700 p-8 rounded-2xl shadow-xl min-h-[400px] flex flex-col justify-between">
         <div>
-          <p className="text-sm text-slate-300 font-bold mb-6 text-center">{question.prompt}</p>
+          <p className="text-sm text-slate-300 font-bold mb-2 text-center">{question.prompt}</p>
+          {isMatching && question.pairs.length > 1 && (
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
+              {matchedPairIdx.length} de {question.pairs.length} emparejados
+            </p>
+          )}
+          {!(isMatching && question.pairs.length > 1) && <div className="mb-6" />}
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              {question.pairs.map((pair, pIdx) => (
-                <button
-                  key={pIdx}
-                  onClick={() => handleSelectLeft(pIdx)}
-                  disabled={matchedPairIdx.includes(pIdx)}
-                  className={`w-full p-2 border rounded-xl text-left transition-all ${
-                    matchedPairIdx.includes(pIdx)
-                      ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900'
-                      : selectedLeftIdx === pIdx
-                      ? 'border-sky-400 bg-sky-950'
-                      : 'bg-slate-900 border-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  {pair.left.type === 'image' ? (
-                    <img src={pair.left.value} alt="" className="w-full h-20 object-cover rounded-lg" />
-                  ) : (
-                    <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              {shuffledAnswers.map((answer, aIdx) => {
-                const alreadyUsed = matchedPairIdx.some((pIdx) => question.pairs[pIdx].answer === answer);
-                return (
+          {isMatching && (
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                {question.pairs.map((pair, pIdx) => (
                   <button
-                    key={aIdx}
-                    onClick={() => handleAttemptAnswer(answer, aIdx)}
-                    disabled={alreadyUsed}
-                    className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all ${
-                      alreadyUsed
-                        ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900 text-slate-700'
-                        : wrongFlashIdx === aIdx
-                        ? 'border-rose-500 bg-rose-950 text-rose-300'
-                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
+                    key={pIdx}
+                    onClick={() => handleSelectLeft(pIdx)}
+                    disabled={matchedPairIdx.includes(pIdx)}
+                    className={`w-full p-2 border rounded-xl text-left transition-all ${
+                      matchedPairIdx.includes(pIdx)
+                        ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900'
+                        : selectedLeftIdx === pIdx
+                        ? 'border-sky-400 bg-sky-950'
+                        : 'bg-slate-900 border-slate-700 hover:border-slate-500'
                     }`}
                   >
-                    {answer}
+                    {pair.left.type === 'image' ? (
+                      <img src={pair.left.value} alt="" className="w-full h-20 object-cover rounded-lg" />
+                    ) : (
+                      <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
+                    )}
                   </button>
-                );
-              })}
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                {shuffledAnswers.map((answer, aIdx) => {
+                  const alreadyUsed = matchedPairIdx.some((pIdx) => question.pairs[pIdx].answer === answer);
+                  return (
+                    <button
+                      key={aIdx}
+                      onClick={() => handleAttemptAnswer(answer, aIdx)}
+                      disabled={alreadyUsed}
+                      className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all ${
+                        alreadyUsed
+                          ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900 text-slate-700'
+                          : wrongFlashIdx === aIdx
+                          ? 'border-rose-500 bg-rose-950 text-rose-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
+                      }`}
+                    >
+                      {answer}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
+
+          {isImageSelect && (
+            <div>
+              {(question.correctIndices || []).length > 1 && (
+                <p className="text-xs text-slate-400 text-center mb-4">
+                  (elige {question.correctIndices.length})
+                </p>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {question.options.map((opt, oIdx) => {
+                  const isSelected = selectedImageIdx.includes(oIdx);
+                  const showWrong = imageWrongFlash && isSelected;
+                  const showCorrect = imageSelectDone && isSelected;
+                  return (
+                    <button
+                      key={oIdx}
+                      onClick={() =>
+                        isMultiSelect ? handleToggleImageOption(oIdx) : handleSelectSingleImage(oIdx, question)
+                      }
+                      disabled={imageSelectDone}
+                      className={`border-2 rounded-xl overflow-hidden transition-all ${
+                        showWrong
+                          ? 'border-rose-500'
+                          : showCorrect
+                          ? 'border-emerald-500'
+                          : isSelected
+                          ? 'border-sky-400'
+                          : 'border-slate-700 hover:border-slate-500'
+                      } ${imageSelectDone && !isSelected ? 'opacity-40' : ''}`}
+                    >
+                      <img src={opt.img} alt={opt.label || ''} className="w-full h-28 object-cover" />
+                      {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+              {isMultiSelect && !imageSelectDone && (
+                <button
+                  onClick={() => handleConfirmImageSelect(question)}
+                  disabled={selectedImageIdx.length === 0}
+                  className="mt-4 w-full py-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-black rounded-xl text-xs uppercase tracking-widest"
+                >
+                  Confirmar Selección
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between pt-6 border-t border-slate-700 mt-6">
