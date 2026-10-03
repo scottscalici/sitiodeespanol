@@ -50,6 +50,7 @@ export default function CuriosidadQuizEngine() {
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [finalGrade, setFinalGrade] = useState(null);
   const [pointsAwarded, setPointsAwarded] = useState(null);
+  const [attemptNumber, setAttemptNumber] = useState(null); // which attempt this finish was (1, 2, 3+)
 
   const isAdmin = userData?.role === 'admin';
 
@@ -197,23 +198,44 @@ export default function CuriosidadQuizEngine() {
       const data = snap.exists() ? snap.data() : {};
       const existingEntry = data.progress?.curiosidades?.[curiosidadId];
       const existingGrade = existingEntry?.grade ?? -1;
-      const alreadyCompletedBefore = !!existingEntry?.completed;
+      const attemptsSoFar = existingEntry?.attempts || 0;
       const bestGrade = Math.max(grade, existingGrade);
+      // Frozen the very first time this is completed — this is what a
+      // future "champion of the day" comparison reads, specifically so a
+      // later catch-up attempt can't quietly outrank someone who nailed it
+      // the first time (completion credit, separately, is a flat 1/1 the
+      // instant `completed` is true, regardless of accuracy or attempt).
+      const firstAttemptGrade = existingEntry?.firstAttemptGrade ?? grade;
 
-      // Generous on purpose: half of your first-attempt percentage becomes
-      // class-ranking points (100% -> 50, 50% -> 25). Unlike Calentamiento,
-      // the grade here is just a flat completion credit, so this is what
-      // pushes kids to actually try the first time through. Only ever
-      // awarded once per curiosidad — same anti-farming rule as
-      // Calentamiento — so replaying it for a better grade can't also farm
-      // more points.
-      const pointsEarned = alreadyCompletedBefore ? 0 : Math.round(grade / 2);
+      // Generous on purpose, and deliberately front-loaded: attempt 1 pays
+      // half your percentage (100% -> 50, 50% -> 25) since the grade itself
+      // is just a flat completion credit with no accuracy incentive built
+      // in. Attempt 2 pays a SECOND-RATE bonus (half of attempt 1's rate)
+      // on only the improvement over attempt 1 — e.g. 50% then 100% nets
+      // round((100-50) * 0.25) = 13 more, for 38 total, not the full 50 —
+      // so catching up later is worth something but never as much as
+      // getting it right the first time. Nothing is ever earned (or lost)
+      // on a third attempt or beyond.
+      let pointsEarned = 0;
+      if (attemptsSoFar === 0) {
+        pointsEarned = Math.round(grade * 0.5);
+      } else if (attemptsSoFar === 1) {
+        const improvement = Math.max(0, grade - firstAttemptGrade);
+        pointsEarned = Math.round(improvement * 0.25);
+      }
       setPointsAwarded(pointsEarned);
+      setAttemptNumber(attemptsSoFar + 1);
 
       const updatePayload = {
         progress: {
           curiosidades: {
-            [curiosidadId]: { completed: true, grade: bestGrade, timestamp: new Date().toISOString() },
+            [curiosidadId]: {
+              completed: true,
+              grade: bestGrade,
+              firstAttemptGrade,
+              attempts: attemptsSoFar + 1,
+              timestamp: new Date().toISOString(),
+            },
           },
         },
       };
@@ -329,17 +351,24 @@ export default function CuriosidadQuizEngine() {
         </h2>
         <p className="text-5xl font-black text-white">{finalGrade}%</p>
         <p className="text-xs font-bold text-slate-400">
-          {correctCount} de {totalItems} correctas en el primer intento
+          {correctCount} de {totalItems} correctas{attemptNumber === 1 ? ' en el primer intento' : ''}
         </p>
 
         {!isAdmin && (
           <div className="p-4 bg-amber-950/30 rounded-2xl border border-amber-900/50 max-w-xs mx-auto">
             {pointsAwarded === null ? (
               <p className="text-sm text-slate-400 italic animate-pulse">Calculando recompensa...</p>
-            ) : pointsAwarded === 0 ? (
-              <p className="text-sm font-black text-slate-400">Ya ganaste tus puntos la primera vez</p>
-            ) : (
+            ) : pointsAwarded > 0 ? (
               <p className="text-2xl font-black text-amber-400">🏆 +{pointsAwarded} Puntos</p>
+            ) : attemptNumber === 1 ? (
+              <>
+                <p className="text-sm font-black text-slate-400">0 puntos esta vez</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+                  Puedes intentarlo una vez más para ganar algunos
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-black text-slate-400">Ya no hay más puntos disponibles aquí</p>
             )}
           </div>
         )}
