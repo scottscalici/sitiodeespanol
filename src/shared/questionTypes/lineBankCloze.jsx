@@ -9,10 +9,17 @@ import { parseLines, parseAnswerTokens } from './text';
 // pulling from one shared, alphabetized word bank. Blanks are numbered
 // globally across every row for grading (onItemFirstAttempt/getItemCount),
 // but each row's own {{blank}} tokens are local to that row's text.
+//
+// `allowRepeats` (default false, so existing saved questions keep their
+// original depleting behavior): when true, a word stays available in every
+// row's dropdown even after it's been used correctly elsewhere — e.g. a
+// direct-object-pronoun drill where "lo" is legitimately the right answer
+// for several different sentences at once, unlike a roster where each
+// correct surname is only ever used once.
 export const TYPE_KEY = 'line_bank_cloze';
 export const TYPE_LABEL = 'Líneas con Banco de Palabras';
 
-export const emptyQuestion = () => ({ type: 'line_bank_cloze', prompt: '', lines: [{ img: '', rawText: '' }], distractorsText: '' });
+export const emptyQuestion = () => ({ type: 'line_bank_cloze', prompt: '', lines: [{ img: '', rawText: '' }], distractorsText: '', allowRepeats: false });
 export const getItemCount = (q) => q.answers.length;
 
 // Converts each row's raw {{word}}-tagged text into its blank-tokenized
@@ -82,6 +89,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   };
 
   const optionsForBlank = (globalIdx) => {
+    if (question.allowRepeats) return question.wordBank || [];
     const usedElsewhere = question.answers.filter((_, j) => j !== globalIdx && correct[j]);
     return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
   };
@@ -195,6 +203,21 @@ export const Editor = ({ question: q, onChange }) => {
           placeholder={'campo\nduro'}
         />
       </div>
+
+      <label className="flex items-start gap-2 mt-3 text-xs text-slate-600 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!q.allowRepeats}
+          onChange={(e) => onChange({ allowRepeats: e.target.checked })}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="font-bold">Permitir repetir opciones</span> — cada opción sigue disponible en todas las
+          líneas aunque ya se haya usado (útil para algo como pronombres de objeto directo, donde "lo" puede ser la
+          respuesta correcta varias veces). Si está desmarcado, cada opción desaparece del banco una vez usada
+          correctamente, como en Cloze con Banco de Palabras.
+        </span>
+      </label>
     </>
   );
 };
