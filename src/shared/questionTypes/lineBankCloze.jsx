@@ -133,11 +133,27 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
 
 // --- Admin-facing editor ---
 export const Editor = ({ question: q, onChange }) => {
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+
   const updateLine = (lIdx, patch) => {
     onChange({ lines: q.lines.map((l, j) => (j === lIdx ? { ...l, ...patch } : l)) });
   };
   const addLine = () => onChange({ lines: [...q.lines, { img: '', rawText: '' }] });
   const removeLine = (lIdx) => onChange({ lines: q.lines.filter((_, j) => j !== lIdx) });
+
+  // Pasting several lines at once creates one row per non-blank line, each
+  // with no photo yet (added individually afterward if wanted) — if the
+  // question is still just its single untouched starter row, the paste
+  // replaces it instead of leaving an empty row at the top.
+  const handleBulkAdd = () => {
+    const newLines = parseLines(bulkText).map((rawText) => ({ img: '', rawText }));
+    if (newLines.length === 0) return;
+    const onlyBlankStarterRow = q.lines.length === 1 && !q.lines[0].rawText.trim() && !q.lines[0].img;
+    onChange({ lines: onlyBlankStarterRow ? newLines : [...q.lines, ...newLines] });
+    setBulkText('');
+    setBulkOpen(false);
+  };
 
   const allAnswers = (q.lines || []).flatMap((l) => parseAnswerTokens(l.rawText || '').answers);
 
@@ -177,9 +193,38 @@ export const Editor = ({ question: q, onChange }) => {
         ))}
       </div>
 
-      <button onClick={addLine} className="mt-2 text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
-        + Agregar línea
-      </button>
+      <div className="flex items-center gap-3 mt-2">
+        <button onClick={addLine} className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+          + Agregar línea
+        </button>
+        <button onClick={() => setBulkOpen((v) => !v)} className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+          📋 Pegar varias líneas
+        </button>
+      </div>
+
+      {bulkOpen && (
+        <div className="mt-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest mb-1">
+            Una línea por fila, con la respuesta entre llaves dobles — se agregan sin foto (puedes añadirla después).
+          </p>
+          <textarea
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            rows={4}
+            placeholder={'Tengo el libro. → {{Lo}} tengo.\nVeo a María. → {{La}} veo.\nTengo los libros. → {{Los}} tengo.'}
+            className="w-full border border-indigo-300 rounded-md p-2 text-xs font-mono bg-white"
+          />
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={handleBulkAdd}
+              disabled={!bulkText.trim()}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-[10px] font-black uppercase tracking-widest rounded-lg"
+            >
+              Agregar líneas
+            </button>
+          </div>
+        </div>
+      )}
 
       {allAnswers.length === 0 ? (
         <p className="text-xs text-slate-400 italic mt-2">
