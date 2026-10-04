@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { invalidateCollectionCache } from '../../../utils/firestoreCache';
+import { encodeWord } from '../../../utils/wordCipher';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -25,7 +26,9 @@ const FormSenordle = () => {
     // 2. Format the Document ID to match your SenordlePage logic
     const docId = `${course}_${date}`;
     const wordData = {
-      word: cleanWord,
+      // Obfuscated at rest — see wordCipher.js — so the answer isn't sitting
+      // in plain text in Firestore for a student to read directly.
+      word: encodeWord(cleanWord),
       course: course,
       date: date,
       createdAt: new Date().toISOString()

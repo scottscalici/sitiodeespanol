@@ -1,14 +1,17 @@
 import React from 'react';
 
 // Every card key the live Dashboard actually reads a theme color for.
-// Deliberately excludes Destacado and Anuncios (they already pick their own
-// color from real information — region, or warning/trip type — so a flat
-// theme color would erase that signal) and any legacy key from the old
-// vanilla-JS site (pruebas, senordle, extras, sidebarEvalList, cultura) that
-// nothing in this React app consumes yet.
+// Deliberately excludes Destacado (it picks its own color from real
+// information — region — so a flat theme color would erase that signal)
+// and any legacy key from the old vanilla-JS site (pruebas, senordle,
+// extras, sidebarEvalList, cultura) that nothing in this React app consumes
+// yet. Anuncios is included, but only ever applies to a routine/default
+// announcement — a 'warning' or 'trip' one keeps its own fixed semantic
+// color (red/emerald) regardless of this setting.
 const CARD_KEYS = [
   { key: 'calentamiento', label: 'Calentamiento', texture: true },
   { key: 'evaluacion', label: 'Evaluación', texture: true },
+  { key: 'anuncios', label: 'Anuncios (solo tipo rutinario)', texture: true },
   { key: 'lectura', label: 'Lectura', texture: true },
   { key: 'conversacion', label: 'Conversación', texture: true },
   { key: 'video', label: 'Video', texture: true },

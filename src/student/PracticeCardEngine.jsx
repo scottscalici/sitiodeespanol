@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
-import { checkAnswerLeniently } from '../utils/checkAnswer';
-import { playAudio } from '../utils/playAudio';
+import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
+import { normalizeLegacyPracticeQuestion } from '../utils/legacyPracticeQuestion';
 
 // A small, focused graded practice (e.g. Gustar, prepositional pronouns) —
 // unlike Calentamiento (verb-conjugation tables) or WorkoutEngine's
-// retry-until-correct Learning Path questions, each question here is
-// checked once and the grade reflects first-attempt accuracy, matching how
-// a calentamiento's own grade is a first-attempt score. Its grade is folded
-// into the SAME "Promedio Calentamientos" average students and teachers
-// already see (see src/utils/warmupBreakdown.js), and completing it for the
-// first time awards its point value as ordinary XP.
+// retry-until-correct Learning Path questions, its grade reflects
+// FIRST-ATTEMPT accuracy, matching how a calentamiento's own grade is a
+// first-attempt score. Its grade is folded into the SAME "Promedio
+// Calentamientos" average students and teachers already see (see
+// src/utils/warmupBreakdown.js), and completing it for the first time
+// awards its point value as ordinary XP. Question rendering/interaction is
+// shared with Curiosidades (src/shared/questionTypes) — only this grading
+// wrapper (first-attempt accuracy %, high-score gate, flat point-per-
+// correct, folded into the warmup average) is specific to Practice Cards.
 export default function PracticeCardEngine({ onClose }) {
   const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
@@ -25,12 +28,18 @@ export default function PracticeCardEngine({ onClose }) {
   const [notFound, setNotFound] = useState(false);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState(null);
-  const [userAnswer, setUserAnswer] = useState('');
-  const [isChecked, setIsChecked] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [errors, setErrors] = useState([]);
+
+  // Whether every gradable item in the CURRENT question has been answered
+  // correctly (or, for one-shot types like write/listen, simply checked) —
+  // reported by the active type's Renderer via onAllCorrect(), reset
+  // whenever the question changes. Same pattern as CuriosidadQuizEngine.
+  const [currentAllCorrect, setCurrentAllCorrect] = useState(false);
+
+  // First-attempt correctness per gradable item, keyed `${questionIdx}-${itemIdx}`
+  // — only ever set once per item, so a retry after a miss doesn't change
+  // the recorded grade.
+  const firstAttemptRef = useRef({});
+
   const [finished, setFinished] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [pointsAwarded, setPointsAwarded] = useState(0);
@@ -48,7 +57,12 @@ export default function PracticeCardEngine({ onClose }) {
         );
         const snap = await getDocs(q);
         if (!snap.empty) {
-          setCardData({ id: snap.docs[0].id, ...snap.docs[0].data() });
+          const data = snap.docs[0].data();
+          setCardData({
+            id: snap.docs[0].id,
+            ...data,
+            questions: (data.questions || []).map(normalizeLegacyPracticeQuestion),
+          });
         } else {
           setNotFound(true);
         }
@@ -64,46 +78,29 @@ export default function PracticeCardEngine({ onClose }) {
 
   const questions = cardData?.questions || [];
   const currentQ = questions[currentIndex];
+  const totalItems = questions.reduce((sum, q) => sum + getItemCount(q), 0);
 
   useEffect(() => {
-    if (currentQ?.type === 'listen') playAudio(currentQ.prompt);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, cardData]);
+    setCurrentAllCorrect(false);
+  }, [currentIndex]);
 
   const handleClose = () => {
     if (onClose) onClose();
     else navigate('/');
   };
 
-  const handleCheck = () => {
-    if (!currentQ) return;
-    let correct;
-    let studentInput = '';
-
-    if (currentQ.type === 'mc') {
-      studentInput = selectedOption || '';
-      correct = selectedOption === currentQ.correctAnswer;
-    } else {
-      studentInput = userAnswer;
-      correct = checkAnswerLeniently(userAnswer, currentQ.correctAnswer, false).correct;
-    }
-
-    setIsCorrect(correct);
-    setIsChecked(true);
-    if (correct) {
-      setCorrectCount((prev) => prev + 1);
-    } else {
-      setErrors((prev) => [...prev, { prompt: currentQ.prompt, expected: currentQ.correctAnswer, studentInput }]);
+  const handleItemFirstAttempt = (itemIdx, isCorrect) => {
+    const key = `${currentIndex}-${itemIdx}`;
+    if (!(key in firstAttemptRef.current)) {
+      firstAttemptRef.current[key] = isCorrect;
     }
   };
 
-  const handleNext = () => {
+  const handleAllCorrect = () => setCurrentAllCorrect(true);
+
+  const handleAdvance = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
-      setSelectedOption(null);
-      setUserAnswer('');
-      setIsChecked(false);
-      setIsCorrect(false);
     } else {
       setFinished(true);
     }
@@ -116,13 +113,14 @@ export default function PracticeCardEngine({ onClose }) {
 
     const save = async () => {
       setSaveState('saving');
-      const grade = Math.round((correctCount / questions.length) * 100);
-      const rawScore = `${correctCount}/${questions.length}`;
-      // Ranking/XP points = however many questions were answered correctly
-      // on this (the first, since points only ever award once below) attempt
-      // — one point per correct answer, no admin-set rate or multiplier.
-      // Independent of the card's grade-pool weight (gradeWeight, used only
-      // by warmupBreakdown.js for the classwork average).
+      const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
+      const grade = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
+      const rawScore = `${correctCount}/${totalItems}`;
+      // Ranking/XP points = however many gradable items were answered
+      // correctly on this (the first, since points only ever award once
+      // below) attempt — one point per correct item, no admin-set rate or
+      // multiplier. Independent of the card's grade-pool weight
+      // (gradeWeight, used only by warmupBreakdown.js for the classwork average).
       const points = correctCount;
 
       try {
@@ -137,7 +135,7 @@ export default function PracticeCardEngine({ onClose }) {
               {
                 progress: {
                   practiceCards: {
-                    [cardData.id]: { completed: true, grade, rawScore, errors, timestamp: new Date().toISOString() },
+                    [cardData.id]: { completed: true, grade, rawScore, timestamp: new Date().toISOString() },
                   },
                 },
               },
@@ -177,13 +175,14 @@ export default function PracticeCardEngine({ onClose }) {
   }
 
   if (finished) {
-    const grade = Math.round((correctCount / questions.length) * 100);
+    const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
+    const grade = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
     return (
       <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 text-center">
         <span className="text-5xl">{grade >= 70 ? '🎉' : '💪'}</span>
         <h1 className="text-2xl font-black text-slate-800">{cardData.title}</h1>
         <p className="text-4xl font-black text-emerald-600">{grade}%</p>
-        <p className="text-slate-500 font-bold">{correctCount}/{questions.length} correctas</p>
+        <p className="text-slate-500 font-bold">{correctCount}/{totalItems} correctas</p>
         {pointsAwarded > 0 && (
           <p className="text-amber-600 font-black uppercase tracking-widest text-sm">+{pointsAwarded} puntos</p>
         )}
@@ -198,7 +197,7 @@ export default function PracticeCardEngine({ onClose }) {
   }
 
   const progressPercent = Math.round((currentIndex / questions.length) * 100);
-  const isButtonDisabled = !isChecked && !selectedOption && !userAnswer.trim();
+  const TypeRenderer = QUESTION_TYPES[currentQ.type]?.Renderer;
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans">
@@ -214,62 +213,27 @@ export default function PracticeCardEngine({ onClose }) {
         <div className="w-full max-w-3xl mx-auto text-center pb-8">
           <span className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-6 block">{cardData.title}</span>
 
-          {currentQ.type === 'mc' ? (
-            <>
-              <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-8">{currentQ.prompt}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                {currentQ.options.map((opt, i) => (
-                  <button key={i} disabled={isChecked} onClick={() => setSelectedOption(opt)}
-                    className={`p-4 rounded-2xl border-2 font-bold text-lg transition-all ${
-                      isChecked && opt === currentQ.correctAnswer ? 'bg-emerald-100 border-emerald-500 text-emerald-800' :
-                      isChecked && selectedOption === opt && opt !== currentQ.correctAnswer ? 'bg-red-100 border-red-500 text-red-800' :
-                      selectedOption === opt ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >{opt}</button>
-                ))}
-              </div>
-            </>
-          ) : currentQ.type === 'listen' ? (
-            <>
-              <button onClick={() => playAudio(currentQ.prompt)} className="w-24 h-24 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-4xl shadow-lg mx-auto mb-8 transition-transform active:scale-95">🔊</button>
-              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe lo que escuchaste..."
-                className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
-                onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
-            </>
-          ) : (
-            <>
-              <h2 className="text-3xl font-black text-slate-800 mb-8">{currentQ.prompt}</h2>
-              <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} readOnly={isChecked} placeholder="Escribe en español..."
-                className="w-full text-xl p-4 rounded-2xl border-2 text-center bg-white shadow-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all"
-                onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} autoFocus />
-            </>
+          {TypeRenderer && (
+            <TypeRenderer
+              key={currentIndex}
+              question={currentQ}
+              onItemFirstAttempt={handleItemFirstAttempt}
+              onAllCorrect={handleAllCorrect}
+            />
           )}
         </div>
       </div>
 
-      <div className={`flex-none border-t-2 p-4 md:p-6 transition-colors z-10 ${isChecked ? isCorrect ? 'bg-emerald-100 border-emerald-200' : 'bg-red-100 border-red-200' : 'bg-white border-slate-200'}`}>
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
-          <div>
-            {isChecked && (
-              <div className="flex flex-col animate-fade-in">
-                <span className={`font-black text-lg ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {isCorrect ? '¡Correcto!' : 'Incorrecto'}
-                </span>
-                {!isCorrect && (
-                  <span className="text-red-600 font-bold text-sm">Respuesta: {currentQ.correctAnswer}</span>
-                )}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={isChecked ? handleNext : handleCheck}
-            disabled={isButtonDisabled}
-            className={`px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-              isChecked ? (isCorrect ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700') : 'bg-blue-600 hover:bg-blue-700'
-            } text-white`}
-          >
-            {isChecked ? (currentIndex < questions.length - 1 ? 'Siguiente' : 'Terminar') : 'Comprobar'}
-          </button>
+      <div className="flex-none border-t-2 border-slate-200 bg-white p-4 md:p-6 z-10">
+        <div className="max-w-3xl mx-auto w-full flex items-center justify-end">
+          {currentAllCorrect && (
+            <button
+              onClick={handleAdvance}
+              className="px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all animate-pulse"
+            >
+              {currentIndex < questions.length - 1 ? 'Siguiente' : 'Terminar'}
+            </button>
+          )}
         </div>
       </div>
     </div>

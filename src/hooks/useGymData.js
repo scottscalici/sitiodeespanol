@@ -173,7 +173,12 @@ export const useGymData = (userCourse = 's2') => {
           try {
             const docs = await getCachedCollection(collectionName);
             const bundle = docs.find((d) => d.id === bundleDocId);
-            if (bundle) return Object.values(bundle.items || {});
+            // Object.values alone drops each item's own id (the bundle map's
+            // key) — harmless until something needs to address one item
+            // specifically, e.g. Curiosidad.jsx's "Jugar" link building
+            // /curiosidad-quiz/${item.id}, which silently became
+            // /curiosidad-quiz/undefined without this.
+            if (bundle) return Object.entries(bundle.items || {}).map(([id, data]) => ({ id, ...data }));
             return docs;
           } catch (err) {
             return [];
