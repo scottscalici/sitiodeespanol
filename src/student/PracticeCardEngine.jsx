@@ -209,7 +209,15 @@ export default function PracticeCardEngine({ onClose }) {
         <span className="text-slate-500 font-black text-sm">{currentIndex + 1}/{questions.length}</span>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-start md:justify-center overflow-y-auto p-4 md:p-6 w-full">
+      {/* justify-start always, never justify-center here: a flex container
+          that both centers its content AND scrolls clips the content's own
+          start edge when that content is taller than the viewport — the
+          centered block overflows equally above and below, but scrollTop=0
+          only reaches the natural top, not the extra space centering pushed
+          above it. A short mc/write/listen question never overflowed, but a
+          multi-row type like line_bank_cloze can, which cut off its first
+          row or two behind the header above. */}
+      <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto p-4 md:p-6 w-full">
         <div className="w-full max-w-3xl mx-auto text-center pb-8">
           <span className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-6 block">{cardData.title}</span>
 
