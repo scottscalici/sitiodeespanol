@@ -1,5 +1,5 @@
 // A neutral, pluggable catalog of question types — any consumer (currently
-// Curiosidades; Practice Cards is next) picks a question's behavior purely
+// Curiosidades and Practice Cards) picks a question's behavior purely
 // by its `type` string, never by importing a type's internals directly.
 // Each entry: { Renderer, Editor, getItemCount, emptyQuestion, finalizeQuestion, reconstructQuestion, TYPE_LABEL }.
 //
@@ -27,6 +27,8 @@ import * as imageSelect from './imageSelect';
 import * as dropdownCloze from './dropdownCloze';
 import * as wordBankCloze from './wordBankCloze';
 import * as multipleChoice from './multipleChoice';
+import * as write from './write';
+import * as listen from './listen';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -34,6 +36,8 @@ export const QUESTION_TYPES = {
   [dropdownCloze.TYPE_KEY]: dropdownCloze,
   [wordBankCloze.TYPE_KEY]: wordBankCloze,
   [multipleChoice.TYPE_KEY]: multipleChoice,
+  [write.TYPE_KEY]: write,
+  [listen.TYPE_KEY]: listen,
 };
 
 export const TYPE_LABELS = Object.fromEntries(

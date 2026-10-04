@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
-import { playAudio } from '../../utils/playAudio';
+import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion } from '../../shared/questionTypes';
+import { normalizeLegacyPracticeQuestion } from '../../utils/legacyPracticeQuestion';
 
-const emptyQuestion = () => ({ type: 'mc', prompt: '', options: ['', ''], correctAnswer: '' });
+const DEFAULT_TYPE = 'multiple_choice';
+const emptyQuestion = () => QUESTION_TYPES[DEFAULT_TYPE].emptyQuestion();
+
+const reconstructEditableFields = (questions) =>
+  (questions || []).map((q) => reconstructQuestion(normalizeLegacyPracticeQuestion(q)));
 
 export default function PracticeCardAdmin() {
   const [cardId, setCardId] = useState('practica_s2_d1_gustar');
@@ -36,34 +41,16 @@ export default function PracticeCardAdmin() {
       setCourse(c.course || 's2');
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
-      setQuestions(c.questions?.length ? c.questions : [emptyQuestion()]);
+      setQuestions(c.questions?.length ? reconstructEditableFields(c.questions) : [emptyQuestion()]);
     }
   };
 
-  const updateQuestion = (index, field, value) => {
-    const updated = [...questions];
-    updated[index] = { ...updated[index], [field]: value };
-    setQuestions(updated);
+  const updateQuestionData = (index, patch) => {
+    setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
   };
 
-  const updateOption = (qIndex, optIndex, value) => {
-    const updated = [...questions];
-    const options = [...updated[qIndex].options];
-    options[optIndex] = value;
-    updated[qIndex] = { ...updated[qIndex], options };
-    setQuestions(updated);
-  };
-
-  const addOption = (qIndex) => {
-    const updated = [...questions];
-    updated[qIndex] = { ...updated[qIndex], options: [...updated[qIndex].options, ''] };
-    setQuestions(updated);
-  };
-
-  const removeOption = (qIndex, optIndex) => {
-    const updated = [...questions];
-    updated[qIndex] = { ...updated[qIndex], options: updated[qIndex].options.filter((_, i) => i !== optIndex) };
-    setQuestions(updated);
+  const changeType = (index, newType) => {
+    setQuestions((prev) => prev.map((q, i) => (i === index ? QUESTION_TYPES[newType].emptyQuestion() : q)));
   };
 
   const addQuestion = () => setQuestions([...questions, emptyQuestion()]);
@@ -73,15 +60,12 @@ export default function PracticeCardAdmin() {
     e.preventDefault();
     setSaving(true);
     try {
-      const cleanQuestions = questions
-        .filter((q) => q.prompt.trim() && q.correctAnswer.trim())
-        .map((q) => (q.type === 'mc' ? { ...q, options: q.options.filter((o) => o.trim()) } : { type: q.type, prompt: q.prompt, correctAnswer: q.correctAnswer }));
-
-      if (cleanQuestions.length === 0) {
+      if (questions.length === 0) {
         alert('Agrega al menos una pregunta con respuesta antes de guardar.');
         setSaving(false);
         return;
       }
+      const cleanQuestions = questions.map(finalizeQuestion);
 
       await setDoc(
         doc(db, 'practice_cards', cardId),
@@ -131,7 +115,7 @@ export default function PracticeCardAdmin() {
       <div className="mb-6 border-b border-slate-200 pb-4">
         <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">Creador de Tarjetas de Práctica</h1>
         <p className="text-slate-500 font-bold text-sm mt-1">
-          Preguntas de opción múltiple o de escribir. Los puntos de clasificación y el peso en el promedio de clase se configuran por separado abajo.
+          Mismos tipos de pregunta que las curiosidades. Los puntos de clasificación y el peso en el promedio de clase se configuran por separado abajo.
         </p>
       </div>
 
@@ -183,59 +167,41 @@ export default function PracticeCardAdmin() {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
             <h2 className="text-lg font-black text-slate-800 uppercase">Preguntas ({questions.length})</h2>
-            <button type="button" onClick={addQuestion} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-sm">
-              + Añadir Pregunta
-            </button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              {Object.values(QUESTION_TYPES).map((mod) => (
+                <button
+                  key={mod.TYPE_KEY}
+                  type="button"
+                  onClick={() => setQuestions([...questions, mod.emptyQuestion()])}
+                  className="px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white font-black rounded-xl text-[10px] uppercase tracking-wider shadow-sm"
+                >
+                  + {mod.TYPE_LABEL}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {questions.map((q, qIdx) => (
-            <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-              <div className="flex justify-between items-center">
-                <select value={q.type} onChange={(e) => updateQuestion(qIdx, 'type', e.target.value)} className="p-1.5 border rounded-lg text-xs font-bold bg-white">
-                  <option value="mc">Opción Múltiple</option>
-                  <option value="write">Escribir</option>
-                  <option value="listen">Escuchar</option>
-                </select>
-                <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
-              </div>
+          {questions.map((q, qIdx) => {
+            const mod = QUESTION_TYPES[q.type];
+            if (!mod) return null;
+            const Editor = mod.Editor;
+            return (
+              <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex justify-between items-center">
+                  <select value={q.type} onChange={(e) => changeType(qIdx, e.target.value)} className="p-1.5 border rounded-lg text-xs font-bold bg-white">
+                    {Object.values(QUESTION_TYPES).map((m) => (
+                      <option key={m.TYPE_KEY} value={m.TYPE_KEY}>{TYPE_LABELS[m.TYPE_KEY]}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
+                </div>
 
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">
-                  {q.type === 'listen' ? 'Texto a Reproducir (español)' : 'Pregunta (inglés o instrucción)'}
-                </label>
-                <div className="flex gap-2 items-center">
-                  <input type="text" value={q.prompt} onChange={(e) => updateQuestion(qIdx, 'prompt', e.target.value)} className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white" />
-                  {q.type === 'listen' && (
-                    <button type="button" onClick={() => playAudio(q.prompt)} className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm shrink-0" title="Probar audio">🔊</button>
-                  )}
-                </div>
+                <Editor question={q} onChange={(patch) => updateQuestionData(qIdx, patch)} instanceId={qIdx} showCategory={false} />
               </div>
-
-              {q.type === 'mc' ? (
-                <div className="space-y-2">
-                  <label className="block text-[9px] font-black text-slate-400 uppercase">Opciones</label>
-                  {q.options.map((opt, optIdx) => (
-                    <div key={optIdx} className="flex gap-2 items-center">
-                      <input type="text" value={opt} onChange={(e) => updateOption(qIdx, optIdx, e.target.value)} className="flex-1 p-1.5 border rounded-lg text-sm bg-white" placeholder={`Opción ${optIdx + 1}`} />
-                      <button type="button" onClick={() => removeOption(qIdx, optIdx)} className="text-rose-400 text-xs font-bold">✕</button>
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => addOption(qIdx)} className="text-sky-600 text-xs font-bold">+ Opción</button>
-                  <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Respuesta Correcta (debe coincidir con una opción)</label>
-                    <input type="text" value={q.correctAnswer} onChange={(e) => updateQuestion(qIdx, 'correctAnswer', e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold bg-white" />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Respuesta Correcta</label>
-                  <input type="text" value={q.correctAnswer} onChange={(e) => updateQuestion(qIdx, 'correctAnswer', e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold bg-white" />
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="flex justify-end">
