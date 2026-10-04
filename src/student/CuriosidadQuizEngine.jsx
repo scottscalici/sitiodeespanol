@@ -4,70 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
-
-// Shuffles a copy of the array (Fisher-Yates would be overkill here — a
-// simple random sort is fine for a handful of answer tiles).
-const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-
-// How many gradable "items" one question is worth — a 9-pair matching
-// question is 9 items, not 1, so the final grade (and eventually the
-// champion comparison) reflects how much was actually in it, not how many
-// question blocks the admin happened to group them into. Every other type
-// is a single yes/no unit.
-const getItemCount = (q) => {
-  if (q.type === 'matching') return q.pairs.length;
-  if (q.type === 'dropdown_cloze') return q.blanks.length;
-  if (q.type === 'word_bank_cloze') return q.answers.length;
-  return 1;
-};
-
-// The correct value for a given blank, regardless of which cloze type this
-// is — dropdown_cloze keeps a per-blank answer alongside its own options,
-// word_bank_cloze keeps a flat answers array matched against one shared bank.
-const getClozeBlankAnswer = (question, blankIdx) =>
-  question.type === 'word_bank_cloze' ? question.answers[blankIdx] : question.blanks[blankIdx].answer;
-
-// Splits a cloze passage on its "{{blank}}" tokens, interleaving the plain
-// text with one inline <select> per blank. Index-based keys are fine here —
-// the segments never reorder within a render. `optionsForBlank(i)` decouples
-// this from whether each blank has its own option list (dropdown_cloze) or
-// all blanks share one word bank (word_bank_cloze).
-const renderClozeText = (text, selections, correctArr, wrongFlashIdx, onSelect, optionsForBlank) => {
-  const parts = (text || '').split('{{blank}}');
-  const nodes = [];
-  parts.forEach((part, i) => {
-    if (part) nodes.push(<span key={`t-${i}`}>{part}</span>);
-    if (i < parts.length - 1) {
-      const isCorrect = correctArr[i];
-      const isWrong = wrongFlashIdx === i;
-      nodes.push(
-        <select
-          key={`b-${i}`}
-          value={selections[i] || ''}
-          onChange={(e) => onSelect(i, e.target.value)}
-          disabled={isCorrect}
-          className={`mx-1 border-b-2 bg-slate-900 font-bold rounded px-2 py-1 text-sm align-middle ${
-            isCorrect
-              ? 'border-emerald-500 text-emerald-400'
-              : isWrong
-              ? 'border-rose-500 text-rose-300'
-              : 'border-slate-500 text-sky-300'
-          }`}
-        >
-          <option value="" disabled>
-            ?
-          </option>
-          {optionsForBlank(i).map((opt, oIdx) => (
-            <option key={oIdx} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      );
-    }
-  });
-  return nodes;
-};
+import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
 
 export default function CuriosidadQuizEngine() {
   const { curiosidadId } = useParams();
@@ -80,28 +17,17 @@ export default function CuriosidadQuizEngine() {
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
 
-  // --- Matching-type state ---
-  const [matchedPairIdx, setMatchedPairIdx] = useState([]); // indices into pairs matched so far, this question
-  const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
-  const [shuffledAnswers, setShuffledAnswers] = useState([]);
-  const [wrongFlashIdx, setWrongFlashIdx] = useState(null); // answer tile index to briefly flash red
-
-  // --- Image-select-type state (also reused by multiple_choice below — both
-  // are "click one option, lock in on correct" single-select interactions,
-  // just over images vs. plain text) ---
-  const [selectedImageIdx, setSelectedImageIdx] = useState([]); // currently toggled option indices
-  const [imageSelectDone, setImageSelectDone] = useState(false); // locked in as correct
-  const [imageWrongFlash, setImageWrongFlash] = useState(false);
+  // Whether every gradable item in the CURRENT question has been answered
+  // correctly — reported by the active type's Renderer via onAllCorrect(),
+  // reset whenever the question changes. This is all the parent needs to
+  // know to decide whether to show the advance button; it never has to
+  // reach into any type's own interaction state.
+  const [currentAllCorrect, setCurrentAllCorrect] = useState(false);
 
   // --- Category picker (for curiosidades whose questions are tagged with a
   // `category`, e.g. a Jeopardy-style lightning round) ---
   const [selectedCategory, setSelectedCategory] = useState(null); // null = show the picker
   const [completedCategories, setCompletedCategories] = useState([]); // session-only, not persisted
-
-  // --- Dropdown-cloze-type state ---
-  const [clozeSelections, setClozeSelections] = useState([]); // current dropdown value per blank
-  const [clozeCorrect, setClozeCorrect] = useState([]); // which blanks are locked in as correct
-  const [clozeWrongFlash, setClozeWrongFlash] = useState(null); // blank index currently flashing red
 
   // First-attempt correctness per gradable item, keyed `${questionIdx}-${itemIdx}`
   // (itemIdx is the pair index for matching, always 0 for single-unit types)
@@ -155,29 +81,13 @@ export default function CuriosidadQuizEngine() {
     return () => clearInterval(interval);
   }, [finished]);
 
-  // 3. Reset per-question state whenever we land on a new question —
-  // matching gets a freshly shuffled answer bank, image-select starts
-  // unselected/unlocked.
+  // 3. The active type's Renderer remounts fresh on every question change
+  // (keyed by currentQuestion) and owns its own interaction state, so the
+  // only thing this parent needs to reset itself is its own "is the current
+  // question fully correct yet" flag.
   useEffect(() => {
-    if (!curiosidad) return;
-    const q = curiosidad.questions[currentQuestion];
-    if (!q) return;
-
-    if (q.type === 'matching') {
-      const answers = q.pairs.map((p) => p.answer).concat(q.distractors || []);
-      setShuffledAnswers(shuffle(answers));
-    }
-    setMatchedPairIdx([]);
-    setSelectedLeftIdx(null);
-    setSelectedImageIdx([]);
-    setImageSelectDone(false);
-    if (q.type === 'dropdown_cloze' || q.type === 'word_bank_cloze') {
-      const blankCount = getItemCount(q);
-      setClozeSelections(Array(blankCount).fill(''));
-      setClozeCorrect(Array(blankCount).fill(false));
-    }
-    setClozeWrongFlash(null);
-  }, [curiosidad, currentQuestion]);
+    setCurrentAllCorrect(false);
+  }, [currentQuestion]);
 
   const totalItems = curiosidad
     ? curiosidad.questions.reduce((sum, q) => sum + getItemCount(q), 0)
@@ -206,111 +116,17 @@ export default function CuriosidadQuizEngine() {
     : [];
   const posInCategory = currentCategoryIndices.indexOf(currentQuestion);
 
-  const handleSelectLeft = (pairIdx) => {
-    if (matchedPairIdx.includes(pairIdx)) return;
-    setSelectedLeftIdx(pairIdx);
-  };
-
-  const handleAttemptAnswer = (answer, answerTileIdx) => {
-    if (selectedLeftIdx === null) return;
-    const q = curiosidad.questions[currentQuestion];
-    const pair = q.pairs[selectedLeftIdx];
-    const key = `${currentQuestion}-${selectedLeftIdx}`;
-    const isCorrect = pair.answer === answer;
-
+  // Passed down to the active type's Renderer — builds this engine's own
+  // grading key from a bare item index, so no type needs to know about
+  // "which question" it's part of.
+  const handleItemFirstAttempt = (itemIdx, isCorrect) => {
+    const key = `${currentQuestion}-${itemIdx}`;
     if (!(key in firstAttemptRef.current)) {
       firstAttemptRef.current[key] = isCorrect;
     }
-
-    if (isCorrect) {
-      setMatchedPairIdx((prev) => [...prev, selectedLeftIdx]);
-      setSelectedLeftIdx(null);
-    } else {
-      setWrongFlashIdx(answerTileIdx);
-      setTimeout(() => setWrongFlashIdx(null), 400);
-    }
   };
 
-  // Records (once) whether THIS attempt at the whole image-select question
-  // was correct, then either locks it in (correct) or flashes an error so
-  // the student can adjust their selection and try again.
-  const recordImageSelectAttempt = (selection, question) => {
-    const key = `${currentQuestion}-0`;
-    const correct = [...question.correctIndices].sort().join(',') === [...selection].sort().join(',');
-
-    if (!(key in firstAttemptRef.current)) {
-      firstAttemptRef.current[key] = correct;
-    }
-
-    if (correct) {
-      setImageSelectDone(true);
-    } else {
-      setImageWrongFlash(true);
-      setTimeout(() => setImageWrongFlash(false), 400);
-    }
-  };
-
-  // Single-correct-answer questions resolve the instant you click one
-  // option — no separate confirm step needed.
-  const handleSelectSingleImage = (oIdx, question) => {
-    if (imageSelectDone) return;
-    setSelectedImageIdx([oIdx]);
-    recordImageSelectAttempt([oIdx], question);
-  };
-
-  // Multi-correct-answer questions let you toggle several options, then
-  // confirm the whole set at once.
-  const handleToggleImageOption = (oIdx) => {
-    if (imageSelectDone) return;
-    setSelectedImageIdx((prev) => (prev.includes(oIdx) ? prev.filter((i) => i !== oIdx) : [...prev, oIdx]));
-  };
-
-  const handleConfirmImageSelect = (question) => {
-    if (imageSelectDone || selectedImageIdx.length === 0) return;
-    recordImageSelectAttempt(selectedImageIdx, question);
-  };
-
-  // Multiple-choice resolves the instant you click an option, same as
-  // image-select's single-correct-answer mode — reuses that same lock/flash
-  // state since the interaction is identical, just over text instead of images.
-  const handleSelectMC = (oIdx, question) => {
-    if (imageSelectDone) return;
-    const key = `${currentQuestion}-0`;
-    const isCorrect = question.options[oIdx] === question.answer;
-
-    if (!(key in firstAttemptRef.current)) {
-      firstAttemptRef.current[key] = isCorrect;
-    }
-
-    setSelectedImageIdx([oIdx]);
-    if (isCorrect) {
-      setImageSelectDone(true);
-    } else {
-      setImageWrongFlash(true);
-      setTimeout(() => setImageWrongFlash(false), 400);
-    }
-  };
-
-  // Each blank grades independently and locks once correct, same first-
-  // attempt-only principle as the other types (one key per blank index).
-  const handleSelectClozeBlank = (blankIdx, value, question) => {
-    if (clozeCorrect[blankIdx]) return;
-    const key = `${currentQuestion}-${blankIdx}`;
-    const isCorrect = getClozeBlankAnswer(question, blankIdx) === value;
-
-    if (!(key in firstAttemptRef.current)) {
-      firstAttemptRef.current[key] = isCorrect;
-    }
-
-    setClozeSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
-
-    if (isCorrect) {
-      setClozeCorrect((prev) => prev.map((c, i) => (i === blankIdx ? true : c)));
-    } else {
-      setClozeWrongFlash(blankIdx);
-      setTimeout(() => setClozeWrongFlash(null), 400);
-    }
-  };
+  const handleAllCorrect = () => setCurrentAllCorrect(true);
 
   const goToPreviousQuestion = () => {
     if (hasCategories) {
@@ -546,21 +362,8 @@ export default function CuriosidadQuizEngine() {
   const isLastQuestion = currentQuestion === curiosidad.questions.length - 1;
   const isLastInCategory = hasCategories && posInCategory === currentCategoryIndices.length - 1;
   const isLastCategoryRemaining = hasCategories && completedCategories.length === categoryGroups.length - 1;
-  const isMatching = question.type === 'matching';
-  const isImageSelect = question.type === 'image_select';
-  const isDropdownCloze = question.type === 'dropdown_cloze';
-  const isWordBankCloze = question.type === 'word_bank_cloze';
-  const isAnyCloze = isDropdownCloze || isWordBankCloze;
   const isMultipleChoice = question.type === 'multiple_choice';
-  const isMultiSelect = isImageSelect && (question.correctIndices || []).length > 1;
-
-  const allMatched = isMatching
-    ? matchedPairIdx.length === question.pairs.length
-    : isImageSelect || isMultipleChoice
-    ? imageSelectDone
-    : isAnyCloze
-    ? clozeCorrect.length > 0 && clozeCorrect.every(Boolean)
-    : false;
+  const TypeRenderer = QUESTION_TYPES[question.type]?.Renderer;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center pb-20">
@@ -653,190 +456,22 @@ export default function CuriosidadQuizEngine() {
 
           {!showCategoryPicker && (
           <>
-          <p className="text-sm text-slate-300 font-bold mb-2 text-center">{question.prompt}</p>
-          {isMatching && question.pairs.length > 1 && (
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
-              {matchedPairIdx.length} de {question.pairs.length} emparejados
-            </p>
-          )}
-          {isAnyCloze && getItemCount(question) > 1 && (
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
-              {clozeCorrect.filter(Boolean).length} de {getItemCount(question)} completados
-            </p>
-          )}
-          {!(isMatching && question.pairs.length > 1) && !(isAnyCloze && getItemCount(question) > 1) && (
-            <div className="mb-6" />
-          )}
+          <p className="text-sm text-slate-300 font-bold mb-6 text-center">{question.prompt}</p>
 
-          {isMatching && (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                {question.pairs.map((pair, pIdx) => (
-                  <button
-                    key={pIdx}
-                    onClick={() => handleSelectLeft(pIdx)}
-                    disabled={matchedPairIdx.includes(pIdx)}
-                    className={`w-full p-2 border rounded-xl text-left transition-all ${
-                      matchedPairIdx.includes(pIdx)
-                        ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900'
-                        : selectedLeftIdx === pIdx
-                        ? 'border-sky-400 bg-sky-950'
-                        : 'bg-slate-900 border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    {pair.left.type === 'image' ? (
-                      <img
-                        src={pair.left.value}
-                        alt=""
-                        className="w-full h-32 object-contain bg-slate-950 rounded-lg"
-                      />
-                    ) : (
-                      <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-2">
-                {shuffledAnswers.map((answer, aIdx) => {
-                  const alreadyUsed = matchedPairIdx.some((pIdx) => question.pairs[pIdx].answer === answer);
-                  return (
-                    <button
-                      key={aIdx}
-                      onClick={() => handleAttemptAnswer(answer, aIdx)}
-                      disabled={alreadyUsed}
-                      className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all ${
-                        alreadyUsed
-                          ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900 text-slate-700'
-                          : wrongFlashIdx === aIdx
-                          ? 'border-rose-500 bg-rose-950 text-rose-300'
-                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
-                      }`}
-                    >
-                      {answer}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {isImageSelect && (
-            <div>
-              {(question.correctIndices || []).length > 1 && (
-                <p className="text-xs text-slate-400 text-center mb-4">
-                  (elige {question.correctIndices.length})
-                </p>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {question.options.map((opt, oIdx) => {
-                  const isSelected = selectedImageIdx.includes(oIdx);
-                  const showWrong = imageWrongFlash && isSelected;
-                  const showCorrect = imageSelectDone && isSelected;
-                  return (
-                    <button
-                      key={oIdx}
-                      onClick={() =>
-                        isMultiSelect ? handleToggleImageOption(oIdx) : handleSelectSingleImage(oIdx, question)
-                      }
-                      disabled={imageSelectDone}
-                      className={`border-2 rounded-xl overflow-hidden transition-all ${
-                        showWrong
-                          ? 'border-rose-500'
-                          : showCorrect
-                          ? 'border-emerald-500'
-                          : isSelected
-                          ? 'border-sky-400'
-                          : 'border-slate-700 hover:border-slate-500'
-                      } ${imageSelectDone && !isSelected ? 'opacity-40' : ''}`}
-                    >
-                      <img
-                        src={opt.img}
-                        alt={opt.label || ''}
-                        className="w-full h-32 object-contain bg-slate-950"
-                      />
-                      {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
-                    </button>
-                  );
-                })}
-              </div>
-              {isMultiSelect && !imageSelectDone && (
-                <button
-                  onClick={() => handleConfirmImageSelect(question)}
-                  disabled={selectedImageIdx.length === 0}
-                  className="mt-4 w-full py-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white font-black rounded-xl text-xs uppercase tracking-widest"
-                >
-                  Confirmar Selección
-                </button>
-              )}
-            </div>
-          )}
-
-          {isAnyCloze && (
-            <div>
-              {question.img && (
-                <img
-                  src={question.img}
-                  alt=""
-                  className="w-full max-h-64 object-contain bg-slate-950 rounded-lg mb-6"
-                />
-              )}
-              <p className="text-base text-slate-200 leading-loose text-center">
-                {renderClozeText(
-                  question.text,
-                  clozeSelections,
-                  clozeCorrect,
-                  clozeWrongFlash,
-                  (blankIdx, value) => handleSelectClozeBlank(blankIdx, value, question),
-                  isWordBankCloze
-                    ? (blankIdx) => {
-                        // A word already correctly placed in a DIFFERENT
-                        // blank is used up — hide it from every other
-                        // blank's dropdown, same as a paper word bank.
-                        const usedElsewhere = question.answers.filter((_, j) => j !== blankIdx && clozeCorrect[j]);
-                        return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
-                      }
-                    : (blankIdx) => question.blanks[blankIdx]?.options || []
-                )}
-              </p>
-            </div>
-          )}
-
-          {isMultipleChoice && (
-            <div
-              className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}
-            >
-              {question.options.map((opt, oIdx) => {
-                const isSelected = selectedImageIdx.includes(oIdx);
-                const showWrong = imageWrongFlash && isSelected;
-                const showCorrect = imageSelectDone && isSelected;
-                return (
-                  <button
-                    key={oIdx}
-                    onClick={() => handleSelectMC(oIdx, question)}
-                    disabled={imageSelectDone}
-                    className={`p-4 border-2 rounded-xl font-bold text-sm transition-all ${
-                      showWrong
-                        ? 'border-rose-500 bg-rose-950 text-rose-300'
-                        : showCorrect
-                        ? 'border-emerald-500 bg-emerald-950 text-emerald-300'
-                        : isSelected
-                        ? 'border-sky-400 bg-sky-950 text-slate-100'
-                        : 'bg-slate-900 border-slate-700 text-slate-200 hover:border-amber-400'
-                    } ${imageSelectDone && !isSelected ? 'opacity-40' : ''}`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
+          {TypeRenderer && (
+            <TypeRenderer
+              key={currentQuestion}
+              question={question}
+              onItemFirstAttempt={handleItemFirstAttempt}
+              onAllCorrect={handleAllCorrect}
+            />
           )}
 
           {/* Purely a fun flourish mirroring the board's point values — the
               real ranking points (pointsAwarded, shown on the results
               screen) are computed the same accuracy-based way as every
               other curiosidad type, completely independent of this number. */}
-          {isMultipleChoice && hasCategories && imageSelectDone && (
+          {isMultipleChoice && hasCategories && currentAllCorrect && (
             <p className="text-center text-amber-400 font-black text-lg mt-4 animate-pulse">
               🎉 +{(posInCategory + 1) * 100} puntos
             </p>
@@ -858,7 +493,7 @@ export default function CuriosidadQuizEngine() {
             <span />
           )}
 
-          {allMatched && (
+          {currentAllCorrect && (
             <button
               onClick={handleAdvance}
               className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-md animate-pulse"

@@ -1,117 +1,23 @@
 import React, { useState } from 'react';
-import ImageUploadField from '../shared/ImageUploadField';
 import QuestionPoolPickerModal from '../shared/QuestionPoolPickerModal';
 import { addPoolQuestion } from '../../utils/questionPool';
+import {
+  QUESTION_TYPES,
+  TYPE_LABELS,
+  finalizeQuestion,
+  reconstructQuestion,
+  parseBulkRow,
+  shuffle,
+} from '../../shared/questionTypes';
 
-// Shuffles a copy of the array (same simple approach as the student engine's
-// own shuffle — order just needs to vary, not be cryptographically random).
-const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-
-// Turns a raw, freely-typed textarea value into a clean list — one entry per
-// non-empty line, trimmed. Used at save time, never while typing: a textarea
-// whose `value` is always re-derived from an already-filtered array (e.g.
-// re-joining with '\n' after stripping blank lines on every keystroke) can't
-// let you press Enter to start a new blank line, since the empty line you
-// just created gets silently stripped right back out before the next
-// render — the cursor appears stuck. Keeping the raw text as its own field
-// and only parsing it into a real list on save avoids that entirely.
-const parseLines = (text) => (text || '').split('\n').map((s) => s.trim()).filter(Boolean);
-
-// Each question type gets its own editor block below, picked by the same
-// `type` field the student engine branches on.
-const emptyPair = () => ({ left: { type: 'text', value: '' }, answer: '' });
-const emptyMatchingQuestion = () => ({ type: 'matching', prompt: '', pairs: [emptyPair()], distractorsText: '' });
-const emptyImageOption = () => ({ img: '', label: '' });
-const emptyImageSelectQuestion = () => ({
-  type: 'image_select',
-  prompt: '',
-  options: [emptyImageOption(), emptyImageOption()],
-  correctIndices: [],
-});
-
-// A passage of text with one or more blanks, each blank getting its OWN
-// dropdown of options (unlike a shared word bank) — the admin types the
-// literal token "{{blank}}" wherever a blank belongs, and the blanks array
-// below is kept in sync with however many tokens are currently in the text.
-const BLANK_TOKEN = '{{blank}}';
-const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
-const emptyClozeBlank = () => ({ options: ['', ''], answer: '' });
-const emptyDropdownClozeQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
-
-// Same shared-word-bank cloze idea, but authored by writing the actual
-// correct word directly in the passage inside double braces — e.g.
-// "El pato nada en {{agua}}." — instead of a generic "{{blank}}" token plus
-// a separate per-blank answer picker. parseAnswerTokens turns that into the
-// blank-tokenized text the student engine renders, plus the answers in
-// order; any extra distractors are typed separately and merged in at save
-// time (see handleSave) into the final, alphabetized wordBank.
-const ANSWER_TOKEN_REGEX = /\{\{([^{}]+)\}\}/g;
-const parseAnswerTokens = (rawText) => {
-  const answers = [];
-  const text = (rawText || '').replace(ANSWER_TOKEN_REGEX, (match, word) => {
-    answers.push(word.trim());
-    return '{{blank}}';
-  });
-  return { text, answers };
-};
-const emptyWordBankClozeQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', rawText: '', distractorsText: '' });
-
-// A single clue with 2-4 text options, one correct — the "Jeopardy-style"
-// question type. `category` groups questions into the student-facing
-// category picker (see CuriosidadQuizEngine); questions with no category
-// just play in the normal linear sequence like any other type. Every
-// multiple_choice question gets mirrored into the shared question_pool
-// collection on save (see handleSave below) so it's reusable in future
-// activities beyond this one curiosidad.
-const emptyMultipleChoiceQuestion = () => ({ type: 'multiple_choice', prompt: '', category: '', options: ['', ''], answer: '' });
-
-const TYPE_LABELS = {
-  matching: 'Emparejar',
-  image_select: 'Selección de Imagen',
-  dropdown_cloze: 'Cloze con Menús',
-  word_bank_cloze: 'Cloze con Banco de Palabras',
-  multiple_choice: 'Opción Múltiple',
-};
-
-// Bulk-paste format, one clue per line: categoría | pregunta | respuesta | distractor1 | distractor2 | distractor3
-// (1 to 3 distractors — 2 to 4 total options). Point values aren't part of
-// this at all: they're purely cosmetic on a future Jeopardy board and have
-// no bearing on grading, so there's nothing to assign here.
-const parseBulkRow = (line) => {
-  const parts = line.split('|').map((s) => s.trim());
-  if (parts.length < 4) return null;
-  const [category, clue, answer, ...rest] = parts;
-  const distractors = rest.map((d) => d.trim()).filter(Boolean).slice(0, 3);
-  if (!category || !clue || !answer || distractors.length === 0) return null;
-  return {
-    type: 'multiple_choice',
-    prompt: clue,
-    category,
-    options: shuffle([answer, ...distractors]),
-    answer,
-  };
-};
-
-// Reopening an already-saved curiosidad only has the final, persisted shape
-// (matching's plain `distractors` array; word_bank_cloze's blank-tokenized
-// `text` + `answers`) — never the raw, freely-typed text these editors
-// actually edit. Reconstructs that raw text once on load so editing an
-// existing question starts from something that reads naturally, instead of
-// a blank textarea next to already-filled-in data.
-const reconstructEditableFields = (rawQuestions) =>
-  (rawQuestions || []).map((q) => {
-    if (q.type === 'matching' && q.distractorsText === undefined) {
-      return { ...q, distractorsText: (q.distractors || []).join('\n') };
-    }
-    if (q.type === 'word_bank_cloze' && q.rawText === undefined) {
-      const answers = q.answers || [];
-      let i = 0;
-      const rawText = (q.text || '').replace(/\{\{blank\}\}/g, () => `{{${answers[i++] ?? ''}}}`);
-      const distractorsText = (q.wordBank || []).filter((w) => !answers.includes(w)).join('\n');
-      return { ...q, rawText, distractorsText };
-    }
-    return q;
-  });
+// Reopening an already-saved curiosidad only has each question's final,
+// persisted shape — never the raw, freely-typed text some editors actually
+// edit (e.g. word_bank_cloze's {{word}}-tagged passage, matching's
+// distractors textarea). Each type's own reconstructQuestion() rebuilds
+// that raw text once on load so editing an existing question starts from
+// something that reads naturally, instead of a blank textarea next to
+// already-filled-in data.
+const reconstructEditableFields = (rawQuestions) => (rawQuestions || []).map(reconstructQuestion);
 
 const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
   const [questions, setQuestions] = useState(() => reconstructEditableFields(curiosidad.questions));
@@ -138,191 +44,6 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
 
   const updateQuestion = (qIdx, patch) => {
     setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, ...patch } : q)));
-  };
-
-  // --- Matching-type helpers ---
-  const addPair = (qIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === qIdx ? { ...q, pairs: [...q.pairs, emptyPair()] } : q))
-    );
-  };
-
-  const updatePair = (qIdx, pIdx, patch) => {
-    setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx ? { ...q, pairs: q.pairs.map((p, j) => (j === pIdx ? { ...p, ...patch } : p)) } : q
-      )
-    );
-  };
-
-  const removePair = (qIdx, pIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === qIdx ? { ...q, pairs: q.pairs.filter((_, j) => j !== pIdx) } : q))
-    );
-  };
-
-  // --- Image-select-type helpers ---
-  const addImageOption = (qIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, emptyImageOption()] } : q))
-    );
-  };
-
-  const updateImageOption = (qIdx, oIdx, patch) => {
-    setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx ? { ...q, options: q.options.map((o, j) => (j === oIdx ? { ...o, ...patch } : o)) } : q
-      )
-    );
-  };
-
-  const removeImageOption = (qIdx, oIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx
-          ? {
-              ...q,
-              options: q.options.filter((_, j) => j !== oIdx),
-              // Keep correctIndices in sync — remove this index and shift
-              // every index after it down by one.
-              correctIndices: (q.correctIndices || [])
-                .filter((idx) => idx !== oIdx)
-                .map((idx) => (idx > oIdx ? idx - 1 : idx)),
-            }
-          : q
-      )
-    );
-  };
-
-  const toggleCorrectOption = (qIdx, oIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const current = q.correctIndices || [];
-        const isCorrect = current.includes(oIdx);
-        return {
-          ...q,
-          correctIndices: isCorrect ? current.filter((idx) => idx !== oIdx) : [...current, oIdx],
-        };
-      })
-    );
-  };
-
-  // --- Dropdown-cloze-type helpers ---
-  // Changing the passage text re-counts "{{blank}}" tokens and grows/shrinks
-  // the blanks array to match, preserving existing blanks by position so
-  // editing text before/after an existing blank doesn't lose its options.
-  const updateClozeText = (qIdx, text) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const needed = countBlanks(text);
-        let blanks = q.blanks || [];
-        if (needed > blanks.length) {
-          blanks = [...blanks, ...Array.from({ length: needed - blanks.length }, emptyClozeBlank)];
-        } else if (needed < blanks.length) {
-          blanks = blanks.slice(0, needed);
-        }
-        return { ...q, text, blanks };
-      })
-    );
-  };
-
-  const addClozeBlankOption = (qIdx, bIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx
-          ? { ...q, blanks: q.blanks.map((b, j) => (j === bIdx ? { ...b, options: [...b.options, ''] } : b)) }
-          : q
-      )
-    );
-  };
-
-  const updateClozeBlankOption = (qIdx, bIdx, oIdx, value) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        return {
-          ...q,
-          blanks: q.blanks.map((b, j) => {
-            if (j !== bIdx) return b;
-            const oldValue = b.options[oIdx];
-            return {
-              ...b,
-              options: b.options.map((o, k) => (k === oIdx ? value : o)),
-              // The correct answer is stored by value, not index — keep it
-              // pointing at the same option if that's the one being edited.
-              answer: b.answer === oldValue ? value : b.answer,
-            };
-          }),
-        };
-      })
-    );
-  };
-
-  const removeClozeBlankOption = (qIdx, bIdx, oIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        return {
-          ...q,
-          blanks: q.blanks.map((b, j) => {
-            if (j !== bIdx) return b;
-            const removedValue = b.options[oIdx];
-            return {
-              ...b,
-              options: b.options.filter((_, k) => k !== oIdx),
-              answer: b.answer === removedValue ? '' : b.answer,
-            };
-          }),
-        };
-      })
-    );
-  };
-
-  const setClozeBlankAnswer = (qIdx, bIdx, value) => {
-    setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === qIdx ? { ...q, blanks: q.blanks.map((b, j) => (j === bIdx ? { ...b, answer: value } : b)) } : q
-      )
-    );
-  };
-
-  // --- Multiple-choice-type helpers ---
-  const addMCOption = (qIdx) => {
-    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, options: [...q.options, ''] } : q)));
-  };
-
-  const updateMCOption = (qIdx, oIdx, value) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const oldValue = q.options[oIdx];
-        return {
-          ...q,
-          options: q.options.map((o, j) => (j === oIdx ? value : o)),
-          answer: q.answer === oldValue ? value : q.answer,
-        };
-      })
-    );
-  };
-
-  const removeMCOption = (qIdx, oIdx) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const removedValue = q.options[oIdx];
-        return {
-          ...q,
-          options: q.options.filter((_, j) => j !== oIdx),
-          answer: q.answer === removedValue ? '' : q.answer,
-        };
-      })
-    );
-  };
-
-  const setMCAnswer = (qIdx, value) => {
-    setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, answer: value } : q)));
   };
 
   // --- Bulk import (multiple_choice only) ---
@@ -367,28 +88,6 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setPoolPickerOpen(false);
   };
 
-  // Converts the raw, freely-typed editing fields (distractorsText, rawText)
-  // into the final shape the student engine actually reads — matching's
-  // `distractors` array, word_bank_cloze's blank-tokenized `text` + ordered
-  // `answers` + alphabetized `wordBank` (answers and distractors merged,
-  // deduped). The raw fields are dropped from what gets persisted; they're
-  // reconstructed from this same final shape if the question is edited again
-  // (see reconstructEditableFields above).
-  const finalizeQuestion = (q) => {
-    if (q.type === 'matching') {
-      const { distractorsText, ...rest } = q;
-      return { ...rest, distractors: parseLines(distractorsText) };
-    }
-    if (q.type === 'word_bank_cloze') {
-      const { rawText, distractorsText, ...rest } = q;
-      const { text, answers } = parseAnswerTokens(rawText);
-      const distractors = parseLines(distractorsText);
-      const wordBank = [...new Set([...answers, ...distractors])].sort((a, b) => a.localeCompare(b, 'es'));
-      return { ...rest, text, answers, wordBank };
-    }
-    return q;
-  };
-
   // Saves straight to the database (see CuriosidadesManager's
   // handleSaveQuestions) — the modal stays open and shows an error on
   // failure instead of closing and losing the unsaved edits, and only
@@ -422,6 +121,9 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
       );
       setQuestions(poolSyncedQuestions);
 
+      // Each type converts its own raw, freely-typed editing fields into
+      // the final persisted shape here — see e.g. word_bank_cloze's
+      // finalizeQuestion for why this has to happen at save time.
       const finalizedQuestions = poolSyncedQuestions.map(finalizeQuestion);
 
       // In Secuencial mode, a category — however it got there (typed in
@@ -523,405 +225,53 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
             </p>
           )}
 
-          {questions.map((q, qIdx) => (
-            <div key={qIdx} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
-              <div className="flex justify-between items-start mb-3 gap-3">
-                <div className="flex-1 flex items-center gap-2">
-                  <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-100 rounded-full px-2 py-1">
-                    {TYPE_LABELS[q.type] || q.type}
-                  </span>
-                  <input
-                    type="text"
-                    value={q.prompt}
-                    onChange={(e) => updateQuestion(qIdx, { prompt: e.target.value })}
-                    placeholder="Instrucción para el estudiante"
-                    className="flex-1 border border-slate-300 rounded-lg p-2 text-sm font-bold"
-                  />
+          {questions.map((q, qIdx) => {
+            const TypeEditor = QUESTION_TYPES[q.type]?.Editor;
+            return (
+              <div key={qIdx} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                <div className="flex justify-between items-start mb-3 gap-3">
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-100 rounded-full px-2 py-1">
+                      {TYPE_LABELS[q.type] || q.type}
+                    </span>
+                    <input
+                      type="text"
+                      value={q.prompt}
+                      onChange={(e) => updateQuestion(qIdx, { prompt: e.target.value })}
+                      placeholder="Instrucción para el estudiante"
+                      className="flex-1 border border-slate-300 rounded-lg p-2 text-sm font-bold"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== qIdx))}
+                    className="shrink-0 text-rose-500 hover:text-rose-700 text-xs font-black uppercase"
+                  >
+                    🗑️ Quitar
+                  </button>
                 </div>
-                <button
-                  onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== qIdx))}
-                  className="shrink-0 text-rose-500 hover:text-rose-700 text-xs font-black uppercase"
-                >
-                  🗑️ Quitar
-                </button>
-              </div>
 
-              {q.type === 'matching' && (
-                <>
-                  <div className="space-y-2">
-                    {q.pairs.map((pair, pIdx) => (
-                      <div key={pIdx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
-                        <select
-                          value={pair.left.type}
-                          onChange={(e) => updatePair(qIdx, pIdx, { left: { type: e.target.value, value: '' } })}
-                          className="text-xs border border-slate-300 rounded-md p-1.5 font-bold shrink-0"
-                        >
-                          <option value="text">Texto</option>
-                          <option value="image">Imagen</option>
-                        </select>
-
-                        {pair.left.type === 'image' ? (
-                          <div className="flex-1 flex items-center gap-2 min-w-0">
-                            {pair.left.value && (
-                              <img
-                                src={pair.left.value}
-                                alt=""
-                                className="w-10 h-10 object-cover rounded-md border border-slate-200 shrink-0"
-                              />
-                            )}
-                            <ImageUploadField
-                              value={pair.left.value}
-                              onChange={(url) => updatePair(qIdx, pIdx, { left: { type: 'image', value: url } })}
-                              folder="curiosidades"
-                              inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
-                            />
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={pair.left.value}
-                            onChange={(e) => updatePair(qIdx, pIdx, { left: { type: 'text', value: e.target.value } })}
-                            placeholder="Elemento (izquierda)"
-                            className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs min-w-0"
-                          />
-                        )}
-
-                        <span className="text-slate-300 shrink-0">→</span>
-
-                        <input
-                          type="text"
-                          value={pair.answer}
-                          onChange={(e) => updatePair(qIdx, pIdx, { answer: e.target.value })}
-                          placeholder="Respuesta correcta"
-                          className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs min-w-0"
-                        />
-
-                        <button
-                          onClick={() => removePair(qIdx, pIdx)}
-                          className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => addPair(qIdx)}
-                    className="mt-2 text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
-                  >
-                    + Agregar par
-                  </button>
-
-                  <div className="mt-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      Distractores extra (opcional, uno por línea)
-                    </label>
-                    <textarea
-                      value={q.distractorsText || ''}
-                      onChange={(e) => updateQuestion(qIdx, { distractorsText: e.target.value })}
-                      rows={2}
-                      className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
-                      placeholder="Respuestas incorrectas extra que aparecerán en el banco de opciones"
-                    />
-                  </div>
-                </>
-              )}
-
-              {q.type === 'image_select' && (
-                <>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Marca la casilla de cada opción correcta — marcar más de una la convierte en una pregunta de
-                    "elige {(q.correctIndices || []).length || 'N'}".
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {q.options.map((opt, oIdx) => {
-                      const isCorrect = (q.correctIndices || []).includes(oIdx);
-                      return (
-                        <div
-                          key={oIdx}
-                          className={`bg-white border rounded-lg p-2 flex flex-col gap-2 ${
-                            isCorrect ? 'border-emerald-400 ring-1 ring-emerald-300' : 'border-slate-200'
-                          }`}
-                        >
-                          {opt.img && (
-                            <img src={opt.img} alt="" className="w-full h-20 object-cover rounded-md border border-slate-200" />
-                          )}
-                          <ImageUploadField
-                            value={opt.img}
-                            onChange={(url) => updateImageOption(qIdx, oIdx, { img: url })}
-                            folder="curiosidades"
-                            inputClassName="w-full border border-slate-300 rounded-md p-1 text-[10px] font-mono"
-                          />
-                          <input
-                            type="text"
-                            value={opt.label}
-                            onChange={(e) => updateImageOption(qIdx, oIdx, { label: e.target.value })}
-                            placeholder="Etiqueta opcional"
-                            className="w-full border border-slate-300 rounded-md p-1.5 text-xs"
-                          />
-                          <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                            <input
-                              type="checkbox"
-                              checked={isCorrect}
-                              onChange={() => toggleCorrectOption(qIdx, oIdx)}
-                            />
-                            Correcta
-                          </label>
-                          <button
-                            onClick={() => removeImageOption(qIdx, oIdx)}
-                            className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-700"
-                          >
-                            ✕ Quitar opción
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => addImageOption(qIdx)}
-                    className="mt-3 text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
-                  >
-                    + Agregar opción
-                  </button>
-                </>
-              )}
-
-              {q.type === 'dropdown_cloze' && (
-                <>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Escribe el párrafo y pon <code className="bg-slate-200 px-1 rounded">{BLANK_TOKEN}</code> donde
-                    va cada espacio en blanco — cada uno tendrá su propio menú de opciones.
-                  </p>
-
-                  <div className="flex items-start gap-2 mb-3">
-                    {q.img && (
-                      <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
-                    )}
-                    <ImageUploadField
-                      value={q.img}
-                      onChange={(url) => updateQuestion(qIdx, { img: url })}
-                      folder="curiosidades"
-                      placeholder="Imagen opcional (p. ej. foto del cóndor)"
-                      inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
-                    />
-                  </div>
-
-                  <textarea
-                    value={q.text}
-                    onChange={(e) => updateClozeText(qIdx, e.target.value)}
-                    rows={3}
-                    placeholder={`El cóndor es ${BLANK_TOKEN} de las aves más grandes del mundo.`}
-                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
+                {TypeEditor && (
+                  <TypeEditor
+                    question={q}
+                    onChange={(patch) => updateQuestion(qIdx, patch)}
+                    instanceId={qIdx}
+                    showCategory={jeopardyMode}
                   />
-
-                  {q.blanks.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic mt-2">
-                      Agrega al menos un {BLANK_TOKEN} al texto para crear un espacio en blanco.
-                    </p>
-                  ) : (
-                    <div className="space-y-3 mt-3">
-                      {q.blanks.map((blank, bIdx) => (
-                        <div key={bIdx} className="bg-white border border-slate-200 rounded-lg p-3">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                            Espacio en blanco {bIdx + 1}
-                          </p>
-                          <div className="space-y-1.5">
-                            {blank.options.map((opt, oIdx) => (
-                              <div key={oIdx} className="flex items-center gap-2">
-                                <input
-                                  type="radio"
-                                  name={`cloze-${qIdx}-${bIdx}-answer`}
-                                  checked={blank.answer === opt && opt !== ''}
-                                  onChange={() => setClozeBlankAnswer(qIdx, bIdx, opt)}
-                                  title="Marcar como respuesta correcta"
-                                />
-                                <input
-                                  type="text"
-                                  value={opt}
-                                  onChange={(e) => updateClozeBlankOption(qIdx, bIdx, oIdx, e.target.value)}
-                                  placeholder="Opción"
-                                  className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
-                                />
-                                <button
-                                  onClick={() => removeClozeBlankOption(qIdx, bIdx, oIdx)}
-                                  className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <button
-                            onClick={() => addClozeBlankOption(qIdx, bIdx)}
-                            className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
-                          >
-                            + Agregar opción
-                          </button>
-                          {!blank.answer && (
-                            <p className="text-[10px] text-amber-600 font-bold mt-1">
-                              Marca con el círculo cuál opción es la correcta.
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {q.type === 'word_bank_cloze' && (() => {
-                const preview = parseAnswerTokens(q.rawText);
-                return (
-                  <>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                      Escribe el párrafo y pon la respuesta correcta entre llaves dobles, como{' '}
-                      <code className="bg-slate-200 px-1 rounded">{'{{agua}}'}</code>, donde va cada espacio en
-                      blanco — todos comparten un banco de palabras generado automáticamente.
-                    </p>
-
-                    <div className="flex items-start gap-2 mb-3">
-                      {q.img && (
-                        <img src={q.img} alt="" className="w-20 h-20 object-cover rounded-lg border border-slate-200 shrink-0" />
-                      )}
-                      <ImageUploadField
-                        value={q.img}
-                        onChange={(url) => updateQuestion(qIdx, { img: url })}
-                        folder="curiosidades"
-                        placeholder="Imagen opcional"
-                        inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
-                      />
-                    </div>
-
-                    <textarea
-                      value={q.rawText || ''}
-                      onChange={(e) => updateQuestion(qIdx, { rawText: e.target.value })}
-                      rows={3}
-                      placeholder={'El pato nada en {{agua}} y come {{pan}}. Vive cerca del {{lago}}.'}
-                      className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
-                    />
-
-                    {preview.answers.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic mt-2">
-                        Agrega al menos una respuesta entre llaves dobles, como {'{{agua}}'}.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-slate-500 mt-2">
-                        {preview.answers.length} espacio{preview.answers.length === 1 ? '' : 's'} en blanco: {preview.answers.join(', ')}
-                      </p>
-                    )}
-
-                    <div className="mt-3">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        Distractores extra (opcional, uno por línea — palabras incorrectas que también aparecerán
-                        en el banco)
-                      </label>
-                      <textarea
-                        value={q.distractorsText || ''}
-                        onChange={(e) => updateQuestion(qIdx, { distractorsText: e.target.value })}
-                        rows={2}
-                        className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
-                        placeholder={'sol\nnube'}
-                      />
-                    </div>
-                  </>
-                );
-              })()}
-
-              {q.type === 'multiple_choice' && (
-                <>
-                  {jeopardyMode && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">
-                        Categoría
-                      </label>
-                      <input
-                        type="text"
-                        value={q.category}
-                        onChange={(e) => updateQuestion(qIdx, { category: e.target.value })}
-                        placeholder="p. ej. Geografía Extrema — igual en cada pregunta de esta categoría"
-                        className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
-                      />
-                    </div>
-                  )}
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Marca con el círculo cuál opción es la correcta (2 a 4 opciones).
-                  </p>
-                  <div className="space-y-1.5">
-                    {q.options.map((opt, oIdx) => (
-                      <div key={oIdx} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name={`mc-${qIdx}-answer`}
-                          checked={q.answer === opt && opt !== ''}
-                          onChange={() => setMCAnswer(qIdx, opt)}
-                          title="Marcar como respuesta correcta"
-                        />
-                        <input
-                          type="text"
-                          value={opt}
-                          onChange={(e) => updateMCOption(qIdx, oIdx, e.target.value)}
-                          placeholder="Opción"
-                          className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
-                        />
-                        <button
-                          onClick={() => removeMCOption(qIdx, oIdx)}
-                          className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  {q.options.length < 4 && (
-                    <button
-                      onClick={() => addMCOption(qIdx)}
-                      className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
-                    >
-                      + Agregar opción
-                    </button>
-                  )}
-                  {!q.answer && (
-                    <p className="text-[10px] text-amber-600 font-bold mt-1">
-                      Marca con el círculo cuál opción es la correcta.
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
 
           <div className="flex gap-3">
-            <button
-              onClick={() => setQuestions((prev) => [...prev, emptyMatchingQuestion()])}
-              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
-            >
-              + Pregunta de Emparejar
-            </button>
-            <button
-              onClick={() => setQuestions((prev) => [...prev, emptyImageSelectQuestion()])}
-              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
-            >
-              + Pregunta de Selección de Imagen
-            </button>
-            <button
-              onClick={() => setQuestions((prev) => [...prev, emptyDropdownClozeQuestion()])}
-              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
-            >
-              + Pregunta de Cloze con Menús
-            </button>
-            <button
-              onClick={() => setQuestions((prev) => [...prev, emptyWordBankClozeQuestion()])}
-              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
-            >
-              + Pregunta de Cloze con Banco de Palabras
-            </button>
-            <button
-              onClick={() => setQuestions((prev) => [...prev, emptyMultipleChoiceQuestion()])}
-              className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
-            >
-              + Pregunta de Opción Múltiple
-            </button>
+            {Object.values(QUESTION_TYPES).map((mod) => (
+              <button
+                key={mod.TYPE_KEY}
+                onClick={() => setQuestions((prev) => [...prev, mod.emptyQuestion()])}
+                className="flex-1 py-3 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-indigo-50"
+              >
+                + Pregunta de {mod.TYPE_LABEL}
+              </button>
+            ))}
           </div>
 
           {jeopardyMode && (
