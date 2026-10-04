@@ -1,0 +1,200 @@
+import React, { useState } from 'react';
+import ImageUploadField from '../../admin/shared/ImageUploadField';
+import { renderClozeText } from './clozeShared';
+import { parseLines, parseAnswerTokens } from './text';
+
+// Like word_bank_cloze, but several independent rows (each its own optional
+// photo + one short line of text) instead of one shared passage — e.g. a
+// roster of athlete photos, each captioned "Amon-Ra St. {{Café}}", all
+// pulling from one shared, alphabetized word bank. Blanks are numbered
+// globally across every row for grading (onItemFirstAttempt/getItemCount),
+// but each row's own {{blank}} tokens are local to that row's text.
+export const TYPE_KEY = 'line_bank_cloze';
+export const TYPE_LABEL = 'Líneas con Banco de Palabras';
+
+export const emptyQuestion = () => ({ type: 'line_bank_cloze', prompt: '', lines: [{ img: '', rawText: '' }], distractorsText: '' });
+export const getItemCount = (q) => q.answers.length;
+
+// Converts each row's raw {{word}}-tagged text into its blank-tokenized
+// form, concatenating every row's answers (in row order) into one flat
+// `answers` array — same save-time conversion word_bank_cloze does, just
+// repeated per row instead of once for a whole passage.
+export const finalizeQuestion = (q) => {
+  const { lines, distractorsText, ...rest } = q;
+  let answers = [];
+  const finalLines = (lines || []).map((line) => {
+    const parsed = parseAnswerTokens(line.rawText || '');
+    answers = answers.concat(parsed.answers);
+    return { img: line.img || '', text: parsed.text };
+  });
+  const distractors = parseLines(distractorsText);
+  const wordBank = [...new Set([...answers, ...distractors])].sort((a, b) => a.localeCompare(b, 'es'));
+  return { ...rest, lines: finalLines, answers, wordBank };
+};
+
+// Reopening an already-saved question only has each row's final
+// blank-tokenized text plus the flat `answers` array — walks that array in
+// order, handing each row exactly as many answers as it has blanks.
+export const reconstructQuestion = (q) => {
+  if (q.lines?.[0]?.rawText !== undefined) return q;
+  const answers = q.answers || [];
+  let i = 0;
+  const lines = (q.lines || []).map((line) => ({
+    img: line.img || '',
+    rawText: (line.text || '').replace(/\{\{blank\}\}/g, () => `{{${answers[i++] ?? ''}}}`),
+  }));
+  const distractorsText = (q.wordBank || []).filter((w) => !answers.includes(w)).join('\n');
+  return { ...q, lines, distractorsText };
+};
+
+// --- Student-facing renderer ---
+// Same "shared word bank, word disappears once correctly placed elsewhere"
+// mechanic as word_bank_cloze, just spread across several rows. Each row
+// gets a slice of the global selections/correct arrays (and the global
+// wrongFlash index, translated to that row's local blank numbering) so
+// renderClozeText — which only knows about ONE text string's own blanks —
+// can be reused unmodified per row.
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
+  const blankCount = question.answers.length;
+  const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
+  const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
+  const [wrongFlash, setWrongFlash] = useState(null);
+  const attemptedRef = React.useRef({});
+
+  const handleSelect = (globalIdx, value) => {
+    if (correct[globalIdx]) return;
+    const isCorrect = question.answers[globalIdx] === value;
+
+    if (!attemptedRef.current[globalIdx]) {
+      attemptedRef.current[globalIdx] = true;
+      onItemFirstAttempt(globalIdx, isCorrect);
+    }
+
+    setSelections((prev) => prev.map((v, i) => (i === globalIdx ? value : v)));
+    if (isCorrect) {
+      const next = correct.map((c, i) => (i === globalIdx ? true : c));
+      setCorrect(next);
+      if (next.every(Boolean)) onAllCorrect();
+    } else {
+      setWrongFlash(globalIdx);
+      setTimeout(() => setWrongFlash(null), 400);
+    }
+  };
+
+  const optionsForBlank = (globalIdx) => {
+    const usedElsewhere = question.answers.filter((_, j) => j !== globalIdx && correct[j]);
+    return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
+  };
+
+  let offset = 0;
+
+  return (
+    <div>
+      {blankCount > 1 && (
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
+          {correct.filter(Boolean).length} de {blankCount} completados
+        </p>
+      )}
+      <div className="space-y-3">
+        {question.lines.map((line, lIdx) => {
+          const lineBlankCount = (line.text.match(/\{\{blank\}\}/g) || []).length;
+          const start = offset;
+          offset += lineBlankCount;
+          return (
+            <div key={lIdx} className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-xl p-3">
+              {line.img && (
+                <img src={line.img} alt="" className="w-16 h-16 object-cover rounded-lg border border-slate-700 shrink-0" />
+              )}
+              <p className="text-base text-slate-200 leading-loose text-left flex-1">
+                {renderClozeText(
+                  line.text,
+                  selections.slice(start, start + lineBlankCount),
+                  correct.slice(start, start + lineBlankCount),
+                  wrongFlash !== null && wrongFlash >= start && wrongFlash < start + lineBlankCount ? wrongFlash - start : null,
+                  (localIdx, value) => handleSelect(start + localIdx, value),
+                  (localIdx) => optionsForBlank(start + localIdx)
+                )}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- Admin-facing editor ---
+export const Editor = ({ question: q, onChange }) => {
+  const updateLine = (lIdx, patch) => {
+    onChange({ lines: q.lines.map((l, j) => (j === lIdx ? { ...l, ...patch } : l)) });
+  };
+  const addLine = () => onChange({ lines: [...q.lines, { img: '', rawText: '' }] });
+  const removeLine = (lIdx) => onChange({ lines: q.lines.filter((_, j) => j !== lIdx) });
+
+  const allAnswers = (q.lines || []).flatMap((l) => parseAnswerTokens(l.rawText || '').answers);
+
+  return (
+    <>
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+        Una línea por elemento (foto opcional + texto). Escribe la respuesta correcta entre llaves dobles, como{' '}
+        <code className="bg-slate-200 px-1 rounded">{'{{Café}}'}</code> — todas las líneas comparten un banco de palabras.
+      </p>
+
+      <div className="space-y-2">
+        {q.lines.map((line, lIdx) => (
+          <div key={lIdx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
+            <div className="flex items-center gap-2 shrink-0">
+              {line.img && (
+                <img src={line.img} alt="" className="w-10 h-10 object-cover rounded-md border border-slate-200" />
+              )}
+              <ImageUploadField
+                value={line.img}
+                onChange={(url) => updateLine(lIdx, { img: url })}
+                folder="curiosidades"
+                placeholder="Foto opcional"
+                inputClassName="w-28 border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+              />
+            </div>
+            <input
+              type="text"
+              value={line.rawText}
+              onChange={(e) => updateLine(lIdx, { rawText: e.target.value })}
+              placeholder="Amon-Ra St. {{Café}}"
+              className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs font-mono min-w-0"
+            />
+            <button onClick={() => removeLine(lIdx)} className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1">
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button onClick={addLine} className="mt-2 text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+        + Agregar línea
+      </button>
+
+      {allAnswers.length === 0 ? (
+        <p className="text-xs text-slate-400 italic mt-2">
+          Agrega al menos una respuesta entre llaves dobles, como {'{{Café}}'}.
+        </p>
+      ) : (
+        <p className="text-xs text-slate-500 mt-2">
+          {allAnswers.length} espacio{allAnswers.length === 1 ? '' : 's'} en blanco: {allAnswers.join(', ')}
+        </p>
+      )}
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          Distractores extra (opcional, uno por línea — palabras incorrectas que también aparecerán en el banco)
+        </label>
+        <textarea
+          value={q.distractorsText || ''}
+          onChange={(e) => onChange({ distractorsText: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
+          placeholder={'campo\nduro'}
+        />
+      </div>
+    </>
+  );
+};

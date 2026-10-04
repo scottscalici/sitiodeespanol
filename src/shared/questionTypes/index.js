@@ -26,6 +26,7 @@ import * as matching from './matching';
 import * as imageSelect from './imageSelect';
 import * as dropdownCloze from './dropdownCloze';
 import * as wordBankCloze from './wordBankCloze';
+import * as lineBankCloze from './lineBankCloze';
 import * as multipleChoice from './multipleChoice';
 import * as write from './write';
 import * as listen from './listen';
@@ -35,6 +36,7 @@ export const QUESTION_TYPES = {
   [imageSelect.TYPE_KEY]: imageSelect,
   [dropdownCloze.TYPE_KEY]: dropdownCloze,
   [wordBankCloze.TYPE_KEY]: wordBankCloze,
+  [lineBankCloze.TYPE_KEY]: lineBankCloze,
   [multipleChoice.TYPE_KEY]: multipleChoice,
   [write.TYPE_KEY]: write,
   [listen.TYPE_KEY]: listen,
