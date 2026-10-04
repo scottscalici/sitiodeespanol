@@ -22,6 +22,19 @@ export const parseBulkRow = (line) => {
   return { type: 'multiple_choice', prompt: clue, category, options: shuffle([answer, ...distractors]), answer };
 };
 
+// Same bulk-paste idea, minus the leading category column — for a consumer
+// with no Jeopardy/category concept at all (Practice Cards), so its admin
+// isn't asked to type a category that would never be shown or used.
+// Format: pregunta | respuesta | distractor1 | distractor2 | distractor3
+export const parseBulkRowPlain = (line) => {
+  const parts = line.split('|').map((s) => s.trim());
+  if (parts.length < 3) return null;
+  const [clue, answer, ...rest] = parts;
+  const distractors = rest.map((d) => d.trim()).filter(Boolean).slice(0, 3);
+  if (!clue || !answer || distractors.length === 0) return null;
+  return { type: 'multiple_choice', prompt: clue, category: '', options: shuffle([answer, ...distractors]), answer };
+};
+
 // --- Student-facing renderer ---
 // Resolves the instant you click an option — one gradable item, first-
 // attempt-only, lock on correct. Options render as a responsive grid: 2 or 4

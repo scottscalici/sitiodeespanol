@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
-import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion } from '../../shared/questionTypes';
+import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion, parseBulkRowPlain } from '../../shared/questionTypes';
 import { normalizeLegacyPracticeQuestion } from '../../utils/legacyPracticeQuestion';
 
 const DEFAULT_TYPE = 'multiple_choice';
@@ -23,6 +23,10 @@ export default function PracticeCardAdmin() {
   const [savedCards, setSavedCards] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkStatus, setBulkStatus] = useState('');
 
   useEffect(() => {
     getCachedCollection('practice_cards')
@@ -55,6 +59,27 @@ export default function PracticeCardAdmin() {
 
   const addQuestion = () => setQuestions([...questions, emptyQuestion()]);
   const removeQuestion = (index) => setQuestions(questions.filter((_, i) => i !== index));
+
+  const handleBulkImport = () => {
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    const parsed = lines.map(parseBulkRowPlain);
+    const valid = parsed.filter(Boolean);
+    const invalidCount = parsed.length - valid.length;
+
+    if (valid.length === 0) {
+      setBulkStatus('No se pudo leer ninguna línea. Formato: pregunta | respuesta | distractor1 | distractor2');
+      return;
+    }
+
+    setQuestions((prev) => [...prev, ...valid]);
+    setBulkText('');
+    setBulkImportOpen(false);
+    setBulkStatus(
+      invalidCount > 0
+        ? `Se importaron ${valid.length} pregunta(s). ${invalidCount} línea(s) no se pudieron leer y se omitieron.`
+        : ''
+    );
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -202,6 +227,58 @@ export default function PracticeCardAdmin() {
               </div>
             );
           })}
+
+          <div className="border-t border-slate-200 pt-4">
+            {!bulkImportOpen ? (
+              <button
+                type="button"
+                onClick={() => setBulkImportOpen(true)}
+                className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+              >
+                📋 Importar en Lote (Opción Múltiple)
+              </button>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Una pregunta por línea — útil para pegar muchas de una vez
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                  pregunta | respuesta correcta | distractor 1 | distractor 2 | distractor 3
+                </p>
+                <textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={5}
+                  placeholder={
+                    '¿Ustedes reciclan el papel? | Sí, lo reciclamos en el contenedor azul. | Sí, los reciclamos en el contenedor azul. | Sí, la reciclamos en el contenedor azul.\n' +
+                    '¿Tú reciclas los envases? | Sí, siempre los reciclo. | Sí, siempre lo reciclo. | Sí, siempre las reciclo.'
+                  }
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={handleBulkImport}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+                  >
+                    Importar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkImportOpen(false);
+                      setBulkText('');
+                      setBulkStatus('');
+                    }}
+                    className="text-xs font-bold text-slate-500 uppercase"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            {bulkStatus && <p className="text-xs text-slate-600 font-bold mt-2">{bulkStatus}</p>}
+          </div>
         </div>
 
         <div className="flex justify-end">

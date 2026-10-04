@@ -50,5 +50,5 @@ export const getItemCount = (q) => QUESTION_TYPES[q.type]?.getItemCount(q) ?? 1;
 export const finalizeQuestion = (q) => QUESTION_TYPES[q.type]?.finalizeQuestion(q) ?? q;
 export const reconstructQuestion = (q) => QUESTION_TYPES[q.type]?.reconstructQuestion(q) ?? q;
 
-export { parseBulkRow } from './multipleChoice';
+export { parseBulkRow, parseBulkRowPlain } from './multipleChoice';
 export { shuffle } from './clozeShared';
