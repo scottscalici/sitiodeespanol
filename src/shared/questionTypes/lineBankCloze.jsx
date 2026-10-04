@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
-import { renderClozeText } from './clozeShared';
+import { renderClozeText, sameWord, buildWordBank } from './clozeShared';
 import { parseLines, parseAnswerTokens } from './text';
 
 // Like word_bank_cloze, but several independent rows (each its own optional
@@ -35,7 +35,7 @@ export const finalizeQuestion = (q) => {
     return { img: line.img || '', text: parsed.text };
   });
   const distractors = parseLines(distractorsText);
-  const wordBank = [...new Set([...answers, ...distractors])].sort((a, b) => a.localeCompare(b, 'es'));
+  const wordBank = buildWordBank(answers, distractors);
   return { ...rest, lines: finalLines, answers, wordBank };
 };
 
@@ -70,7 +70,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
 
   const handleSelect = (globalIdx, value) => {
     if (correct[globalIdx]) return;
-    const isCorrect = question.answers[globalIdx] === value;
+    const isCorrect = sameWord(question.answers[globalIdx], value);
 
     if (!attemptedRef.current[globalIdx]) {
       attemptedRef.current[globalIdx] = true;
@@ -91,7 +91,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   const optionsForBlank = (globalIdx) => {
     if (question.allowRepeats) return question.wordBank || [];
     const usedElsewhere = question.answers.filter((_, j) => j !== globalIdx && correct[j]);
-    return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
+    return (question.wordBank || []).filter((w) => !usedElsewhere.some((a) => sameWord(a, w)));
   };
 
   let offset = 0;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
-import { renderClozeText, ClozeChrome } from './clozeShared';
+import { renderClozeText, ClozeChrome, sameWord, buildWordBank } from './clozeShared';
 import { parseLines, parseAnswerTokens } from './text';
 
 export const TYPE_KEY = 'word_bank_cloze';
@@ -16,7 +16,7 @@ export const finalizeQuestion = (q) => {
   const { rawText, distractorsText, ...rest } = q;
   const { text, answers } = parseAnswerTokens(rawText);
   const distractors = parseLines(distractorsText);
-  const wordBank = [...new Set([...answers, ...distractors])].sort((a, b) => a.localeCompare(b, 'es'));
+  const wordBank = buildWordBank(answers, distractors);
   return { ...rest, text, answers, wordBank };
 };
 
@@ -44,7 +44,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
 
   const handleSelect = (blankIdx, value) => {
     if (correct[blankIdx]) return;
-    const isCorrect = question.answers[blankIdx] === value;
+    const isCorrect = sameWord(question.answers[blankIdx], value);
 
     if (!attemptedRef.current[blankIdx]) {
       attemptedRef.current[blankIdx] = true;
@@ -64,7 +64,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
 
   const optionsForBlank = (blankIdx) => {
     const usedElsewhere = question.answers.filter((_, j) => j !== blankIdx && correct[j]);
-    return (question.wordBank || []).filter((w) => !usedElsewhere.includes(w));
+    return (question.wordBank || []).filter((w) => !usedElsewhere.some((a) => sameWord(a, w)));
   };
 
   return (

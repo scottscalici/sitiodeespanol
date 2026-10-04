@@ -4,6 +4,28 @@ import React from 'react';
 // simple random sort is fine for a handful of tiles/options).
 export const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
+// Shared by word_bank_cloze and line_bank_cloze: "Lo" and "lo" are the same
+// underlying word, differing only because Spanish capitalizes whichever
+// one happens to start a sentence — not a grammar distinction either type
+// is actually testing. Matching case-insensitively means picking either
+// case counts as correct, and using one case correctly also excludes the
+// other case from the rest of the bank (the "spend once" mechanic treats
+// them as one word, not two).
+export const sameWord = (a, b) => (a || '').toLowerCase() === (b || '').toLowerCase();
+
+// Builds a bank's options from every blank's answer plus any extra
+// distractors, deduped case-insensitively (first-seen casing wins) and
+// alphabetized — so "Lo" and "lo" collapse into one chip instead of
+// appearing as two separate, confusingly-similar options.
+export const buildWordBank = (answers, distractors) => {
+  const seen = new Map();
+  [...answers, ...distractors].forEach((w) => {
+    const key = (w || '').toLowerCase();
+    if (!seen.has(key)) seen.set(key, w);
+  });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'es'));
+};
+
 // Splits a cloze passage on its "{{blank}}" tokens, interleaving the plain
 // text with one inline <select> per blank. Index-based keys are fine here —
 // the segments never reorder within a render. `optionsForBlank(i)` decouples
