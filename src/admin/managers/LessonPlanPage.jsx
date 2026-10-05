@@ -137,18 +137,35 @@ export default function LessonPlanPage() {
   const dateStrings = calendarMap[selectedDay] || [];
   const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Fecha por confirmar';
 
+  // Plain "sujeto palabra" list of every verb actually baked for today
+  // (e.g. "yo hablar, tú comer, ella vivir") and a plain list of the day's
+  // vocab terms — printed small and unstyled on purpose, so there's room to
+  // circle/underline ones by hand while teaching, to flag for review.
+  const verbList = activeCalentamientoVerbs
+    .flatMap((c) => c.bakedQuestions || [])
+    .map((q) => `${q.sujeto} ${q.palabra}`)
+    .join(', ');
+  const vocabList = activeCalentamientoVocab
+    .flatMap((v) => v.sequence || [])
+    .map((w) => w.palabra)
+    .join(', ');
+
   // --- Build each section's summary content ---
   const sectionContent = {
     calentamiento:
       activeCalentamientoVerbs.length + activeCalentamientoVocab.length === 0 ? null : (
-        <ul className="list-disc pl-5 space-y-1">
-          {activeCalentamientoVerbs.map((c) => (
-            <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
-          ))}
-          {activeCalentamientoVocab.map((v) => (
-            <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
-          ))}
-        </ul>
+        <div className="space-y-2">
+          <ul className="list-disc pl-5 space-y-1">
+            {activeCalentamientoVerbs.map((c) => (
+              <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
+            ))}
+            {activeCalentamientoVocab.map((v) => (
+              <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
+            ))}
+          </ul>
+          {verbList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-2">{verbList}</p>}
+          {vocabList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-1">{vocabList}</p>}
+        </div>
       ),
     oraciones:
       activeSentenceSets.length === 0 ? null : (
