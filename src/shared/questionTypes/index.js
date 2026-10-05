@@ -51,4 +51,5 @@ export const finalizeQuestion = (q) => QUESTION_TYPES[q.type]?.finalizeQuestion(
 export const reconstructQuestion = (q) => QUESTION_TYPES[q.type]?.reconstructQuestion(q) ?? q;
 
 export { parseBulkRow, parseBulkRowPlain } from './multipleChoice';
+export { parseBulkSections } from './lineBankCloze';
 export { shuffle } from './clozeShared';

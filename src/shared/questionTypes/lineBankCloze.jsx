@@ -54,6 +54,43 @@ export const reconstructQuestion = (q) => {
   return { ...q, lines, distractorsText };
 };
 
+// Bulk-imports MULTIPLE separate line_bank_cloze questions ("sections") in
+// one paste, splitting on divider lines instead of dumping everything into
+// one question's `lines` — pasting two sections back-to-back used to
+// silently merge them into one oversized question with no way to tell
+// where one ended and the next began. A divider is a line starting with
+// "---" (plain) or "#"/"##"/"###" (optionally followed by a title, which
+// becomes that section's `prompt`, shown to students above the question).
+// Content before the first divider is its own section with no prompt.
+// Returns questions in their raw, editable shape (ready to drop straight
+// into admin state next to any other question), each defaulting to
+// allowRepeats: false same as emptyQuestion().
+const DIVIDER_RE = /^(?:-{3,}|#{1,3})\s*(.*)$/;
+export const parseBulkSections = (text) => {
+  const lines = (text || '').split('\n').map((l) => l.trim());
+  const sections = [];
+  let current = { prompt: '', rawLines: [] };
+  lines.forEach((line) => {
+    if (!line) return;
+    const divider = line.match(DIVIDER_RE);
+    if (divider) {
+      if (current.rawLines.length > 0) sections.push(current);
+      current = { prompt: divider[1].trim(), rawLines: [] };
+    } else {
+      current.rawLines.push(line);
+    }
+  });
+  if (current.rawLines.length > 0) sections.push(current);
+
+  return sections.map((s) => ({
+    type: TYPE_KEY,
+    prompt: s.prompt,
+    lines: s.rawLines.map((rawText) => ({ img: '', rawText })),
+    distractorsText: '',
+    allowRepeats: false,
+  }));
+};
+
 // --- Student-facing renderer ---
 // Same "shared word bank, word disappears once correctly placed elsewhere"
 // mechanic as word_bank_cloze, just spread across several rows. Each row
@@ -135,6 +172,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
 export const Editor = ({ question: q, onChange }) => {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const updateLine = (lIdx, patch) => {
     onChange({ lines: q.lines.map((l, j) => (j === lIdx ? { ...l, ...patch } : l)) });
@@ -153,6 +191,21 @@ export const Editor = ({ question: q, onChange }) => {
     onChange({ lines: onlyBlankStarterRow ? newLines : [...q.lines, ...newLines] });
     setBulkText('');
     setBulkOpen(false);
+  };
+
+  // Lets the admin pull this question's lines back out as plain text — to
+  // fix a typo in bulk, reorder rows, split this question in two, or move
+  // some lines into a different question — by copying them out, editing
+  // them as text, and pasting back in (here, or into another question's
+  // own paste box, or into the section importer above the question list).
+  const copyAsText = async () => {
+    try {
+      await navigator.clipboard.writeText(q.lines.map((l) => l.rawText).join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Error copying lines as text:', err);
+    }
   };
 
   const allAnswers = (q.lines || []).flatMap((l) => parseAnswerTokens(l.rawText || '').answers);
@@ -200,6 +253,11 @@ export const Editor = ({ question: q, onChange }) => {
         <button onClick={() => setBulkOpen((v) => !v)} className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
           📋 Pegar varias líneas
         </button>
+        {q.lines.length > 0 && (
+          <button onClick={copyAsText} className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
+            {copied ? '✅ Copiado' : '📤 Copiar como texto'}
+          </button>
+        )}
       </div>
 
       {bulkOpen && (

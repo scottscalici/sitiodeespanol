@@ -7,6 +7,7 @@ import {
   finalizeQuestion,
   reconstructQuestion,
   parseBulkRow,
+  parseBulkSections,
   shuffle,
 } from '../../shared/questionTypes';
 
@@ -70,6 +71,24 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
         ? `Se importaron ${valid.length} pregunta(s). ${invalidCount} línea(s) no se pudieron leer y se omitieron.`
         : ''
     );
+  };
+
+  // --- Bulk import (line_bank_cloze "sections" — several NEW questions at
+  // once, split on divider lines) ---
+  const [sectionImportOpen, setSectionImportOpen] = useState(false);
+  const [sectionBulkText, setSectionBulkText] = useState('');
+  const [sectionBulkStatus, setSectionBulkStatus] = useState('');
+
+  const handleSectionImport = () => {
+    const newQuestions = parseBulkSections(sectionBulkText);
+    if (newQuestions.length === 0) {
+      setSectionBulkStatus('No se encontró ninguna línea para importar.');
+      return;
+    }
+    setQuestions((prev) => [...prev, ...newQuestions]);
+    setSectionBulkText('');
+    setSectionImportOpen(false);
+    setSectionBulkStatus(`Se importaron ${newQuestions.length} sección(es).`);
   };
 
   // Entries picked from the shared pool already carry a real pool doc id —
@@ -272,6 +291,61 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                 + Pregunta de {mod.TYPE_LABEL}
               </button>
             ))}
+          </div>
+
+          <div className="border-t border-slate-200 pt-4">
+            {!sectionImportOpen ? (
+              <button
+                onClick={() => setSectionImportOpen(true)}
+                className="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+              >
+                📋 Importar Secciones (Líneas con Banco de Palabras)
+              </button>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Pega varias secciones a la vez — cada una se convierte en su propia pregunta, en vez de mezclarse
+                  todas juntas
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                  Separa cada sección con una línea "---" (o "## Título de la sección" para ponerle un título visible
+                  para el estudiante)
+                </p>
+                <textarea
+                  value={sectionBulkText}
+                  onChange={(e) => setSectionBulkText(e.target.value)}
+                  rows={6}
+                  placeholder={
+                    '## Sección 3\n' +
+                    'Tengo el libro. → {{Lo}} tengo.\n' +
+                    'Veo a María. → {{La}} veo.\n' +
+                    '---\n' +
+                    '## Sección 4\n' +
+                    'Ella me pasó el balón. → Ella {{me}} {{lo}} pasó.'
+                  }
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={handleSectionImport}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+                  >
+                    Importar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSectionImportOpen(false);
+                      setSectionBulkText('');
+                      setSectionBulkStatus('');
+                    }}
+                    className="text-xs font-bold text-slate-500 uppercase"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            {sectionBulkStatus && <p className="text-xs text-slate-600 font-bold mt-2">{sectionBulkStatus}</p>}
           </div>
 
           {jeopardyMode && (
