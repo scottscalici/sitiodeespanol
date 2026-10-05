@@ -25,6 +25,8 @@ export default function LessonPlanPage() {
   const [loading, setLoading] = useState(true);
 
   const [calendarMap, setCalendarMap] = useState({});
+  const [rawDatesMap, setRawDatesMap] = useState({});
+  const [anuncios, setAnuncios] = useState([]);
   const [calentamientos, setCalentamientos] = useState([]);
   const [vocabWarmups, setVocabWarmups] = useState([]);
   const [practiceCards, setPracticeCards] = useState([]);
@@ -47,23 +49,27 @@ export default function LessonPlanPage() {
       try {
         const configSnap = await getDoc(doc(db, 'config', 'academic_year_2026_2027'));
         const mapping = {};
+        const rawMapping = {};
         if (configSnap.exists()) {
           const data = configSnap.data();
           (data.map || []).forEach((item) => {
             if (item.dia === null || item.dia === undefined) return;
             const dayNum = Number(item.dia);
             if (!mapping[dayNum]) mapping[dayNum] = [];
+            if (!rawMapping[dayNum]) rawMapping[dayNum] = [];
             let formatted = item.fecha;
             if (item.fecha && item.fecha.includes('-')) {
               const parts = item.fecha.split('-');
               if (parts.length === 3) formatted = `${parts[1]}/${parts[2]}`;
             }
             mapping[dayNum].push(`${formatted}${item.ciclo ? ` (${item.ciclo})` : ''}`);
+            if (item.fecha) rawMapping[dayNum].push(item.fecha);
           });
         }
         setCalendarMap(mapping);
+        setRawDatesMap(rawMapping);
 
-        const [calSnap, vocabSnap, practiceSnap, sentenceSnap, curiosidadesList, tareasSnap, evalsSnap, gramSnap] = await Promise.all([
+        const [calSnap, vocabSnap, practiceSnap, sentenceSnap, curiosidadesList, tareasSnap, evalsSnap, gramSnap, anunciosSnap] = await Promise.all([
           getDocs(collection(db, 'calentamientos')),
           getDocs(collection(db, 'dailyVocabWarmups')),
           getDocs(collection(db, 'practice_cards')),
@@ -72,6 +78,7 @@ export default function LessonPlanPage() {
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
           getDoc(doc(db, 'curriculum_tracks', 'gramatica_master')),
+          getDocs(collection(db, 'anuncios')),
         ]);
 
         setCalentamientos(calSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -79,6 +86,7 @@ export default function LessonPlanPage() {
         setPracticeCards(practiceSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setSentenceSets(sentenceSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setCuriosidades(curiosidadesList);
+        setAnuncios(anunciosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setTareas({ s2: tareasSnap.exists() ? tareasSnap.data().s2 || [] : [], s4: tareasSnap.exists() ? tareasSnap.data().s4 || [] : [] });
         setEvaluaciones({ s2: evalsSnap.exists() ? evalsSnap.data().s2 || [] : [], s4: evalsSnap.exists() ? evalsSnap.data().s4 || [] : [] });
         setGramatica({ s2: gramSnap.exists() ? gramSnap.data().s2 || [] : [], s4: gramSnap.exists() ? gramSnap.data().s4 || [] : [] });
@@ -136,6 +144,14 @@ export default function LessonPlanPage() {
 
   const dateStrings = calendarMap[selectedDay] || [];
   const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Fecha por confirmar';
+
+  // Anuncios are matched by actual calendar date (not día number) — a día
+  // can resolve to two real dates (one per A/B ciclo), so an announcement
+  // active on either one counts as active today.
+  const rawDates = rawDatesMap[selectedDay] || [];
+  const activeAnuncios = anuncios.filter(
+    (a) => (a.courses || []).includes(course) && rawDates.some((d) => d >= a.start_date && d <= a.end_date)
+  );
 
   // Plain "sujeto palabra" list of every verb actually baked for today
   // (e.g. "yo hablar, tú comer, ella vivir") and a plain list of the day's
@@ -256,6 +272,17 @@ export default function LessonPlanPage() {
             <p>{TIME_BLOCKS.map((b) => `${b.label}: ${b.start}–${b.end}`).join('  ·  ')}</p>
           </div>
         </div>
+
+        {/* Anuncios — plain script to read at the start of class, no
+            styling/images/links (those live in the student-facing card). */}
+        {activeAnuncios.length > 0 && (
+          <div className="mb-8 border-b border-gray-300 pb-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-1">📢 Anuncios</h3>
+            {activeAnuncios.map((a) => (
+              <p key={a.id} className="text-base">{a.text}</p>
+            ))}
+          </div>
+        )}
 
         {/* Timed agenda */}
         {agendaSections.length === 0 ? (
