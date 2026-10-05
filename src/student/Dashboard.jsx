@@ -359,7 +359,7 @@ const Dashboard = () => {
           </div>
   
           {/* 📢 ANUNCIOS */}
-          <Anuncios anuncios={data?.anuncios} cal={data?.cal} liveDia={liveDia} course={course} />
+          <Anuncios anuncios={data?.anuncios} fecha={liveDiaFecha} course={course} />
   
           {/* 🎨 SEASONAL THEME HERO BANNER */}
           <ThemeHeroBanner hero={theme?.hero} accent={theme?.styles?.accent} />

@@ -15,6 +15,66 @@ const SYNTAX_HELP = [
   'Sin ninguna marca → constructor de oraciones (arrastra las palabras en orden) — o escritura/dictado si el segmento pide ese tipo de pregunta.',
 ].join('\n');
 
+// Bulk-paste format: one sentence per line, columns separated by " | "
+// (a pipe WITH a space on each side) — deliberately distinct from the two
+// in-sentence markup patterns that also use a bare pipe character with no
+// surrounding space ([[verbo|infinitivo]] and the "||" reverse-question
+// marker), so splitting on /\s\|\s/ never mistakes either of those for a
+// column break. Always imports as distractorMode 'none' — the verb-contrast
+// and fixed-pool modes need picking from this app's own verb/pool data, not
+// something an LLM can fill in, so those stay on the one-at-a-time editor.
+const parseBulkSentenceRow = (line) => {
+  const parts = line.split(/\s\|\s/).map((s) => s.trim());
+  const [spanish, english = '', chapterId = '', tagsRaw = ''] = parts;
+  if (!spanish) return null;
+  return {
+    spanish,
+    english,
+    chapterId,
+    grammarTags: tagsRaw.split(',').map((t) => t.trim()).filter(Boolean),
+    distractorMode: 'none',
+    pairTag: '',
+    poolTag: '',
+    targetLemma: '',
+    targetTense: '',
+    targetSubject: '',
+  };
+};
+
+// A ready-to-copy prompt so the admin can hand an LLM the exact row format
+// above plus this app's own markup rules, instead of re-explaining it from
+// scratch every time. [CORCHETES] are placeholders for the admin to fill in
+// before sending it.
+const BULK_LLM_PROMPT = `Genera [NÚMERO] oraciones en español para practicar [TEMA/GRAMÁTICA], nivel [NIVEL], para el Capítulo [CAPÍTULO].
+
+Escribe cada oración en su PROPIA línea, en texto plano (sin numerar, sin viñetas, sin bloque de código, sin encabezados), en este formato EXACTO con cuatro columnas separadas por " | " (un espacio, un pipe, un espacio):
+
+español | inglés | capítulo | etiquetas
+
+Reglas para la columna "español" — marca la respuesta usando EXACTAMENTE una de estas formas:
+- [[respuesta]] → un solo hueco. Ej: Yo [[fui]] a la tienda ayer.
+- [[forma_conjugada|infinitivo]] → hueco de verbo: la forma conjugada, un pipe SIN espacios, y el infinitivo, todo dentro de los mismos corchetes dobles. Ej: Ella [[comió|comer]] pizza.
+- [[a]] ... [[b]] ... [[c]] → dos o más huecos en la misma oración. Ej: [[Fui]] a la tienda y [[compré]] pan.
+- {{palabra}} ... {{palabra}} → exactamente dos palabras marcadas (para lógico/ilógico). Ej: El hielo está {{caliente}} y el fuego está {{frío}}.
+- Afirmación || ¿Pregunta correcta? → dos pipes juntos SIN espacios, para practicar formular la pregunta. Ej: Tiene veinte años. || ¿Cuántos años tiene?
+- Sin ninguna marca → oración normal, para armar/dictado. Ej: Ella vive en Madrid.
+
+Columnas restantes:
+- inglés: traducción completa al inglés (déjala vacía si no aplica, pero no quites la columna).
+- capítulo: el id del capítulo, ej. 8 (puede ir vacío).
+- etiquetas: palabras clave separadas por comas, ej. pretérito, viajes (puede ir vacío).
+
+MUY IMPORTANTE:
+- La única forma de pipe con ESPACIOS a cada lado (" | ") es la que separa las cuatro columnas. En [[forma|infinitivo]] y en || el pipe NO lleva espacios.
+- No generes oraciones con pares de contraste de verbos (eso se configura aparte, a mano, en la app).
+- No agregues nada más que las líneas de oraciones — ni introducción ni explicación.
+
+Ejemplo de salida:
+Yo [[fui]] a la tienda ayer. | I went to the store yesterday. | 8 | pretérito
+Ella [[comió|comer]] pizza anoche. | She ate pizza last night. | 8 | pretérito, comida
+El hielo está {{caliente}} y el fuego está {{frío}}. |  | 8 | lógico
+Tiene veinte años. || ¿Cuántos años tiene? | He is twenty years old. | 8 | preguntas`;
+
 const emptyDraft = () => ({
   spanish: '',
   english: '',
@@ -41,6 +101,12 @@ export default function SentenceManager() {
 
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [promptCopied, setPromptCopied] = useState(false);
 
   const fetchSentences = async () => {
     setLoading(true);
@@ -76,11 +142,66 @@ export default function SentenceManager() {
   });
 
   const startNewSentence = () => {
+    setBulkOpen(false);
     setEditingId('new');
     setDraft(emptyDraft());
   };
 
+  const openBulkImport = () => {
+    cancelEdit();
+    setBulkStatus('');
+    setBulkOpen(true);
+  };
+
+  const closeBulkImport = () => {
+    setBulkOpen(false);
+    setBulkText('');
+    setBulkStatus('');
+  };
+
+  const handleBulkImport = async () => {
+    // Trimming here is only to detect blank lines — NOT applied to the line
+    // itself before parsing, since a trailing empty column (e.g. no tags)
+    // legitimately ends in " | " and trimming the whole line would eat that
+    // space, corrupting the separator parseBulkSentenceRow looks for.
+    const rows = bulkText.split('\n').filter((l) => l.trim());
+    const parsed = rows.map(parseBulkSentenceRow).filter(Boolean);
+    if (parsed.length === 0) {
+      setBulkStatus('❌ No se encontró ninguna oración válida para importar.');
+      return;
+    }
+    setBulkSaving(true);
+    setBulkStatus('');
+    try {
+      await Promise.all(
+        parsed.map((payload) =>
+          addDoc(collection(db, 'sentence_bank'), { ...payload, createdAt: serverTimestamp(), lastUpdated: serverTimestamp() })
+        )
+      );
+      invalidateCollectionCache('sentence_bank');
+      await fetchSentences();
+      setBulkStatus(`✅ ${parsed.length} oración${parsed.length === 1 ? '' : 'es'} importada${parsed.length === 1 ? '' : 's'}.`);
+      setBulkText('');
+    } catch (err) {
+      console.error('Error bulk-importing sentences:', err);
+      setBulkStatus('❌ Error al importar. Tus líneas no se perdieron — intenta de nuevo.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const copyLlmPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(BULK_LLM_PROMPT);
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    } catch (err) {
+      console.error('Error copying prompt:', err);
+    }
+  };
+
   const startEditSentence = (s) => {
+    setBulkOpen(false);
     setEditingId(s.id);
     setDraft({
       spanish: s.spanish || '',
@@ -202,6 +323,12 @@ export default function SentenceManager() {
               + Nueva Oración
             </button>
             <button
+              onClick={openBulkImport}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+            >
+              📋 Importar en Lote
+            </button>
+            <button
               onClick={() => navigate('/admin-daily-plan-hub')}
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-700 cursor-pointer"
             >
@@ -285,7 +412,72 @@ export default function SentenceManager() {
 
           {/* RIGHT: EDITOR */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            {!draft ? (
+            {bulkOpen ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest">Importar en Lote</h3>
+                  <button onClick={closeBulkImport} className="text-slate-500 hover:text-slate-300 text-xs font-bold">
+                    ✕ Cerrar
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Instrucciones para pedirle oraciones a una IA
+                    </p>
+                    <button
+                      onClick={copyLlmPrompt}
+                      className="shrink-0 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-[10px] px-2.5 py-1.5 rounded-lg border border-slate-700"
+                    >
+                      {promptCopied ? '✅ Copiado' : '📋 Copiar prompt'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Copia este prompt, reemplaza lo que está entre corchetes (tema, nivel, capítulo, número de oraciones)
+                    y pégaselo a tu IA de preferencia. Pega lo que te devuelva directamente en el cuadro de abajo.
+                  </p>
+                  <pre className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800 rounded-lg p-2 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
+                    {BULK_LLM_PROMPT}
+                  </pre>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">
+                    Pega aquí las oraciones (una por línea)
+                  </label>
+                  <textarea
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    rows={10}
+                    placeholder={'Yo [[fui]] a la tienda ayer. | I went to the store yesterday. | 8 | pretérito'}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs font-mono text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {bulkStatus && (
+                  <p className={`text-xs font-bold text-center ${bulkStatus.includes('❌') ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {bulkStatus}
+                  </p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleBulkImport}
+                    disabled={bulkSaving || !bulkText.trim()}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg transition-all"
+                  >
+                    {bulkSaving ? 'Importando...' : 'Importar Oraciones'}
+                  </button>
+                  <button
+                    onClick={closeBulkImport}
+                    className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : !draft ? (
               <p className="text-slate-500 text-sm text-center py-12">Selecciona una oración para editar, o crea una nueva.</p>
             ) : (
               <div className="space-y-4">

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import Senordle from '../components/Senordle';
 import PointsIndicator from '../components/PointsIndicator';
 import { awardPoints } from '../utils/pointsHelper';
+import { decodeWord } from '../utils/wordCipher';
 
 // Points by try number (index 0 = 1st try). A failed 6th try falls back to the 10-point floor.
 const SENORDLE_POINTS_BY_TRY = [25, 22, 20, 17, 15, 12];
@@ -50,7 +51,7 @@ useEffect(() => {
         wordData = docSnap.exists() ? docSnap.data() : null;
       }
 
-      setTargetWord(wordData?.word ? wordData.word.toUpperCase() : "LIBRO");
+      setTargetWord(wordData?.word ? decodeWord(wordData.word) : "LIBRO");
 
       // B. Get Validation Dictionaries (Using Promise.all to fetch both at the exact same time)
       const [dictResponse1, dictResponse2] = await Promise.all([

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
+import { encodeWord, decodeWord } from '../../utils/wordCipher';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -85,7 +86,10 @@ const SenordleUploader = () => {
             console.log(`UPLOADING SEÑORDLE WORD: ${docId} -> ${word}`);
 
             const wordData = {
-              word: word.toUpperCase(),
+              // Obfuscated at rest — see wordCipher.js — so the answer isn't
+              // sitting in plain text in Firestore for a student to read
+              // directly (the preview table below decodes it back for you).
+              word: encodeWord(word),
               date: date,
               course: courseKey,
               lastUpdated: serverTimestamp()
@@ -338,7 +342,7 @@ const SenordleUploader = () => {
                 <span className={`font-mono ${item.date === todayStr() ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
                   {item.date} {item.date === todayStr() ? '(Hoy)' : ''}
                 </span>
-                <span className="font-bold text-white">{item.word}</span>
+                <span className="font-bold text-white">{decodeWord(item.word)}</span>
               </div>
             ))
           )}

@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore"; // 🟢 1. Import Firestore
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,6 +22,9 @@ export const db = getFirestore(app);
 
 // Initialize and Export Auth
 export const auth = getAuth(app);
+
+// Initialize and Export Storage (admin-uploaded images — curiosidades, etc.)
+export const storage = getStorage(app);
 
 
 
