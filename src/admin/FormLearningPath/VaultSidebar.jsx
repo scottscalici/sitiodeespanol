@@ -3,6 +3,11 @@ import React, { useState } from 'react';
 export default function VaultSidebar({
   vaultSource,
   setVaultSource,
+  kpImportText,
+  setKpImportText,
+  kpImportStatus,
+  isImportingKp,
+  onImportKpContent,
   contentType,
   selectedBook,
   setSelectedBook,
@@ -35,6 +40,7 @@ export default function VaultSidebar({
   const [newGrammarText, setNewGrammarText] = useState('');
   const [newGrammarTopic, setNewGrammarTopic] = useState('');
   const [isCreatingGrammar, setIsCreatingGrammar] = useState(false);
+  const [showKpImport, setShowKpImport] = useState(false);
 
   const isItemUsed = (itemId) => {
     for (const pod of pods) {
@@ -83,6 +89,37 @@ export default function VaultSidebar({
         >
           {vaultSource === 'kpractice' ? '👧 K-Practice (Personal)' : '🏫 Mis Clases (S2/S4)'} ⇄
         </button>
+
+        {vaultSource === 'kpractice' && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowKpImport((v) => !v)}
+              className="w-full text-center px-2.5 py-1 text-[10px] font-black bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {showKpImport ? 'Ocultar Importar JSON' : '📥 Importar Contenido (JSON)'}
+            </button>
+            {showKpImport && (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={kpImportText}
+                  onChange={(e) => setKpImportText(e.target.value)}
+                  rows={6}
+                  className="w-full p-2 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-emerald-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={onImportKpContent}
+                  disabled={isImportingKp}
+                  className="w-full px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-900 font-black text-xs uppercase tracking-wider rounded-md transition-colors"
+                >
+                  {isImportingKp ? 'Importando...' : 'Importar a K-Practice'}
+                </button>
+                {kpImportStatus && <p className="text-[10px] font-bold text-amber-300">{kpImportStatus}</p>}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dynamic Filters based on Active Tab */}
         {activeTab === 'verbs' ? (

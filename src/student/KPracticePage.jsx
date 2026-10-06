@@ -12,6 +12,14 @@ import WorkoutEngine from './WorkoutEngine';
 //    path that exists is simply available
 //  - progress/points live in localStorage instead of a Firestore user doc,
 //    since there's no account to attach them to
+//  - the mastery threshold to advance a segment is its own constant here
+//    (not shared with StudentLearningPath.jsx's hardcoded 80), so it can be
+//    tuned for her independently of what real students need — 70 for now,
+//    change freely, or set FREE_ROAM to true to unlock every pod/segment
+//    regardless of score (no locking at all).
+const MASTERY_THRESHOLD = 70;
+const FREE_ROAM = false;
+
 const PROGRESS_KEY = 'kpractice_progress_v1';
 
 const loadProgress = () => {
@@ -120,11 +128,11 @@ export default function KPracticePage() {
 
   const pathItemsRaw = [];
   pods.forEach((pod, pIdx) => {
-    const podLocked = pIdx > activePodIndex;
+    const podLocked = !FREE_ROAM && pIdx > activePodIndex;
     (pod.segments || []).forEach((seg, sIdx) => {
       const isCompleted = pIdx < activePodIndex || (pIdx === activePodIndex && sIdx < activeSegmentIndex);
       const isCurrent = pIdx === activePodIndex && sIdx === activeSegmentIndex;
-      pathItemsRaw.push({ key: seg.id, kind: 'segment', pod, pIdx, seg, sIdx, isCompleted, isCurrent, isLocked: podLocked, canClick: isCompleted || isCurrent });
+      pathItemsRaw.push({ key: seg.id, kind: 'segment', pod, pIdx, seg, sIdx, isCompleted, isCurrent, isLocked: podLocked, canClick: FREE_ROAM || isCompleted || isCurrent });
     });
     pathItemsRaw.push({ key: `${pod.id}_checkpoint`, kind: 'checkpoint', pod, pIdx, isCompleted: pIdx < activePodIndex, isLocked: podLocked });
   });
@@ -280,7 +288,7 @@ export default function KPracticePage() {
             let newPodIdx = activePodIndex;
             let newSegIdx = activeSegmentIndex;
             const currentActiveSeg = pods[activePodIndex]?.segments[activeSegmentIndex];
-            if (score >= 80 && segId === currentActiveSeg?.id) {
+            if (score >= MASTERY_THRESHOLD && segId === currentActiveSeg?.id) {
               if (activeSegmentIndex < pods[activePodIndex].segments.length - 1) newSegIdx = activeSegmentIndex + 1;
               else { newPodIdx = activePodIndex + 1; newSegIdx = 0; }
             }
@@ -293,9 +301,9 @@ export default function KPracticePage() {
             saveProgress(nextProgress);
 
             setFeedbackModal(
-              score >= 80
+              score >= MASTERY_THRESHOLD
                 ? { tone: 'success', emoji: '🎉', title: '¡Excelente! ¡Aprobaste!', message: `Obtuviste un ${score}%. Multiplicador: ${multiplier}x (+${totalPointsEarned} pts)` }
-                : { tone: 'warning', emoji: '💪', title: '¡Buen esfuerzo!', message: `Obtuviste un ${score}%. Necesitas al menos 80% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)` }
+                : { tone: 'warning', emoji: '💪', title: '¡Buen esfuerzo!', message: `Obtuviste un ${score}%. Necesitas al menos ${MASTERY_THRESHOLD}% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)` }
             );
           }}
         />
