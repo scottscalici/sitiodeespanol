@@ -30,6 +30,7 @@ import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROU
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
+import ConversacionesManager from './admin/managers/ConversacionesManager';
 import ConectoresEngine from './student/ConectoresEngine';
 import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
@@ -296,6 +297,14 @@ function App() {
     </AdminRoute>
   }
 />
+            <Route
+              path="/admin-daily-plan-conversaciones"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ConversacionesManager />
+                </AdminRoute>
+              }
+            />
 <Route
   path="/admin-secret-portal-conectores"
   element={

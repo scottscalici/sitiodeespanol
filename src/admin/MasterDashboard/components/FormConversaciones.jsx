@@ -7,7 +7,11 @@ const VisibilidadCheckbox = ({ field, visibilidad, onToggle }) => (
   </label>
 );
 
-export default function FormConversaciones({ actividad, setActividad, handleChange }) {
+// `hideClassification` skips the Clasificación block (título, imagen,
+// subtítulo, tag, courses, días) — used by ConversacionesManager's content
+// modal, which already covers those fields in its own grid row and only
+// opens this form for everything past that (enlaces, tiempos, contenido).
+export default function FormConversaciones({ actividad, setActividad, handleChange, hideClassification = false }) {
 
   // Helper for comma-separated numbers (dias)
   const handleDiasChange = (e) => {
@@ -124,8 +128,13 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* --- CLASIFICACIÓN --- */}
+      {!hideClassification && (
       <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f8f9fa' }}>
         <h4 style={{ margin: '0 0 15px 0' }}>Clasificación</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
+          <label>Título</label>
+          <input name="titulo" value={actividad.titulo || ""} onChange={handleChange} style={{ padding: '8px' }} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
           <label>Imagen (URL)</label>
           <input name="imagen" value={actividad.imagen || ""} onChange={handleChange} placeholder="https://..." style={{ padding: '8px' }} />
@@ -162,6 +171,7 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
           </div>
         </div>
       </div>
+      )}
 
       {/* --- ENLACES --- */}
       <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f8f9fa' }}>
