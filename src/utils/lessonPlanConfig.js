@@ -10,9 +10,11 @@ export const TIME_BLOCKS = [
 // each is editable per day right on the page before printing (not saved,
 // since the actual pacing varies day to day).
 export const DEFAULT_DURATIONS = {
+  destacado: 5,
   calentamiento: 10,
   oraciones: 10,
   curiosidad: 15,
+  actividades: 15,
   gramatica: 15,
   evaluacion: 20,
   practica: 15,

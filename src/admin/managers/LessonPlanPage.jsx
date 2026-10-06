@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc, getDocs, collection, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getCachedBucketedCollection } from '../../utils/firestoreCache';
+import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { TIME_BLOCKS, DEFAULT_DURATIONS, computeBlockTimes } from '../../utils/lessonPlanConfig';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
 
 const SECTION_DEFS = [
+  { key: 'destacado', label: 'Destacado del Día', icon: '🌟' },
   { key: 'calentamiento', label: 'Calentamiento', icon: '⏱️' },
   { key: 'oraciones', label: 'Oraciones de Práctica', icon: '✍️' },
   { key: 'curiosidad', label: 'Curiosidad', icon: '💡' },
+  { key: 'actividades', label: 'Actividades (Video/Lectura/Conversación)', icon: '🎬' },
   { key: 'gramatica', label: 'Gramática / Estructuras', icon: '📚' },
   { key: 'evaluacion', label: 'Evaluación', icon: '🎯' },
   { key: 'practica', label: 'Práctica', icon: '✏️' },
@@ -22,82 +24,12 @@ const emptyNotes = () => Object.fromEntries([...SECTION_DEFS.map((s) => s.key), 
 export default function LessonPlanPage() {
   const [course, setCourse] = useState('s2');
   const [selectedDay, setSelectedDay] = useState(1);
-  const [loading, setLoading] = useState(true);
-
-  const [calendarMap, setCalendarMap] = useState({});
-  const [rawDatesMap, setRawDatesMap] = useState({});
-  const [anuncios, setAnuncios] = useState([]);
-  const [calentamientos, setCalentamientos] = useState([]);
-  const [vocabWarmups, setVocabWarmups] = useState([]);
-  const [practiceCards, setPracticeCards] = useState([]);
-  const [sentenceSets, setSentenceSets] = useState([]);
-  const [curiosidades, setCuriosidades] = useState([]);
-  const [gramatica, setGramatica] = useState({ s2: [], s4: [] });
-  const [evaluaciones, setEvaluaciones] = useState({ s2: [], s4: [] });
-  const [tareas, setTareas] = useState({ s2: [], s4: [] });
+  const planData = useLessonPlanData(course, selectedDay);
 
   const [durations, setDurations] = useState(DEFAULT_DURATIONS);
   const [notes, setNotes] = useState(emptyNotes());
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesStatus, setNotesStatus] = useState('');
-
-  // Fetched once — the whole data set, filtered client-side on day/course
-  // change so flipping through days feels instant (same pattern as
-  // DailyPlanHub, which this page pulls together for printing).
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const configSnap = await getDoc(doc(db, 'config', 'academic_year_2026_2027'));
-        const mapping = {};
-        const rawMapping = {};
-        if (configSnap.exists()) {
-          const data = configSnap.data();
-          (data.map || []).forEach((item) => {
-            if (item.dia === null || item.dia === undefined) return;
-            const dayNum = Number(item.dia);
-            if (!mapping[dayNum]) mapping[dayNum] = [];
-            if (!rawMapping[dayNum]) rawMapping[dayNum] = [];
-            let formatted = item.fecha;
-            if (item.fecha && item.fecha.includes('-')) {
-              const parts = item.fecha.split('-');
-              if (parts.length === 3) formatted = `${parts[1]}/${parts[2]}`;
-            }
-            mapping[dayNum].push(`${formatted}${item.ciclo ? ` (${item.ciclo})` : ''}`);
-            if (item.fecha) rawMapping[dayNum].push(item.fecha);
-          });
-        }
-        setCalendarMap(mapping);
-        setRawDatesMap(rawMapping);
-
-        const [calSnap, vocabSnap, practiceSnap, sentenceSnap, curiosidadesList, tareasSnap, evalsSnap, gramSnap, anunciosSnap] = await Promise.all([
-          getDocs(collection(db, 'calentamientos')),
-          getDocs(collection(db, 'dailyVocabWarmups')),
-          getDocs(collection(db, 'practice_cards')),
-          getDocs(collection(db, 'sentence_sets')),
-          getCachedBucketedCollection('curiosidades'),
-          getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
-          getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
-          getDoc(doc(db, 'curriculum_tracks', 'gramatica_master')),
-          getDocs(collection(db, 'anuncios')),
-        ]);
-
-        setCalentamientos(calSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setVocabWarmups(vocabSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setPracticeCards(practiceSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setSentenceSets(sentenceSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setCuriosidades(curiosidadesList);
-        setAnuncios(anunciosSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setTareas({ s2: tareasSnap.exists() ? tareasSnap.data().s2 || [] : [], s4: tareasSnap.exists() ? tareasSnap.data().s4 || [] : [] });
-        setEvaluaciones({ s2: evalsSnap.exists() ? evalsSnap.data().s2 || [] : [], s4: evalsSnap.exists() ? evalsSnap.data().s4 || [] : [] });
-        setGramatica({ s2: gramSnap.exists() ? gramSnap.data().s2 || [] : [], s4: gramSnap.exists() ? gramSnap.data().s4 || [] : [] });
-      } catch (err) {
-        console.error('Error loading lesson plan data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
-  }, []);
 
   // Per-day/course notes — loaded fresh whenever the day or course changes,
   // saved explicitly via the button (not on every keystroke).
@@ -114,7 +46,9 @@ export default function LessonPlanPage() {
     setNotesStatus('');
     try {
       const noteId = `${course}_d${selectedDay}`;
-      await setDoc(doc(db, 'lesson_plan_notes', noteId), { course, dia: selectedDay, notes, updatedAt: new Date().toISOString() });
+      // merge:true — the Formal plan view writes its own `objectives` field
+      // to this same per-day doc, so a plain overwrite here would erase it.
+      await setDoc(doc(db, 'lesson_plan_notes', noteId), { course, dia: selectedDay, notes, updatedAt: new Date().toISOString() }, { merge: true });
       setNotesStatus('✅ Notas guardadas.');
     } catch (err) {
       console.error('Error saving lesson plan notes:', err);
@@ -127,82 +61,74 @@ export default function LessonPlanPage() {
   const updateNote = (key, value) => setNotes((prev) => ({ ...prev, [key]: value }));
   const updateDuration = (key, value) => setDurations((prev) => ({ ...prev, [key]: Math.max(0, Number(value) || 0) }));
 
-  if (loading) {
+  if (planData.loading) {
     return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Cargando Plan de Lección...</div>;
   }
 
-  // --- Filter everything to the selected day/course (same joins DailyPlanHub uses) ---
-  const activeCalentamientoVerbs = calentamientos.filter((c) => c.course === course && Number(c.dia) === selectedDay);
-  const activeCalentamientoVocab = vocabWarmups.filter((v) => v.course === course && Number(v.dia) === selectedDay);
-  const activePracticeCards = practiceCards.filter((p) => p.course === course && Number(p.dia) === selectedDay);
-  const activeSentenceSets = sentenceSets.filter((s) => (s.assignments || []).some((a) => a.course === course && Number(a.dia) === selectedDay));
-  const activeCuriosidades = curiosidades.filter((c) => (course === 's2' ? c.s2_dia === selectedDay : c.s4_dia === selectedDay));
-  const activeGramatica = (gramatica[course] || []).filter((g) => Number(g.dia) === selectedDay);
-  const activeEvaluaciones = (evaluaciones[course] || []).filter((e) => Number(e.dia) === selectedDay && e.label && e.label !== 'Nada');
-  const tareasDueToday = (tareas[course] || []).filter((t) => Number(t.day_due) === selectedDay);
-  const tareasAssignedTodayDueLater = (tareas[course] || []).filter((t) => Number(t.day_assigned) === selectedDay && Number(t.day_due) > selectedDay);
-
-  const dateStrings = calendarMap[selectedDay] || [];
-  const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Fecha por confirmar';
-
-  // Anuncios are matched by actual calendar date (not día number) — a día
-  // can resolve to two real dates (one per A/B ciclo), so an announcement
-  // active on either one counts as active today.
-  const rawDates = rawDatesMap[selectedDay] || [];
-  const activeAnuncios = anuncios.filter(
-    (a) => (a.courses || []).includes(course) && rawDates.some((d) => d >= a.start_date && d <= a.end_date)
-  );
-
-  // Plain "sujeto palabra" list of every verb actually baked for today
-  // (e.g. "yo hablar, tú comer, ella vivir") and a plain list of the day's
-  // vocab terms — printed small and unstyled on purpose, so there's room to
-  // circle/underline ones by hand while teaching, to flag for review.
-  const verbList = activeCalentamientoVerbs
-    .flatMap((c) => c.bakedQuestions || [])
-    .map((q) => `${q.sujeto} ${q.palabra}`)
-    .join(', ');
-  const vocabList = activeCalentamientoVocab
-    .flatMap((v) => v.sequence || [])
-    .map((w) => w.palabra)
-    .join(', ');
-
   // --- Build each section's summary content ---
   const sectionContent = {
+    destacado:
+      planData.destacado.length === 0 ? null : (
+        <ul className="list-disc pl-5 space-y-1">
+          {planData.destacado.map((d) => (
+            <li key={d.id}>
+              <span className="font-bold">{d.header || d.type}</span>
+              {d.word_of_the_day?.word && (
+                <> — palabra del día: <span className="italic">{d.word_of_the_day.word}</span>{d.word_of_the_day.translation ? ` (${d.word_of_the_day.translation})` : ''}</>
+              )}
+            </li>
+          ))}
+        </ul>
+      ),
     calentamiento:
-      activeCalentamientoVerbs.length + activeCalentamientoVocab.length === 0 ? null : (
+      planData.calentamiento.verbs.length + planData.calentamiento.vocab.length === 0 ? null : (
         <div className="space-y-2">
           <ul className="list-disc pl-5 space-y-1">
-            {activeCalentamientoVerbs.map((c) => (
+            {planData.calentamiento.verbs.map((c) => (
               <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
             ))}
-            {activeCalentamientoVocab.map((v) => (
+            {planData.calentamiento.vocab.map((v) => (
               <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
             ))}
           </ul>
-          {verbList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-2">{verbList}</p>}
-          {vocabList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-1">{vocabList}</p>}
+          {planData.calentamiento.verbList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-2">{planData.calentamiento.verbList}</p>}
+          {planData.calentamiento.vocabList && <p className="text-xs leading-relaxed font-sans text-gray-700 mt-1">{planData.calentamiento.vocabList}</p>}
         </div>
       ),
     oraciones:
-      activeSentenceSets.length === 0 ? null : (
+      planData.oraciones.length === 0 ? null : (
         <ul className="list-disc pl-5 space-y-1">
-          {activeSentenceSets.map((s) => (
+          {planData.oraciones.map((s) => (
             <li key={s.id}>{s.title || 'Oraciones'} ({(s.lines || []).length} oraciones)</li>
           ))}
         </ul>
       ),
     curiosidad:
-      activeCuriosidades.length === 0 ? null : (
+      planData.curiosidad.length === 0 ? null : (
         <ul className="list-disc pl-5 space-y-1">
-          {activeCuriosidades.map((c) => (
+          {planData.curiosidad.map((c) => (
             <li key={c.id}>{c.title}{c.teacher_notes ? ` — ${c.teacher_notes}` : ''}</li>
           ))}
         </ul>
       ),
+    actividades:
+      (() => {
+        const { videos, conversaciones, musica, cultura, lecturas } = planData.actividades;
+        if (videos.length + conversaciones.length + musica.length + cultura.length + lecturas.length === 0) return null;
+        return (
+          <ul className="list-disc pl-5 space-y-1">
+            {videos.map((v) => <li key={`vid-${v.id}`}>🎬 Video: {v.title}</li>)}
+            {conversaciones.map((c) => <li key={`conv-${c.id}`}>🗣️ Conversación: {c.titulo}</li>)}
+            {musica.map((m) => <li key={`mus-${m.id}`}>🎵 Música: {m.titulo}</li>)}
+            {cultura.map((c) => <li key={`cul-${c.id}`}>🌎 Cultura: {c.titulo}</li>)}
+            {lecturas.map((l) => <li key={`lec-${l.id}`}>📖 Lectura: {l.subtitulo || 'Comprensión de Lectura'}</li>)}
+          </ul>
+        );
+      })(),
     gramatica:
-      activeGramatica.length === 0 ? null : (
+      planData.gramatica.length === 0 ? null : (
         <div className="space-y-2">
-          {activeGramatica.map((g, idx) => (
+          {planData.gramatica.map((g, idx) => (
             <div key={idx}>
               {g.introText && <p><span className="font-bold">Introducir:</span> {g.introText}</p>}
               {g.repasoText && <p><span className="font-bold">Repasar:</span> {g.repasoText}</p>}
@@ -211,17 +137,17 @@ export default function LessonPlanPage() {
         </div>
       ),
     evaluacion:
-      activeEvaluaciones.length === 0 ? null : (
+      planData.evaluacion.length === 0 ? null : (
         <ul className="list-disc pl-5 space-y-1">
-          {activeEvaluaciones.map((e, idx) => (
+          {planData.evaluacion.map((e, idx) => (
             <li key={idx} className="font-bold">{e.label}</li>
           ))}
         </ul>
       ),
     practica:
-      activePracticeCards.length === 0 ? null : (
+      planData.practica.length === 0 ? null : (
         <ul className="list-disc pl-5 space-y-1">
-          {activePracticeCards.map((p) => (
+          {planData.practica.map((p) => (
             <li key={p.id}>{p.title} ({p.questions?.length || 0} preguntas)</li>
           ))}
         </ul>
@@ -257,6 +183,9 @@ export default function LessonPlanPage() {
         <button onClick={() => window.print()} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest">
           🖨️ Imprimir
         </button>
+        <Link to={`/admin-lesson-plan-formal/${course}/${selectedDay}`} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest text-center">
+          🏛️ Plan Formal
+        </Link>
         {notesStatus && <p className="text-[10px] font-bold text-slate-600 w-full">{notesStatus}</p>}
       </div>
 
@@ -268,17 +197,17 @@ export default function LessonPlanPage() {
             <h2 className="text-xl italic text-gray-700">{course === 's2' ? 'Spanish 2' : 'Spanish 4'}</h2>
           </div>
           <div className="flex justify-between items-center text-lg">
-            <p>Día {selectedDay} — {activeDatesDisplay}</p>
+            <p>Día {selectedDay} — {planData.activeDatesDisplay}</p>
             <p>{TIME_BLOCKS.map((b) => `${b.label}: ${b.start}–${b.end}`).join('  ·  ')}</p>
           </div>
         </div>
 
         {/* Anuncios — plain script to read at the start of class, no
             styling/images/links (those live in the student-facing card). */}
-        {activeAnuncios.length > 0 && (
+        {planData.anuncios.length > 0 && (
           <div className="mb-8 border-b border-gray-300 pb-4">
             <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-1">📢 Anuncios</h3>
-            {activeAnuncios.map((a) => (
+            {planData.anuncios.map((a) => (
               <p key={a.id} className="text-base">{a.text}</p>
             ))}
           </div>
@@ -329,25 +258,25 @@ export default function LessonPlanPage() {
         {/* Tarea — reference list, not timed */}
         <div className="break-inside-avoid border-t-2 border-black pt-4">
           <h3 className="text-lg font-bold uppercase tracking-wide mb-2">📝 Tarea</h3>
-          {tareasDueToday.length === 0 && tareasAssignedTodayDueLater.length === 0 ? (
+          {planData.tarea.dueToday.length === 0 && planData.tarea.assignedTodayDueLater.length === 0 ? (
             <p className="italic text-gray-500">Sin tareas relevantes hoy.</p>
           ) : (
             <div className="space-y-3 text-base">
-              {tareasDueToday.length > 0 && (
+              {planData.tarea.dueToday.length > 0 && (
                 <div>
                   <p className="font-bold">Vence hoy:</p>
                   <ul className="list-disc pl-5">
-                    {tareasDueToday.map((t) => (
+                    {planData.tarea.dueToday.map((t) => (
                       <li key={t.id}>{t.titulo} ({t.tipo})</li>
                     ))}
                   </ul>
                 </div>
               )}
-              {tareasAssignedTodayDueLater.length > 0 && (
+              {planData.tarea.assignedTodayDueLater.length > 0 && (
                 <div>
                   <p className="font-bold">Asignada hoy (vence después):</p>
                   <ul className="list-disc pl-5">
-                    {tareasAssignedTodayDueLater.map((t) => (
+                    {planData.tarea.assignedTodayDueLater.map((t) => (
                       <li key={t.id}>{t.titulo} ({t.tipo}) — vence Día {t.day_due}</li>
                     ))}
                   </ul>
