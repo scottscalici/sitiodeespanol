@@ -96,6 +96,17 @@ service cloud.firestore {
       allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- CONVERSACIÓN NOTES (per-student scratch notes on a conversación activity) ---
+    // Doc ID is `${uid}_${activityId}`, but that's not checkable directly, so
+    // ownership is verified against the document's own `uid` field (same
+    // pattern as recuperaciones above) — a student may only create/update
+    // their own notes; an admin (teacher) can read any student's.
+    match /conversacion_notes/{docId} {
+      allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // --- LEADERBOARD HISTORY (Hall of Fame weekly/monthly archives) ---
     // Snapshotted client-side by the first student in a course to earn
     // points in a new week/month (see archivePeriodIfNeeded in
