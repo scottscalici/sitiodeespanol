@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
 export default function VaultSidebar({
+  vaultSource,
+  setVaultSource,
   contentType,
   selectedBook,
   setSelectedBook,
@@ -67,6 +69,20 @@ export default function VaultSidebar({
             Click to Assign 🎯
           </span>
         </div>
+
+        {/* Which pool this vault reads from — 'kpractice' is a fully
+            separate set of collections (never mixes into real students'
+            vocab/verb vaults or bundles), for personal-use content. */}
+        <button
+          type="button"
+          onClick={() => setVaultSource(vaultSource === 'kpractice' ? 'main' : 'kpractice')}
+          title="Click to switch which content pool this vault reads from"
+          className={`w-full text-center px-2.5 py-1 text-xs font-black rounded-md uppercase tracking-wider transition-colors cursor-pointer ${
+            vaultSource === 'kpractice' ? 'bg-amber-500 hover:bg-amber-400 text-slate-900' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+          }`}
+        >
+          {vaultSource === 'kpractice' ? '👧 K-Practice (Personal)' : '🏫 Mis Clases (S2/S4)'} ⇄
+        </button>
 
         {/* Dynamic Filters based on Active Tab */}
         {activeTab === 'verbs' ? (

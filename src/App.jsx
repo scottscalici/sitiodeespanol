@@ -18,6 +18,7 @@ import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
+import KPracticePage from './student/KPracticePage';
 import PracticeHub from './student/PracticeHub';
 import Recuperacion from './student/Recuperacion';
 import TicoTalk from './student/TicoTalk';
@@ -182,6 +183,10 @@ function App() {
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/student-learning-path/:targetDia?" element={<StudentLearningPath />} />
+            {/* Unlisted on purpose — no nav link anywhere, no login. A
+                personal-use practice page (see KPracticePage.jsx) pulling
+                from the separate kpractice_* content pool. */}
+            <Route path="/kpractice" element={<KPracticePage />} />
             <Route path="/practice-hub" element={<PracticeHub />} />
             <Route path="/recuperacion" element={<Recuperacion />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />

@@ -45,6 +45,12 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [availableSections, setAvailableSections] = useState([]);
   const [rawChapterData, setRawChapterData] = useState(null);
 
+  // 'main' reads the real teaching collections (vocab_bundles, verbs,
+  // verbGroups) — 'kpractice' reads a completely separate pool
+  // (kpractice_vocab_bundles, kpractice_verbs, kpractice_verbGroups) so
+  // personal-use content (e.g. a family member's own class) never mixes
+  // into real students' vault or vocab/verb vaults.
+  const [vaultSource, setVaultSource] = useState('main');
   const [vaultVocab, setVaultVocab] = useState([]);
   const [vaultVerbs, setVaultVerbs] = useState([]);
   const [allVerbsList, setAllVerbsList] = useState([]);
@@ -360,11 +366,25 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     return 'Descubre 2'; // Fallback por defecto
   };
 
+  // Switching pools resets the book/chapter picker — "Descubre 2" means
+  // nothing in the kpractice pool and vice versa, so carrying over the old
+  // selection would just show "No Chapters Found" until re-picked anyway.
+  const handleSetVaultSource = (source) => {
+    setVaultSource(source);
+    setSelectedBook('');
+    setSelectedChapter('');
+    setSelectedSection('');
+  };
+
+  const vocabBundlesCollection = vaultSource === 'kpractice' ? 'kpractice_vocab_bundles' : 'vocab_bundles';
+  const verbsCollection = vaultSource === 'kpractice' ? 'kpractice_verbs' : 'verbs';
+  const verbGroupsCollection = vaultSource === 'kpractice' ? 'kpractice_verbGroups' : 'verbGroups';
+
   const fetchAllChapters = async () => {
     try {
       // Shared cache — VocabSequencer and the student useGymData hook also
       // read vocab_bundles in full.
-      const bundles = await getCachedCollection('vocab_bundles');
+      const bundles = await getCachedCollection(vocabBundlesCollection);
       const booksSet = new Set();
       const chaptersSet = new Set();
 
@@ -395,7 +415,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setIsLoadingVault(true);
     try {
       let targetData = null;
-      const bundles = await getCachedCollection('vocab_bundles');
+      const bundles = await getCachedCollection(vocabBundlesCollection);
 
       bundles.forEach(data => {
         const bookName = guessBookName(data, data.id);
@@ -428,8 +448,8 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       // Shared cache — verbGroups/verbs are also read by VerbVault and
       // CalentamientoAdmin; sentence_bank is also read by SentenceManager.
       const [groups, verbs, grammarList] = await Promise.all([
-        getCachedCollection('verbGroups'),
-        getCachedBucketedCollection('verbs'),
+        getCachedCollection(verbGroupsCollection),
+        getCachedBucketedCollection(verbsCollection),
         getCachedCollection('sentence_bank'),
       ]);
 
@@ -459,9 +479,10 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     } catch (err) {}
   };
 
-  useEffect(() => { fetchExistingPaths(); fetchVerbsAndGrammar(); }, []);
-  useEffect(() => { fetchAllChapters(); }, [selectedBook]);
-  useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook]);
+  useEffect(() => { fetchExistingPaths(); }, []);
+  useEffect(() => { fetchVerbsAndGrammar(); }, [vaultSource]);
+  useEffect(() => { fetchAllChapters(); }, [selectedBook, vaultSource]);
+  useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook, vaultSource]);
 
   // A vocab path's vault can never show verbs, and vice versa — keeps the
   // "no vocab bleeding into a verb path" rule enforced by the tool itself,
@@ -543,6 +564,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   return (
     <div className="flex w-screen h-screen bg-slate-100 font-sans fixed inset-0 z-50 overflow-hidden">
       <VaultSidebar
+        vaultSource={vaultSource} setVaultSource={handleSetVaultSource}
         contentType={contentType}
         selectedBook={selectedBook} setSelectedBook={setSelectedBook} availableBooks={availableBooks}
         activeTab={activeTab} setActiveTab={setActiveTab} selectedChapter={selectedChapter} setSelectedChapter={setSelectedChapter}
