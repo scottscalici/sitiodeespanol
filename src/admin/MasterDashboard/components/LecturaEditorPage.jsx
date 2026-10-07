@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteField, addDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../../firebase';
 import { useNavigate } from 'react-router-dom';
 
 export default function LecturaEditorPage() {
@@ -183,6 +184,28 @@ export default function LecturaEditorPage() {
     }
   };
 
+  // Manual per-reading image fix — for when the bulk uploader's filename
+  // match misses one (e.g. the source file's name doesn't quite match
+  // imagen_filename). Uploads straight to Storage and sets `imagen` on
+  // just this one doc; no need to touch Firestore by hand.
+  const handleImageFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedId || selectedId === 'new') return;
+    setStatus('Subiendo imagen...');
+    try {
+      const storageRef = ref(storage, `lectura_images/${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setActividad((prev) => ({ ...prev, imagen: url }));
+      setStatus('✅ Imagen subida — recuerda hacer clic en "Guardar Cambios" abajo.');
+    } catch (error) {
+      console.error('Error uploading lectura image:', error);
+      setStatus('❌ Error al subir la imagen.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   if (loading) {
     return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest bg-black min-h-screen text-white">Cargando Editor...</div>;
   }
@@ -240,6 +263,32 @@ export default function LecturaEditorPage() {
                 <div className="sm:col-span-2 flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Text ID</label>
                   <input name="text_id" value={actividad.text_id || ""} onChange={handleChange} placeholder="A, B, C..." className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-2 border-t border-neutral-800">
+                <div className="sm:col-span-4 flex flex-col gap-2">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Imagen</label>
+                  {actividad.imagen ? (
+                    <img src={actividad.imagen} alt="" className="w-full h-24 object-cover rounded-lg border border-neutral-800" />
+                  ) : (
+                    <div className="w-full h-24 flex items-center justify-center rounded-lg border border-dashed border-neutral-700 text-neutral-600 text-[10px] uppercase tracking-widest">
+                      Sin imagen
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleImageFileUpload} className="text-[10px] text-neutral-400" />
+                </div>
+                <div className="sm:col-span-8 flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">O pega una URL directamente</label>
+                  <input
+                    value={actividad.imagen || ""}
+                    onChange={(e) => setActividad((prev) => ({ ...prev, imagen: e.target.value }))}
+                    placeholder="https://..."
+                    className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Sube un archivo arriba o pega una URL — cualquiera de las dos funciona. No olvides "Guardar Cambios" al final.
+                  </p>
                 </div>
               </div>
             </div>
