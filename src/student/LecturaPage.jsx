@@ -29,10 +29,31 @@ function parseLetterSet(answer) {
   );
 }
 
+const LAYOUT_STORAGE_KEY = 'ib_lectura_layout';
+
 export default function LecturaPage() {
   const { lecturaId } = useParams();
   const [lectura, setLectura] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [layout, setLayout] = useState(() => {
+    try {
+      return localStorage.getItem(LAYOUT_STORAGE_KEY) || 'lado-a-lado';
+    } catch {
+      return 'lado-a-lado';
+    }
+  });
+
+  const toggleLayout = () => {
+    setLayout((prev) => {
+      const next = prev === 'lado-a-lado' ? 'apilado' : 'lado-a-lado';
+      try {
+        localStorage.setItem(LAYOUT_STORAGE_KEY, next);
+      } catch {
+        // localStorage unavailable (private browsing, etc.) — layout just won't persist
+      }
+      return next;
+    });
+  };
 
   // Keyed "sIdx_qIdx" -> a letter (choice/true-false) or an array of letters
   // (multiple_select). Free-text types (short_answer, reference, etc.) have
@@ -138,13 +159,28 @@ export default function LecturaPage() {
               {lectura.subtitulo || 'Comprensión de Lectura'}
             </h1>
           </div>
-          <Link to="/" className="text-slate-400 hover:text-white font-bold text-xs bg-slate-700 px-4 py-2 rounded-xl border border-slate-600 transition-colors">
-            ← Volver al Dashboard
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleLayout}
+              className="text-slate-300 hover:text-white font-bold text-xs bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl border border-slate-600 transition-colors"
+              title="Cambiar diseño de la página"
+            >
+              {layout === 'lado-a-lado' ? '📱 Vista Apilada' : '💻 Vista Lado a Lado'}
+            </button>
+            <Link to="/" className="text-slate-400 hover:text-white font-bold text-xs bg-slate-700 px-4 py-2 rounded-xl border border-slate-600 transition-colors">
+              ← Volver al Dashboard
+            </Link>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl h-fit lg:sticky lg:top-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div className={layout === 'lado-a-lado' ? 'grid grid-cols-1 lg:grid-cols-12 gap-8' : 'space-y-6'}>
+          <div
+            className={
+              layout === 'lado-a-lado'
+                ? 'lg:col-span-5 bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl h-fit lg:sticky lg:top-6 space-y-4 max-h-[80vh] overflow-y-auto'
+                : 'bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl space-y-4'
+            }
+          >
             <h3 className="text-xs font-black uppercase tracking-widest text-cyan-400 border-b border-slate-700 pb-3">
               Texto de Lectura
             </h3>
@@ -157,7 +193,7 @@ export default function LecturaPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 space-y-6">
+          <div className={layout === 'lado-a-lado' ? 'lg:col-span-7 space-y-6' : 'space-y-6'}>
             {(lectura.question_sections || []).map((section, sIdx) => {
               const hasOptions = section.options && Object.keys(section.options).length > 0;
               return (
