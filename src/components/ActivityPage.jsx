@@ -687,12 +687,16 @@ const ConversacionLayout = ({ activity }) => {
         )}
 
         {/* Referencia permanente — no viene de los datos de esta actividad,
-            siempre disponible en cualquier conversación. */}
+            siempre disponible en cualquier conversación. Opens in a new tab
+            (same as the enlaces/reading links below) so clicking it mid-prep
+            doesn't unmount this page and lose the running timer or notes. */}
         <Link
           to="/glosario-idiomatico"
+          target="_blank"
+          rel="noopener noreferrer"
           className="self-start text-xs font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-4 py-2 rounded-full shadow-sm transition-colors inline-flex items-center gap-1.5 w-fit"
         >
-          📚 Glosario de Expresiones Idiomáticas
+          📚 Glosario de Expresiones Idiomáticas ↗
         </Link>
 
         {/* Timer engine */}
