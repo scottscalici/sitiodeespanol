@@ -36,7 +36,12 @@ export const buildWordBank = (answers, distractors) => {
 // of per-blank booleans (a persistent "graded and still wrong" indicator
 // that stays until the student changes it or re-submits — dropdown_cloze's
 // submit-to-check flow).
-export const renderClozeText = (text, selections, correctArr, wrongIndicator, onSelect, optionsForBlank) => {
+// `lockOnCorrect` (default true, matching every existing retry-mode caller)
+// disables a blank once it's correct. Practice Cards' deferred, submit-the-
+// whole-card mode passes false — every blank stays editable right up until
+// the student is done, since "correct" there is just the live grading
+// state as of the last Enviar, not a locked-in final answer.
+export const renderClozeText = (text, selections, correctArr, wrongIndicator, onSelect, optionsForBlank, { lockOnCorrect = true } = {}) => {
   const parts = (text || '').split('{{blank}}');
   const nodes = [];
   parts.forEach((part, i) => {
@@ -49,7 +54,7 @@ export const renderClozeText = (text, selections, correctArr, wrongIndicator, on
           key={`b-${i}`}
           value={selections[i] || ''}
           onChange={(e) => onSelect(i, e.target.value)}
-          disabled={isCorrect}
+          disabled={lockOnCorrect && isCorrect}
           className={`mx-1 border-b-2 bg-slate-900 font-bold rounded px-2 py-1 text-sm align-middle ${
             isCorrect
               ? 'border-emerald-500 text-emerald-400'

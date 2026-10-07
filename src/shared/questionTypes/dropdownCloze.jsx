@@ -12,7 +12,23 @@ export const getItemCount = (q) => q.blanks.length;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
+// Pure, given a {selections} snapshot (the same shape the deferred
+// Renderer's onStateChange reports) — the one place "what counts as
+// correct" lives, read by both that Renderer's own live coloring and
+// Practice Cards' whole-card grading at Enviar time.
+export const gradeState = (question, state) => {
+  const selections = state?.selections || [];
+  return question.blanks.map((blank, i) => blank.answer === selections[i]);
+};
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract. 'retry' (default, Curiosidad) keeps this type's original
+// per-question submit-then-grade model; 'deferred' (Practice Cards) answers
+// everything ungraded and only colors blanks once the whole card is
+// submitted.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Each blank has its own independent option list (unlike word_bank_cloze's
 // shared bank) and locks once answered correctly. Grading is deferred to an
 // explicit "Revisar" click (not on every selection) so a student can fill
@@ -21,7 +37,7 @@ export const reconstructQuestion = (q) => q;
 // instant it's made. The first REVISAR that touches a given blank is what
 // counts as its "first attempt" for scoring, not the dropdown selection
 // itself — re-picking a wrong blank and re-submitting doesn't re-trigger it.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const blankCount = question.blanks.length;
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
@@ -91,6 +107,44 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialSt
         </div>
       )}
     </div>
+  );
+};
+
+// Freely editable at all times (never locks, even once correct — the
+// student may resubmit for a better score), with no Revisar step: grading
+// only ever shows once the caller says the whole card has been submitted,
+// and re-colors live from then on as the student keeps editing.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const blankCount = question.blanks.length;
+  const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
+
+  useEffect(() => {
+    onStateChange?.({ selections });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections]);
+
+  const handleSelect = (blankIdx, value) => {
+    setSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
+  };
+
+  const correct = submitted ? gradeState(question, { selections }) : Array(blankCount).fill(null);
+  const wrong = correct.map((c) => c === false);
+  // Pre-submit, "completado" just means answered (nothing graded yet);
+  // once submitted it switches to counting actually-correct blanks.
+  const completedCount = submitted ? correct.filter((c) => c === true).length : selections.filter(Boolean).length;
+
+  return (
+    <ClozeChrome img={question.img} completed={completedCount} total={blankCount}>
+      {renderClozeText(
+        question.text,
+        selections,
+        correct,
+        wrong,
+        handleSelect,
+        (blankIdx) => question.blanks[blankIdx]?.options || [],
+        { lockOnCorrect: false }
+      )}
+    </ClozeChrome>
   );
 };
 

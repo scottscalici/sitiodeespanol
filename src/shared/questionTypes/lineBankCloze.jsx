@@ -91,7 +91,18 @@ export const parseBulkSections = (text) => {
   }));
 };
 
+// Pure, given a {selections} snapshot — see dropdownCloze.jsx's gradeState
+// for why this is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => {
+  const selections = state?.selections || [];
+  return question.answers.map((answer, i) => sameWord(answer, selections[i]));
+};
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Same "shared word bank, word disappears once correctly placed elsewhere"
 // mechanic as word_bank_cloze, just spread across several rows. Each row
 // gets a slice of the global selections/correct/wrongAttempted arrays so
@@ -100,7 +111,7 @@ export const parseBulkSections = (text) => {
 // "Revisar" click (not on every selection), same as word_bank_cloze and
 // dropdown_cloze — a word only leaves the shared bank once Revisar actually
 // confirms it's correct, not the instant it's picked.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const blankCount = question.answers.length;
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
@@ -202,6 +213,70 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialSt
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+// Freely editable at all times, no Revisar step — see wordBankCloze.jsx's
+// DeferredRenderer for the depletion rationale (same mechanic, just spread
+// across rows via the same global-index slicing as RetryRenderer above).
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const blankCount = question.answers.length;
+  const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
+
+  useEffect(() => {
+    onStateChange?.({ selections });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections]);
+
+  const handleSelect = (globalIdx, value) => {
+    setSelections((prev) => prev.map((v, i) => (i === globalIdx ? value : v)));
+  };
+
+  const correct = submitted ? gradeState(question, { selections }) : Array(blankCount).fill(null);
+  const wrong = correct.map((c) => c === false);
+  const completedCount = submitted ? correct.filter((c) => c === true).length : selections.filter(Boolean).length;
+
+  const optionsForBlank = (globalIdx) => {
+    if (question.allowRepeats) return question.wordBank || [];
+    const usedElsewhere = selections.filter((v, j) => j !== globalIdx && v);
+    return (question.wordBank || []).filter((w) => !usedElsewhere.some((v) => sameWord(v, w)));
+  };
+
+  let offset = 0;
+
+  return (
+    <div>
+      {blankCount > 1 && (
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
+          {completedCount} de {blankCount} completados
+        </p>
+      )}
+      <div className="space-y-3">
+        {question.lines.map((line, lIdx) => {
+          const lineBlankCount = (line.text.match(/\{\{blank\}\}/g) || []).length;
+          const start = offset;
+          offset += lineBlankCount;
+          return (
+            <div key={lIdx} className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-xl p-3">
+              {line.img && (
+                <img src={line.img} alt="" className="w-16 h-16 object-cover rounded-lg border border-slate-700 shrink-0" />
+              )}
+              <p className="text-base text-slate-200 leading-loose text-left flex-1">
+                {renderClozeText(
+                  line.text,
+                  selections.slice(start, start + lineBlankCount),
+                  correct.slice(start, start + lineBlankCount),
+                  wrong.slice(start, start + lineBlankCount),
+                  (localIdx, value) => handleSelect(start + localIdx, value),
+                  (localIdx) => optionsForBlank(start + localIdx),
+                  { lockOnCorrect: false }
+                )}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

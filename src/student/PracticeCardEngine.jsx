@@ -7,17 +7,18 @@ import { awardPoints } from '../utils/pointsHelper';
 import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
 import { normalizeLegacyPracticeQuestion } from '../utils/legacyPracticeQuestion';
 
-// A small, focused graded practice (e.g. Gustar, prepositional pronouns) —
-// unlike Calentamiento (verb-conjugation tables) or WorkoutEngine's
-// retry-until-correct Learning Path questions, its grade reflects
-// FIRST-ATTEMPT accuracy, matching how a calentamiento's own grade is a
-// first-attempt score. Its grade is folded into the SAME "Promedio
+// A small, focused graded practice (e.g. Gustar, prepositional pronouns).
+// Unlike Curiosidad's retry-until-correct flow, a Practice Card is answered
+// in full — freely moving between questions with Anterior/Siguiente, no
+// grading feedback at all — before a single Enviar grades the WHOLE card at
+// once (every type's own `gradeState`, see src/shared/questionTypes/index.js)
+// and shows a results screen, same submit-then-grade shape as Calentamiento's
+// "Revisar Bloque". From there the student can go back in, see every item
+// colored live as they fix things, and hit Enviar again for a better score —
+// nothing ever locks. Its grade is folded into the same "Promedio
 // Calentamientos" average students and teachers already see (see
-// src/utils/warmupBreakdown.js), and completing it for the first time
-// awards its point value as ordinary XP. Question rendering/interaction is
-// shared with Curiosidades (src/shared/questionTypes) — only this grading
-// wrapper (first-attempt accuracy %, high-score gate, flat point-per-
-// correct, folded into the warmup average) is specific to Practice Cards.
+// src/utils/warmupBreakdown.js), and completing it for the first time awards
+// its point value as ordinary XP (never re-awarded on a later resubmit).
 export default function PracticeCardEngine({ onClose }) {
   const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
@@ -29,38 +30,28 @@ export default function PracticeCardEngine({ onClose }) {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Whether every gradable item in the CURRENT question has been answered
-  // correctly (or, for one-shot types like write/listen, simply checked) —
-  // reported by the active type's Renderer via onAllCorrect(), reset
-  // whenever the question changes. Same pattern as CuriosidadQuizEngine.
-  const [currentAllCorrect, setCurrentAllCorrect] = useState(false);
+  // Whether Enviar has ever been clicked this session — gates the
+  // deferred Renderers' live green/red coloring (see the `mode: 'deferred'`
+  // contract) and whether Enviar stays available on every question (not
+  // just the last) for a quick fix-and-resubmit loop.
+  const [submitted, setSubmitted] = useState(false);
+  // Shown right after Enviar; "Revisar y Mejorar" drops back into the
+  // question flow (now colored) without losing any answers.
+  const [showResults, setShowResults] = useState(false);
 
-  // First-attempt correctness per gradable item, keyed `${questionIdx}-${itemIdx}`
-  // — only ever set once per item, so a retry after a miss doesn't change
-  // the recorded grade.
-  const firstAttemptRef = useRef({});
+  // Every question's latest answer snapshot (from its Renderer's
+  // onStateChange), keyed by question index — kept for the WHOLE card, not
+  // just the current question, since Enviar grades everything at once from
+  // whatever was last reported for each one, including questions the
+  // student isn't currently looking at.
+  const questionStatesRef = useRef({});
 
-  const [finished, setFinished] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [pointsAwarded, setPointsAwarded] = useState(0);
+  const [grade, setGrade] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
 
-  // Resuming an interrupted session (closed before finishing): restored once
-  // from the student's saved progress.practiceCards[id].inProgress record,
-  // so earlier questions aren't redone (their first-attempt grading is
-  // restored directly into firstAttemptRef) and the question they were on
-  // reopens with their exact prior answers — right ones locked, wrong ones
-  // still marked wrong — instead of blank. Cleared once the card is
-  // finished, so a deliberate retry for a better score still starts fresh.
-  const [restored, setRestored] = useState(null); // { index, questionState } | null
-  const currentQuestionStateRef = useRef(null);
   const saveTimeoutRef = useRef(null);
-
-  // Skips the very first run of the "reset currentAllCorrect on question
-  // change" effect below — otherwise it would fire on the same mount as a
-  // restored already-correct question's onAllCorrect() call and clobber it
-  // back to false (child effects run before parent effects, so the child's
-  // call always loses that race on mount).
-  const skipNextResetRef = useRef(true);
 
   useEffect(() => {
     if (!targetDia || !courseId) return;
@@ -87,10 +78,10 @@ export default function PracticeCardEngine({ onClose }) {
           if (userData?.role !== 'admin') {
             const inProgress = userData?.progress?.practiceCards?.[cardId]?.inProgress;
             if (inProgress) {
-              firstAttemptRef.current = { ...(inProgress.firstAttempts || {}) };
+              questionStatesRef.current = { ...(inProgress.questionStates || {}) };
+              setSubmitted(!!inProgress.submitted);
               const idx = Math.max(0, Math.min(inProgress.currentIndex || 0, loadedQuestions.length - 1));
               setCurrentIndex(idx);
-              setRestored({ index: idx, questionState: inProgress.questionState || null });
             }
           }
         } else {
@@ -111,18 +102,11 @@ export default function PracticeCardEngine({ onClose }) {
   const currentQ = questions[currentIndex];
   const totalItems = questions.reduce((sum, q) => sum + getItemCount(q), 0);
 
-  useEffect(() => {
-    if (skipNextResetRef.current) {
-      skipNextResetRef.current = false;
-      return;
-    }
-    setCurrentAllCorrect(false);
-  }, [currentIndex]);
-
   // Builds this card's in-progress snapshot and (debounced, or immediately
-  // when flushed) saves it to progress.practiceCards[id].inProgress — the
-  // record handleAdvance/close both update as the student answers, read back
-  // in the restore effect above.
+  // when flushed) saves it to progress.practiceCards[id].inProgress — read
+  // back in the restore effect above. Never "cleared" on finishing: the
+  // card stays resumable indefinitely, same as the saved high score itself,
+  // since the student may always come back to try for a better one.
   const saveProgress = (payload) => {
     if (!cardData?.id || !userData?.uid || userData.role === 'admin') return;
     setDoc(
@@ -132,9 +116,15 @@ export default function PracticeCardEngine({ onClose }) {
     ).catch((err) => console.error('Error saving practice progress:', err));
   };
 
-  const scheduleSave = (indexArg, questionStateArg) => {
+  const buildProgressPayload = (indexArg, submittedArg) => ({
+    currentIndex: indexArg,
+    submitted: submittedArg,
+    questionStates: { ...questionStatesRef.current },
+  });
+
+  const scheduleSave = (indexArg, submittedArg) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    const payload = { currentIndex: indexArg, firstAttempts: { ...firstAttemptRef.current }, questionState: questionStateArg };
+    const payload = buildProgressPayload(indexArg, submittedArg);
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       saveProgress(payload);
@@ -146,7 +136,7 @@ export default function PracticeCardEngine({ onClose }) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    if (!finished) saveProgress({ currentIndex, firstAttempts: { ...firstAttemptRef.current }, questionState: currentQuestionStateRef.current });
+    saveProgress(buildProgressPayload(currentIndex, submitted));
   };
 
   const handleClose = () => {
@@ -155,94 +145,81 @@ export default function PracticeCardEngine({ onClose }) {
     else navigate('/');
   };
 
-  const handleItemFirstAttempt = (itemIdx, isCorrect) => {
-    const key = `${currentIndex}-${itemIdx}`;
-    if (!(key in firstAttemptRef.current)) {
-      firstAttemptRef.current[key] = isCorrect;
-    }
-  };
-
-  const handleAllCorrect = () => setCurrentAllCorrect(true);
-
   const handleStateChange = (state) => {
-    currentQuestionStateRef.current = state;
-    scheduleSave(currentIndex, state);
+    questionStatesRef.current = { ...questionStatesRef.current, [currentIndex]: state };
+    scheduleSave(currentIndex, submitted);
   };
 
-  const handleAdvance = () => {
-    currentQuestionStateRef.current = null;
-    if (currentIndex < questions.length - 1) {
-      const next = currentIndex + 1;
-      setCurrentIndex(next);
-      scheduleSave(next, null);
-    } else {
-      setFinished(true);
-    }
+  const goTo = (nextIndex) => {
+    setCurrentIndex(nextIndex);
+    scheduleSave(nextIndex, submitted);
   };
 
-  // Auto-save the instant the final screen is reached, same as
-  // Calentamiento — no extra click required to lock in a finished session.
-  useEffect(() => {
-    if (!finished || !cardData) return;
+  // Grades every question from its latest known state (this session's
+  // onStateChange reports, or a restored one), via that type's own
+  // gradeState — the single source of truth also driving each deferred
+  // Renderer's own live coloring. Saved score only improves on a high
+  // score (never regresses on a worse resubmit); points award once, ever,
+  // from the FIRST submission's correct count.
+  const handleSubmit = async () => {
+    // Cancel any pending debounced save — otherwise a stale one scheduled
+    // just before this click (e.g. an edit made less than 800ms earlier)
+    // could still fire afterward and silently overwrite this submission's
+    // authoritative record with the pre-submit snapshot it closed over.
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
+    const perQuestionResults = questions.map((question, idx) => {
+      const mod = QUESTION_TYPES[question.type];
+      const state = questionStatesRef.current[idx];
+      return mod?.gradeState ? mod.gradeState(question, state) : [];
+    });
+    const newCorrectCount = perQuestionResults.flat().filter(Boolean).length;
+    const newGrade = totalItems > 0 ? Math.round((newCorrectCount / totalItems) * 100) : 0;
 
-    const save = async () => {
-      setSaveState('saving');
-      const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
-      const grade = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
-      const rawScore = `${correctCount}/${totalItems}`;
-      // Ranking/XP points = however many gradable items were answered
-      // correctly on this (the first, since points only ever award once
-      // below) attempt — one point per correct item, no admin-set rate or
-      // multiplier. Independent of the card's grade-pool weight
-      // (gradeWeight, used only by warmupBreakdown.js for the classwork average).
-      const points = correctCount;
+    setCorrectCount(newCorrectCount);
+    setGrade(newGrade);
+    setSubmitted(true);
+    setShowResults(true);
+    setSaveState('saving');
 
-      try {
-        const alreadyCompleted = !!userData?.progress?.practiceCards?.[cardData.id]?.completed;
-        const existingGrade = userData?.progress?.practiceCards?.[cardData.id]?.grade ?? -1;
-        const isNewHighScore = grade > existingGrade;
+    try {
+      const alreadyCompleted = !!userData?.progress?.practiceCards?.[cardData.id]?.completed;
+      const existingGrade = userData?.progress?.practiceCards?.[cardData.id]?.grade ?? -1;
+      const isNewHighScore = newGrade > existingGrade;
 
-        if (userData?.uid && userData.role !== 'admin') {
-          if (isNewHighScore) {
-            await setDoc(
-              doc(db, 'users', userData.uid),
-              {
-                progress: {
-                  practiceCards: {
-                    [cardData.id]: { completed: true, grade, rawScore, timestamp: new Date().toISOString() },
-                  },
-                },
-              },
-              { merge: true }
-            );
-          }
-          if (!alreadyCompleted && points > 0) {
-            await awardPoints(userData.uid, points);
-            setPointsAwarded(points);
-          }
-          // The session is over either way — clear any in-progress resume
-          // record so reopening this card later starts a fresh attempt
-          // (same as today's "retry for a better score" behavior) instead
-          // of restoring a now-stale snapshot.
+      if (userData?.uid && userData.role !== 'admin') {
+        if (isNewHighScore) {
           await setDoc(
             doc(db, 'users', userData.uid),
-            { progress: { practiceCards: { [cardData.id]: { inProgress: null } } } },
+            {
+              progress: {
+                practiceCards: {
+                  [cardData.id]: { completed: true, grade: newGrade, rawScore: `${newCorrectCount}/${totalItems}`, timestamp: new Date().toISOString() },
+                },
+              },
+            },
             { merge: true }
           );
         }
-        setSaveState('saved');
-      } catch (err) {
-        console.error('Error saving practice card result:', err);
-        setSaveState('error');
+        // Ranking/XP points = however many gradable items were answered
+        // correctly on the FIRST-ever submission — one point per correct
+        // item, awarded once no matter how many times the card is
+        // resubmitted afterward. Independent of the card's grade-pool
+        // weight (gradeWeight, used only by warmupBreakdown.js).
+        if (!alreadyCompleted && newCorrectCount > 0) {
+          await awardPoints(userData.uid, newCorrectCount);
+          setPointsAwarded(newCorrectCount);
+        }
+        saveProgress(buildProgressPayload(currentIndex, true));
       }
-    };
-    save();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finished, cardData]);
+      setSaveState('saved');
+    } catch (err) {
+      console.error('Error saving practice card result:', err);
+      setSaveState('error');
+    }
+  };
 
   if (loading) {
     return (
@@ -261,9 +238,7 @@ export default function PracticeCardEngine({ onClose }) {
     );
   }
 
-  if (finished) {
-    const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
-    const grade = totalItems > 0 ? Math.round((correctCount / totalItems) * 100) : 0;
+  if (showResults) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 text-center">
         <span className="text-5xl">{grade >= 70 ? '🎉' : '💪'}</span>
@@ -276,16 +251,30 @@ export default function PracticeCardEngine({ onClose }) {
         {saveState === 'error' && (
           <p className="text-rose-500 text-xs font-bold">Hubo un error al guardar. Intenta de nuevo.</p>
         )}
-        <button onClick={handleClose} className="mt-2 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest text-xs">
-          Volver al Panel
-        </button>
+        <div className="flex items-center justify-center gap-3 mt-2">
+          <button
+            onClick={() => setShowResults(false)}
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs transition-all"
+          >
+            ✏️ Revisar y Mejorar
+          </button>
+          <button onClick={handleClose} className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest text-xs">
+            🚀 Volver al Panel
+          </button>
+        </div>
       </div>
     );
   }
 
-  const progressPercent = Math.round((currentIndex / questions.length) * 100);
+  const progressPercent = Math.round(((currentIndex + 1) / questions.length) * 100);
   const TypeRenderer = QUESTION_TYPES[currentQ.type]?.Renderer;
-  const restoredState = restored && restored.index === currentIndex ? restored.questionState : undefined;
+  // Always read from the ref, not just on a Firestore-restored session —
+  // every question remounts (via its `key`) each time it's navigated away
+  // from and back to, and without this it would reset to blank and the
+  // Renderer's own mount-time onStateChange would silently wipe out
+  // whatever was already captured for it.
+  const initialState = questionStatesRef.current[currentIndex];
+  const isLast = currentIndex === questions.length - 1;
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans">
@@ -312,10 +301,10 @@ export default function PracticeCardEngine({ onClose }) {
           {TypeRenderer && (
             <TypeRenderer
               key={currentIndex}
+              mode="deferred"
               question={currentQ}
-              onItemFirstAttempt={handleItemFirstAttempt}
-              onAllCorrect={handleAllCorrect}
-              initialState={restoredState}
+              submitted={submitted}
+              initialState={initialState}
               onStateChange={handleStateChange}
             />
           )}
@@ -323,15 +312,41 @@ export default function PracticeCardEngine({ onClose }) {
       </div>
 
       <div className="flex-none border-t-2 border-slate-200 bg-white p-4 md:p-6 z-10">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-end">
-          {currentAllCorrect && (
-            <button
-              onClick={handleAdvance}
-              className="px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all animate-pulse"
-            >
-              {currentIndex < questions.length - 1 ? 'Siguiente' : 'Terminar'}
-            </button>
-          )}
+        <div className="max-w-3xl mx-auto w-full flex items-center justify-between gap-3">
+          <button
+            onClick={() => goTo(currentIndex - 1)}
+            disabled={currentIndex === 0}
+            className="px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs bg-slate-200 text-slate-600 hover:bg-slate-300 disabled:opacity-0 disabled:pointer-events-none transition-all"
+          >
+            ⬅ Anterior
+          </button>
+
+          <div className="flex items-center gap-3">
+            {submitted && (
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg bg-sky-600 hover:bg-sky-700 text-white transition-all"
+              >
+                Enviar
+              </button>
+            )}
+            {!isLast && (
+              <button
+                onClick={() => goTo(currentIndex + 1)}
+                className="px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
+              >
+                Siguiente
+              </button>
+            )}
+            {isLast && !submitted && (
+              <button
+                onClick={handleSubmit}
+                className="px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg bg-sky-600 hover:bg-sky-700 text-white transition-all animate-pulse"
+              >
+                Enviar
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

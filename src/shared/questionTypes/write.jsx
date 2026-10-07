@@ -14,7 +14,15 @@ export const getItemCount = () => 1;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+// Pure, given a {value} snapshot — see dropdownCloze.jsx's gradeState for
+// why this is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => [checkAnswerLeniently(state?.value || '', question.answer, false).correct];
+
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const [value, setValue] = useState(() => initialState?.value || '');
   const [checked, setChecked] = useState(() => initialState?.checked || false);
   const [isCorrect, setIsCorrect] = useState(() => initialState?.isCorrect || false);
@@ -72,6 +80,44 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialSt
         >
           Comprobar
         </button>
+      )}
+    </div>
+  );
+};
+
+// Plain, always-editable text input — no Comprobar step, since nothing is
+// graded until the whole card is submitted. Colored live from then on.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const [value, setValue] = useState(() => initialState?.value || '');
+
+  useEffect(() => {
+    onStateChange?.({ value });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const isCorrect = submitted ? gradeState(question, { value })[0] : null;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Escribe tu respuesta..."
+        autoFocus
+        className={`w-full border rounded-lg p-3 text-base ${
+          isCorrect === true
+            ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
+            : isCorrect === false
+            ? 'border-rose-400 bg-rose-50 text-rose-800'
+            : 'border-slate-300'
+        }`}
+      />
+      {isCorrect === false && (
+        <p className="text-sm text-rose-600">
+          Respuesta correcta: <span className="font-bold">{question.answer}</span>
+        </p>
       )}
     </div>
   );
