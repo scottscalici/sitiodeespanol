@@ -80,6 +80,7 @@ export default function LessonPlanPage() {
               {d.word_of_the_day?.word && (
                 <> — palabra del día: <span className="italic">{d.word_of_the_day.word}</span>{d.word_of_the_day.translation ? ` (${d.word_of_the_day.translation})` : ''}</>
               )}
+              {d.spanish && <p className="font-normal text-gray-700 mt-1">{d.spanish}</p>}
             </li>
           ))}
         </ul>
