@@ -170,15 +170,26 @@ export default function MasterDashboard() {
           const worksheetTitle = jsonData.worksheet.title;
           for (const textObj of jsonData.worksheet.texts) {
             const convertedData = {
-              titulo: textObj.title,
-              subtitulo: worksheetTitle,
+              subtitulo: textObj.title || worksheetTitle,
               text_id: textObj.text_id || "",
-              test_id: jsonData.worksheet.test_id || "",
-              type: "ib_paper_2",
+              test_id: jsonData.worksheet.test_id || worksheetTitle || "",
+              dia: "",
               paragraphs: textObj.paragraphs || [],
-              question_sections: textObj.question_sections || [],
-              dias: [],
-              isNew: false
+              // "correction" sections are just the author's own answer-key
+              // patch notes for a preceding multiple_select section, not
+              // student-facing content — drop them. A question's answer can
+              // also be an array (multiple_select, e.g. ["A","C","D"]); join
+              // it to a string since LecturaPage grades every type with a
+              // plain string compare.
+              question_sections: (textObj.question_sections || [])
+                .filter((sec) => sec.type !== "correction")
+                .map((sec) => ({
+                  ...sec,
+                  questions: (sec.questions || []).map((q) => ({
+                    ...q,
+                    answer: Array.isArray(q.answer) ? q.answer.join(", ") : q.answer,
+                  })),
+                })),
             };
 
             const docId = `${worksheetTitle}-${textObj.text_id}`
@@ -186,7 +197,7 @@ export default function MasterDashboard() {
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/(^-|-$)/g, '');
 
-            await setDoc(doc(db, "lectura", docId), convertedData, { merge: true });
+            await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
           }
           alert(`Se han convertido y subido ${jsonData.worksheet.texts.length} textos con éxito.`);
         }
