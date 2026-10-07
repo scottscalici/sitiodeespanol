@@ -15,6 +15,7 @@ const LecturasSequencer = () => {
   const [masterSchedule, setMasterSchedule] = useState({ ib: {}, s2: {}, s4: {} });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
+  const [filterText, setFilterText] = useState('');
 
   // 1. Fetch Master Schedule and Available Readings
   useEffect(() => {
@@ -114,6 +115,11 @@ const LecturasSequencer = () => {
     return <div className="text-white text-center p-10 font-bold animate-pulse uppercase tracking-widest">Cargando Lecturas Sequencer...</div>;
   }
 
+  const q = filterText.trim().toLowerCase();
+  const filteredLecturas = q
+    ? availableLecturas.filter(l => `${l.subtitulo} ${l.testId} ${l.textId}`.toLowerCase().includes(q))
+    : availableLecturas;
+
   return (
     <div className="max-w-6xl mx-auto p-6 text-white font-sans grid grid-cols-1 lg:grid-cols-2 gap-8">
       
@@ -153,11 +159,20 @@ const LecturasSequencer = () => {
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
               Textos de Lectura Disponibles
             </label>
+            <input
+              type="text"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder="Buscar por título o examen..."
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white mb-2 outline-none focus:border-cyan-500"
+            />
             <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 max-h-[250px] overflow-y-auto space-y-2">
               {availableLecturas.length === 0 ? (
                 <p className="text-xs text-slate-500 italic text-center py-4">No hay lecturas creadas todavía.</p>
+              ) : filteredLecturas.length === 0 ? (
+                <p className="text-xs text-slate-500 italic text-center py-4">Sin resultados para "{filterText}".</p>
               ) : (
-                availableLecturas.map(lectura => (
+                filteredLecturas.map(lectura => (
                   <label key={lectura.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition-colors">
                     <input 
                       type="checkbox" 

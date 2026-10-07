@@ -173,6 +173,7 @@ export default function MasterDashboard() {
               subtitulo: textObj.title || worksheetTitle,
               text_id: textObj.text_id || "",
               test_id: jsonData.worksheet.test_id || worksheetTitle || "",
+              type: "ib_paper_2",
               dia: "",
               paragraphs: textObj.paragraphs || [],
               // "correction" sections are just the author's own answer-key
@@ -200,6 +201,64 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
           }
           alert(`Se han convertido y subido ${jsonData.worksheet.texts.length} textos con éxito.`);
+        }
+        // --- DETECTAR FORMATO LECTURA CULTURAL (Array de topics con niveles) ---
+        else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].topicName !== undefined && jsonData[0].levels !== undefined) {
+          // Only the Spanish-language tiers make sense as reading-comprehension
+          // practice — level_1 is written in English (a scaffolding tier), so
+          // it's intentionally skipped here.
+          const LEVELS_TO_IMPORT = [
+            { key: "level_2", label: "Nivel 2" },
+            { key: "level_3", label: "Nivel 3" },
+          ];
+          let count = 0;
+          const topicNameCounts = {};
+          for (const topic of jsonData) {
+            // A few topicNames repeat in the source file with genuinely
+            // different content (e.g. two different write-ups both titled
+            // "Cartagena de Indias") — suffix the docId so the second one
+            // doesn't silently overwrite the first.
+            const slugBase = (topicNameCounts[topic.topicName] = (topicNameCounts[topic.topicName] || 0) + 1);
+            const topicSlug = slugBase > 1 ? `${topic.topicName}-v${slugBase}` : topic.topicName;
+
+            for (const { key, label } of LEVELS_TO_IMPORT) {
+              const levelData = topic.levels?.[key];
+              if (!levelData) continue;
+
+              const convertedData = {
+                subtitulo: topic.topicName,
+                text_id: label,
+                test_id: "Lectura Cultural",
+                type: "cultural",
+                dia: "",
+                paragraphs: (levelData.readingText || "")
+                  .split("\n\n")
+                  .map((p) => p.trim())
+                  .filter(Boolean),
+                question_sections: [
+                  {
+                    type: "short_answer",
+                    instructions: levelData.instruction || "",
+                    questions: (levelData.questions || []).map((prompt, i) => ({
+                      number: i + 1,
+                      prompt,
+                      answer: (levelData.answerKey || [])[i] || "",
+                      points: 1,
+                    })),
+                  },
+                ],
+              };
+
+              const docId = `${topicSlug}-${key}`
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '');
+
+              await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
+              count++;
+            }
+          }
+          alert(`¡Éxito! Se han importado ${count} lecturas culturales.`);
         }
         // --- DETECTAR FORMATO DESTACADO DIARIO (Array) ---
         else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].dia !== undefined) {
@@ -278,7 +337,7 @@ export default function MasterDashboard() {
         }
         // --- SI NO RECONOCE NINGÚN FORMATO ---
         else {
-          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Destacado Diario, Temas, Videos, o Conversaciones (items).");
+          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Lectura Cultural, Destacado Diario, Temas, Videos, o Conversaciones (items).");
         }
 
         fetchData();
