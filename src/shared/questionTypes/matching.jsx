@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 import { shuffle } from './clozeShared';
 
@@ -32,14 +32,26 @@ export const reconstructQuestion = (q) =>
 // the caller changes its `key` (e.g. on navigating to a different question).
 // Calls onItemFirstAttempt(pairIdx, isCorrect) once per pair's first attempt,
 // and onAllCorrect() once every pair has been matched.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
-  const [matchedPairIdx, setMatchedPairIdx] = useState([]);
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const [matchedPairIdx, setMatchedPairIdx] = useState(() => initialState?.matchedPairIdx || []);
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
   const [shuffledAnswers] = useState(() =>
     shuffle(question.pairs.map((p) => p.answer).concat(question.distractors || []))
   );
   const [wrongFlashIdx, setWrongFlashIdx] = useState(null);
   const attemptedRef = React.useRef({});
+
+  // Resuming an already-fully-matched question re-shows the advance
+  // control right away, without requiring another match.
+  useEffect(() => {
+    if (initialState?.matchedPairIdx?.length === question.pairs.length) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ matchedPairIdx });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedPairIdx]);
 
   const handleSelectLeft = (pairIdx) => {
     if (matchedPairIdx.includes(pairIdx)) return;

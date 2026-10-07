@@ -44,6 +44,24 @@ export default function PracticeCardEngine({ onClose }) {
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [pointsAwarded, setPointsAwarded] = useState(0);
 
+  // Resuming an interrupted session (closed before finishing): restored once
+  // from the student's saved progress.practiceCards[id].inProgress record,
+  // so earlier questions aren't redone (their first-attempt grading is
+  // restored directly into firstAttemptRef) and the question they were on
+  // reopens with their exact prior answers — right ones locked, wrong ones
+  // still marked wrong — instead of blank. Cleared once the card is
+  // finished, so a deliberate retry for a better score still starts fresh.
+  const [restored, setRestored] = useState(null); // { index, questionState } | null
+  const currentQuestionStateRef = useRef(null);
+  const saveTimeoutRef = useRef(null);
+
+  // Skips the very first run of the "reset currentAllCorrect on question
+  // change" effect below — otherwise it would fire on the same mount as a
+  // restored already-correct question's onAllCorrect() call and clobber it
+  // back to false (child effects run before parent effects, so the child's
+  // call always loses that race on mount).
+  const skipNextResetRef = useRef(true);
+
   useEffect(() => {
     if (!targetDia || !courseId) return;
     const fetchCard = async () => {
@@ -57,12 +75,24 @@ export default function PracticeCardEngine({ onClose }) {
         );
         const snap = await getDocs(q);
         if (!snap.empty) {
+          const cardId = snap.docs[0].id;
           const data = snap.docs[0].data();
-          setCardData({
-            id: snap.docs[0].id,
-            ...data,
-            questions: (data.questions || []).map(normalizeLegacyPracticeQuestion),
-          });
+          const loadedQuestions = (data.questions || []).map(normalizeLegacyPracticeQuestion);
+          setCardData({ id: cardId, ...data, questions: loadedQuestions });
+
+          // Restoring an interrupted session: applied here, synchronously
+          // alongside setCardData (same batch, before the loading spinner
+          // clears), so the UI never flashes question 1 before snapping to
+          // a restored later question on a separate render.
+          if (userData?.role !== 'admin') {
+            const inProgress = userData?.progress?.practiceCards?.[cardId]?.inProgress;
+            if (inProgress) {
+              firstAttemptRef.current = { ...(inProgress.firstAttempts || {}) };
+              const idx = Math.max(0, Math.min(inProgress.currentIndex || 0, loadedQuestions.length - 1));
+              setCurrentIndex(idx);
+              setRestored({ index: idx, questionState: inProgress.questionState || null });
+            }
+          }
         } else {
           setNotFound(true);
         }
@@ -74,6 +104,7 @@ export default function PracticeCardEngine({ onClose }) {
       }
     };
     fetchCard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetDia, courseId]);
 
   const questions = cardData?.questions || [];
@@ -81,10 +112,45 @@ export default function PracticeCardEngine({ onClose }) {
   const totalItems = questions.reduce((sum, q) => sum + getItemCount(q), 0);
 
   useEffect(() => {
+    if (skipNextResetRef.current) {
+      skipNextResetRef.current = false;
+      return;
+    }
     setCurrentAllCorrect(false);
   }, [currentIndex]);
 
+  // Builds this card's in-progress snapshot and (debounced, or immediately
+  // when flushed) saves it to progress.practiceCards[id].inProgress — the
+  // record handleAdvance/close both update as the student answers, read back
+  // in the restore effect above.
+  const saveProgress = (payload) => {
+    if (!cardData?.id || !userData?.uid || userData.role === 'admin') return;
+    setDoc(
+      doc(db, 'users', userData.uid),
+      { progress: { practiceCards: { [cardData.id]: { inProgress: payload } } } },
+      { merge: true }
+    ).catch((err) => console.error('Error saving practice progress:', err));
+  };
+
+  const scheduleSave = (indexArg, questionStateArg) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    const payload = { currentIndex: indexArg, firstAttempts: { ...firstAttemptRef.current }, questionState: questionStateArg };
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      saveProgress(payload);
+    }, 800);
+  };
+
+  const flushSave = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    if (!finished) saveProgress({ currentIndex, firstAttempts: { ...firstAttemptRef.current }, questionState: currentQuestionStateRef.current });
+  };
+
   const handleClose = () => {
+    flushSave();
     if (onClose) onClose();
     else navigate('/');
   };
@@ -98,9 +164,17 @@ export default function PracticeCardEngine({ onClose }) {
 
   const handleAllCorrect = () => setCurrentAllCorrect(true);
 
+  const handleStateChange = (state) => {
+    currentQuestionStateRef.current = state;
+    scheduleSave(currentIndex, state);
+  };
+
   const handleAdvance = () => {
+    currentQuestionStateRef.current = null;
     if (currentIndex < questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
+      const next = currentIndex + 1;
+      setCurrentIndex(next);
+      scheduleSave(next, null);
     } else {
       setFinished(true);
     }
@@ -110,6 +184,10 @@ export default function PracticeCardEngine({ onClose }) {
   // Calentamiento — no extra click required to lock in a finished session.
   useEffect(() => {
     if (!finished || !cardData) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
 
     const save = async () => {
       setSaveState('saving');
@@ -146,6 +224,15 @@ export default function PracticeCardEngine({ onClose }) {
             await awardPoints(userData.uid, points);
             setPointsAwarded(points);
           }
+          // The session is over either way — clear any in-progress resume
+          // record so reopening this card later starts a fresh attempt
+          // (same as today's "retry for a better score" behavior) instead
+          // of restoring a now-stale snapshot.
+          await setDoc(
+            doc(db, 'users', userData.uid),
+            { progress: { practiceCards: { [cardData.id]: { inProgress: null } } } },
+            { merge: true }
+          );
         }
         setSaveState('saved');
       } catch (err) {
@@ -198,6 +285,7 @@ export default function PracticeCardEngine({ onClose }) {
 
   const progressPercent = Math.round((currentIndex / questions.length) * 100);
   const TypeRenderer = QUESTION_TYPES[currentQ.type]?.Renderer;
+  const restoredState = restored && restored.index === currentIndex ? restored.questionState : undefined;
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans">
@@ -227,6 +315,8 @@ export default function PracticeCardEngine({ onClose }) {
               question={currentQ}
               onItemFirstAttempt={handleItemFirstAttempt}
               onAllCorrect={handleAllCorrect}
+              initialState={restoredState}
+              onStateChange={handleStateChange}
             />
           )}
         </div>

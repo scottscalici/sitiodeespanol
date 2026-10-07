@@ -12,15 +12,28 @@ export const getItemCount = () => 1;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
-  const [value, setValue] = useState('');
-  const [checked, setChecked] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const [value, setValue] = useState(() => initialState?.value || '');
+  const [checked, setChecked] = useState(() => initialState?.checked || false);
+  const [isCorrect, setIsCorrect] = useState(() => initialState?.isCorrect || false);
   const attemptedRef = React.useRef(false);
 
   useEffect(() => {
     playAudio(question.prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.prompt]);
+
+  // Resuming an already-checked question re-shows the advance control
+  // right away, without requiring another check.
+  useEffect(() => {
+    if (initialState?.checked) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ value, checked, isCorrect });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, checked, isCorrect]);
 
   const handleCheck = () => {
     if (checked || !value.trim()) return;

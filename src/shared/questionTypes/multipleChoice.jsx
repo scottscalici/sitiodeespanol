@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { shuffle } from './clozeShared';
 
 export const TYPE_KEY = 'multiple_choice';
@@ -39,11 +39,23 @@ export const parseBulkRowPlain = (line) => {
 // Resolves the instant you click an option — one gradable item, first-
 // attempt-only, lock on correct. Options render as a responsive grid: 2 or 4
 // side-by-side pairs (4 wraps into a 2x2 block), 3 all in one row.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
-  const [selectedIdx, setSelectedIdx] = useState(null);
-  const [done, setDone] = useState(false);
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx ?? null);
+  const [done, setDone] = useState(() => initialState?.done || false);
   const [wrongFlash, setWrongFlash] = useState(false);
   const attemptedRef = React.useRef(false);
+
+  // Resuming an already-resolved question re-shows the advance control
+  // right away, without requiring another click.
+  useEffect(() => {
+    if (initialState?.done) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx, done });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx, done]);
 
   const handleSelect = (oIdx) => {
     if (done) return;

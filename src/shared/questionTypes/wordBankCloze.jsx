@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 import { renderClozeText, ClozeChrome, sameWord, buildWordBank } from './clozeShared';
 import { parseLines, parseAnswerTokens } from './text';
@@ -39,12 +39,24 @@ export const reconstructQuestion = (q) => {
 // submit-then-grade model as dropdown_cloze — a word only leaves the shared
 // bank once Revisar actually confirms it's correct, not the instant it's
 // picked.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const blankCount = question.answers.length;
-  const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
-  const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
-  const [wrongAttempted, setWrongAttempted] = useState(() => Array(blankCount).fill(false));
+  const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
+  const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
+  const [wrongAttempted, setWrongAttempted] = useState(() => initialState?.wrongAttempted || Array(blankCount).fill(false));
   const attemptedRef = React.useRef({});
+
+  // Resuming an already-fully-correct question re-shows the advance
+  // control right away, without requiring another Revisar click.
+  useEffect(() => {
+    if (initialState?.correct?.length && initialState.correct.every(Boolean)) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selections, correct, wrongAttempted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections, correct, wrongAttempted]);
 
   const handleSelect = (blankIdx, value) => {
     if (correct[blankIdx]) return;

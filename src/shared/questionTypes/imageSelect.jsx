@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 
 export const TYPE_KEY = 'image_select';
@@ -22,12 +22,24 @@ export const reconstructQuestion = (q) => q;
 // Single-correct-answer questions resolve the instant you click one option;
 // multi-correct ones let you toggle several, then confirm. Either way, one
 // gradable item (itemIdx 0), first-attempt-only, lock on correct.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
+export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const isMultiSelect = (question.correctIndices || []).length > 1;
-  const [selectedIdx, setSelectedIdx] = useState([]);
-  const [done, setDone] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx || []);
+  const [done, setDone] = useState(() => initialState?.done || false);
   const [wrongFlash, setWrongFlash] = useState(false);
   const attemptedRef = React.useRef(false);
+
+  // Resuming an already-resolved question re-shows the advance control
+  // right away, without requiring another selection.
+  useEffect(() => {
+    if (initialState?.done) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx, done });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx, done]);
 
   const recordAttempt = (selection) => {
     const isCorrect = [...question.correctIndices].sort().join(',') === [...selection].sort().join(',');

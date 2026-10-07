@@ -3,13 +3,21 @@
 // by its `type` string, never by importing a type's internals directly.
 // Each entry: { Renderer, Editor, getItemCount, emptyQuestion, finalizeQuestion, reconstructQuestion, TYPE_LABEL }.
 //
-// Renderer contract: <Renderer question={q} onItemFirstAttempt={(itemIdx, isCorrect) => void} onAllCorrect={() => void} />
+// Renderer contract: <Renderer question={q} onItemFirstAttempt={(itemIdx, isCorrect) => void} onAllCorrect={() => void} initialState={state?} onStateChange={(state) => void} />
 //   Self-contained — owns its own interaction state, remounts fresh when the
 //   caller changes its `key` (e.g. navigating to a different question).
 //   Calls onItemFirstAttempt once per gradable item's first attempt, and
 //   onAllCorrect once every item in the question is correct. The caller
 //   builds its own grading keys/points from those two callbacks; nothing
 //   type-specific leaks out.
+//   `initialState`/`onStateChange` are optional and only used by Practice
+//   Cards to resume an interrupted session: `initialState`, when given,
+//   hydrates the Renderer's own internal state instead of starting blank
+//   (and fires onAllCorrect() once on mount if that restores an
+//   already-fully-correct question), and `onStateChange` is called with a
+//   plain, type-owned snapshot of that same internal state on every change,
+//   for the caller to persist. A caller that doesn't care about resuming
+//   (Curiosidad) simply never passes them.
 //
 // Editor contract: <Editor question={q} onChange={(patch) => void} instanceId={...} showCategory={...} />
 //   Renders the admin authoring UI for one question; calls onChange with a
