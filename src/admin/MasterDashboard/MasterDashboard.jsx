@@ -155,16 +155,9 @@ export default function MasterDashboard() {
     }
   };
 
-  const handleJSONUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setIsUploading(true);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const jsonData = JSON.parse(e.target.result);
-
+  // Parses and imports a single already-parsed JSON blob, auto-detecting its
+  // format. Returns a one-line summary string for the batch-upload alert.
+  const processOneJSONUpload = async (jsonData) => {
         // --- DETECTAR FORMATO BUNDLE IB ---
         if (jsonData.worksheet) {
           const worksheetTitle = jsonData.worksheet.title;
@@ -200,7 +193,7 @@ export default function MasterDashboard() {
 
             await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
           }
-          alert(`Se han convertido y subido ${jsonData.worksheet.texts.length} textos con éxito.`);
+          return `${jsonData.worksheet.texts.length} textos (worksheet IB)`;
         }
         // --- DETECTAR FORMATO LECTURA CULTURAL (Array de topics con niveles) ---
         else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].topicName !== undefined && jsonData[0].levels !== undefined) {
@@ -258,7 +251,7 @@ export default function MasterDashboard() {
               count++;
             }
           }
-          alert(`¡Éxito! Se han importado ${count} lecturas culturales.`);
+          return `${count} lecturas culturales`;
         }
         // --- DETECTAR FORMATO DESTACADO DIARIO (Array) ---
         else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].dia !== undefined) {
@@ -268,7 +261,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "destacado_diario", docId), item, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} destacados diarios.`);
+          return `${count} destacados diarios`;
         }
         // --- DETECTAR FORMATO TEMAS (THEMES) ---
         else if (jsonData.themes && Array.isArray(jsonData.themes)) {
@@ -283,7 +276,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "temas", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} temas a la base de datos.`);
+          return `${count} temas`;
         }
         // --- DETECTAR FORMATO VIDEOS (daily_tags) ---
         else if (jsonData.daily_tags && Array.isArray(jsonData.daily_tags)) {
@@ -298,7 +291,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "videos", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} videos a la base de datos.`);
+          return `${count} videos`;
         }
         // --- DETECTAR FORMATO CONVERSACIONES (items map, ej: planes/conversaciones.json) ---
         else if (jsonData.items && typeof jsonData.items === 'object' && !Array.isArray(jsonData.items)) {
@@ -333,21 +326,37 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han importado ${count} lecciones de conversación.`);
+          return `${count} lecciones de conversación`;
         }
         // --- SI NO RECONOCE NINGÚN FORMATO ---
-        else {
-          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Lectura Cultural, Destacado Diario, Temas, Videos, o Conversaciones (items).");
-        }
+        return null;
+  };
 
-        fetchData();
+  // Single or multi-file JSON upload. Each file is parsed and routed through
+  // processOneJSONUpload independently, so one bad file in a batch doesn't
+  // abort the rest — results are rolled up into one summary alert.
+  const handleJSONUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setIsUploading(true);
+
+    const results = [];
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const jsonData = JSON.parse(text);
+        const summary = await processOneJSONUpload(jsonData);
+        results.push(summary ? `✅ ${file.name}: ${summary}` : `⚠️ ${file.name}: formato no reconocido`);
       } catch (error) {
-        console.error("Error en carga:", error);
-        alert("Error al procesar el JSON.");
+        console.error(`Error en carga de ${file.name}:`, error);
+        results.push(`❌ ${file.name}: error al procesar`);
       }
-      setIsUploading(false);
-    };
-    reader.readAsText(file);
+    }
+
+    fetchData();
+    setIsUploading(false);
+    alert(results.join('\n'));
+    event.target.value = '';
   };
   // IA PREP Parser
   const handleHTMLUpload = async (event) => {
@@ -452,7 +461,8 @@ export default function MasterDashboard() {
             </button>
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#eee', borderRadius: '4px' }}>
               <h4>Upload JSON</h4>
-              <input type="file" accept=".json" onChange={handleJSONUpload} />
+              <input type="file" accept=".json" multiple onChange={handleJSONUpload} />
+              <p style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Puedes seleccionar varios archivos a la vez (ej: los 24 de IB).</p>
             </div>
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
               <h4>Import IA HTML</h4>
