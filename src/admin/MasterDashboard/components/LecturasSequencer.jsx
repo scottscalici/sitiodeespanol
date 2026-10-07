@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 
 const LecturasSequencer = () => {
@@ -15,6 +15,10 @@ const LecturasSequencer = () => {
   const [masterSchedule, setMasterSchedule] = useState({ ib: {}, s2: {}, s4: {} });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
+  const [filterText, setFilterText] = useState('');
+  // Whether curriculum_tracks/lecturas_master exists yet — updateDoc throws
+  // on a missing doc, so the very first-ever save has to use setDoc instead.
+  const [masterDocExists, setMasterDocExists] = useState(false);
 
   // 1. Fetch Master Schedule and Available Readings
   useEffect(() => {
@@ -23,7 +27,7 @@ const LecturasSequencer = () => {
       try {
         const masterRef = doc(db, 'curriculum_tracks', 'lecturas_master');
         const masterSnap = await getDoc(masterRef);
-        
+
         if (masterSnap.exists()) {
           const data = masterSnap.data();
           setMasterSchedule({
@@ -31,6 +35,7 @@ const LecturasSequencer = () => {
             s2: data.s2 || {},
             s4: data.s4 || {}
           });
+          setMasterDocExists(true);
         }
 
         // Fetch reading documents from 'lecturas' collection
@@ -79,27 +84,40 @@ const LecturasSequencer = () => {
       return;
     }
 
-    const updatedCourseSchedule = { ...masterSchedule[course] };
-
-    for (let i = start; i <= end; i++) {
-      if (selectedLecturas.length === 0) {
-        delete updatedCourseSchedule[i.toString()];
-      } else {
-        updatedCourseSchedule[i.toString()] = [...selectedLecturas];
-      }
-    }
-
-    const updatedMaster = {
-      ...masterSchedule,
-      [course]: updatedCourseSchedule
-    };
-
     try {
       setStatus('Guardando...');
       const masterRef = doc(db, 'curriculum_tracks', 'lecturas_master');
-      await setDoc(masterRef, updatedMaster, { merge: true });
-      
-      setMasterSchedule(updatedMaster);
+
+      if (masterDocExists) {
+        // updateDoc's dot-path targeting is what makes clearing a day
+        // actually work: deleteField() on "course.day" removes just that
+        // nested key. (setDoc+merge would silently do nothing here, since
+        // merge only touches keys you explicitly send — a day simply
+        // missing from the payload is left as-is, not deleted.)
+        const updateData = {};
+        for (let i = start; i <= end; i++) {
+          updateData[`${course}.${i}`] = selectedLecturas.length === 0 ? deleteField() : [...selectedLecturas];
+        }
+        await updateDoc(masterRef, updateData);
+      } else {
+        // First-ever save: nothing to clear yet, just create the doc.
+        const initialCourseSchedule = {};
+        for (let i = start; i <= end; i++) {
+          if (selectedLecturas.length > 0) initialCourseSchedule[i.toString()] = [...selectedLecturas];
+        }
+        await setDoc(masterRef, { [course]: initialCourseSchedule }, { merge: true });
+        setMasterDocExists(true);
+      }
+
+      const updatedCourseSchedule = { ...masterSchedule[course] };
+      for (let i = start; i <= end; i++) {
+        if (selectedLecturas.length === 0) {
+          delete updatedCourseSchedule[i.toString()];
+        } else {
+          updatedCourseSchedule[i.toString()] = [...selectedLecturas];
+        }
+      }
+      setMasterSchedule(prev => ({ ...prev, [course]: updatedCourseSchedule }));
       setStatus(`¡Éxito! Lecturas actualizadas del Día ${start} al ${end}.`);
       setStartDay('');
       setEndDay('');
@@ -110,9 +128,43 @@ const LecturasSequencer = () => {
     }
   };
 
+  // Quick single-entry removal from the preview panel — lets you fix a
+  // single wrongly-assigned day (e.g. assigned under the wrong course)
+  // without having to re-enter a day range and an empty checklist.
+  const handleRemoveFromDay = async (day, lecturaId) => {
+    const dayKey = day.toString();
+    const current = masterSchedule[course]?.[dayKey] || [];
+    const filtered = current.filter(id => id !== lecturaId);
+
+    try {
+      const masterRef = doc(db, 'curriculum_tracks', 'lecturas_master');
+      const fieldPath = `${course}.${dayKey}`;
+      await updateDoc(masterRef, { [fieldPath]: filtered.length === 0 ? deleteField() : filtered });
+
+      setMasterSchedule(prev => {
+        const updatedCourseSchedule = { ...prev[course] };
+        if (filtered.length === 0) {
+          delete updatedCourseSchedule[dayKey];
+        } else {
+          updatedCourseSchedule[dayKey] = filtered;
+        }
+        return { ...prev, [course]: updatedCourseSchedule };
+      });
+      setStatus(`Quitado del Día ${day}.`);
+    } catch (error) {
+      console.error('Error removing lectura from day:', error);
+      setStatus('Error al quitar la lectura de ese día.');
+    }
+  };
+
   if (loading) {
     return <div className="text-white text-center p-10 font-bold animate-pulse uppercase tracking-widest">Cargando Lecturas Sequencer...</div>;
   }
+
+  const q = filterText.trim().toLowerCase();
+  const filteredLecturas = q
+    ? availableLecturas.filter(l => `${l.subtitulo} ${l.testId} ${l.textId}`.toLowerCase().includes(q))
+    : availableLecturas;
 
   return (
     <div className="max-w-6xl mx-auto p-6 text-white font-sans grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -153,11 +205,20 @@ const LecturasSequencer = () => {
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
               Textos de Lectura Disponibles
             </label>
+            <input
+              type="text"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder="Buscar por título o examen..."
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white mb-2 outline-none focus:border-cyan-500"
+            />
             <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 max-h-[250px] overflow-y-auto space-y-2">
               {availableLecturas.length === 0 ? (
                 <p className="text-xs text-slate-500 italic text-center py-4">No hay lecturas creadas todavía.</p>
+              ) : filteredLecturas.length === 0 ? (
+                <p className="text-xs text-slate-500 italic text-center py-4">Sin resultados para "{filterText}".</p>
               ) : (
-                availableLecturas.map(lectura => (
+                filteredLecturas.map(lectura => (
                   <label key={lectura.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition-colors">
                     <input 
                       type="checkbox" 
@@ -203,11 +264,22 @@ const LecturasSequencer = () => {
                   {day}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {activeLecturas.map(lId => (
-                    <span key={lId} className="bg-slate-950 border border-cyan-500/30 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">
-                      {lId}
-                    </span>
-                  ))}
+                  {activeLecturas.map(lId => {
+                    const info = availableLecturas.find(l => l.id === lId);
+                    return (
+                      <span key={lId} className="bg-slate-950 border border-cyan-500/30 text-slate-300 text-[10px] font-bold pl-3 pr-1.5 py-1 rounded-full shadow-sm inline-flex items-center gap-1.5">
+                        {info ? `Texto ${info.textId} — ${info.subtitulo}` : lId}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFromDay(day, lId)}
+                          title="Quitar de este día"
+                          className="text-rose-400 hover:text-rose-200 hover:bg-rose-900/60 rounded-full w-4 h-4 flex items-center justify-center text-xs leading-none"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             );

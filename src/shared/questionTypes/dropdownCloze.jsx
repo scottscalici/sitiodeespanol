@@ -14,38 +14,71 @@ export const reconstructQuestion = (q) => q;
 
 // --- Student-facing renderer ---
 // Each blank has its own independent option list (unlike word_bank_cloze's
-// shared bank) and locks once answered correctly, first-attempt-only.
+// shared bank) and locks once answered correctly. Grading is deferred to an
+// explicit "Revisar" click (not on every selection) so a student can fill
+// in every blank before anything is checked — same submit-then-grade model
+// as Calentamiento's "Revisar Bloque", rather than judging each pick the
+// instant it's made. The first REVISAR that touches a given blank is what
+// counts as its "first attempt" for scoring, not the dropdown selection
+// itself — re-picking a wrong blank and re-submitting doesn't re-trigger it.
 export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   const blankCount = question.blanks.length;
   const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
-  const [wrongFlash, setWrongFlash] = useState(null);
+  const [wrongAttempted, setWrongAttempted] = useState(() => Array(blankCount).fill(false));
   const attemptedRef = React.useRef({});
 
   const handleSelect = (blankIdx, value) => {
     if (correct[blankIdx]) return;
-    const isCorrect = question.blanks[blankIdx].answer === value;
-
-    if (!attemptedRef.current[blankIdx]) {
-      attemptedRef.current[blankIdx] = true;
-      onItemFirstAttempt(blankIdx, isCorrect);
-    }
-
     setSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
-    if (isCorrect) {
-      const next = correct.map((c, i) => (i === blankIdx ? true : c));
-      setCorrect(next);
-      if (next.every(Boolean)) onAllCorrect();
-    } else {
-      setWrongFlash(blankIdx);
-      setTimeout(() => setWrongFlash(null), 400);
-    }
+    // Picking something new clears any stale "wrong" mark until re-checked.
+    setWrongAttempted((prev) => prev.map((w, i) => (i === blankIdx ? false : w)));
   };
 
+  const handleRevisar = () => {
+    const nextCorrect = [...correct];
+    const nextWrong = [...wrongAttempted];
+
+    question.blanks.forEach((blank, i) => {
+      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
+      const isCorrect = blank.answer === selections[i];
+
+      if (!attemptedRef.current[i]) {
+        attemptedRef.current[i] = true;
+        onItemFirstAttempt(i, isCorrect);
+      }
+
+      if (isCorrect) {
+        nextCorrect[i] = true;
+        nextWrong[i] = false;
+      } else {
+        nextWrong[i] = true;
+      }
+    });
+
+    setCorrect(nextCorrect);
+    setWrongAttempted(nextWrong);
+    if (nextCorrect.every(Boolean)) onAllCorrect();
+  };
+
+  const allCorrect = correct.every(Boolean);
+
   return (
-    <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
-      {renderClozeText(question.text, selections, correct, wrongFlash, handleSelect, (blankIdx) => question.blanks[blankIdx]?.options || [])}
-    </ClozeChrome>
+    <div>
+      <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
+        {renderClozeText(question.text, selections, correct, wrongAttempted, handleSelect, (blankIdx) => question.blanks[blankIdx]?.options || [])}
+      </ClozeChrome>
+      {!allCorrect && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleRevisar}
+            className="bg-sky-600 hover:bg-sky-700 text-white font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl transition-colors"
+          >
+            Revisar
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -403,7 +403,7 @@ const DailyPlanHub = () => {
                     {activeConversaciones.length}
                   </span>
                 </div>
-                <Link to="/admin-secret-portal-master?tipo=conversaciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
+                <Link to="/admin-daily-plan-conversaciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
               </div>
               <div className="space-y-3">
                 {activeConversaciones.length === 0 ? (

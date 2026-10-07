@@ -280,6 +280,7 @@ const VocabVault = () => {
       edit_evaluacion: !!wordObj?.metadata?.evaluacion,
       edit_ib_tags: tagsToText(wordObj?.metadata?.ib_tags),
       edit_usage_tags: tagsToText(wordObj?.usage_tags),
+      edit_alt_answers: tagsToText(wordObj?.alt_answers),
       def1_text: safelyGetText(wordObj?.definiciones?.nivel1),
       def2_text: safelyGetText(wordObj?.definiciones?.nivel2),
       def3_text: safelyGetText(wordObj?.definiciones?.nivel3)
@@ -299,6 +300,7 @@ const VocabVault = () => {
       edit_evaluacion: false,
       edit_ib_tags: "",
       edit_usage_tags: "",
+      edit_alt_answers: "",
       def1_text: "",
       def2_text: "",
       def3_text: ""
@@ -323,6 +325,7 @@ const VocabVault = () => {
         ...editingWord,
         metadata,
         usage_tags: textToTags(editingWord.edit_usage_tags),
+        alt_answers: textToTags(editingWord.edit_alt_answers),
         definiciones: {
           nivel1: (editingWord.def1_text || "").split('\n').filter(t => t.trim() !== ''),
           nivel2: (editingWord.def2_text || "").split('\n').filter(t => t.trim() !== ''),
@@ -334,6 +337,7 @@ const VocabVault = () => {
       delete updatedData.edit_textbook; delete updatedData.edit_section;
       delete updatedData.edit_tipo; delete updatedData.edit_evaluacion;
       delete updatedData.edit_ib_tags; delete updatedData.edit_usage_tags;
+      delete updatedData.edit_alt_answers;
       delete updatedData.isNew;
 
       if (editingWord.isNew) {
@@ -647,6 +651,7 @@ const VocabVault = () => {
                  )}
                  <div style={{display: 'flex', gap: '10px'}}><div style={s.inputBox}><label style={s.label}>Textbook</label><input value={editingWord.edit_textbook} onChange={e=>setEditingWord({...editingWord, edit_textbook: e.target.value})} style={s.inputLarge}/></div><div style={s.inputBox}><label style={s.label}>Sections (optional)</label><input placeholder="e.g. 9.1 — leave blank for now" value={editingWord.edit_section} onChange={e=>setEditingWord({...editingWord, edit_section: e.target.value})} style={s.inputLarge}/></div></div>
                  <div style={{display: 'flex', gap: '10px'}}><div style={s.inputBox}><label style={s.label}>Spanish</label><input value={editingWord.palabra} onChange={e=>setEditingWord({...editingWord, palabra: e.target.value})} style={s.inputLarge}/></div><div style={s.inputBox}><label style={s.label}>English</label><input value={editingWord.traduccion} onChange={e=>setEditingWord({...editingWord, traduccion: e.target.value})} style={s.inputLarge}/></div></div>
+                 <div style={s.inputBox}><label style={s.label}>Respuestas Alternativas (comma-separated — e.g. a synonym like "sano" for "saludable")</label><input placeholder="otra respuesta aceptada, otra más..." value={editingWord.edit_alt_answers} onChange={e=>setEditingWord({...editingWord, edit_alt_answers: e.target.value})} style={s.inputLarge}/></div>
                  <div style={{display: 'flex', gap: '10px'}}>
                    <div style={s.inputBox}><label style={s.label}>Tipo (verbo, adjetivo, etc.)</label><input value={editingWord.edit_tipo} onChange={e=>setEditingWord({...editingWord, edit_tipo: e.target.value})} style={s.inputLarge}/></div>
                    <div style={{...s.inputBox, flexGrow: 0, justifyContent: 'center'}}>

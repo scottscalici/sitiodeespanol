@@ -155,30 +155,35 @@ export default function MasterDashboard() {
     }
   };
 
-  const handleJSONUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setIsUploading(true);
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const jsonData = JSON.parse(e.target.result);
-
+  // Parses and imports a single already-parsed JSON blob, auto-detecting its
+  // format. Returns a one-line summary string for the batch-upload alert.
+  const processOneJSONUpload = async (jsonData) => {
         // --- DETECTAR FORMATO BUNDLE IB ---
         if (jsonData.worksheet) {
           const worksheetTitle = jsonData.worksheet.title;
           for (const textObj of jsonData.worksheet.texts) {
             const convertedData = {
-              titulo: textObj.title,
-              subtitulo: worksheetTitle,
+              subtitulo: textObj.title || worksheetTitle,
               text_id: textObj.text_id || "",
-              test_id: jsonData.worksheet.test_id || "",
+              test_id: jsonData.worksheet.test_id || worksheetTitle || "",
               type: "ib_paper_2",
+              dia: "",
               paragraphs: textObj.paragraphs || [],
-              question_sections: textObj.question_sections || [],
-              dias: [],
-              isNew: false
+              // "correction" sections are just the author's own answer-key
+              // patch notes for a preceding multiple_select section, not
+              // student-facing content — drop them. A question's answer can
+              // also be an array (multiple_select, e.g. ["A","C","D"]); join
+              // it to a string since LecturaPage grades every type with a
+              // plain string compare.
+              question_sections: (textObj.question_sections || [])
+                .filter((sec) => sec.type !== "correction")
+                .map((sec) => ({
+                  ...sec,
+                  questions: (sec.questions || []).map((q) => ({
+                    ...q,
+                    answer: Array.isArray(q.answer) ? q.answer.join(", ") : q.answer,
+                  })),
+                })),
             };
 
             const docId = `${worksheetTitle}-${textObj.text_id}`
@@ -186,9 +191,67 @@ export default function MasterDashboard() {
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/(^-|-$)/g, '');
 
-            await setDoc(doc(db, "lectura", docId), convertedData, { merge: true });
+            await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
           }
-          alert(`Se han convertido y subido ${jsonData.worksheet.texts.length} textos con éxito.`);
+          return `${jsonData.worksheet.texts.length} textos (worksheet IB)`;
+        }
+        // --- DETECTAR FORMATO LECTURA CULTURAL (Array de topics con niveles) ---
+        else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].topicName !== undefined && jsonData[0].levels !== undefined) {
+          // Only the Spanish-language tiers make sense as reading-comprehension
+          // practice — level_1 is written in English (a scaffolding tier), so
+          // it's intentionally skipped here.
+          const LEVELS_TO_IMPORT = [
+            { key: "level_2", label: "Nivel 2" },
+            { key: "level_3", label: "Nivel 3" },
+          ];
+          let count = 0;
+          const topicNameCounts = {};
+          for (const topic of jsonData) {
+            // A few topicNames repeat in the source file with genuinely
+            // different content (e.g. two different write-ups both titled
+            // "Cartagena de Indias") — suffix the docId so the second one
+            // doesn't silently overwrite the first.
+            const slugBase = (topicNameCounts[topic.topicName] = (topicNameCounts[topic.topicName] || 0) + 1);
+            const topicSlug = slugBase > 1 ? `${topic.topicName}-v${slugBase}` : topic.topicName;
+
+            for (const { key, label } of LEVELS_TO_IMPORT) {
+              const levelData = topic.levels?.[key];
+              if (!levelData) continue;
+
+              const convertedData = {
+                subtitulo: topic.topicName,
+                text_id: label,
+                test_id: "Lectura Cultural",
+                type: "cultural",
+                dia: "",
+                paragraphs: (levelData.readingText || "")
+                  .split("\n\n")
+                  .map((p) => p.trim())
+                  .filter(Boolean),
+                question_sections: [
+                  {
+                    type: "short_answer",
+                    instructions: levelData.instruction || "",
+                    questions: (levelData.questions || []).map((prompt, i) => ({
+                      number: i + 1,
+                      prompt,
+                      answer: (levelData.answerKey || [])[i] || "",
+                      points: 1,
+                    })),
+                  },
+                ],
+              };
+
+              const docId = `${topicSlug}-${key}`
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, '');
+
+              await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
+              count++;
+            }
+          }
+          return `${count} lecturas culturales`;
         }
         // --- DETECTAR FORMATO DESTACADO DIARIO (Array) ---
         else if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].dia !== undefined) {
@@ -198,7 +261,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "destacado_diario", docId), item, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} destacados diarios.`);
+          return `${count} destacados diarios`;
         }
         // --- DETECTAR FORMATO TEMAS (THEMES) ---
         else if (jsonData.themes && Array.isArray(jsonData.themes)) {
@@ -213,7 +276,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "temas", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} temas a la base de datos.`);
+          return `${count} temas`;
         }
         // --- DETECTAR FORMATO VIDEOS (daily_tags) ---
         else if (jsonData.daily_tags && Array.isArray(jsonData.daily_tags)) {
@@ -228,7 +291,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "videos", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han migrado ${count} videos a la base de datos.`);
+          return `${count} videos`;
         }
         // --- DETECTAR FORMATO CONVERSACIONES (items map, ej: planes/conversaciones.json) ---
         else if (jsonData.items && typeof jsonData.items === 'object' && !Array.isArray(jsonData.items)) {
@@ -263,21 +326,37 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "conversaciones", docId), dataToSave, { merge: true });
             count++;
           }
-          alert(`¡Éxito! Se han importado ${count} lecciones de conversación.`);
+          return `${count} lecciones de conversación`;
         }
         // --- SI NO RECONOCE NINGÚN FORMATO ---
-        else {
-          alert("Formato no reconocido. Asegúrate de que el JSON sea un worksheet, Destacado Diario, Temas, Videos, o Conversaciones (items).");
-        }
+        return null;
+  };
 
-        fetchData();
+  // Single or multi-file JSON upload. Each file is parsed and routed through
+  // processOneJSONUpload independently, so one bad file in a batch doesn't
+  // abort the rest — results are rolled up into one summary alert.
+  const handleJSONUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setIsUploading(true);
+
+    const results = [];
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const jsonData = JSON.parse(text);
+        const summary = await processOneJSONUpload(jsonData);
+        results.push(summary ? `✅ ${file.name}: ${summary}` : `⚠️ ${file.name}: formato no reconocido`);
       } catch (error) {
-        console.error("Error en carga:", error);
-        alert("Error al procesar el JSON.");
+        console.error(`Error en carga de ${file.name}:`, error);
+        results.push(`❌ ${file.name}: error al procesar`);
       }
-      setIsUploading(false);
-    };
-    reader.readAsText(file);
+    }
+
+    fetchData();
+    setIsUploading(false);
+    alert(results.join('\n'));
+    event.target.value = '';
   };
   // IA PREP Parser
   const handleHTMLUpload = async (event) => {
@@ -382,7 +461,8 @@ export default function MasterDashboard() {
             </button>
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#eee', borderRadius: '4px' }}>
               <h4>Upload JSON</h4>
-              <input type="file" accept=".json" onChange={handleJSONUpload} />
+              <input type="file" accept=".json" multiple onChange={handleJSONUpload} />
+              <p style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Puedes seleccionar varios archivos a la vez (ej: los 24 de IB).</p>
             </div>
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
               <h4>Import IA HTML</h4>

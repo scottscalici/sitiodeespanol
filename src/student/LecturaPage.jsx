@@ -70,7 +70,7 @@ export default function LecturaPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="bg-cyan-950 text-cyan-400 border border-cyan-800 px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">
-                Examen IB • Texto {lectura.text_id || 'A'}
+                {lectura.type === 'cultural' ? 'Lectura Cultural' : 'Examen IB'} • Texto {lectura.text_id || 'A'}
               </span>
               <span className="text-xs font-mono text-slate-400">{lectura.test_id}</span>
             </div>

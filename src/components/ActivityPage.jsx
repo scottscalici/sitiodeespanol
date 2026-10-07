@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useGymData } from '../hooks/useGymData';
 import { useAuth } from '../context/AuthContext';
 import Eslabones from './Eslabones';
@@ -285,7 +287,7 @@ const TeacherOnlyBadge = () => (
 
 const ConversacionLayout = ({ activity }) => {
   const { raw } = activity;
-  const { userData } = useAuth();
+  const { userData, currentUser } = useAuth();
   const isS4 = userData?.course === 's4';
   const isAdmin = userData?.role === 'admin';
   const canSee = (field) => isAdmin || !!raw.visibilidad?.[field];
@@ -379,13 +381,60 @@ const ConversacionLayout = ({ activity }) => {
   const isOvertime = phase === 'speak' && seconds < 0;
   const isOnTarget = phase === 'speak' && spoken >= 180 && seconds >= 0;
 
-  // Notes (ephemeral — never persisted to Firestore, matching the original design)
+  // Notes — persisted per student per activity, so returning to the same
+  // conversación later picks up right where notes were left off.
   const notasConfig = raw.notas || { type: 'block', bullets: 10, pregunta: false };
   const [bulletNotes, setBulletNotes] = useState(
     Array(notasConfig.bullets || 10).fill('')
   );
   const [blockNotes, setBlockNotes] = useState('');
   const [tuPregunta, setTuPregunta] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesStatus, setNotesStatus] = useState('');
+
+  const noteDocId = currentUser ? `${currentUser.uid}_${activity.id}` : null;
+
+  useEffect(() => {
+    if (!noteDocId) return;
+    let cancelled = false;
+    getDoc(doc(db, 'conversacion_notes', noteDocId))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const data = snap.data();
+        // Re-pad/truncate against the CURRENT bullet count, in case the
+        // teacher changed notasConfig.bullets after this student last saved.
+        const bulletCount = notasConfig.bullets || 10;
+        const saved = data.bulletNotes || [];
+        setBulletNotes(Array.from({ length: bulletCount }, (_, i) => saved[i] || ''));
+        setBlockNotes(data.blockNotes || '');
+        setTuPregunta(data.tuPregunta || '');
+      })
+      .catch((err) => console.error('Error loading conversación notes:', err));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteDocId]);
+
+  const saveNotes = async () => {
+    if (!noteDocId) return;
+    setNotesSaving(true);
+    setNotesStatus('');
+    try {
+      await setDoc(doc(db, 'conversacion_notes', noteDocId), {
+        uid: currentUser.uid,
+        activityId: activity.id,
+        bulletNotes,
+        blockNotes,
+        tuPregunta,
+        updatedAt: new Date().toISOString(),
+      });
+      setNotesStatus('✅ Notas guardadas.');
+    } catch (err) {
+      console.error('Error saving conversación notes:', err);
+      setNotesStatus('❌ Error al guardar.');
+    } finally {
+      setNotesSaving(false);
+    }
+  };
 
   const updateBullet = (i, value) => {
     setBulletNotes((prev) => {
@@ -760,6 +809,16 @@ const ConversacionLayout = ({ activity }) => {
               />
             </div>
           )}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={saveNotes}
+              disabled={notesSaving || !noteDocId}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-colors"
+            >
+              {notesSaving ? 'Guardando...' : '💾 Guardar Notas'}
+            </button>
+            {notesStatus && <p className="text-xs font-bold text-slate-500">{notesStatus}</p>}
+          </div>
         </div>
 
         {/* Question zone */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteField, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -137,6 +137,49 @@ export default function LecturaEditorPage() {
     } catch (error) {
       console.error("Error saving lectura:", error);
       setStatus('Error al guardar.');
+    }
+  };
+
+  // Delete from Firebase — also strips this lectura out of any día it's
+  // already been assigned to in curriculum_tracks/lecturas_master, so
+  // deleting (or just assigning to a day as a test) never leaves a dangling
+  // reference the student dashboard would try to fetch and fail on.
+  const handleDelete = async () => {
+    if (!selectedId || selectedId === 'new') return;
+    const confirmed = window.confirm(
+      `¿Eliminar "${actividad.subtitulo || selectedId}"? Esto también la quitará de cualquier día al que ya esté asignada.`
+    );
+    if (!confirmed) return;
+
+    setStatus('Eliminando...');
+    try {
+      await deleteDoc(doc(db, 'lecturas', selectedId));
+
+      const masterRef = doc(db, 'curriculum_tracks', 'lecturas_master');
+      const masterSnap = await getDoc(masterRef);
+      if (masterSnap.exists()) {
+        const data = masterSnap.data();
+        const updateData = {};
+        for (const course of ['ib', 's2', 's4']) {
+          const courseMap = data[course] || {};
+          for (const [dia, ids] of Object.entries(courseMap)) {
+            if (!Array.isArray(ids) || !ids.includes(selectedId)) continue;
+            const filtered = ids.filter((id) => id !== selectedId);
+            updateData[`${course}.${dia}`] = filtered.length === 0 ? deleteField() : filtered;
+          }
+        }
+        if (Object.keys(updateData).length > 0) {
+          await updateDoc(masterRef, updateData);
+        }
+      }
+
+      setLecturasList((prev) => prev.filter((l) => l.id !== selectedId));
+      setSelectedId('');
+      setActividad({ subtitulo: '', test_id: '', text_id: 'A', dia: '', paragraphs: [], question_sections: [] });
+      setStatus('Lectura eliminada.');
+    } catch (error) {
+      console.error('Error deleting lectura:', error);
+      setStatus('Error al eliminar.');
     }
   };
 
@@ -331,9 +374,20 @@ export default function LecturaEditorPage() {
               </p>
             )}
 
-            <button type="submit" className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg transition-all active:scale-95">
-              Guardar Cambios en Firebase
-            </button>
+            <div className="flex gap-3">
+              <button type="submit" className="flex-1 py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg transition-all active:scale-95">
+                Guardar Cambios en Firebase
+              </button>
+              {selectedId !== 'new' && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="py-4 px-6 bg-rose-900/60 hover:bg-rose-700 text-rose-200 hover:text-white font-black uppercase tracking-widest text-xs rounded-2xl border border-rose-800 transition-all active:scale-95"
+                >
+                  Eliminar
+                </button>
+              )}
+            </div>
           </form>
         )}
 

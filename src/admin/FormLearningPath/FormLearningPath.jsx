@@ -7,6 +7,7 @@ import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, PRACTICE_BOSS_BATTLE_MIX, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
+import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
 
 // mode='learningPath' (default): the graded, sequential Dominio builder,
 // saving to learning_paths. mode='practiceHub': same vault + pod/segment
@@ -45,6 +46,12 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [availableSections, setAvailableSections] = useState([]);
   const [rawChapterData, setRawChapterData] = useState(null);
 
+  // 'main' reads the real teaching collections (vocab_bundles, verbs,
+  // verbGroups) — 'kpractice' reads a completely separate pool
+  // (kpractice_vocab_bundles, kpractice_verbs, kpractice_verbGroups) so
+  // personal-use content (e.g. a family member's own class) never mixes
+  // into real students' vault or vocab/verb vaults.
+  const [vaultSource, setVaultSource] = useState('main');
   const [vaultVocab, setVaultVocab] = useState([]);
   const [vaultVerbs, setVaultVerbs] = useState([]);
   const [allVerbsList, setAllVerbsList] = useState([]);
@@ -360,11 +367,26 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     return 'Descubre 2'; // Fallback por defecto
   };
 
+  // Switching pools resets the book/chapter picker — "Descubre 2" means
+  // nothing in the kpractice pool and vice versa, so carrying over the old
+  // selection would just show "No Chapters Found" until re-picked anyway.
+  const handleSetVaultSource = (source) => {
+    setVaultSource(source);
+    setSelectedBook('');
+    setSelectedChapter('');
+    setSelectedSection('');
+  };
+
+  const vocabBundlesCollection = vaultSource === 'kpractice' ? 'kpractice_vocab_bundles' : 'vocab_bundles';
+  const verbsCollection = vaultSource === 'kpractice' ? 'kpractice_verbs' : 'verbs';
+  const verbGroupsCollection = vaultSource === 'kpractice' ? 'kpractice_verbGroups' : 'verbGroups';
+  const sentenceBankCollection = vaultSource === 'kpractice' ? 'kpractice_sentence_bank' : 'sentence_bank';
+
   const fetchAllChapters = async () => {
     try {
       // Shared cache — VocabSequencer and the student useGymData hook also
       // read vocab_bundles in full.
-      const bundles = await getCachedCollection('vocab_bundles');
+      const bundles = await getCachedCollection(vocabBundlesCollection);
       const booksSet = new Set();
       const chaptersSet = new Set();
 
@@ -395,7 +417,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setIsLoadingVault(true);
     try {
       let targetData = null;
-      const bundles = await getCachedCollection('vocab_bundles');
+      const bundles = await getCachedCollection(vocabBundlesCollection);
 
       bundles.forEach(data => {
         const bookName = guessBookName(data, data.id);
@@ -428,9 +450,9 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       // Shared cache — verbGroups/verbs are also read by VerbVault and
       // CalentamientoAdmin; sentence_bank is also read by SentenceManager.
       const [groups, verbs, grammarList] = await Promise.all([
-        getCachedCollection('verbGroups'),
-        getCachedBucketedCollection('verbs'),
-        getCachedCollection('sentence_bank'),
+        getCachedCollection(verbGroupsCollection),
+        getCachedBucketedCollection(verbsCollection),
+        getCachedCollection(sentenceBankCollection),
       ]);
 
       const groupList = groups.map(data => ({ id: data.id, label: data.name || data.id, tags: data.tenses?.[0] || 'Cluster', tenses: data.tenses || [], verbIds: data.verbIds || [], isGroup: true, fullData: data }));
@@ -459,9 +481,10 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     } catch (err) {}
   };
 
-  useEffect(() => { fetchExistingPaths(); fetchVerbsAndGrammar(); }, []);
-  useEffect(() => { fetchAllChapters(); }, [selectedBook]);
-  useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook]);
+  useEffect(() => { fetchExistingPaths(); }, []);
+  useEffect(() => { fetchVerbsAndGrammar(); }, [vaultSource]);
+  useEffect(() => { fetchAllChapters(); }, [selectedBook, vaultSource]);
+  useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook, vaultSource]);
 
   // A vocab path's vault can never show verbs, and vice versa — keeps the
   // "no vocab bleeding into a verb path" rule enforced by the tool itself,
@@ -514,6 +537,47 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setIsSaving(false);
   };
 
+  // One-click seed/merge of the K-Practice pool from a JSON payload shaped
+  // like kpracticeSeedData.js's KPRACTICE_SEED_CONTENT (vocab_bundle, verbs,
+  // sentences) — pre-filled with the teacher's dictated content below, but
+  // editable/replaceable for anything added later, so this stays useful as
+  // an ongoing bulk-import tool, not just a one-time seed.
+  const [kpImportText, setKpImportText] = useState(JSON.stringify(KPRACTICE_SEED_CONTENT, null, 2));
+  const [kpImportStatus, setKpImportStatus] = useState('');
+  const [isImportingKp, setIsImportingKp] = useState(false);
+
+  const handleImportKpContent = async () => {
+    setIsImportingKp(true);
+    setKpImportStatus('');
+    try {
+      const payload = JSON.parse(kpImportText);
+      if (payload.vocab_bundle?.id) {
+        await setDoc(doc(db, 'kpractice_vocab_bundles', payload.vocab_bundle.id), payload.vocab_bundle, { merge: true });
+        invalidateCollectionCache('kpractice_vocab_bundles');
+      }
+      for (const v of payload.verbs || []) {
+        await setDoc(doc(db, 'kpractice_verbs', v.id), v, { merge: true });
+      }
+      if (payload.verbs?.length) invalidateCollectionCache('kpractice_verbs');
+      for (const s of payload.sentences || []) {
+        await setDoc(doc(db, 'kpractice_sentence_bank', s.id), s, { merge: true });
+      }
+      if (payload.sentences?.length) invalidateCollectionCache('kpractice_sentence_bank');
+
+      setKpImportStatus(`✅ Importado: ${payload.vocab_bundle ? '1 paquete de vocabulario, ' : ''}${payload.verbs?.length || 0} verbo(s), ${payload.sentences?.length || 0} oración(es).`);
+      if (vaultSource === 'kpractice') {
+        fetchAllChapters();
+        fetchVocabVault();
+        fetchVerbsAndGrammar();
+      }
+    } catch (err) {
+      console.error('Error importing K-Practice content:', err);
+      setKpImportStatus('❌ JSON inválido o error al guardar — revisa la consola.');
+    } finally {
+      setIsImportingKp(false);
+    }
+  };
+
   const handleCreateGrammar = async (sentence, topic) => {
     try {
       const grammarTags = topic ? [topic] : [];
@@ -530,8 +594,8 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         targetSubject: '',
         createdAt: new Date().toISOString(),
       };
-      const docRef = await addDoc(collection(db, 'sentence_bank'), payload);
-      invalidateCollectionCache('sentence_bank');
+      const docRef = await addDoc(collection(db, sentenceBankCollection), payload);
+      invalidateCollectionCache(sentenceBankCollection);
       const newItem = { id: docRef.id, label: sentence, tags: topic || 'Gramática', chapterId: payload.chapterId, grammarTags, fullData: payload };
       setAllGrammarList([newItem, ...allGrammarList]);
     } catch (err) {
@@ -543,6 +607,10 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   return (
     <div className="flex w-screen h-screen bg-slate-100 font-sans fixed inset-0 z-50 overflow-hidden">
       <VaultSidebar
+        vaultSource={vaultSource} setVaultSource={handleSetVaultSource}
+        kpImportText={kpImportText} setKpImportText={setKpImportText}
+        kpImportStatus={kpImportStatus} isImportingKp={isImportingKp}
+        onImportKpContent={handleImportKpContent}
         contentType={contentType}
         selectedBook={selectedBook} setSelectedBook={setSelectedBook} availableBooks={availableBooks}
         activeTab={activeTab} setActiveTab={setActiveTab} selectedChapter={selectedChapter} setSelectedChapter={setSelectedChapter}

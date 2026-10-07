@@ -156,11 +156,13 @@ export default function PathBuilder({
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <button
                 type="button"
-                onClick={() => setCourse(course === 's2' ? 's4' : 's2')}
-                title="Click to switch which course this path is tagged for"
-                className="px-2.5 py-0.5 text-xs font-black bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md uppercase tracking-wider transition-colors cursor-pointer"
+                onClick={() => setCourse(course === 's2' ? 's4' : course === 's4' ? 'kpractice' : 's2')}
+                title="Click to cycle which course this path is tagged for"
+                className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider transition-colors cursor-pointer ${
+                  course === 'kpractice' ? 'bg-amber-100 hover:bg-amber-200 text-amber-800' : 'bg-blue-100 hover:bg-blue-200 text-blue-800'
+                }`}
               >
-                {course.toUpperCase()} Course ⇄
+                {course === 'kpractice' ? '👧 K-Practice' : `${course.toUpperCase()} Course`} ⇄
               </button>
 
               {/* A path is one content type from the start — no more branches

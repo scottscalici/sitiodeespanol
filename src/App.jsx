@@ -18,6 +18,7 @@ import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
+import KPracticePage from './student/KPracticePage';
 import PracticeHub from './student/PracticeHub';
 import Recuperacion from './student/Recuperacion';
 import TicoTalk from './student/TicoTalk';
@@ -30,6 +31,7 @@ import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROU
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
+import ConversacionesManager from './admin/managers/ConversacionesManager';
 import ConectoresEngine from './student/ConectoresEngine';
 import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
@@ -46,6 +48,7 @@ import MasterDashboard from './admin/MasterDashboard/MasterDashboard';
 import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
+import LessonPlanFormalPage from './admin/managers/LessonPlanFormalPage';
 import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
@@ -180,6 +183,10 @@ function App() {
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/student-learning-path/:targetDia?" element={<StudentLearningPath />} />
+            {/* Unlisted on purpose — no nav link anywhere, no login. A
+                personal-use practice page (see KPracticePage.jsx) pulling
+                from the separate kpractice_* content pool. */}
+            <Route path="/kpractice" element={<KPracticePage />} />
             <Route path="/practice-hub" element={<PracticeHub />} />
             <Route path="/recuperacion" element={<Recuperacion />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
@@ -295,6 +302,14 @@ function App() {
     </AdminRoute>
   }
 />
+            <Route
+              path="/admin-daily-plan-conversaciones"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ConversacionesManager />
+                </AdminRoute>
+              }
+            />
 <Route
   path="/admin-secret-portal-conectores"
   element={
@@ -421,6 +436,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <LessonPlanPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-lesson-plan-formal/:course/:dia"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LessonPlanFormalPage />
                 </AdminRoute>
               }
             />

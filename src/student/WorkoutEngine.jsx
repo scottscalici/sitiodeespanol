@@ -19,6 +19,11 @@ const getVerbById = async (verbId) => {
   }
 };
 
+// A free-typed vocab/listen/speak question's correctAnswer can be a
+// comma-joined list of accepted synonyms (see alt_answers below) — the
+// canonical word to actually SPEAK is always the first one.
+const primaryAnswer = (str) => (str || '').split(',')[0].trim();
+
 // Last-resort MC filler for "reverse engineering" (statement → question)
 // sentences when the sentence bank doesn't yet have enough authored
 // "|| question" pairs to source 3 real distractor questions from.
@@ -636,6 +641,13 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           // --- STANDARD VOCAB GENERATOR ---
           const engTrans = getEnglishTrans(target) || "⚠️ Falta traducción (English) en BD";
           const spaWord = target.label.trim();
+          // Alternate accepted answers (synonyms, e.g. "sano" for "saludable")
+          // only ever widen what a TYPED answer accepts — checkAnswerLeniently
+          // already treats a comma-joined correctAnswer as multiple valid
+          // answers. mc/matching keep using the single canonical spaWord,
+          // since an alternate would make no sense as a button/tile.
+          const altAnswers = (target.fullData?.alt_answers || []).map((a) => (a || '').trim()).filter(Boolean);
+          const typedCorrectAnswer = [spaWord, ...altAnswers].join(', ');
 
           let format = 'write';
 
@@ -660,11 +672,11 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
             let options = [spaWord, ...getWordDistractors(3, [spaWord], { truncateToFirstWord: false })];
             generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: engTrans, engTrans: engTrans, options: shuffle(options), correctAnswer: spaWord, topic: target.tags || 'Vocabulario', _pointCategory: 'regular' });
           } else if (format === 'listen') {
-            generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Comprensión Auditiva', _pointCategory: 'regular' });
+            generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Comprensión Auditiva', _pointCategory: 'regular' });
           } else if (format === 'speak') {
-            generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Pronunciación', _pointCategory: 'regular' });
+            generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Pronunciación', _pointCategory: 'regular' });
           } else {
-            generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: spaWord, topic: target.tags || 'Escritura', _pointCategory: 'regular' });
+            generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Escritura', _pointCategory: 'regular' });
           }
         }
       }
@@ -1022,7 +1034,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               <div className="flex flex-col items-center justify-center mb-8">
                   {currentQ.isDictation ? (
                     <button
-                      onClick={() => playAudio(currentQ.correctAnswer)}
+                      onClick={() => playAudio(primaryAnswer(currentQ.correctAnswer))}
                       className="w-20 h-20 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-3xl shadow-lg transition-transform active:scale-95"
                       title="Escuchar de nuevo"
                     >
@@ -1032,7 +1044,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                     <div className="flex items-center gap-4">
                         <h2 className="text-4xl md:text-5xl font-black text-slate-800">{currentQ.prompt}</h2>
                         <button
-                          onClick={() => playAudio(currentQ.correctAnswer)}
+                          onClick={() => playAudio(primaryAnswer(currentQ.correctAnswer))}
                           className="p-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-all active:scale-95"
                           title="Escuchar pronunciación"
                         >
@@ -1191,7 +1203,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                 <div className="flex items-center gap-3">
                   <span className={`text-xl md:text-2xl font-black ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>{isCorrect ? '¡Excelente!' : 'Incorrecto'}</span>
                   {currentQ.type !== 'matching' && (
-                    <button onClick={() => playAudio(currentQ.correctAnswer)} className={`p-2 rounded-full transition-transform active:scale-95 ${isCorrect ? 'bg-emerald-200 text-emerald-800 hover:bg-emerald-300' : 'bg-red-200 text-red-800 hover:bg-red-300'}`}>🔊</button>
+                    <button onClick={() => playAudio(primaryAnswer(currentQ.correctAnswer))} className={`p-2 rounded-full transition-transform active:scale-95 ${isCorrect ? 'bg-emerald-200 text-emerald-800 hover:bg-emerald-300' : 'bg-red-200 text-red-800 hover:bg-red-300'}`}>🔊</button>
                   )}
                 </div>
                 {!isCorrect && currentQ.type !== 'matching' && (

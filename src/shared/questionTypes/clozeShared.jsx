@@ -30,15 +30,20 @@ export const buildWordBank = (answers, distractors) => {
 // text with one inline <select> per blank. Index-based keys are fine here —
 // the segments never reorder within a render. `optionsForBlank(i)` decouples
 // this from whether each blank has its own option list (dropdown_cloze) or
-// all blanks share one word bank (word_bank_cloze).
-export const renderClozeText = (text, selections, correctArr, wrongFlashIdx, onSelect, optionsForBlank) => {
+// all blanks share one word bank (word_bank_cloze). `wrongIndicator` is
+// either a single blank index (a one-off transient flash, auto-cleared by
+// the caller after a timeout — word_bank_cloze/line_bank_cloze) or an array
+// of per-blank booleans (a persistent "graded and still wrong" indicator
+// that stays until the student changes it or re-submits — dropdown_cloze's
+// submit-to-check flow).
+export const renderClozeText = (text, selections, correctArr, wrongIndicator, onSelect, optionsForBlank) => {
   const parts = (text || '').split('{{blank}}');
   const nodes = [];
   parts.forEach((part, i) => {
     if (part) nodes.push(<span key={`t-${i}`}>{part}</span>);
     if (i < parts.length - 1) {
       const isCorrect = correctArr[i];
-      const isWrong = wrongFlashIdx === i;
+      const isWrong = Array.isArray(wrongIndicator) ? !!wrongIndicator[i] : wrongIndicator === i;
       nodes.push(
         <select
           key={`b-${i}`}

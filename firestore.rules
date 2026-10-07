@@ -96,6 +96,29 @@ service cloud.firestore {
       allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- CONVERSACIÓN NOTES (per-student scratch notes on a conversación activity) ---
+    // Doc ID is `${uid}_${activityId}`, but that's not checkable directly, so
+    // ownership is verified against the document's own `uid` field (same
+    // pattern as recuperaciones above) — a student may only create/update
+    // their own notes; an admin (teacher) can read any student's.
+    match /conversacion_notes/{docId} {
+      allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // --- LEARNING PATHS (kpractice carve-out) ---
+    // /kpractice (src/student/KPracticePage.jsx) is a deliberately unlinked,
+    // no-login practice page for personal use — it has no account to prove
+    // isLoggedIn() with, so a path tagged course == 'kpractice' is the only
+    // kind of learning_paths doc readable without login. Every other path
+    // (real students' graded units) still requires login, same as before —
+    // this is strictly additive. Writes stay admin-only either way.
+    match /learning_paths/{pathId} {
+      allow read: if isLoggedIn() || resource.data.course == 'kpractice';
+      allow write: if isAdmin();
+    }
+
     // --- LEADERBOARD HISTORY (Hall of Fame weekly/monthly archives) ---
     // Snapshotted client-side by the first student in a course to earn
     // points in a new week/month (see archivePeriodIfNeeded in
