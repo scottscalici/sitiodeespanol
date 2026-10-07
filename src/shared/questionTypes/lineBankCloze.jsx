@@ -94,36 +94,52 @@ export const parseBulkSections = (text) => {
 // --- Student-facing renderer ---
 // Same "shared word bank, word disappears once correctly placed elsewhere"
 // mechanic as word_bank_cloze, just spread across several rows. Each row
-// gets a slice of the global selections/correct arrays (and the global
-// wrongFlash index, translated to that row's local blank numbering) so
+// gets a slice of the global selections/correct/wrongAttempted arrays so
 // renderClozeText — which only knows about ONE text string's own blanks —
-// can be reused unmodified per row.
+// can be reused unmodified per row. Grading is deferred to an explicit
+// "Revisar" click (not on every selection), same as word_bank_cloze and
+// dropdown_cloze — a word only leaves the shared bank once Revisar actually
+// confirms it's correct, not the instant it's picked.
 export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   const blankCount = question.answers.length;
   const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
-  const [wrongFlash, setWrongFlash] = useState(null);
+  const [wrongAttempted, setWrongAttempted] = useState(() => Array(blankCount).fill(false));
   const attemptedRef = React.useRef({});
 
   const handleSelect = (globalIdx, value) => {
     if (correct[globalIdx]) return;
-    const isCorrect = sameWord(question.answers[globalIdx], value);
-
-    if (!attemptedRef.current[globalIdx]) {
-      attemptedRef.current[globalIdx] = true;
-      onItemFirstAttempt(globalIdx, isCorrect);
-    }
-
     setSelections((prev) => prev.map((v, i) => (i === globalIdx ? value : v)));
-    if (isCorrect) {
-      const next = correct.map((c, i) => (i === globalIdx ? true : c));
-      setCorrect(next);
-      if (next.every(Boolean)) onAllCorrect();
-    } else {
-      setWrongFlash(globalIdx);
-      setTimeout(() => setWrongFlash(null), 400);
-    }
+    setWrongAttempted((prev) => prev.map((w, i) => (i === globalIdx ? false : w)));
   };
+
+  const handleRevisar = () => {
+    const nextCorrect = [...correct];
+    const nextWrong = [...wrongAttempted];
+
+    question.answers.forEach((answer, i) => {
+      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
+      const isCorrect = sameWord(answer, selections[i]);
+
+      if (!attemptedRef.current[i]) {
+        attemptedRef.current[i] = true;
+        onItemFirstAttempt(i, isCorrect);
+      }
+
+      if (isCorrect) {
+        nextCorrect[i] = true;
+        nextWrong[i] = false;
+      } else {
+        nextWrong[i] = true;
+      }
+    });
+
+    setCorrect(nextCorrect);
+    setWrongAttempted(nextWrong);
+    if (nextCorrect.every(Boolean)) onAllCorrect();
+  };
+
+  const allCorrect = correct.every(Boolean);
 
   const optionsForBlank = (globalIdx) => {
     if (question.allowRepeats) return question.wordBank || [];
@@ -155,7 +171,7 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
                   line.text,
                   selections.slice(start, start + lineBlankCount),
                   correct.slice(start, start + lineBlankCount),
-                  wrongFlash !== null && wrongFlash >= start && wrongFlash < start + lineBlankCount ? wrongFlash - start : null,
+                  wrongAttempted.slice(start, start + lineBlankCount),
                   (localIdx, value) => handleSelect(start + localIdx, value),
                   (localIdx) => optionsForBlank(start + localIdx)
                 )}
@@ -164,6 +180,16 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
           );
         })}
       </div>
+      {!allCorrect && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleRevisar}
+            className="bg-sky-600 hover:bg-sky-700 text-white font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl transition-colors"
+          >
+            Revisar
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -34,33 +34,51 @@ export const reconstructQuestion = (q) => {
 // --- Student-facing renderer ---
 // Every blank shares the SAME word bank; a word already correctly placed in
 // one blank disappears from the others (same as a paper word bank), while
-// distractors (never correct anywhere) stay available throughout.
+// distractors (never correct anywhere) stay available throughout. Grading is
+// deferred to an explicit "Revisar" click (not on every selection), same
+// submit-then-grade model as dropdown_cloze — a word only leaves the shared
+// bank once Revisar actually confirms it's correct, not the instant it's
+// picked.
 export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   const blankCount = question.answers.length;
   const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
-  const [wrongFlash, setWrongFlash] = useState(null);
+  const [wrongAttempted, setWrongAttempted] = useState(() => Array(blankCount).fill(false));
   const attemptedRef = React.useRef({});
 
   const handleSelect = (blankIdx, value) => {
     if (correct[blankIdx]) return;
-    const isCorrect = sameWord(question.answers[blankIdx], value);
-
-    if (!attemptedRef.current[blankIdx]) {
-      attemptedRef.current[blankIdx] = true;
-      onItemFirstAttempt(blankIdx, isCorrect);
-    }
-
     setSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
-    if (isCorrect) {
-      const next = correct.map((c, i) => (i === blankIdx ? true : c));
-      setCorrect(next);
-      if (next.every(Boolean)) onAllCorrect();
-    } else {
-      setWrongFlash(blankIdx);
-      setTimeout(() => setWrongFlash(null), 400);
-    }
+    setWrongAttempted((prev) => prev.map((w, i) => (i === blankIdx ? false : w)));
   };
+
+  const handleRevisar = () => {
+    const nextCorrect = [...correct];
+    const nextWrong = [...wrongAttempted];
+
+    question.answers.forEach((answer, i) => {
+      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
+      const isCorrect = sameWord(answer, selections[i]);
+
+      if (!attemptedRef.current[i]) {
+        attemptedRef.current[i] = true;
+        onItemFirstAttempt(i, isCorrect);
+      }
+
+      if (isCorrect) {
+        nextCorrect[i] = true;
+        nextWrong[i] = false;
+      } else {
+        nextWrong[i] = true;
+      }
+    });
+
+    setCorrect(nextCorrect);
+    setWrongAttempted(nextWrong);
+    if (nextCorrect.every(Boolean)) onAllCorrect();
+  };
+
+  const allCorrect = correct.every(Boolean);
 
   const optionsForBlank = (blankIdx) => {
     const usedElsewhere = question.answers.filter((_, j) => j !== blankIdx && correct[j]);
@@ -68,9 +86,21 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   };
 
   return (
-    <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
-      {renderClozeText(question.text, selections, correct, wrongFlash, handleSelect, optionsForBlank)}
-    </ClozeChrome>
+    <div>
+      <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
+        {renderClozeText(question.text, selections, correct, wrongAttempted, handleSelect, optionsForBlank)}
+      </ClozeChrome>
+      {!allCorrect && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleRevisar}
+            className="bg-sky-600 hover:bg-sky-700 text-white font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl transition-colors"
+          >
+            Revisar
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 
