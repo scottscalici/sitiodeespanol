@@ -8,15 +8,19 @@ import { TIME_BLOCKS, DEFAULT_DURATIONS, computeBlockTimes } from '../../utils/l
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
 
+// Order matches how the class period actually runs: quizzes/evaluación
+// first thing, then the daily-routine trio (calentamiento, curiosidad,
+// gramática), then the rest. Anuncios (rendered separately, above this
+// list) and tarea (rendered separately, below it) aren't in this array.
 const SECTION_DEFS = [
-  { key: 'destacado', label: 'Destacado del Día', icon: '🌟' },
-  { key: 'calentamiento', label: 'Calentamiento', icon: '⏱️' },
-  { key: 'oraciones', label: 'Oraciones de Práctica', icon: '✍️' },
-  { key: 'curiosidad', label: 'Curiosidad', icon: '💡' },
-  { key: 'actividades', label: 'Actividades (Video/Lectura/Conversación)', icon: '🎬' },
-  { key: 'gramatica', label: 'Gramática / Estructuras', icon: '📚' },
   { key: 'evaluacion', label: 'Evaluación', icon: '🎯' },
+  { key: 'calentamiento', label: 'Calentamiento', icon: '⏱️' },
+  { key: 'curiosidad', label: 'Curiosidad', icon: '💡' },
+  { key: 'gramatica', label: 'Gramática / Estructuras', icon: '📚' },
   { key: 'practica', label: 'Práctica', icon: '✏️' },
+  { key: 'oraciones', label: 'Oraciones de Práctica', icon: '✍️' },
+  { key: 'actividades', label: 'Actividades (Video/Lectura/Conversación)', icon: '🎬' },
+  { key: 'destacado', label: 'Destacado del Día', icon: '🌟' },
 ];
 
 const emptyNotes = () => Object.fromEntries([...SECTION_DEFS.map((s) => s.key), 'tarea'].map((k) => [k, '']));
