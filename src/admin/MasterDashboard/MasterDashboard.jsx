@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, getDocs, doc, setDoc, query, where, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import FormCultura from './components/FormCultura';
@@ -443,15 +443,31 @@ export default function MasterDashboard() {
   };
 
   // Bulk image upload for lectura_cultural — uploads each selected file to
-  // Storage, then matches it by filename against any "lecturas" doc whose
-  // imagen_filename equals that name (set by the cultural JSON import) and
-  // writes the resulting download URL into that doc's `imagen` field. A
-  // topic's level_2 and level_3 docs share the same image, so one file
-  // commonly updates two docs.
+  // Storage, then matches it against any "lecturas" doc whose
+  // imagen_filename has the same name IGNORING EXTENSION (the source JSON
+  // references the original .png files, but what gets uploaded here is a
+  // resized/recompressed .jpg copy — same base name, different extension)
+  // and writes the resulting download URL into that doc's `imagen` field. A
+  // topic's level_2 and level_3 docs share one image, so one file commonly
+  // updates two docs. Matching is done against one up-front fetch of the
+  // whole collection rather than a per-file query, since Firestore can't
+  // do an extension-insensitive equality match server-side.
+  const stripExt = (filename) => filename.replace(/\.[^./\\]+$/, '').toLowerCase();
+
   const handleImageBulkUpload = async (event) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
     setIsUploading(true);
+
+    const allLecturas = await getDocs(collection(db, "lecturas"));
+    const byBaseName = new Map();
+    allLecturas.forEach((docSnap) => {
+      const fn = docSnap.data().imagen_filename;
+      if (!fn) return;
+      const base = stripExt(fn);
+      if (!byBaseName.has(base)) byBaseName.set(base, []);
+      byBaseName.get(base).push(docSnap.id);
+    });
 
     const results = [];
     for (const file of files) {
@@ -460,16 +476,15 @@ export default function MasterDashboard() {
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
 
-        const matchQuery = query(collection(db, "lecturas"), where("imagen_filename", "==", file.name));
-        const snap = await getDocs(matchQuery);
-        if (snap.empty) {
+        const matchedIds = byBaseName.get(stripExt(file.name)) || [];
+        if (matchedIds.length === 0) {
           results.push(`⚠️ ${file.name}: subida, pero ninguna lectura la referencia todavía`);
           continue;
         }
-        for (const docSnap of snap.docs) {
-          await updateDoc(doc(db, "lecturas", docSnap.id), { imagen: url });
+        for (const id of matchedIds) {
+          await updateDoc(doc(db, "lecturas", id), { imagen: url });
         }
-        results.push(`✅ ${file.name}: ${snap.docs.length} lectura(s) actualizada(s)`);
+        results.push(`✅ ${file.name}: ${matchedIds.length} lectura(s) actualizada(s)`);
       } catch (error) {
         console.error(`Error subiendo ${file.name}:`, error);
         results.push(`❌ ${file.name}: error al subir`);
