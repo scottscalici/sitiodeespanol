@@ -107,6 +107,17 @@ service cloud.firestore {
       allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // --- LECTURA COMPLETIONS (per-student marker: "has done this reading
+    // before") --- Doc ID is `${uid}_${lecturaId}`; same ownership-by-field
+    // pattern as conversacion_notes above. Used only to skip the 5-minute
+    // anti-guessing timer on a cultural reading's word-bank exercise once a
+    // student has genuinely been through it once.
+    match /lectura_completions/{docId} {
+      allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // --- LEARNING PATHS (kpractice carve-out) ---
     // /kpractice (src/student/KPracticePage.jsx) is a deliberately unlinked,
     // no-login practice page for personal use — it has no account to prove
