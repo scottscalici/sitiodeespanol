@@ -28,6 +28,7 @@ const DailyPlanHub = () => {
   const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
   const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
   const [allPracticeCards, setAllPracticeCards] = useState([]); // Small graded practice (Gustar, etc.)
+  const [allImageCards, setAllImageCards] = useState([]); // One-off photo shares
 
   const MAX_DAYS = 80;
 
@@ -59,7 +60,7 @@ const DailyPlanHub = () => {
 
         // Fetch Sequences & Collections
         const [
-          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap
+          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap, imageCardsSnap
         ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
@@ -72,7 +73,8 @@ const DailyPlanHub = () => {
           getDocs(collection(db, 'calentamientos')),
           getDocs(collection(db, 'dailyVocabWarmups')),
           getDocs(collection(db, 'conversaciones')),
-          getDocs(collection(db, 'practice_cards'))
+          getDocs(collection(db, 'practice_cards')),
+          getDocs(collection(db, 'image_cards'))
         ]);
 
         if (tareasSnap.exists()) {
@@ -100,6 +102,14 @@ const DailyPlanHub = () => {
         setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllConversaciones(convSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllPracticeCards(practiceCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // Single-bundle-doc collection (see ImageCardsManager) — unwrap its
+        // items map back into a flat array instead of treating the bundle
+        // doc itself as one item.
+        const imageCardsBundle = imageCardsSnap.docs.find((d) => d.id === '_bundle');
+        setAllImageCards(
+          imageCardsBundle ? Object.entries(imageCardsBundle.data().items || {}).map(([id, data]) => ({ id, ...data })) : []
+        );
 
       } catch (error) {
         console.error('Error loading Daily Hub data:', error);
@@ -134,6 +144,8 @@ const DailyPlanHub = () => {
   const activeConversaciones = allConversaciones.filter(c =>
     (c.courses || []).includes(activeCourse) && (c.dias || []).includes(selectedDay)
   );
+
+  const activeImageCards = allImageCards.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
 
   const dateStrings = calendarMap[selectedDay] || [];
   const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Date TBD';
@@ -240,6 +252,33 @@ const DailyPlanHub = () => {
                       </span>
                       <h3 className="font-bold text-white text-lg">{dest.header}</h3>
                       <p className="text-sm text-neutral-400 mt-1">{dest.location}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-pink-400 flex items-center gap-2">📸 Tarjetas de Imagen</h2>
+                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeImageCards.length}</span>
+                </div>
+                <Link to="/admin-image-cards" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
+              </div>
+              <div className="space-y-3">
+                {activeImageCards.length === 0 ? (
+                  <p className="text-neutral-500 text-sm italic">Sin tarjetas de imagen asignadas.</p>
+                ) : (
+                  activeImageCards.map(card => (
+                    <div key={card.id} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center gap-3">
+                      {card.images?.[0] && (
+                        <img src={card.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-sm truncate">{card.caption || '(sin título)'}</p>
+                        <p className="text-xs text-neutral-500">{(card.images || []).length} imagen{(card.images || []).length === 1 ? '' : 'es'}</p>
+                      </div>
                     </div>
                   ))
                 )}

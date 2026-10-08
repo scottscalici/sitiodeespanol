@@ -69,6 +69,7 @@ import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
+import ImageCardsManager from './admin/managers/ImageCardsManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
@@ -502,6 +503,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CuriosidadesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-image-cards"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ImageCardsManager />
                 </AdminRoute>
               }
             />

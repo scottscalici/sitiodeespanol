@@ -24,6 +24,7 @@ import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
+import ImageCards from '../components/ImageCards';
 import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
 import Anuncios from '../components/Anuncios';
@@ -344,6 +345,10 @@ const Dashboard = () => {
     return Number(c.dia) === liveDia;
   });
 
+  const activeImageCards = (data?.imageCards || []).filter(c =>
+    c.course === course && Number(c.dia) === liveDia
+  );
+
   const activeRecursos = (data?.recursos || []).filter(r => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
@@ -436,6 +441,9 @@ const Dashboard = () => {
 
               {/* 💡 CURIOSIDAD */}
               <Curiosidad curiosidades={activeCuriosidades} />
+
+              {/* 📸 TARJETAS DE IMAGEN — one-off photo shares */}
+              <ImageCards cards={activeImageCards} />
   
               {/* 🏗️ ESTRUCTURA — its own "Índice" button lives in the card's header */}
               <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
