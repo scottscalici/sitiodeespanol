@@ -18,20 +18,21 @@ export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr,
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 };
 
-// Every curiosidad that actually has interactive questions attached, applies
-// to `course` (via its s2_dia/s4_dia/etc. field), and is due on or before
-// `todayStr` — same "assigned once its day arrives" gate and quarter-date
-// filtering as getAssignedWarmups above, just resolving the day number from
-// a course-specific field (one curiosidad doc covers every course, unlike
-// calentamientos which are separate per-course docs) instead of a plain
-// `dia` + `course` pair. The curiosidad's own day field IS its due date —
-// the same number the Dashboard card already uses to decide when to show it.
+// Every curiosidad that actually has interactive questions attached, isn't
+// excused, applies to `course` (via its s2_dia/s4_dia/etc. field), and is
+// due on or before `todayStr` — same "assigned once its day arrives" gate,
+// `!excused` check, and quarter-date filtering as getAssignedWarmups above,
+// just resolving the day number from a course-specific field (one
+// curiosidad doc covers every course, unlike calentamientos which are
+// separate per-course docs) instead of a plain `dia` + `course` pair. The
+// curiosidad's own day field IS its due date — the same number the
+// Dashboard card already uses to decide when to show it.
 export const getAssignedCuriosidades = (curiosidades, fechaByDia, course, todayStr, dateRange) => {
   // Matches Curiosidad.jsx's own field-per-course convention (s2_dia,
   // s4_dia, ib_dia, ...) with a plain `dia` fallback for anything generic.
   const getDia = (c) => c[`${course}_dia`] ?? c.dia;
   return curiosidades
-    .filter((c) => getDia(c) != null && c.questions?.length > 0)
+    .filter((c) => getDia(c) != null && c.questions?.length > 0 && !c.excused)
     .map((c) => {
       const dia = getDia(c);
       return { ...c, dia, fecha: fechaByDia[Number(dia)] };
