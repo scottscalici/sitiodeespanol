@@ -896,7 +896,17 @@ const handleResetPassword = async () => {
                     return (
                       <tr key={student.uid} className="hover:bg-slate-700/20 transition-colors">
                         <td className="p-4 pl-6 sticky left-0 bg-slate-800">
-                          <p className="font-bold text-white">{displayName}</p>
+                          <p className="font-bold text-white flex items-center gap-2">
+                            {displayName}
+                            {student.streak_count > 0 && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[10px] font-black text-orange-400 shrink-0"
+                                title="Racha actual (días consecutivos activo)"
+                              >
+                                🔥{student.streak_count}
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-slate-500 mt-1">{student.email}</p>
                         </td>
 
