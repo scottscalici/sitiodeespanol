@@ -36,6 +36,8 @@ import ConversacionesManager from './admin/managers/ConversacionesManager';
 import ConectoresEngine from './student/ConectoresEngine';
 import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
+import TriviaLobbyPage from './student/TriviaLobbyPage';
+import TriviaRoomPage from './student/TriviaRoomPage';
 import SampleSentencesPage from './student/SampleSentencesPage';
 import SilabasPage from './student/SilabasPage';
 import HallOfFamePage from './student/HallOfFamePage';
@@ -70,6 +72,7 @@ import VerbAudit from './admin/managers/VerbAudit';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import ImageCardsManager from './admin/managers/ImageCardsManager';
+import QuestionPoolManager from './admin/managers/QuestionPoolManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
@@ -181,6 +184,8 @@ function App() {
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
             <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
+            <Route path="/juegos/trivia" element={<TriviaLobbyPage />} />
+            <Route path="/juegos/trivia/:roomCode" element={<TriviaRoomPage />} />
             <Route path="/juegos/silabas" element={<SilabasPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
@@ -511,6 +516,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ImageCardsManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-question-pool"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <QuestionPoolManager />
                 </AdminRoute>
               }
             />
