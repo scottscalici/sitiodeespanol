@@ -98,10 +98,12 @@ const RecreoHub = () => {
             <div className="absolute top-4 right-4 z-20 bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-500/50">
               Nuevo
             </div>
-            <img src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png" 
-                 alt="Impostor" 
-                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-               />
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png"
+                   alt="Impostor"
+                   className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                 />
+            </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Impostor</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra al impostor en tu mesa. Juega en grupo, en vivo, en español.</p>
             <div className="text-indigo-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
