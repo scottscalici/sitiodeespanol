@@ -28,6 +28,12 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
   // separate from the ranking points students earn, which are computed from
   // accuracy in CuriosidadQuizEngine regardless of this value.
   const [gradeWeight, setGradeWeight] = useState(curiosidad.gradeWeight ?? 1);
+  // Excludes this curiosidad entirely from the pooled "Promedio
+  // Calentamientos" average (gradebook and student dashboard alike) —
+  // same blanket excuse PracticeCardAdmin/CalentamientoAdmin already have,
+  // for the whole class rather than one student (that's the gradebook's
+  // own per-student override instead).
+  const [excused, setExcused] = useState(curiosidad.excused || false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -158,6 +164,7 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
         questions: modeCorrectedQuestions,
         minSeconds: Number(minSeconds) || 60,
         gradeWeight: Number(gradeWeight) || 1,
+        excused,
       });
       onClose();
     } catch (err) {
@@ -236,6 +243,17 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                 🏆 Jeopardy (categorías)
               </button>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <div>
+              <p className="text-xs font-black text-slate-700 uppercase tracking-widest">Excusar esta Curiosidad</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Se excluye por completo del promedio (gradebook y panel del estudiante).</p>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer bg-white px-3 py-2 rounded-xl border border-slate-300 shrink-0">
+              <input type="checkbox" checked={excused} onChange={(e) => setExcused(e.target.checked)} className="rounded text-amber-500" />
+              <span>Excusada</span>
+            </label>
           </div>
 
           {questions.length === 0 && (

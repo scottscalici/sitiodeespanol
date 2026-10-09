@@ -4,10 +4,10 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getCachedCollection, getCachedQuery } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedQuery, getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
-import { getAssignedWarmups, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
+import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 
 // Components
@@ -24,6 +24,7 @@ import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
+import ImageCards from '../components/ImageCards';
 import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
 import Anuncios from '../components/Anuncios';
@@ -110,9 +111,10 @@ const Dashboard = () => {
   // Calentamiento promedio: a calentamiento counts once its day's date has
   // arrived; a missed one counts as a 0 instead of being skipped, so this
   // matches the teacher gradebook's average. Practice cards (small graded
-  // activities like Gustar) are assigned/graded the exact same way and fold
-  // into this SAME average, tagged with `kind` so the breakdown modal below
-  // can tell the two apart (different link target, different error shape).
+  // activities like Gustar) and curiosidades are assigned/graded the same
+  // way and fold into this SAME average, tagged with `kind` so the
+  // breakdown modal below can tell the three apart (different link target,
+  // different error shape) — mirrors TeacherGradebook's getCombinedBreakdown.
   useEffect(() => {
     const computeWarmupBreakdown = async () => {
       if (!course || !data?.cal?.length) return;
@@ -126,26 +128,41 @@ const Dashboard = () => {
           getCachedQuery(`${name}:course:${course}`, () =>
             getDocs(query(collection(db, name), where('course', '==', course)))
           );
-        const [calentamientos, allPracticeCards] = await Promise.all([
+        const [calentamientos, allPracticeCards, curiosidadesBundle] = await Promise.all([
           scopedQuery('calentamientos'),
           scopedQuery('practice_cards'),
+          // One doc for every course (unlike the two above) — flattened the
+          // same way TeacherGradebook reads it.
+          getCachedDoc('curiosidades', '_bundle'),
         ]);
         setPracticeCards(allPracticeCards);
         const todayStr = new Date().toLocaleDateString('en-CA');
 
+        const curiosidadItems = curiosidadesBundle?.items || {};
+        const allCuriosidades = Object.entries(curiosidadItems).map(([id, item]) => ({ id, ...item }));
+
         const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
         const assignedPractice = getAssignedWarmups(allPracticeCards, fechaByDia, course, todayStr, null);
+        const assignedCuriosidades = getAssignedCuriosidades(allCuriosidades, fechaByDia, course, todayStr, null);
         const practicePossible = (c) => c.gradeWeight || 1;
+        const curiosidadPossible = (c) => c.gradeWeight || 1;
+        // Flat completion credit — the accuracy percentage stored alongside
+        // `completed` drives ranking points elsewhere, never the class grade.
+        const curiosidadGrade = (entry) => (entry?.completed ? 100 : 0);
         setWarmupBreakdown([
           ...buildWarmupBreakdown(assigned, userData?.progress?.warmups || {}).map((b) => ({ ...b, kind: 'calentamiento' })),
           ...buildWarmupBreakdown(assignedPractice, userData?.progress?.practiceCards || {}, practicePossible).map((b) => ({ ...b, kind: 'practica' })),
+          ...buildWarmupBreakdown(assignedCuriosidades, userData?.progress?.curiosidades || {}, curiosidadPossible, curiosidadGrade).map((b) => ({
+            ...b,
+            kind: 'curiosidad',
+          })),
         ]);
       } catch (error) {
         console.error('Error computing warmup breakdown:', error);
       }
     };
     computeWarmupBreakdown();
-  }, [course, data?.cal, fechaByDia, userData?.progress?.warmups, userData?.progress?.practiceCards]);
+  }, [course, data?.cal, fechaByDia, userData?.progress?.warmups, userData?.progress?.practiceCards, userData?.progress?.curiosidades]);
 
   // Fetch Music
   useEffect(() => {
@@ -328,6 +345,10 @@ const Dashboard = () => {
     return Number(c.dia) === liveDia;
   });
 
+  const activeImageCards = (data?.imageCards || []).filter(c =>
+    c.course === course && Number(c.dia) === liveDia
+  );
+
   const activeRecursos = (data?.recursos || []).filter(r => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
@@ -420,6 +441,9 @@ const Dashboard = () => {
 
               {/* 💡 CURIOSIDAD */}
               <Curiosidad curiosidades={activeCuriosidades} />
+
+              {/* 📸 TARJETAS DE IMAGEN — one-off photo shares */}
+              <ImageCards cards={activeImageCards} />
   
               {/* 🏗️ ESTRUCTURA — its own "Índice" button lives in the card's header */}
               <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
@@ -767,6 +791,7 @@ const Dashboard = () => {
                       : 'bg-emerald-50 text-emerald-600 border-emerald-200';
 
                     const isPractica = item.kind === 'practica';
+                    const isCuriosidad = item.kind === 'curiosidad';
                     // An excused item has nothing left to do — show it as a
                     // plain (non-clickable) row instead of linking into the
                     // activity, so a student isn't prompted to complete
@@ -775,7 +800,11 @@ const Dashboard = () => {
                     const cardProps = item.excusedByTeacher
                       ? {}
                       : {
-                          to: isPractica ? `/practica/tarjeta/${item.course}/${item.dia}` : `/calentamiento/${item.course}/${item.dia}`,
+                          to: isCuriosidad
+                            ? `/curiosidad-quiz/${item.id}`
+                            : isPractica
+                            ? `/practica/tarjeta/${item.course}/${item.dia}`
+                            : `/calentamiento/${item.course}/${item.dia}`,
                           onClick: () => setShowWarmupModal(false),
                         };
                     return (
@@ -788,7 +817,7 @@ const Dashboard = () => {
                       >
                         <div className="flex justify-between items-center gap-3">
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-800 text-sm truncate">{isPractica ? '✏️' : '🔥'} Día {item.dia}: {item.title}</p>
+                            <p className="font-bold text-slate-800 text-sm truncate">{isCuriosidad ? '✨' : isPractica ? '✏️' : '🔥'} Día {item.dia}: {item.title}</p>
                             <p className="text-[10px] text-slate-400 font-mono">{item.fecha}</p>
                           </div>
                           <div className={`shrink-0 border rounded-lg px-3 py-1.5 text-center min-w-[70px] font-black text-xs ${gradeClasses}`}>

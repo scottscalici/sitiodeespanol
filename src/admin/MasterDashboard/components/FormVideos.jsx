@@ -1,4 +1,6 @@
 import React from 'react';
+import { toYoutubeEmbedUrl } from '../../../utils/youtube';
+import ImageUploadField from '../../shared/ImageUploadField';
 
 export default function FormVideos({ actividad, setActividad }) {
   if (!actividad) return null;
@@ -38,23 +40,23 @@ export default function FormVideos({ actividad, setActividad }) {
           </div>
 
           <div className="flex flex-col">
-            <label className="font-bold mb-1 text-sm">Video URL (YouTube Embed format)</label>
-            <input 
-              type="text" 
-              value={actividad?.video_url || ""} 
-              onChange={(e) => setActividad({...actividad, video_url: e.target.value})}
+            <label className="font-bold mb-1 text-sm">Video URL (link normal o embed de YouTube)</label>
+            <input
+              type="text"
+              value={actividad?.video_url || ""}
+              onChange={(e) => setActividad({...actividad, video_url: toYoutubeEmbedUrl(e.target.value)})}
               className="p-2 border rounded text-blue-600 font-mono text-sm"
-              placeholder="https://www.youtube.com/embed/..."
+              placeholder="https://www.youtube.com/watch?v=... o .../embed/..."
             />
           </div>
 
           <div className="flex flex-col">
             <label className="font-bold mb-1 text-sm">Thumbnail URL (Fallback/Override)</label>
-            <input 
-              type="text" 
-              value={actividad?.thumbnail_url || ""} 
-              onChange={(e) => setActividad({...actividad, thumbnail_url: e.target.value})}
-              className="p-2 border rounded font-mono text-sm"
+            <ImageUploadField
+              value={actividad?.thumbnail_url}
+              onChange={(url) => setActividad({...actividad, thumbnail_url: url})}
+              folder="videos"
+              inputClassName="p-2 border rounded font-mono text-sm w-full"
             />
           </div>
 

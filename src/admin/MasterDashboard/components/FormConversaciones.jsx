@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { parseConversacionPaste, getRecognizedHeaders } from '../../../utils/conversacionPasteParser';
 
 const VisibilidadCheckbox = ({ field, visibilidad, onToggle }) => (
   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#444', cursor: 'pointer' }}>
@@ -12,6 +13,19 @@ const VisibilidadCheckbox = ({ field, visibilidad, onToggle }) => (
 // modal, which already covers those fields in its own grid row and only
 // opens this form for everything past that (enlaces, tiempos, contenido).
 export default function FormConversaciones({ actividad, setActividad, handleChange, hideClassification = false }) {
+  const [pasteText, setPasteText] = useState('');
+  const [pasteStatus, setPasteStatus] = useState('');
+  const [showPasteBox, setShowPasteBox] = useState(false);
+
+  const handleApplyPaste = () => {
+    const { actividad: updated, matchCount } = parseConversacionPaste(pasteText, actividad);
+    if (matchCount === 0) {
+      setPasteStatus('No se reconoció ningún encabezado — revisa que cada sección empiece con uno de los títulos de la lista.');
+      return;
+    }
+    setActividad(updated);
+    setPasteStatus(`✅ Se aplicaron ${matchCount} sección(es). Revisa los campos abajo — puedes seguir editándolos a mano.`);
+  };
 
   // Helper for comma-separated numbers (dias)
   const handleDiasChange = (e) => {
@@ -126,7 +140,37 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      
+
+      {/* --- PEGAR CONTENIDO (paste-to-fill) --- */}
+      <div style={{ padding: '15px', border: '1px solid #a5b4fc', borderRadius: '6px', backgroundColor: '#eef2ff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 style={{ margin: 0 }}>📋 Pegar Contenido</h4>
+          <button type="button" onClick={() => setShowPasteBox((v) => !v)} style={{ padding: '6px 12px', cursor: 'pointer' }}>
+            {showPasteBox ? 'Ocultar' : 'Mostrar'}
+          </button>
+        </div>
+        {showPasteBox && (
+          <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <p style={{ fontSize: '12px', color: '#4338ca', margin: 0 }}>
+              Escribe o pega un bloque de texto con encabezados — cada sección que reconozca se rellena sola abajo.
+              Encabezados reconocidos: {getRecognizedHeaders().map((h) => h.toUpperCase()).join(', ')}.
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={'ESCENARIO:\n...\n\nMODELO:\n...\n\nPREGUNTAS NIVEL 1:\n¿...?\n¿...?'}
+              style={{ padding: '10px', minHeight: '160px', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '13px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button type="button" onClick={handleApplyPaste} style={{ padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Aplicar a los campos
+              </button>
+              {pasteStatus && <span style={{ fontSize: '12px', color: '#4338ca' }}>{pasteStatus}</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* --- CLASIFICACIÓN --- */}
       {!hideClassification && (
       <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f8f9fa' }}>

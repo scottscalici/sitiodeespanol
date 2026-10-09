@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 import { shuffle } from './clozeShared';
 
@@ -27,19 +27,43 @@ export const finalizeQuestion = (q) => {
 export const reconstructQuestion = (q) =>
   q.distractorsText !== undefined ? q : { ...q, distractorsText: (q.distractors || []).join('\n') };
 
+// Pure, given an {assignments} snapshot (deferred mode's own shape — see
+// DeferredRenderer below) — see dropdownCloze.jsx's gradeState for why this
+// is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => {
+  const assignments = state?.assignments || [];
+  return question.pairs.map((pair, i) => pair.answer === assignments[i]);
+};
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Self-contained: owns its own interaction state, remounts fresh whenever
 // the caller changes its `key` (e.g. on navigating to a different question).
 // Calls onItemFirstAttempt(pairIdx, isCorrect) once per pair's first attempt,
 // and onAllCorrect() once every pair has been matched.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
-  const [matchedPairIdx, setMatchedPairIdx] = useState([]);
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const [matchedPairIdx, setMatchedPairIdx] = useState(() => initialState?.matchedPairIdx || []);
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
   const [shuffledAnswers] = useState(() =>
     shuffle(question.pairs.map((p) => p.answer).concat(question.distractors || []))
   );
   const [wrongFlashIdx, setWrongFlashIdx] = useState(null);
   const attemptedRef = React.useRef({});
+
+  // Resuming an already-fully-matched question re-shows the advance
+  // control right away, without requiring another match.
+  useEffect(() => {
+    if (initialState?.matchedPairIdx?.length === question.pairs.length) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ matchedPairIdx });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedPairIdx]);
 
   const handleSelectLeft = (pairIdx) => {
     if (matchedPairIdx.includes(pairIdx)) return;
@@ -111,6 +135,106 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
                     ? 'opacity-20 pointer-events-none bg-slate-950 border-slate-900 text-slate-700'
                     : wrongFlashIdx === aIdx
                     ? 'border-rose-500 bg-rose-950 text-rose-300'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
+                }`}
+              >
+                {answer}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Deferred mode trades instant-match-on-click for a reassignable "slot"
+// per left item: click a left item, then an answer tile to assign it —
+// freely changeable (picking a new answer for an already-assigned item
+// just overwrites it, freeing its old answer back into the pool) and never
+// locked, since the student may fix a wrong pairing and resubmit. An
+// answer already assigned to a DIFFERENT pair is left out of the grid —
+// same "spend once, free the moment you reassign" mechanic the word-bank
+// cloze types use — rather than instant-correct/wrong feedback per click.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const pairCount = question.pairs.length;
+  const [assignments, setAssignments] = useState(() => initialState?.assignments || Array(pairCount).fill(null));
+  const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
+  const [shuffledAnswers] = useState(() =>
+    shuffle(question.pairs.map((p) => p.answer).concat(question.distractors || []))
+  );
+
+  useEffect(() => {
+    onStateChange?.({ assignments });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments]);
+
+  const correct = submitted ? gradeState(question, { assignments }) : Array(pairCount).fill(null);
+  const completedCount = submitted ? correct.filter((c) => c === true).length : assignments.filter(Boolean).length;
+
+  const handleAssign = (answer) => {
+    if (selectedLeftIdx === null) return;
+    setAssignments((prev) => prev.map((v, i) => (i === selectedLeftIdx ? answer : v)));
+    setSelectedLeftIdx(null);
+  };
+
+  return (
+    <div>
+      {pairCount > 1 && (
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
+          {completedCount} de {pairCount} {submitted ? 'correctos' : 'emparejados'}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-2">
+          {question.pairs.map((pair, pIdx) => {
+            const isCorrect = correct[pIdx];
+            return (
+              <button
+                key={pIdx}
+                onClick={() => setSelectedLeftIdx(pIdx)}
+                className={`w-full p-2 border rounded-xl text-left transition-all ${
+                  isCorrect === true
+                    ? 'border-emerald-500 bg-emerald-950'
+                    : isCorrect === false
+                    ? 'border-rose-500 bg-rose-950'
+                    : selectedLeftIdx === pIdx
+                    ? 'border-sky-400 bg-sky-950'
+                    : 'bg-slate-900 border-slate-700 hover:border-slate-500'
+                }`}
+              >
+                {pair.left.type === 'image' ? (
+                  <img src={pair.left.value} alt="" className="w-full h-32 object-contain bg-slate-950 rounded-lg" />
+                ) : (
+                  <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
+                )}
+                {assignments[pIdx] && (
+                  <span
+                    className={`block mt-1 text-[10px] font-black uppercase tracking-widest ${
+                      isCorrect === true ? 'text-emerald-400' : isCorrect === false ? 'text-rose-400' : 'text-sky-300'
+                    }`}
+                  >
+                    → {assignments[pIdx]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          {shuffledAnswers.map((answer, aIdx) => {
+            const usedElsewhere = assignments.some((a, i) => i !== selectedLeftIdx && a === answer);
+            if (usedElsewhere) return null;
+            const isSelectedPairsAnswer = selectedLeftIdx !== null && assignments[selectedLeftIdx] === answer;
+            return (
+              <button
+                key={aIdx}
+                onClick={() => handleAssign(answer)}
+                disabled={selectedLeftIdx === null}
+                className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all disabled:opacity-40 ${
+                  isSelectedPairsAnswer
+                    ? 'border-sky-400 bg-sky-950 text-slate-100'
                     : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
                 }`}
               >

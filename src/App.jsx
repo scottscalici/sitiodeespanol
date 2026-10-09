@@ -29,6 +29,7 @@ import VocabIndexPage from './student/VocabIndexPage';
 import GrammarIndexPage from './student/GrammarIndexPage';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
+import ConexionesCulturalesPage from './student/ConexionesCulturalesPage';
 import FotosAzarPage from './student/FotosAzarPage';
 import ResourceHubManager from './admin/managers/ResourceHubManager';
 import ConversacionesManager from './admin/managers/ConversacionesManager';
@@ -68,6 +69,7 @@ import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
+import ImageCardsManager from './admin/managers/ImageCardsManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
@@ -199,6 +201,7 @@ function App() {
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
             <Route path="/lectura/:lecturaId" element={<LecturaPage />} /> {/* 👈 STUDENT ROUTE */}
             <Route path="/glosario-idiomatico" element={<GlosarioIdiomaticoPage />} />
+            <Route path="/conexiones-culturales" element={<ConexionesCulturalesPage />} />
             <Route path="/fotos-azar" element={<FotosAzarPage />} />
             <Route path="/practica/conectores" element={<ConectoresEngine />} />
             <Route path="/salon-de-la-fama/:courseId" element={<HallOfFamePage />} />
@@ -500,6 +503,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CuriosidadesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-image-cards"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ImageCardsManager />
                 </AdminRoute>
               }
             />

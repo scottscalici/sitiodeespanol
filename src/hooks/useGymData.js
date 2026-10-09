@@ -232,7 +232,8 @@ export const useGymData = (userCourse = 's2') => {
           atando,
           evalsMaster,
           curios,
-          gramaticaMaster // <--- New Fetcher Executed
+          gramaticaMaster, // <--- New Fetcher Executed
+          imageCards,
         ] = await Promise.all([
           fetchCalendar(),
           safeFetchText(CONFIG.DICTIONARY),
@@ -253,7 +254,8 @@ export const useGymData = (userCourse = 's2') => {
           fetchFirestoreArray('juego_atandocabos', 'eslabones'),
           fetchEvalsMaster(),
           fetchBundledArray('curiosidades'),
-          fetchGramaticaMaster() // <--- Added here
+          fetchGramaticaMaster(), // <--- Added here
+          fetchBundledArray('image_cards'),
         ]);
 
         const validDictionary = dictText
@@ -298,6 +300,7 @@ export const useGymData = (userCourse = 's2') => {
           apuntes,
           atando,
           activities: allActivities,
+          imageCards,
         });
       } catch (error) {
         console.error('Error fetching data:', error);

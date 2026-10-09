@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { shuffle } from './clozeShared';
 
 export const TYPE_KEY = 'multiple_choice';
@@ -35,15 +35,35 @@ export const parseBulkRowPlain = (line) => {
   return { type: 'multiple_choice', prompt: clue, category: '', options: shuffle([answer, ...distractors]), answer };
 };
 
+// Pure, given a {selectedIdx} snapshot — see dropdownCloze.jsx's gradeState
+// for why this is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => [question.options[state?.selectedIdx] === question.answer];
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Resolves the instant you click an option — one gradable item, first-
 // attempt-only, lock on correct. Options render as a responsive grid: 2 or 4
 // side-by-side pairs (4 wraps into a 2x2 block), 3 all in one row.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
-  const [selectedIdx, setSelectedIdx] = useState(null);
-  const [done, setDone] = useState(false);
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx ?? null);
+  const [done, setDone] = useState(() => initialState?.done || false);
   const [wrongFlash, setWrongFlash] = useState(false);
   const attemptedRef = React.useRef(false);
+
+  // Resuming an already-resolved question re-shows the advance control
+  // right away, without requiring another click.
+  useEffect(() => {
+    if (initialState?.done) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx, done });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx, done]);
 
   const handleSelect = (oIdx) => {
     if (done) return;
@@ -84,6 +104,47 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
                 ? 'border-sky-400 bg-sky-950 text-slate-100'
                 : 'bg-slate-900 border-slate-700 text-slate-200 hover:border-amber-400'
             } ${done && !isSelected ? 'opacity-40' : ''}`}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Freely editable at all times — no lock-on-correct, since the student may
+// change their pick and resubmit for a better score. Grading only shows
+// once the caller says the whole card has been submitted.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx ?? null);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx]);
+
+  const isCorrect = submitted ? gradeState(question, { selectedIdx })[0] : null;
+
+  return (
+    <div className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      {question.options.map((opt, oIdx) => {
+        const isSelected = selectedIdx === oIdx;
+        const showWrong = isSelected && isCorrect === false;
+        const showCorrect = isSelected && isCorrect === true;
+        return (
+          <button
+            key={oIdx}
+            onClick={() => setSelectedIdx(oIdx)}
+            className={`p-4 border-2 rounded-xl font-bold text-sm transition-all ${
+              showWrong
+                ? 'border-rose-500 bg-rose-950 text-rose-300'
+                : showCorrect
+                ? 'border-emerald-500 bg-emerald-950 text-emerald-300'
+                : isSelected
+                ? 'border-sky-400 bg-sky-950 text-slate-100'
+                : 'bg-slate-900 border-slate-700 text-slate-200 hover:border-amber-400'
+            }`}
           >
             {opt}
           </button>

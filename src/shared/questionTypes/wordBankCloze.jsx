@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 import { renderClozeText, ClozeChrome, sameWord, buildWordBank } from './clozeShared';
 import { parseLines, parseAnswerTokens } from './text';
@@ -31,36 +31,77 @@ export const reconstructQuestion = (q) => {
   return { ...q, rawText, distractorsText };
 };
 
+// Pure, given a {selections} snapshot — see dropdownCloze.jsx's gradeState
+// for why this is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => {
+  const selections = state?.selections || [];
+  return question.answers.map((answer, i) => sameWord(answer, selections[i]));
+};
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Every blank shares the SAME word bank; a word already correctly placed in
 // one blank disappears from the others (same as a paper word bank), while
-// distractors (never correct anywhere) stay available throughout.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
+// distractors (never correct anywhere) stay available throughout. Grading is
+// deferred to an explicit "Revisar" click (not on every selection), same
+// submit-then-grade model as dropdown_cloze — a word only leaves the shared
+// bank once Revisar actually confirms it's correct, not the instant it's
+// picked.
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const blankCount = question.answers.length;
-  const [selections, setSelections] = useState(() => Array(blankCount).fill(''));
-  const [correct, setCorrect] = useState(() => Array(blankCount).fill(false));
-  const [wrongFlash, setWrongFlash] = useState(null);
+  const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
+  const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
+  const [wrongAttempted, setWrongAttempted] = useState(() => initialState?.wrongAttempted || Array(blankCount).fill(false));
   const attemptedRef = React.useRef({});
+
+  // Resuming an already-fully-correct question re-shows the advance
+  // control right away, without requiring another Revisar click.
+  useEffect(() => {
+    if (initialState?.correct?.length && initialState.correct.every(Boolean)) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selections, correct, wrongAttempted });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections, correct, wrongAttempted]);
 
   const handleSelect = (blankIdx, value) => {
     if (correct[blankIdx]) return;
-    const isCorrect = sameWord(question.answers[blankIdx], value);
-
-    if (!attemptedRef.current[blankIdx]) {
-      attemptedRef.current[blankIdx] = true;
-      onItemFirstAttempt(blankIdx, isCorrect);
-    }
-
     setSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
-    if (isCorrect) {
-      const next = correct.map((c, i) => (i === blankIdx ? true : c));
-      setCorrect(next);
-      if (next.every(Boolean)) onAllCorrect();
-    } else {
-      setWrongFlash(blankIdx);
-      setTimeout(() => setWrongFlash(null), 400);
-    }
+    setWrongAttempted((prev) => prev.map((w, i) => (i === blankIdx ? false : w)));
   };
+
+  const handleRevisar = () => {
+    const nextCorrect = [...correct];
+    const nextWrong = [...wrongAttempted];
+
+    question.answers.forEach((answer, i) => {
+      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
+      const isCorrect = sameWord(answer, selections[i]);
+
+      if (!attemptedRef.current[i]) {
+        attemptedRef.current[i] = true;
+        onItemFirstAttempt(i, isCorrect);
+      }
+
+      if (isCorrect) {
+        nextCorrect[i] = true;
+        nextWrong[i] = false;
+      } else {
+        nextWrong[i] = true;
+      }
+    });
+
+    setCorrect(nextCorrect);
+    setWrongAttempted(nextWrong);
+    if (nextCorrect.every(Boolean)) onAllCorrect();
+  };
+
+  const allCorrect = correct.every(Boolean);
 
   const optionsForBlank = (blankIdx) => {
     const usedElsewhere = question.answers.filter((_, j) => j !== blankIdx && correct[j]);
@@ -68,8 +109,57 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
   };
 
   return (
-    <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
-      {renderClozeText(question.text, selections, correct, wrongFlash, handleSelect, optionsForBlank)}
+    <div>
+      <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
+        {renderClozeText(question.text, selections, correct, wrongAttempted, handleSelect, optionsForBlank)}
+      </ClozeChrome>
+      {!allCorrect && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleRevisar}
+            className="bg-sky-600 hover:bg-sky-700 text-white font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl transition-colors"
+          >
+            Revisar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Freely editable at all times, no Revisar step — grading only shows once
+// the caller says the whole card has been submitted, re-coloring live as
+// the student keeps editing. Word-bank depletion here is based on the
+// CURRENT tentative pick (any blank with a word in it removes that word
+// from every other blank's options), not on confirmed correctness like the
+// retry version — there's no such confirmation pre-submit, and a real word
+// bank works the same way: a word is "spent" the moment you place it,
+// right or wrong, freeing back up the moment you change your mind.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const blankCount = question.answers.length;
+  const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
+
+  useEffect(() => {
+    onStateChange?.({ selections });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selections]);
+
+  const handleSelect = (blankIdx, value) => {
+    setSelections((prev) => prev.map((v, i) => (i === blankIdx ? value : v)));
+  };
+
+  const correct = submitted ? gradeState(question, { selections }) : Array(blankCount).fill(null);
+  const wrong = correct.map((c) => c === false);
+  const completedCount = submitted ? correct.filter((c) => c === true).length : selections.filter(Boolean).length;
+
+  const optionsForBlank = (blankIdx) => {
+    const usedElsewhere = selections.filter((v, j) => j !== blankIdx && v);
+    return (question.wordBank || []).filter((w) => !usedElsewhere.some((v) => sameWord(v, w)));
+  };
+
+  return (
+    <ClozeChrome img={question.img} completed={completedCount} total={blankCount}>
+      {renderClozeText(question.text, selections, correct, wrong, handleSelect, optionsForBlank, { lockOnCorrect: false })}
     </ClozeChrome>
   );
 };

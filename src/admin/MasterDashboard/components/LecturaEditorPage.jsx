@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteField, addDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
+import { db, storage } from '../../../firebase';
 import { useNavigate } from 'react-router-dom';
 
 export default function LecturaEditorPage() {
@@ -19,6 +20,10 @@ export default function LecturaEditorPage() {
   });
   
   const [status, setStatus] = useState('');
+  const [showImagePicker, setShowImagePicker] = useState(false);
+  const [existingImages, setExistingImages] = useState(null); // null = not loaded yet
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [imageFilter, setImageFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Fetch all existing lecturas on load
@@ -183,6 +188,59 @@ export default function LecturaEditorPage() {
     }
   };
 
+  // Manual per-reading image fix — for when the bulk uploader's filename
+  // match misses one (e.g. the source file's name doesn't quite match
+  // imagen_filename). Uploads straight to Storage and sets `imagen` on
+  // just this one doc; no need to touch Firestore by hand.
+  const handleImageFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedId || selectedId === 'new') return;
+    setStatus('Subiendo imagen...');
+    try {
+      const storageRef = ref(storage, `lectura_images/${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setActividad((prev) => ({ ...prev, imagen: url }));
+      setStatus('✅ Imagen subida — recuerda hacer clic en "Guardar Cambios" abajo.');
+    } catch (error) {
+      console.error('Error uploading lectura image:', error);
+      setStatus('❌ Error al subir la imagen.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  // Lazy-loads every file already in Storage's lectura_images/ folder (only
+  // when the picker is first opened) so a reading can reuse an image that's
+  // already there — e.g. a photo uploaded for a sibling Nivel 2/3 doc, or
+  // one from the bulk upload that just needs connecting to a second reading.
+  const toggleImagePicker = async () => {
+    const opening = !showImagePicker;
+    setShowImagePicker(opening);
+    if (opening && existingImages === null) {
+      setLoadingImages(true);
+      try {
+        const listing = await listAll(ref(storage, 'lectura_images'));
+        const items = await Promise.all(
+          listing.items.map(async (item) => ({ name: item.name, url: await getDownloadURL(item) }))
+        );
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        setExistingImages(items);
+      } catch (error) {
+        console.error('Error listing existing lectura images:', error);
+        setStatus('❌ No se pudo cargar la lista de imágenes existentes.');
+      } finally {
+        setLoadingImages(false);
+      }
+    }
+  };
+
+  const handlePickExistingImage = (url) => {
+    setActividad((prev) => ({ ...prev, imagen: url }));
+    setStatus('✅ Imagen seleccionada — recuerda hacer clic en "Guardar Cambios" abajo.');
+    setShowImagePicker(false);
+  };
+
   if (loading) {
     return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest bg-black min-h-screen text-white">Cargando Editor...</div>;
   }
@@ -242,6 +300,72 @@ export default function LecturaEditorPage() {
                   <input name="text_id" value={actividad.text_id || ""} onChange={handleChange} placeholder="A, B, C..." className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500" />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 pt-2 border-t border-neutral-800">
+                <div className="sm:col-span-4 flex flex-col gap-2">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Imagen</label>
+                  {actividad.imagen ? (
+                    <img src={actividad.imagen} alt="" className="w-full h-24 object-cover rounded-lg border border-neutral-800" />
+                  ) : (
+                    <div className="w-full h-24 flex items-center justify-center rounded-lg border border-dashed border-neutral-700 text-neutral-600 text-[10px] uppercase tracking-widest">
+                      Sin imagen
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleImageFileUpload} className="text-[10px] text-neutral-400" />
+                  <button
+                    type="button"
+                    onClick={toggleImagePicker}
+                    className="text-[10px] text-cyan-400 font-bold uppercase hover:underline text-left"
+                  >
+                    {showImagePicker ? 'Ocultar' : '📂 Elegir de imágenes existentes'}
+                  </button>
+                </div>
+                <div className="sm:col-span-8 flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">O pega una URL directamente</label>
+                  <input
+                    value={actividad.imagen || ""}
+                    onChange={(e) => setActividad((prev) => ({ ...prev, imagen: e.target.value }))}
+                    placeholder="https://..."
+                    className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Sube un archivo arriba o pega una URL — cualquiera de las dos funciona. No olvides "Guardar Cambios" al final.
+                  </p>
+                </div>
+              </div>
+
+              {showImagePicker && (
+                <div className="border-t border-neutral-800 pt-4 space-y-3">
+                  <input
+                    value={imageFilter}
+                    onChange={(e) => setImageFilter(e.target.value)}
+                    placeholder="Buscar por nombre de archivo..."
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                  {loadingImages ? (
+                    <p className="text-xs text-neutral-500 italic">Cargando imágenes...</p>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-72 overflow-y-auto">
+                      {(existingImages || [])
+                        .filter((img) => img.name.toLowerCase().includes(imageFilter.trim().toLowerCase()))
+                        .map((img) => (
+                          <button
+                            key={img.name}
+                            type="button"
+                            onClick={() => handlePickExistingImage(img.url)}
+                            title={img.name}
+                            className="group relative aspect-square rounded-lg overflow-hidden border border-neutral-800 hover:border-cyan-500 transition-colors"
+                          >
+                            <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      {(existingImages || []).filter((img) => img.name.toLowerCase().includes(imageFilter.trim().toLowerCase())).length === 0 && (
+                        <p className="col-span-full text-xs text-neutral-500 italic">Sin resultados.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* CONTENIDO DEL TEXTO */}

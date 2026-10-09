@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 
 export const TYPE_KEY = 'image_select';
@@ -18,16 +18,39 @@ export const getItemCount = () => 1;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
+// Pure, given a {selectedIdx} snapshot — see dropdownCloze.jsx's gradeState
+// for why this is the one place "what counts as correct" lives.
+export const gradeState = (question, state) => {
+  const selection = state?.selectedIdx || [];
+  return [[...(question.correctIndices || [])].sort().join(',') === [...selection].sort().join(',')];
+};
+
 // --- Student-facing renderer ---
+// Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
+// contract.
+export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
+
 // Single-correct-answer questions resolve the instant you click one option;
 // multi-correct ones let you toggle several, then confirm. Either way, one
 // gradable item (itemIdx 0), first-attempt-only, lock on correct.
-export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
   const isMultiSelect = (question.correctIndices || []).length > 1;
-  const [selectedIdx, setSelectedIdx] = useState([]);
-  const [done, setDone] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx || []);
+  const [done, setDone] = useState(() => initialState?.done || false);
   const [wrongFlash, setWrongFlash] = useState(false);
   const attemptedRef = React.useRef(false);
+
+  // Resuming an already-resolved question re-shows the advance control
+  // right away, without requiring another selection.
+  useEffect(() => {
+    if (initialState?.done) onAllCorrect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx, done });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx, done]);
 
   const recordAttempt = (selection) => {
     const isCorrect = [...question.correctIndices].sort().join(',') === [...selection].sort().join(',');
@@ -100,6 +123,63 @@ export const Renderer = ({ question, onItemFirstAttempt, onAllCorrect }) => {
           Confirmar Selección
         </button>
       )}
+    </div>
+  );
+};
+
+// Freely editable at all times — a single-select click replaces the pick, a
+// multi-select click toggles membership, no "Confirmar" step needed since
+// there's nothing to lock in until the whole card is submitted. Grading
+// only shows once the caller says that's happened.
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+  const isMultiSelect = (question.correctIndices || []).length > 1;
+  const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx || []);
+
+  useEffect(() => {
+    onStateChange?.({ selectedIdx });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIdx]);
+
+  const handleClick = (oIdx) => {
+    if (isMultiSelect) {
+      setSelectedIdx((prev) => (prev.includes(oIdx) ? prev.filter((i) => i !== oIdx) : [...prev, oIdx]));
+    } else {
+      setSelectedIdx([oIdx]);
+    }
+  };
+
+  const isCorrect = submitted ? gradeState(question, { selectedIdx })[0] : null;
+
+  return (
+    <div>
+      {isMultiSelect && (
+        <p className="text-xs text-slate-400 text-center mb-4">(elige {question.correctIndices.length})</p>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {question.options.map((opt, oIdx) => {
+          const isSelected = selectedIdx.includes(oIdx);
+          const showWrong = isSelected && isCorrect === false;
+          const showCorrect = isSelected && isCorrect === true;
+          return (
+            <button
+              key={oIdx}
+              onClick={() => handleClick(oIdx)}
+              className={`border-2 rounded-xl overflow-hidden transition-all ${
+                showWrong
+                  ? 'border-rose-500'
+                  : showCorrect
+                  ? 'border-emerald-500'
+                  : isSelected
+                  ? 'border-sky-400'
+                  : 'border-slate-700 hover:border-slate-500'
+              }`}
+            >
+              <img src={opt.img} alt={opt.label || ''} className="w-full h-32 object-contain bg-slate-950" />
+              {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 };

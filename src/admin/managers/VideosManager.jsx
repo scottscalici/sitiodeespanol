@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { toYoutubeEmbedUrl } from '../../utils/youtube';
+import ImageUploadField from '../shared/ImageUploadField';
 
 const VideosManager = () => {
   const [items, setItems] = useState([]);
@@ -73,8 +75,18 @@ const VideosManager = () => {
           return { ...item, [field]: numVal };
         }
         if (field === 'tags') {
-          const arr = value.split(',').map(t => t.trim()).filter(t => t !== '');
+          // Deliberately NOT filtering out a trailing empty entry here (e.g.
+          // right after typing "s2," before "s4" follows) — this runs on
+          // every keystroke, and the input's displayed value is this same
+          // array re-joined, so dropping that trailing entry immediately
+          // would erase the comma the instant it's typed, making it look
+          // like commas just don't work. Empty entries are stripped once,
+          // at save time, instead (see handleSave).
+          const arr = value.split(',').map(t => t.trim());
           return { ...item, [field]: arr };
+        }
+        if (field === 'video_url') {
+          return { ...item, [field]: toYoutubeEmbedUrl(value) };
         }
         return { ...item, [field]: value };
       }
@@ -97,6 +109,11 @@ const VideosManager = () => {
         }
         
         const { id, ...dataToSave } = item;
+        // Strip the trailing empty tag editing leaves around (see
+        // handleInputChange's 'tags' case) before this ever reaches Firestore.
+        if (Array.isArray(dataToSave.tags)) {
+          dataToSave.tags = dataToSave.tags.filter((t) => t !== '');
+        }
         batch.set(docRef, dataToSave, { merge: true });
       });
 
@@ -239,12 +256,12 @@ const VideosManager = () => {
                       <span className="text-[9px] font-black text-slate-400">N/A</span>
                     )}
                   </div>
-                  <input 
-                    type="text" 
-                    value={item.thumbnail_url || ''}
-                    onChange={(e) => handleInputChange(item.id, 'thumbnail_url', e.target.value)}
-                    className="w-full bg-white border border-slate-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500 shadow-sm"
+                  <ImageUploadField
+                    value={item.thumbnail_url}
+                    onChange={(url) => handleInputChange(item.id, 'thumbnail_url', url)}
+                    folder="videos"
                     placeholder="Thumbnail URL..."
+                    inputClassName="w-full bg-white border border-slate-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500 shadow-sm"
                   />
                 </div>
 
@@ -264,7 +281,7 @@ const VideosManager = () => {
                     value={item.video_url || item.id || ''}
                     onChange={(e) => handleInputChange(item.id, 'video_url', e.target.value)}
                     className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-purple-500 rounded-md p-2 text-[10px] font-mono text-purple-600 outline-none transition-all shadow-sm"
-                    placeholder="https://youtube.com/embed/..."
+                    placeholder="Link normal o embed de YouTube"
                   />
                 </div>
 

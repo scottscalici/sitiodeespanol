@@ -55,6 +55,7 @@ const LeaderboardCard = ({ course }) => {
               total: d.total_points || d.current_path_points || 0,
               monthly: d.monthKey === monthKey ? (d.monthly_points || 0) : 0,
               weekly: d.weekKey === weekKey ? (d.weekly_points || 0) : 0,
+              streak: d.streak_count || 0,
             };
           });
 
@@ -78,6 +79,14 @@ const LeaderboardCard = ({ course }) => {
   const myIndex = fullRanked.findIndex((s) => s.uid === currentUser?.uid);
   const myRank = myIndex >= 0 ? myIndex + 1 : null;
   const amInTop = myIndex >= 0 && myIndex < 10;
+
+  // Separate from the points tabs above — current daily streak, not a
+  // points metric, so it's always shown by current streak length
+  // regardless of which points tab is active.
+  const topStreaks = students
+    .filter((s) => s.streak > 0)
+    .sort((a, b) => b.streak - a.streak)
+    .slice(0, 3);
 
   return (
     <div
@@ -150,6 +159,37 @@ const LeaderboardCard = ({ course }) => {
             </div>
           )}
         </>
+      )}
+
+      {!loading && topStreaks.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-slate-800">
+          <h4 className="font-black text-slate-400 uppercase tracking-widest text-[10px] mb-2">
+            🔥 Rachas Más Largas
+          </h4>
+          <ol className="space-y-2">
+            {topStreaks.map((student, idx) => {
+              const isMe = currentUser?.uid === student.uid;
+              return (
+                <li
+                  key={student.uid}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 ${
+                    isMe ? 'bg-amber-500/15 border border-amber-500/40' : 'bg-slate-800/50'
+                  }`}
+                >
+                  <span className="w-6 text-center text-sm font-black text-slate-400 shrink-0">
+                    {MEDALS[idx] || `#${idx + 1}`}
+                  </span>
+                  <span className={`flex-1 min-w-0 truncate text-xs font-bold ${isMe ? 'text-amber-300' : 'text-slate-200'}`}>
+                    {student.name}{isMe && ' (Tú)'}
+                  </span>
+                  <span className="text-xs font-black text-orange-400 shrink-0">
+                    {student.streak.toLocaleString()}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
     </div>
   );

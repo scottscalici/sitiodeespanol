@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase.js';
+import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../firebase.js';
 import FormCultura from './components/FormCultura';
 import FormConversaciones from './components/FormConversaciones';
 import FormAnuncios from './components/FormAnuncios';
@@ -224,6 +225,10 @@ export default function MasterDashboard() {
                 test_id: "Lectura Cultural",
                 type: "cultural",
                 dia: "",
+                // Matched against an uploaded image's filename by the
+                // "Upload Imágenes" tool below, which fills in `imagen`
+                // with the real Storage URL once that file is uploaded.
+                imagen_filename: topic.imageFileName || "",
                 paragraphs: (levelData.readingText || "")
                   .split("\n\n")
                   .map((p) => p.trim())
@@ -437,6 +442,61 @@ export default function MasterDashboard() {
     reader.readAsText(file);
   };
 
+  // Bulk image upload for lectura_cultural — uploads each selected file to
+  // Storage, then matches it against any "lecturas" doc whose
+  // imagen_filename has the same name IGNORING EXTENSION (the source JSON
+  // references the original .png files, but what gets uploaded here is a
+  // resized/recompressed .jpg copy — same base name, different extension)
+  // and writes the resulting download URL into that doc's `imagen` field. A
+  // topic's level_2 and level_3 docs share one image, so one file commonly
+  // updates two docs. Matching is done against one up-front fetch of the
+  // whole collection rather than a per-file query, since Firestore can't
+  // do an extension-insensitive equality match server-side.
+  const stripExt = (filename) => filename.replace(/\.[^./\\]+$/, '').toLowerCase();
+
+  const handleImageBulkUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setIsUploading(true);
+
+    const allLecturas = await getDocs(collection(db, "lecturas"));
+    const byBaseName = new Map();
+    allLecturas.forEach((docSnap) => {
+      const fn = docSnap.data().imagen_filename;
+      if (!fn) return;
+      const base = stripExt(fn);
+      if (!byBaseName.has(base)) byBaseName.set(base, []);
+      byBaseName.get(base).push(docSnap.id);
+    });
+
+    const results = [];
+    for (const file of files) {
+      try {
+        const storageRef = ref(storage, `lectura_images/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+
+        const matchedIds = byBaseName.get(stripExt(file.name)) || [];
+        if (matchedIds.length === 0) {
+          results.push(`⚠️ ${file.name}: subida, pero ninguna lectura la referencia todavía`);
+          continue;
+        }
+        for (const id of matchedIds) {
+          await updateDoc(doc(db, "lecturas", id), { imagen: url });
+        }
+        results.push(`✅ ${file.name}: ${matchedIds.length} lectura(s) actualizada(s)`);
+      } catch (error) {
+        console.error(`Error subiendo ${file.name}:`, error);
+        results.push(`❌ ${file.name}: error al subir`);
+      }
+    }
+
+    fetchData();
+    setIsUploading(false);
+    alert(results.join('\n'));
+    event.target.value = '';
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif' }}>
       <div style={{ width: '30%', borderRight: '1px solid #ccc', padding: '1rem', overflowY: 'auto', backgroundColor: '#f9f9f9' }}>
@@ -463,6 +523,13 @@ export default function MasterDashboard() {
               <h4>Upload JSON</h4>
               <input type="file" accept=".json" multiple onChange={handleJSONUpload} />
               <p style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Puedes seleccionar varios archivos a la vez (ej: los 24 de IB).</p>
+            </div>
+            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#e0f2fe', borderRadius: '4px' }}>
+              <h4>Upload Imágenes (Lectura Cultural)</h4>
+              <input type="file" accept="image/*" multiple onChange={handleImageBulkUpload} />
+              <p style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+                Selecciona todas las fotos a la vez — cada una se asigna sola a la(s) lectura(s) cuyo nombre de archivo coincida (primero sube el JSON de Lectura Cultural).
+              </p>
             </div>
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
               <h4>Import IA HTML</h4>
