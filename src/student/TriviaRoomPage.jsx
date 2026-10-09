@@ -159,11 +159,11 @@ const TriviaRoomPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, room?.gameState, room?.currentQuestionIndex, me?.lastScoredQuestionIndex]);
 
-  // Each player awards their own global XP once the game ends — scaled down
-  // from their big 0-1000-per-question in-room score (not a flat
-  // per-correct rate, so a 20+ question game doesn't dwarf a whole
-  // semester of other activities' points) plus a flat top-5 rank bonus,
-  // mirroring the leaderboard shown between questions.
+  // Each player awards their own global XP once the game ends: 1 flat point
+  // per question just for finishing the game, plus 1 point per 1000 of
+  // their big in-room Kahoot score (so better play earns more without the
+  // in-room score itself leaking in at full scale), plus a top-5 rank
+  // bonus mirroring the leaderboard shown between questions.
   useEffect(() => {
     if (!currentUser || !me || userData?.role === 'admin') return;
     if (room?.gameState !== 'gameover') return;
@@ -173,8 +173,9 @@ const TriviaRoomPage = () => {
     const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
     const rank = ranked.findIndex((p) => p.id === currentUser.uid);
     const rankBonus = [15, 10, 7, 5, 3][rank] || 0;
-    const basePoints = Math.round((me.score || 0) / 500);
-    const totalPoints = basePoints + rankBonus;
+    const participationPoints = room.questions?.length || 0;
+    const scoreBonus = Math.floor((me.score || 0) / 1000);
+    const totalPoints = participationPoints + scoreBonus + rankBonus;
 
     const finish = async () => {
       try {
