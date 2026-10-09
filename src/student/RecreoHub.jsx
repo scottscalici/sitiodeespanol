@@ -128,6 +128,45 @@ const RecreoHub = () => {
             </div>
           </Link>
 
+          {/* 7. RÁFAGA */}
+          <Link to="/juegos/rafaga" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-orange-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:-translate-y-2 overflow-hidden">
+            <div className="absolute top-4 right-4 z-20 bg-orange-500/20 text-orange-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-orange-500/50">
+              Nuevo
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img
+                src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/rafaga.png"
+                alt="Ráfaga"
+                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-orange-400 transition-colors">Ráfaga</h2>
+            <p className="text-slate-400 text-sm font-medium mb-8">Compite con toda la clase en tiempo real. Únete con el código que te dé tu profesor.</p>
+            <div className="text-orange-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
+            </div>
+          </Link>
+
+          {/* 8. ¡ZAS! — logo in place, game not built yet; not a Link since
+              there's nowhere to send a click until it exists. */}
+          <div className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 overflow-hidden opacity-60 cursor-not-allowed">
+            <div className="absolute top-4 right-4 z-20 bg-slate-700 text-slate-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-slate-600">
+              Próximamente
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img
+                src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/zas.png"
+                alt="¡Zas!"
+                className="w-full h-full object-contain grayscale"
+              />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 text-slate-400">¡Zas!</h2>
+            <p className="text-slate-500 text-sm font-medium mb-8">Un nuevo juego está en camino. Vuelve pronto.</p>
+            <div className="text-slate-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              MUY PRONTO
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
