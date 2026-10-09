@@ -184,8 +184,8 @@ function App() {
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
             <Route path="/juegos/impostor" element={<ImpostorLobbyPage />} />
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
-            <Route path="/juegos/trivia" element={<TriviaLobbyPage />} />
-            <Route path="/juegos/trivia/:roomCode" element={<TriviaRoomPage />} />
+            <Route path="/juegos/rafaga" element={<TriviaLobbyPage />} />
+            <Route path="/juegos/rafaga/:roomCode" element={<TriviaRoomPage />} />
             <Route path="/juegos/silabas" element={<SilabasPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />

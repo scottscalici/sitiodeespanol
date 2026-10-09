@@ -115,7 +115,7 @@ const TriviaLobbyPage = () => {
         joinedAt: Date.now(),
       });
 
-      navigate(`/juegos/trivia/${code}`);
+      navigate(`/juegos/rafaga/${code}`);
     } catch (err) {
       console.error('Error creating trivia room:', err);
       setError(`❌ No se pudo crear la sala. (${err.code || err.message})`);
@@ -152,7 +152,7 @@ const TriviaLobbyPage = () => {
         joinedAt: Date.now(),
       }, { merge: true });
 
-      navigate(`/juegos/trivia/${code}`);
+      navigate(`/juegos/rafaga/${code}`);
     } catch (err) {
       console.error('Error joining trivia room:', err);
       setError(`❌ No se pudo unir a la sala. (${err.code || err.message})`);
@@ -170,7 +170,7 @@ const TriviaLobbyPage = () => {
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500">
-            Trivia en Vivo
+            Ráfaga
           </h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Compite en tiempo real con toda la clase</p>
         </div>

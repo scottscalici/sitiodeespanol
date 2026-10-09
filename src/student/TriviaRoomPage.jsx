@@ -217,7 +217,7 @@ const TriviaRoomPage = () => {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4">
         <p className="text-rose-400 font-black uppercase tracking-widest">Esta sala ya no existe.</p>
-        <Link to="/juegos/trivia" className="text-indigo-400 font-bold underline">Volver</Link>
+        <Link to="/juegos/rafaga" className="text-indigo-400 font-bold underline">Volver</Link>
       </div>
     );
   }
