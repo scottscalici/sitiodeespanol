@@ -235,7 +235,7 @@ const TriviaRoomPage = () => {
         {/* LOBBY */}
         {room.gameState === 'lobby' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <h2 className="text-2xl font-black uppercase tracking-tight">Sala de Espera</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tight text-white">Sala de Espera</h2>
             <p className="text-slate-400 text-sm">
               {room.questions.length} pregunta{room.questions.length === 1 ? '' : 's'} · {room.timeLimitSeconds}s cada una
             </p>
@@ -273,7 +273,7 @@ const TriviaRoomPage = () => {
                 {currentQuestion.image && (
                   <img src={currentQuestion.image} alt="" className="max-h-56 mx-auto rounded-xl object-contain" />
                 )}
-                <h2 className="text-2xl sm:text-3xl font-black">{currentQuestion.clue}</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-white">{currentQuestion.clue}</h2>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
                   {currentAnswers.length} de {players.length} han respondido
                 </p>
@@ -344,7 +344,7 @@ const TriviaRoomPage = () => {
         {/* LEADERBOARD */}
         {room.gameState === 'leaderboard' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 text-center">
-            <h2 className="text-2xl font-black uppercase tracking-tight">🏆 Tabla de Líderes</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tight text-white">🏆 Tabla de Líderes</h2>
             <div className="space-y-2">
               {topRanked.slice(0, 5).map((p, idx) => (
                 <div key={p.id} className={`flex items-center justify-between rounded-xl px-4 py-2.5 ${p.id === currentUser?.uid ? 'bg-orange-500/20 border border-orange-500/50' : 'bg-slate-800'}`}>
