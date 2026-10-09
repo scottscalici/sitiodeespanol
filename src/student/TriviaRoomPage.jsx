@@ -159,21 +159,26 @@ const TriviaRoomPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, room?.gameState, room?.currentQuestionIndex, me?.lastScoredQuestionIndex]);
 
-  // Each player awards their own global XP once the game ends — 1 point per
-  // correct answer, flat, matching the "1 point per correct item" rate
-  // Practice Cards already use, deliberately NOT the big 0-1000 in-room
-  // score (that's just for live excitement/ranking within this one game,
-  // not meant to dwarf a whole semester of other activities' points).
+  // Each player awards their own global XP once the game ends — scaled down
+  // from their big 0-1000-per-question in-room score (not a flat
+  // per-correct rate, so a 20+ question game doesn't dwarf a whole
+  // semester of other activities' points) plus a flat top-5 rank bonus,
+  // mirroring the leaderboard shown between questions.
   useEffect(() => {
     if (!currentUser || !me || userData?.role === 'admin') return;
     if (room?.gameState !== 'gameover') return;
     if (me.pointsAwarded || pointsAwardedRef.current) return;
     pointsAwardedRef.current = true;
 
-    const correctCount = me.correctCount || 0;
+    const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const rank = ranked.findIndex((p) => p.id === currentUser.uid);
+    const rankBonus = [15, 10, 7, 5, 3][rank] || 0;
+    const basePoints = Math.round((me.score || 0) / 500);
+    const totalPoints = basePoints + rankBonus;
+
     const finish = async () => {
       try {
-        if (correctCount > 0) await awardPoints(currentUser.uid, correctCount);
+        if (totalPoints > 0) await awardPoints(currentUser.uid, totalPoints);
         await updateDoc(doc(db, 'trivia_rooms', roomCode, 'players', currentUser.uid), { pointsAwarded: true });
       } catch (err) {
         console.error('Error awarding trivia XP:', err);
