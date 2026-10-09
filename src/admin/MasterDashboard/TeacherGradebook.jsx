@@ -10,6 +10,7 @@ import {
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
 import BadgeIcon from '../../components/BadgeIcon';
+import { getAllEarnedBadges, BADGE_TIER_LABELS } from '../../utils/gamification';
 import {
   getAssignedWarmups,
   getAssignedCuriosidades,
@@ -97,6 +98,7 @@ export default function TeacherGradebook() {
   const [trophyModal, setTrophyModal] = useState(null); // { uid, email, name, icon, note, status }
   const [awardingTrophy, setAwardingTrophy] = useState(false);
   const [badgeCatalog, setBadgeCatalog] = useState([]); // Insignias catalog, for "pick an existing badge" in the trophy modal
+  const [learningPathsById, setLearningPathsById] = useState({}); // for deriving a student's already-earned pod badges
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -134,6 +136,18 @@ export default function TeacherGradebook() {
         setBadgeCatalog(snap.exists() ? snap.data().badges || [] : []);
       } catch (error) {
         console.error('Error fetching badge catalog:', error);
+      }
+    };
+
+    // Same data Header.jsx uses to compute a student's own earned badges —
+    // lets the trophy modal show what a student has ALREADY earned, not
+    // just let a teacher hand-award a new one.
+    const fetchLearningPaths = async () => {
+      try {
+        const paths = await getCachedCollection('learning_paths');
+        setLearningPathsById(Object.fromEntries(paths.map((p) => [p.id, p])));
+      } catch (error) {
+        console.error('Error fetching learning paths for badge lookup:', error);
       }
     };
 
@@ -212,7 +226,7 @@ export default function TeacherGradebook() {
       }
     };
 
-    await Promise.all([fetchStudents(), fetchQuarters(), fetchBadgeCatalog(), fetchLearningPathColumns()]);
+    await Promise.all([fetchStudents(), fetchQuarters(), fetchBadgeCatalog(), fetchLearningPaths(), fetchLearningPathColumns()]);
   };
 
   useEffect(() => {
@@ -648,6 +662,16 @@ const handleResetPassword = async () => {
       </div>
     );
   }
+
+  // Full record (with `progress`, needed to derive pod badges) for whichever
+  // student the trophy modal is currently open for — `trophyModal` itself
+  // only carries the handful of fields the award form needs.
+  const trophyStudent = trophyModal ? students.find((s) => s.uid === trophyModal.uid) : null;
+  const trophyEarnedBadges = trophyStudent
+    ? getAllEarnedBadges(trophyStudent, learningPathsById, { badges: badgeCatalog })
+    : [];
+  const trophyChapterBadges = trophyEarnedBadges.filter((b) => b.type === 'chapter');
+  const trophySkillBadges = trophyEarnedBadges.filter((b) => b.type === 'skill');
 
   return (
     <div className="min-h-screen bg-slate-900 p-8 font-sans pb-20 relative">
@@ -1100,7 +1124,7 @@ const handleResetPassword = async () => {
       {/* 🏆 SPECIAL TROPHY MODAL — hand-awarded, not tied to points/progress */}
       {trophyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-black text-white uppercase tracking-wider mb-1 flex items-center gap-2">
               <span>🏆</span> Otorgar Trofeo Especial
             </h3>
@@ -1108,6 +1132,25 @@ const handleResetPassword = async () => {
               Estudiante: <span className="font-bold text-amber-400">{trophyModal.email}</span> — para cualquier logro que no
               se mide con puntos (esfuerzo, actitud, creatividad, etc.).
             </p>
+
+            {(trophyChapterBadges.length > 0 || trophySkillBadges.length > 0) && (
+              <div className="mb-4 bg-slate-900/60 border border-slate-700 rounded-xl p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  Insignias Ya Ganadas ({trophyChapterBadges.length + trophySkillBadges.length})
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {[...trophyChapterBadges, ...trophySkillBadges].map((badge) => (
+                    <div key={badge.id} className="flex flex-col items-center gap-1 w-14 text-center">
+                      <BadgeIcon icon={badge.icon} tier={badge.tier} size="sm" title={badge.name} />
+                      <span className="text-[8px] font-bold text-slate-400 leading-tight line-clamp-2">{badge.name}</span>
+                      {badge.tier && (
+                        <span className="text-[7px] font-black uppercase text-slate-500">{BADGE_TIER_LABELS[badge.tier]}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {badgeCatalog.length > 0 && (
               <div className="mb-4">
