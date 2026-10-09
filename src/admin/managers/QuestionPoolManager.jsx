@@ -17,16 +17,18 @@ const PlaceholderThumb = () => (
   </div>
 );
 
-// The first real editing surface for question_pool — until now it only
-// supported browsing/picking (QuestionPoolPickerModal) and automatic writes
-// from multiple_choice questions. Scoped deliberately narrow (images only,
-// not editing the clue/answer text itself) since that's what was actually
-// asked for; a broader editor is a separate future ask.
+// The editing surface for question_pool — browsing/picking is handled
+// separately by QuestionPoolPickerModal. Editing a pool entry here never
+// touches the curiosidad it may have been auto-created from
+// (sourceCuriosidadId is just a breadcrumb) — the pool copy and the
+// original question are deliberately independent after that first write.
 const QuestionPoolManager = () => {
   const [entries, setEntries] = useState([]);
   const [categoryImages, setCategoryImagesState] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -77,6 +79,38 @@ const QuestionPoolManager = () => {
     }
   };
 
+  const startEditing = (entry) => {
+    setEditingId(entry.id);
+    setEditDraft({
+      category: entry.category || '',
+      clue: entry.clue || '',
+      answer: entry.answer || '',
+      distractorsText: (entry.distractors || []).join(', '),
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditDraft(null);
+  };
+
+  const saveEditing = async (id) => {
+    const patch = {
+      category: editDraft.category.trim(),
+      clue: editDraft.clue.trim(),
+      answer: editDraft.answer.trim(),
+      distractors: editDraft.distractorsText.split(',').map((d) => d.trim()).filter(Boolean),
+    };
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+    setEditingId(null);
+    setEditDraft(null);
+    try {
+      await updatePoolQuestion(id, patch);
+    } catch (err) {
+      console.error('Error saving question edit:', err);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-slate-400 font-bold uppercase tracking-widest animate-pulse">Cargando Reserva de Preguntas...</div>;
   }
@@ -85,7 +119,7 @@ const QuestionPoolManager = () => {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Reserva de Preguntas — Imágenes</h1>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Reserva de Preguntas</h1>
           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">
             Usado por el juego de trivia (y cualquier otro que lea de question_pool)
           </p>
@@ -142,6 +176,59 @@ const QuestionPoolManager = () => {
               {filtered.map((entry) => {
                 const resolvedImage = resolvePoolQuestionImage(entry, categoryImages);
                 const usingCategoryDefault = !entry.image && resolvedImage;
+                const isEditing = editingId === entry.id;
+
+                if (isEditing) {
+                  return (
+                    <div key={entry.id} className="p-4 space-y-3 bg-indigo-50/50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={editDraft.category}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, category: e.target.value }))}
+                          placeholder="Categoría"
+                          className="border border-slate-300 rounded-md p-2 text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={editDraft.answer}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, answer: e.target.value }))}
+                          placeholder="Respuesta correcta"
+                          className="border border-slate-300 rounded-md p-2 text-sm font-bold"
+                        />
+                      </div>
+                      <textarea
+                        value={editDraft.clue}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, clue: e.target.value }))}
+                        placeholder="Pregunta / pista"
+                        rows={2}
+                        className="w-full border border-slate-300 rounded-md p-2 text-sm"
+                      />
+                      <input
+                        type="text"
+                        value={editDraft.distractorsText}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, distractorsText: e.target.value }))}
+                        placeholder="Distractores, separados por comas"
+                        className="w-full border border-slate-300 rounded-md p-2 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveEditing(entry.id)}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className="text-slate-500 text-xs font-black uppercase tracking-widest px-4 py-2"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={entry.id} className="p-4 flex items-center gap-4">
                     {resolvedImage ? (
@@ -158,6 +245,12 @@ const QuestionPoolManager = () => {
                       <p className="text-sm font-bold text-slate-800 truncate">{entry.clue}</p>
                       <p className="text-xs text-slate-500">✓ {entry.answer}</p>
                     </div>
+                    <button
+                      onClick={() => startEditing(entry)}
+                      className="text-[10px] font-black text-indigo-600 hover:text-indigo-500 uppercase tracking-widest shrink-0"
+                    >
+                      ✏️ Editar
+                    </button>
                     <div className="w-64 shrink-0">
                       <ImageUploadField
                         value={entry.image}
