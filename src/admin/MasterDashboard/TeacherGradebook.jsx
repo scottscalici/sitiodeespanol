@@ -9,6 +9,7 @@ import {
   getUnitSummary,
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
+import BadgeIcon from '../../components/BadgeIcon';
 import {
   getAssignedWarmups,
   getAssignedCuriosidades,
@@ -95,6 +96,7 @@ export default function TeacherGradebook() {
   // 🏆 Special Trophy Modal State — hand-awarded, not tied to points/progress
   const [trophyModal, setTrophyModal] = useState(null); // { uid, email, name, icon, note, status }
   const [awardingTrophy, setAwardingTrophy] = useState(false);
+  const [badgeCatalog, setBadgeCatalog] = useState([]); // Insignias catalog, for "pick an existing badge" in the trophy modal
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -120,6 +122,18 @@ export default function TeacherGradebook() {
         setQuarters(snap.exists() ? snap.data().quarters || [] : []);
       } catch (error) {
         console.error('Error fetching quarter config:', error);
+      }
+    };
+
+    // Same catalog the Insignias manager (GamificationManager) edits — lets
+    // the special-trophy modal offer "pick an existing badge" instead of
+    // only ever typing a one-off icon/name by hand.
+    const fetchBadgeCatalog = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'gamification'));
+        setBadgeCatalog(snap.exists() ? snap.data().badges || [] : []);
+      } catch (error) {
+        console.error('Error fetching badge catalog:', error);
       }
     };
 
@@ -198,7 +212,7 @@ export default function TeacherGradebook() {
       }
     };
 
-    await Promise.all([fetchStudents(), fetchQuarters(), fetchLearningPathColumns()]);
+    await Promise.all([fetchStudents(), fetchQuarters(), fetchBadgeCatalog(), fetchLearningPathColumns()]);
   };
 
   useEffect(() => {
@@ -1094,6 +1108,28 @@ const handleResetPassword = async () => {
               Estudiante: <span className="font-bold text-amber-400">{trophyModal.email}</span> — para cualquier logro que no
               se mide con puntos (esfuerzo, actitud, creatividad, etc.).
             </p>
+
+            {badgeCatalog.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                  Elegir de Insignias (opcional)
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {badgeCatalog.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setTrophyModal({ ...trophyModal, icon: b.icon, name: b.name, status: '' })}
+                      title={b.name}
+                      className="shrink-0 flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-slate-700 transition-colors"
+                    >
+                      <BadgeIcon icon={b.icon} tier={b.tiered ? 'gold' : null} size="sm" />
+                      <span className="text-[9px] font-bold text-slate-400 max-w-[60px] truncate">{b.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2 mb-3">
               <input
