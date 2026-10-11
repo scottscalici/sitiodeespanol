@@ -5,10 +5,28 @@ import { shuffle } from './clozeShared';
 export const TYPE_KEY = 'matching';
 export const TYPE_LABEL = 'Emparejar';
 
+// A pair's two sides can each carry text and/or an image, shown together.
+// Older saved questions used a narrower shape — `left: {type:'text'|'image',
+// value}` (one or the other, never both) and a plain-string `answer` with no
+// image at all. Student-facing rendering reads raw Firestore data directly
+// (no reconstructQuestion pass — see CuriosidadQuizEngine/PracticeCardEngine),
+// so normalizePair has to understand both shapes forever, not just at the
+// one admin-editor load site.
+const normalizePair = (pair) => ({
+  left:
+    pair.left && pair.left.type !== undefined
+      ? {
+          text: pair.left.type === 'text' ? pair.left.value || '' : '',
+          image: pair.left.type === 'image' ? pair.left.value || '' : '',
+        }
+      : { text: pair.left?.text || '', image: pair.left?.image || '' },
+  right: pair.right ? { text: pair.right.text || '', image: pair.right.image || '' } : { text: pair.answer || '', image: '' },
+});
+
 export const emptyQuestion = () => ({
   type: 'matching',
   prompt: '',
-  pairs: [{ left: { type: 'text', value: '' }, answer: '' }],
+  pairs: [{ left: { text: '', image: '' }, right: { text: '', image: '' } }],
   distractorsText: '',
 });
 
@@ -23,17 +41,46 @@ export const finalizeQuestion = (q) => {
 };
 
 // Reopening an already-saved question only has the final `distractors`
-// array — reconstructs the editable raw text once on load.
-export const reconstructQuestion = (q) =>
-  q.distractorsText !== undefined ? q : { ...q, distractorsText: (q.distractors || []).join('\n') };
+// array — reconstructs the editable raw text once on load, and migrates
+// any pre-upgrade pairs into the current {text, image} shape so the Editor
+// never has to special-case the old one.
+export const reconstructQuestion = (q) => {
+  const withDistractors = q.distractorsText !== undefined ? q : { ...q, distractorsText: (q.distractors || []).join('\n') };
+  return { ...withDistractors, pairs: (withDistractors.pairs || []).map(normalizePair) };
+};
 
 // Pure, given an {assignments} snapshot (deferred mode's own shape — see
 // DeferredRenderer below) — see dropdownCloze.jsx's gradeState for why this
-// is the one place "what counts as correct" lives.
+// is the one place "what counts as correct" lives. Assignments hold an
+// answer-bank key (`p${pairIndex}` for a real pair, `d${index}` for a
+// distractor) rather than the answer's content, so grading never has to
+// compare text/image values — a pair is correct iff it was matched to its
+// own key.
 export const gradeState = (question, state) => {
   const assignments = state?.assignments || [];
-  return question.pairs.map((pair, i) => pair.answer === assignments[i]);
+  return question.pairs.map((_, i) => assignments[i] === `p${i}`);
 };
+
+const buildAnswerBank = (question) => {
+  const pairs = question.pairs.map(normalizePair);
+  const real = pairs.map((p, i) => ({ key: `p${i}`, text: p.right.text, image: p.right.image }));
+  const fake = (question.distractors || []).map((d, i) => ({ key: `d${i}`, text: d, image: '' }));
+  return shuffle([...real, ...fake]);
+};
+
+const BankTile = ({ entry }) => (
+  <>
+    {entry.image && <img src={entry.image} alt="" className="w-full h-20 object-contain bg-slate-950 rounded-lg mb-1" />}
+    {entry.text && <span className="text-xs font-bold text-slate-200">{entry.text}</span>}
+  </>
+);
+
+const LeftTile = ({ left }) => (
+  <>
+    {left.image && <img src={left.image} alt="" className="w-full h-32 object-contain bg-slate-950 rounded-lg mb-1" />}
+    {left.text && <span className="text-xs font-bold text-slate-200">{left.text}</span>}
+  </>
+);
 
 // --- Student-facing renderer ---
 // Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
@@ -45,11 +92,10 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // Calls onItemFirstAttempt(pairIdx, isCorrect) once per pair's first attempt,
 // and onAllCorrect() once every pair has been matched.
 const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+  const pairs = question.pairs.map(normalizePair);
   const [matchedPairIdx, setMatchedPairIdx] = useState(() => initialState?.matchedPairIdx || []);
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
-  const [shuffledAnswers] = useState(() =>
-    shuffle(question.pairs.map((p) => p.answer).concat(question.distractors || []))
-  );
+  const [answerBank] = useState(() => buildAnswerBank(question));
   const [wrongFlashIdx, setWrongFlashIdx] = useState(null);
   const attemptedRef = React.useRef({});
 
@@ -70,10 +116,9 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
     setSelectedLeftIdx(pairIdx);
   };
 
-  const handleAttemptAnswer = (answer, answerTileIdx) => {
+  const handleAttemptAnswer = (entry, answerTileIdx) => {
     if (selectedLeftIdx === null) return;
-    const pair = question.pairs[selectedLeftIdx];
-    const isCorrect = pair.answer === answer;
+    const isCorrect = entry.key === `p${selectedLeftIdx}`;
 
     if (!attemptedRef.current[selectedLeftIdx]) {
       attemptedRef.current[selectedLeftIdx] = true;
@@ -100,7 +145,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       )}
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
-          {question.pairs.map((pair, pIdx) => (
+          {pairs.map((pair, pIdx) => (
             <button
               key={pIdx}
               onClick={() => handleSelectLeft(pIdx)}
@@ -113,22 +158,18 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
                   : 'bg-slate-900 border-slate-700 hover:border-slate-500'
               }`}
             >
-              {pair.left.type === 'image' ? (
-                <img src={pair.left.value} alt="" className="w-full h-32 object-contain bg-slate-950 rounded-lg" />
-              ) : (
-                <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
-              )}
+              <LeftTile left={pair.left} />
             </button>
           ))}
         </div>
 
         <div className="space-y-2">
-          {shuffledAnswers.map((answer, aIdx) => {
-            const alreadyUsed = matchedPairIdx.some((pIdx) => question.pairs[pIdx].answer === answer);
+          {answerBank.map((entry, aIdx) => {
+            const alreadyUsed = matchedPairIdx.some((pIdx) => `p${pIdx}` === entry.key);
             return (
               <button
                 key={aIdx}
-                onClick={() => handleAttemptAnswer(answer, aIdx)}
+                onClick={() => handleAttemptAnswer(entry, aIdx)}
                 disabled={alreadyUsed}
                 className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all ${
                   alreadyUsed
@@ -138,7 +179,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
                     : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
                 }`}
               >
-                {answer}
+                <BankTile entry={entry} />
               </button>
             );
           })}
@@ -157,12 +198,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 // same "spend once, free the moment you reassign" mechanic the word-bank
 // cloze types use — rather than instant-correct/wrong feedback per click.
 const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
-  const pairCount = question.pairs.length;
+  const pairs = question.pairs.map(normalizePair);
+  const pairCount = pairs.length;
   const [assignments, setAssignments] = useState(() => initialState?.assignments || Array(pairCount).fill(null));
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
-  const [shuffledAnswers] = useState(() =>
-    shuffle(question.pairs.map((p) => p.answer).concat(question.distractors || []))
-  );
+  const [answerBank] = useState(() => buildAnswerBank(question));
 
   useEffect(() => {
     onStateChange?.({ assignments });
@@ -172,9 +212,9 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   const correct = submitted ? gradeState(question, { assignments }) : Array(pairCount).fill(null);
   const completedCount = submitted ? correct.filter((c) => c === true).length : assignments.filter(Boolean).length;
 
-  const handleAssign = (answer) => {
+  const handleAssign = (entry) => {
     if (selectedLeftIdx === null) return;
-    setAssignments((prev) => prev.map((v, i) => (i === selectedLeftIdx ? answer : v)));
+    setAssignments((prev) => prev.map((v, i) => (i === selectedLeftIdx ? entry.key : v)));
     setSelectedLeftIdx(null);
   };
 
@@ -187,8 +227,9 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
       )}
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
-          {question.pairs.map((pair, pIdx) => {
+          {pairs.map((pair, pIdx) => {
             const isCorrect = correct[pIdx];
+            const assignedEntry = assignments[pIdx] ? answerBank.find((e) => e.key === assignments[pIdx]) : null;
             return (
               <button
                 key={pIdx}
@@ -203,19 +244,19 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
                     : 'bg-slate-900 border-slate-700 hover:border-slate-500'
                 }`}
               >
-                {pair.left.type === 'image' ? (
-                  <img src={pair.left.value} alt="" className="w-full h-32 object-contain bg-slate-950 rounded-lg" />
-                ) : (
-                  <span className="text-xs font-bold text-slate-200">{pair.left.value}</span>
-                )}
-                {assignments[pIdx] && (
-                  <span
-                    className={`block mt-1 text-[10px] font-black uppercase tracking-widest ${
+                <LeftTile left={pair.left} />
+                {assignedEntry && (
+                  <div
+                    className={`flex items-center gap-1 mt-1 text-[10px] font-black uppercase tracking-widest ${
                       isCorrect === true ? 'text-emerald-400' : isCorrect === false ? 'text-rose-400' : 'text-sky-300'
                     }`}
                   >
-                    → {assignments[pIdx]}
-                  </span>
+                    <span>→</span>
+                    {assignedEntry.image && (
+                      <img src={assignedEntry.image} alt="" className="w-6 h-6 object-cover rounded border border-slate-700" />
+                    )}
+                    {assignedEntry.text && <span>{assignedEntry.text}</span>}
+                  </div>
                 )}
               </button>
             );
@@ -223,14 +264,14 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
         </div>
 
         <div className="space-y-2">
-          {shuffledAnswers.map((answer, aIdx) => {
-            const usedElsewhere = assignments.some((a, i) => i !== selectedLeftIdx && a === answer);
+          {answerBank.map((entry, aIdx) => {
+            const usedElsewhere = assignments.some((a, i) => i !== selectedLeftIdx && a === entry.key);
             if (usedElsewhere) return null;
-            const isSelectedPairsAnswer = selectedLeftIdx !== null && assignments[selectedLeftIdx] === answer;
+            const isSelectedPairsAnswer = selectedLeftIdx !== null && assignments[selectedLeftIdx] === entry.key;
             return (
               <button
                 key={aIdx}
-                onClick={() => handleAssign(answer)}
+                onClick={() => handleAssign(entry)}
                 disabled={selectedLeftIdx === null}
                 className={`w-full p-3 border rounded-xl text-xs font-bold text-left transition-all disabled:opacity-40 ${
                   isSelectedPairsAnswer
@@ -238,7 +279,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
                     : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-400'
                 }`}
               >
-                {answer}
+                <BankTile entry={entry} />
               </button>
             );
           })}
@@ -249,68 +290,69 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 };
 
 // --- Admin-facing editor ---
+const PairSideFields = ({ side, label, onTextChange, onImageChange }) => (
+  <div className="flex-1 min-w-0 space-y-1">
+    <input
+      type="text"
+      value={side.text}
+      onChange={(e) => onTextChange(e.target.value)}
+      placeholder={label}
+      className="w-full border border-slate-300 rounded-md p-1.5 text-xs"
+    />
+    <div className="flex items-center gap-1">
+      {side.image && (
+        <img src={side.image} alt="" className="w-8 h-8 object-cover rounded-md border border-slate-200 shrink-0" />
+      )}
+      <ImageUploadField
+        value={side.image}
+        onChange={onImageChange}
+        folder="curiosidades"
+        inputClassName="w-full border border-slate-300 rounded-md p-1 text-[9px] font-mono"
+      />
+    </div>
+  </div>
+);
+
 export const Editor = ({ question: q, onChange }) => {
   const updatePair = (pIdx, patch) => {
-    onChange({ pairs: q.pairs.map((p, j) => (j === pIdx ? { ...p, ...patch } : p)) });
+    onChange({ pairs: q.pairs.map((p, j) => (j === pIdx ? { ...normalizePair(p), ...patch } : p)) });
   };
-  const addPair = () => onChange({ pairs: [...q.pairs, { left: { type: 'text', value: '' }, answer: '' }] });
+  const updatePairSide = (pIdx, side, patch) => {
+    const pair = normalizePair(q.pairs[pIdx]);
+    updatePair(pIdx, { [side]: { ...pair[side], ...patch } });
+  };
+  const addPair = () => onChange({ pairs: [...q.pairs, { left: { text: '', image: '' }, right: { text: '', image: '' } }] });
   const removePair = (pIdx) => onChange({ pairs: q.pairs.filter((_, j) => j !== pIdx) });
 
   return (
     <>
       <div className="space-y-2">
-        {q.pairs.map((pair, pIdx) => (
-          <div key={pIdx} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
-            <select
-              value={pair.left.type}
-              onChange={(e) => updatePair(pIdx, { left: { type: e.target.value, value: '' } })}
-              className="text-xs border border-slate-300 rounded-md p-1.5 font-bold shrink-0"
-            >
-              <option value="text">Texto</option>
-              <option value="image">Imagen</option>
-            </select>
-
-            {pair.left.type === 'image' ? (
-              <div className="flex-1 flex items-center gap-2 min-w-0">
-                {pair.left.value && (
-                  <img
-                    src={pair.left.value}
-                    alt=""
-                    className="w-10 h-10 object-cover rounded-md border border-slate-200 shrink-0"
-                  />
-                )}
-                <ImageUploadField
-                  value={pair.left.value}
-                  onChange={(url) => updatePair(pIdx, { left: { type: 'image', value: url } })}
-                  folder="curiosidades"
-                  inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
-                />
-              </div>
-            ) : (
-              <input
-                type="text"
-                value={pair.left.value}
-                onChange={(e) => updatePair(pIdx, { left: { type: 'text', value: e.target.value } })}
-                placeholder="Elemento (izquierda)"
-                className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs min-w-0"
+        {q.pairs.map((rawPair, pIdx) => {
+          const pair = normalizePair(rawPair);
+          return (
+            <div key={pIdx} className="flex items-start gap-2 bg-white border border-slate-200 rounded-lg p-2">
+              <PairSideFields
+                side={pair.left}
+                label="Texto (izquierda, opcional si hay imagen)"
+                onTextChange={(text) => updatePairSide(pIdx, 'left', { text })}
+                onImageChange={(image) => updatePairSide(pIdx, 'left', { image })}
               />
-            )}
 
-            <span className="text-slate-300 shrink-0">→</span>
+              <span className="text-slate-300 shrink-0 mt-2">→</span>
 
-            <input
-              type="text"
-              value={pair.answer}
-              onChange={(e) => updatePair(pIdx, { answer: e.target.value })}
-              placeholder="Respuesta correcta"
-              className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs min-w-0"
-            />
+              <PairSideFields
+                side={pair.right}
+                label="Texto (respuesta, opcional si hay imagen)"
+                onTextChange={(text) => updatePairSide(pIdx, 'right', { text })}
+                onImageChange={(image) => updatePairSide(pIdx, 'right', { image })}
+              />
 
-            <button onClick={() => removePair(pIdx)} className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1">
-              ✕
-            </button>
-          </div>
-        ))}
+              <button onClick={() => removePair(pIdx)} className="shrink-0 text-slate-400 hover:text-rose-600 text-xs px-1 mt-2">
+                ✕
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <button onClick={addPair} className="mt-2 text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
