@@ -1,14 +1,40 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getArcadeTileImages } from '../utils/arcadeTiles';
+
+// Fallback GitHub raw-content URLs — used until each tile's image is
+// migrated to Firebase Storage via the admin manager (/admin-arcade-tiles).
+// Kept here rather than deleted so a tile still shows something before
+// migration, and so a single tile can be reverted easily if ever needed.
+const FALLBACK_IMAGES = {
+  senordle: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle.png',
+  eslabones: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/eslabon.png',
+  atandocabos: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/atando_cabos.png',
+  ticotalk: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/tico_talk.png',
+  impostor: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png',
+  silabas: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/silabazo.png',
+  rafaga: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/rafaga.png',
+  zas: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/zas.png',
+};
 
 const RecreoHub = () => {
+  const [tileImages, setTileImages] = useState({});
+
+  useEffect(() => {
+    getArcadeTileImages()
+      .then(setTileImages)
+      .catch((err) => console.error('Error loading arcade tile images:', err));
+  }, []);
+
+  const imageFor = (tileId) => tileImages[tileId] || FALLBACK_IMAGES[tileId];
+
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden">
-      
+
       {/* HEADER SECTION */}
       <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
         <Link to="/" className="text-indigo-400 font-bold mb-8 inline-flex items-center gap-2 hover:text-indigo-300 transition-colors group">
-          <span className="text-xl leading-none group-hover:-translate-x-1 transition-transform">←</span> 
+          <span className="text-xl leading-none group-hover:-translate-x-1 transition-transform">←</span>
           Volver al Gym
         </Link>
 
@@ -23,16 +49,16 @@ const RecreoHub = () => {
 
         {/* ARCADE CABINETS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
+
           {/* 1. SEÑORDLE */}
           <Link to="/juegos/senordle" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-emerald-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:-translate-y-2">
             <div className="absolute top-4 right-4 z-20 bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/50">
               Diario
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle.png" 
-                 alt="Señordle" 
+               <img
+                 src={imageFor('senordle')}
+                 alt="Señordle"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -46,9 +72,9 @@ const RecreoHub = () => {
           {/* 2. ESLABONES */}
           <Link to="/juegos/eslabones" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-cyan-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:-translate-y-2">
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/eslabon.png" 
-                 alt="Eslabones" 
+               <img
+                 src={imageFor('eslabones')}
+                 alt="Eslabones"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -62,9 +88,9 @@ const RecreoHub = () => {
           {/* 3. ATANDO CABOS */}
           <Link to="/juegos/atandocabos" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-fuchsia-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,70,239,0.3)] hover:-translate-y-2">
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/atando_cabos.png" 
-                 alt="Atando Cabos" 
+               <img
+                 src={imageFor('atandocabos')}
+                 alt="Atando Cabos"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -81,9 +107,9 @@ const RecreoHub = () => {
               Nuevo
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/tico_talk.png" 
-                 alt="Tico Talk" 
+               <img
+                 src={imageFor('ticotalk')}
+                 alt="Tico Talk"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -99,7 +125,7 @@ const RecreoHub = () => {
               Nuevo
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-              <img src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png"
+              <img src={imageFor('impostor')}
                    alt="Impostor"
                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                  />
@@ -118,7 +144,7 @@ const RecreoHub = () => {
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
                <img
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/silabazo.png"
+                 src={imageFor('silabas')}
                  alt="Sílabas"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
@@ -137,7 +163,7 @@ const RecreoHub = () => {
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
               <img
-                src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/rafaga.png"
+                src={imageFor('rafaga')}
                 alt="Ráfaga"
                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
               />
@@ -157,7 +183,7 @@ const RecreoHub = () => {
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
               <img
-                src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/zas.png"
+                src={imageFor('zas')}
                 alt="¡Zas!"
                 className="w-full h-full object-contain grayscale"
               />
