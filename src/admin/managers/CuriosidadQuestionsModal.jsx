@@ -53,6 +53,30 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
     setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, ...patch } : q)));
   };
 
+  // Drops poolId so the duplicate gets its own pool entry at save time
+  // (see handleSave's pool-sync step) instead of silently sharing — and
+  // later overwriting — the original question's pooled copy once one of
+  // the two is edited.
+  const duplicateQuestion = (qIdx) => {
+    setQuestions((prev) => {
+      const { poolId, ...rest } = prev[qIdx];
+      const copy = JSON.parse(JSON.stringify(rest));
+      const next = [...prev];
+      next.splice(qIdx + 1, 0, copy);
+      return next;
+    });
+  };
+
+  const moveQuestion = (qIdx, direction) => {
+    setQuestions((prev) => {
+      const targetIdx = qIdx + direction;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[qIdx], next[targetIdx]] = [next[targetIdx], next[qIdx]];
+      return next;
+    });
+  };
+
   // --- Bulk import (multiple_choice only) ---
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
@@ -279,12 +303,37 @@ const CuriosidadQuestionsModal = ({ curiosidad, onClose, onSave }) => {
                       className="flex-1 border border-slate-300 rounded-lg p-2 text-sm font-bold"
                     />
                   </div>
-                  <button
-                    onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== qIdx))}
-                    className="shrink-0 text-rose-500 hover:text-rose-700 text-xs font-black uppercase"
-                  >
-                    🗑️ Quitar
-                  </button>
+                  <div className="shrink-0 flex items-center gap-1">
+                    <button
+                      onClick={() => moveQuestion(qIdx, -1)}
+                      disabled={qIdx === 0}
+                      title="Mover arriba"
+                      className="text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm px-1"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => moveQuestion(qIdx, 1)}
+                      disabled={qIdx === questions.length - 1}
+                      title="Mover abajo"
+                      className="text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm px-1"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      onClick={() => duplicateQuestion(qIdx)}
+                      title="Duplicar pregunta"
+                      className="text-indigo-500 hover:text-indigo-700 text-xs font-black uppercase px-1"
+                    >
+                      ⧉ Duplicar
+                    </button>
+                    <button
+                      onClick={() => setQuestions((prev) => prev.filter((_, i) => i !== qIdx))}
+                      className="text-rose-500 hover:text-rose-700 text-xs font-black uppercase"
+                    >
+                      🗑️ Quitar
+                    </button>
+                  </div>
                 </div>
 
                 {TypeEditor && (

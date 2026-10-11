@@ -63,6 +63,23 @@ export default function PracticeCardAdmin() {
 
   const addQuestion = () => setQuestions([...questions, emptyQuestion()]);
   const removeQuestion = (index) => setQuestions(questions.filter((_, i) => i !== index));
+  const duplicateQuestion = (index) => {
+    setQuestions((prev) => {
+      const copy = JSON.parse(JSON.stringify(prev[index]));
+      const next = [...prev];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
+  };
+  const moveQuestion = (index, direction) => {
+    setQuestions((prev) => {
+      const targetIdx = index + direction;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[targetIdx]] = [next[targetIdx], next[index]];
+      return next;
+    });
+  };
 
   const handleBulkImport = () => {
     const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -236,7 +253,35 @@ export default function PracticeCardAdmin() {
                       <option key={m.TYPE_KEY} value={m.TYPE_KEY}>{TYPE_LABELS[m.TYPE_KEY]}</option>
                     ))}
                   </select>
-                  <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveQuestion(qIdx, -1)}
+                      disabled={qIdx === 0}
+                      title="Mover arriba"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveQuestion(qIdx, 1)}
+                      disabled={qIdx === questions.length - 1}
+                      title="Mover abajo"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateQuestion(qIdx)}
+                      title="Duplicar pregunta"
+                      className="p-1.5 text-indigo-500 hover:text-indigo-700 font-bold text-xs"
+                    >
+                      ⧉
+                    </button>
+                    <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
+                  </div>
                 </div>
 
                 <Editor question={q} onChange={(patch) => updateQuestionData(qIdx, patch)} instanceId={qIdx} showCategory={false} />
