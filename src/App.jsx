@@ -74,6 +74,7 @@ import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import ImageCardsManager from './admin/managers/ImageCardsManager';
 import QuestionPoolManager from './admin/managers/QuestionPoolManager';
 import ArcadeTilesManager from './admin/managers/ArcadeTilesManager';
+import MediaMigrationManager from './admin/managers/MediaMigrationManager';
 import DestacadoManager from './admin/managers/DestacadoManager';
 import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
@@ -533,6 +534,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ArcadeTilesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-media-migration"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <MediaMigrationManager />
                 </AdminRoute>
               }
             />

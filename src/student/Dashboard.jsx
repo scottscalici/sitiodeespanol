@@ -106,6 +106,7 @@ const Dashboard = () => {
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
   const [showWarmupModal, setShowWarmupModal] = useState(false);
   const [practiceCards, setPracticeCards] = useState([]);
+  const [platformLogos, setPlatformLogos] = useState({});
   const warmupAverage = weightedAverageFromBreakdown(warmupBreakdown);
 
   // Calentamiento promedio: a calentamiento counts once its day's date has
@@ -128,14 +129,16 @@ const Dashboard = () => {
           getCachedQuery(`${name}:course:${course}`, () =>
             getDocs(query(collection(db, name), where('course', '==', course)))
           );
-        const [calentamientos, allPracticeCards, curiosidadesBundle] = await Promise.all([
+        const [calentamientos, allPracticeCards, curiosidadesBundle, platformLogosDoc] = await Promise.all([
           scopedQuery('calentamientos'),
           scopedQuery('practice_cards'),
           // One doc for every course (unlike the two above) — flattened the
           // same way TeacherGradebook reads it.
           getCachedDoc('curiosidades', '_bundle'),
+          getCachedDoc('config', 'platform_logos'),
         ]);
         setPracticeCards(allPracticeCards);
+        setPlatformLogos(platformLogosDoc || {});
         const todayStr = new Date().toLocaleDateString('en-CA');
 
         const curiosidadItems = curiosidadesBundle?.items || {};
@@ -675,7 +678,7 @@ const Dashboard = () => {
 
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 shrink-0 rounded-2xl bg-white flex items-center justify-center shadow-inner p-2">
-                        <img src={info.logo} alt={t.tipo} className="w-full h-full object-contain" />
+                        <img src={platformLogos[t.tipo] || info.logo} alt={t.tipo} className="w-full h-full object-contain" />
                       </div>
 
                       <div className="min-w-0 flex-1">
