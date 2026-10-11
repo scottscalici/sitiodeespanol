@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getArcadeTileImages, setArcadeTileImage } from '../../utils/arcadeTiles';
+import { getArcadeTileImages, setArcadeTileImage, ARCADE_TILE_FALLBACK_IMAGES } from '../../utils/arcadeTiles';
+import { importImageFromUrl } from '../../utils/imageUpload';
 import ImageUploadField from '../shared/ImageUploadField';
 
 // El Recreo's tile thumbnails, in display order — kept as a plain list here
@@ -25,6 +26,8 @@ const TILES = [
 const ArcadeTilesManager = () => {
   const [images, setImages] = useState({});
   const [loading, setLoading] = useState(true);
+  const [importingId, setImportingId] = useState(null);
+  const [importError, setImportError] = useState({});
 
   useEffect(() => {
     getArcadeTileImages()
@@ -39,6 +42,27 @@ const ArcadeTilesManager = () => {
       await setArcadeTileImage(tileId, url);
     } catch (err) {
       console.error('Error saving arcade tile image:', err);
+    }
+  };
+
+  // Tries fetching the original GitHub URL straight from the browser instead
+  // of requiring a manual download + re-upload. Whether this actually works
+  // depends on what a network's content filter is blocking — some only
+  // intercept <img> tag loads, in which case a fetch() slips through; others
+  // block the image bytes themselves regardless of how they're requested, in
+  // which case this fails exactly the same way the <img> tag did. Worth one
+  // click to find out before assuming the manual path is the only option.
+  const handleImportFromGithub = async (tileId) => {
+    setImportingId(tileId);
+    setImportError((prev) => ({ ...prev, [tileId]: '' }));
+    try {
+      const url = await importImageFromUrl(ARCADE_TILE_FALLBACK_IMAGES[tileId], 'arcade_tiles', `${tileId}.png`);
+      await handleSetImage(tileId, url);
+    } catch (err) {
+      console.error(`Error importing ${tileId} from GitHub:`, err);
+      setImportError((prev) => ({ ...prev, [tileId]: 'Bloqueado — descarga y sube el archivo manualmente.' }));
+    } finally {
+      setImportingId(null);
     }
   };
 
@@ -76,13 +100,29 @@ const ArcadeTilesManager = () => {
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-slate-800 mb-1">{tile.name}</p>
-                <ImageUploadField
-                  value={images[tile.id]}
-                  onChange={(url) => handleSetImage(tile.id, url)}
-                  folder="arcade_tiles"
-                  placeholder="Usando el enlace de GitHub (sube una imagen para reemplazarlo)"
-                  inputClassName="w-full bg-slate-50 border border-slate-200 rounded-md p-2 text-[10px] font-mono outline-none text-slate-500"
-                />
+                <div className="flex items-center gap-2">
+                  <ImageUploadField
+                    value={images[tile.id]}
+                    onChange={(url) => handleSetImage(tile.id, url)}
+                    folder="arcade_tiles"
+                    placeholder="Usando el enlace de GitHub (sube una imagen para reemplazarlo)"
+                    inputClassName="w-full bg-slate-50 border border-slate-200 rounded-md p-2 text-[10px] font-mono outline-none text-slate-500"
+                  />
+                  {!images[tile.id] && (
+                    <button
+                      type="button"
+                      onClick={() => handleImportFromGithub(tile.id)}
+                      disabled={importingId === tile.id}
+                      title="Intenta descargar la imagen original de GitHub automáticamente"
+                      className="shrink-0 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors"
+                    >
+                      {importingId === tile.id ? '⏳...' : '📥 Importar de GitHub'}
+                    </button>
+                  )}
+                </div>
+                {importError[tile.id] && (
+                  <p className="text-[10px] text-rose-500 font-bold mt-1">{importError[tile.id]}</p>
+                )}
               </div>
             </div>
           ))}

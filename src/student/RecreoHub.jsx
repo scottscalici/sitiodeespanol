@@ -1,21 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getArcadeTileImages } from '../utils/arcadeTiles';
-
-// Fallback GitHub raw-content URLs — used until each tile's image is
-// migrated to Firebase Storage via the admin manager (/admin-arcade-tiles).
-// Kept here rather than deleted so a tile still shows something before
-// migration, and so a single tile can be reverted easily if ever needed.
-const FALLBACK_IMAGES = {
-  senordle: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle.png',
-  eslabones: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/eslabon.png',
-  atandocabos: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/atando_cabos.png',
-  ticotalk: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/tico_talk.png',
-  impostor: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png',
-  silabas: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/silabazo.png',
-  rafaga: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/rafaga.png',
-  zas: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/zas.png',
-};
+import { getArcadeTileImages, ARCADE_TILE_FALLBACK_IMAGES } from '../utils/arcadeTiles';
 
 const RecreoHub = () => {
   const [tileImages, setTileImages] = useState({});
@@ -26,7 +11,7 @@ const RecreoHub = () => {
       .catch((err) => console.error('Error loading arcade tile images:', err));
   }, []);
 
-  const imageFor = (tileId) => tileImages[tileId] || FALLBACK_IMAGES[tileId];
+  const imageFor = (tileId) => tileImages[tileId] || ARCADE_TILE_FALLBACK_IMAGES[tileId];
 
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden">
