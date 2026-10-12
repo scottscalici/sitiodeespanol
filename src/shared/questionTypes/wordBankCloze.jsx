@@ -96,6 +96,19 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       }
     });
 
+    // TEMPORARY debug instrumentation — tracking down a report that
+    // "Revisar" sometimes never completes a word_bank_cloze question even
+    // once every visible blank is correct. Remove once diagnosed.
+    // eslint-disable-next-line no-console
+    console.log('[word_bank_cloze debug]', {
+      answers: question.answers,
+      wordBank: question.wordBank,
+      selections,
+      prevCorrect: correct,
+      nextCorrect,
+      allCorrect: nextCorrect.every(Boolean),
+    });
+
     setCorrect(nextCorrect);
     setWrongAttempted(nextWrong);
     if (nextCorrect.every(Boolean)) onAllCorrect();
