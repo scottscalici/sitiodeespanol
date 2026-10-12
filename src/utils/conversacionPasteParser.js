@@ -2,20 +2,26 @@
 // "PREGUNTAS NIVEL 1:") into the individual FormConversaciones fields, so a
 // teacher can type/paste everything in one place instead of filling a dozen
 // separate boxes one at a time. Headers are matched case- and
-// accent-insensitively and may or may not end in a colon.
+// accent-insensitively, and the value can either start right after the
+// colon on the same line ("TEMA: Identidades" — natural for a short
+// single-line field) or begin on the lines that follow ("ESCENARIO:\n...a
+// whole paragraph...").
 //
 // Fields NOT listed here (enlaces, expresiones_idiomaticas, interacciones,
 // pasos_estudiante) are repeatable multi-field objects that don't map
 // cleanly onto "header: block of text" — they stay manual-entry only.
 
 const FIELD_DEFS = [
+  { headers: ['titulo'], field: 'titulo', type: 'string' },
+  { headers: ['tema'], field: 'subtitulo', type: 'string' },
+  { headers: ['etiquetas'], field: 'etiquetas', type: 'csv' },
   { headers: ['escenario'], field: 'escenario', type: 'string' },
-  { headers: ['instrucciones'], field: 'instrucciones', type: 'lines-fixed2' },
-  { headers: ['modelo', 'modelo de respuesta', 'frase de presentacion', 'frase de presentacion inicial'], field: 'modelo', type: 'string' },
+  { headers: ['instrucciones', 'esquema'], field: 'instrucciones', type: 'lines-fixed2' },
+  { headers: ['modelo', 'modelo de respuesta', 'frase de presentacion', 'frase de presentacion inicial', 'presentacion ejemplar'], field: 'modelo', type: 'string' },
   { headers: ['extracto', 'extracto de la obra'], field: 'extracto', type: 'string' },
-  { headers: ['preguntas nivel 1', 'preguntas 1', 'preguntas seccion 1'], field: 'preguntas.1', type: 'lines' },
-  { headers: ['preguntas nivel 2', 'preguntas 2', 'preguntas seccion 2'], field: 'preguntas.2', type: 'lines' },
-  { headers: ['preguntas nivel 3', 'preguntas 3', 'preguntas seccion 3'], field: 'preguntas.3', type: 'lines' },
+  { headers: ['preguntas nivel 1', 'preguntas 1', 'preguntas seccion 1', 'nivel 1'], field: 'preguntas.1', type: 'lines' },
+  { headers: ['preguntas nivel 2', 'preguntas 2', 'preguntas seccion 2', 'nivel 2'], field: 'preguntas.2', type: 'lines' },
+  { headers: ['preguntas nivel 3', 'preguntas 3', 'preguntas seccion 3', 'nivel 3'], field: 'preguntas.3', type: 'lines' },
   { headers: ['descripcion'], field: 'descripcion', type: 'string' },
   { headers: ['relacion con el tema', 'relacion tema'], field: 'relacion_tema', type: 'string' },
   { headers: ['conexion cultural'], field: 'conexion_cultural', type: 'lines' },
@@ -32,13 +38,24 @@ function normalize(str) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
-    .trim()
-    .replace(/:$/, '');
+    .trim();
 }
 
 const HEADER_LOOKUP = new Map();
 for (const def of FIELD_DEFS) {
   for (const h of def.headers) HEADER_LOOKUP.set(normalize(h), def);
+}
+
+// A header line is either bare ("ESCENARIO") or "HEADER: rest of line" —
+// splitting on the FIRST colon handles a header whose own value also
+// contains colons (e.g. "ESCENARIO: Son las 3:00..."). Only the part
+// before that colon has to match a registered header.
+function matchHeaderLine(rawLine) {
+  const colonIdx = rawLine.indexOf(':');
+  const headerPart = colonIdx === -1 ? rawLine : rawLine.slice(0, colonIdx);
+  const inline = colonIdx === -1 ? '' : rawLine.slice(colonIdx + 1).trim();
+  const def = HEADER_LOOKUP.get(normalize(headerPart));
+  return def ? { def, inline } : null;
 }
 
 // Returns a list of recognized header labels, for a usage hint in the UI.
@@ -58,6 +75,9 @@ function buildValue(type, lines) {
     const nonEmpty = trimmedLines.filter((l) => l !== '');
     return [nonEmpty[0] || '', nonEmpty[1] || ''];
   }
+  if (type === 'csv') {
+    return trimmedLines.join(',').split(',').map((s) => s.trim()).filter(Boolean);
+  }
   return trimmedLines;
 }
 
@@ -70,9 +90,9 @@ export function parseConversacionPaste(text, actividad) {
   let current = null;
 
   for (const rawLine of lines) {
-    const def = HEADER_LOOKUP.get(normalize(rawLine));
-    if (def) {
-      current = { def, lines: [] };
+    const match = matchHeaderLine(rawLine);
+    if (match) {
+      current = { def: match.def, lines: match.inline ? [match.inline] : [] };
       buckets.push(current);
     } else if (current) {
       current.lines.push(rawLine);
