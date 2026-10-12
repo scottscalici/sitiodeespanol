@@ -6,8 +6,19 @@ export const TYPE_KEY = 'dropdown_cloze';
 export const TYPE_LABEL = 'Cloze con Menús';
 export const BLANK_TOKEN = '{{blank}}';
 
+// The text is what's actually rendered — one <select> per occurrence of
+// BLANK_TOKEN — so it's the only reliable source of "how many blanks does
+// this question really have". `question.blanks` is supposed to track it
+// 1:1, but a stray extra (or missing) entry left over from an older edit
+// can't be ruled out for already-saved data. Deriving the count from the
+// text, everywhere a blank count is needed, means a mismatched `blanks`
+// array can never leave a student stuck on a blank with no corresponding
+// control anywhere on the page — the single most confusing way this could
+// fail, since there'd be nothing visible to even point at.
+const countBlanksInText = (text) => (text || '').split(BLANK_TOKEN).length - 1;
+
 export const emptyQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
-export const getItemCount = (q) => q.blanks.length;
+export const getItemCount = (q) => countBlanksInText(q.text);
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
@@ -17,7 +28,8 @@ export const reconstructQuestion = (q) => q;
 // Practice Cards' whole-card grading at Enviar time.
 export const gradeState = (question, state) => {
   const selections = state?.selections || [];
-  return question.blanks.map((blank, i) => blank.answer === selections[i]);
+  const blankCount = countBlanksInText(question.text);
+  return Array.from({ length: blankCount }, (_, i) => question.blanks[i]?.answer === selections[i]);
 };
 
 // --- Student-facing renderer ---
@@ -37,7 +49,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // counts as its "first attempt" for scoring, not the dropdown selection
 // itself — re-picking a wrong blank and re-submitting doesn't re-trigger it.
 const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
-  const blankCount = question.blanks.length;
+  const blankCount = countBlanksInText(question.text);
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
   const [wrongAttempted, setWrongAttempted] = useState(() => initialState?.wrongAttempted || Array(blankCount).fill(false));
@@ -66,9 +78,9 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
     const nextCorrect = [...correct];
     const nextWrong = [...wrongAttempted];
 
-    question.blanks.forEach((blank, i) => {
-      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
-      const isCorrect = blank.answer === selections[i];
+    for (let i = 0; i < blankCount; i++) {
+      if (nextCorrect[i]) continue; // already locked correct — nothing to re-check
+      const isCorrect = question.blanks[i]?.answer === selections[i];
 
       if (!attemptedRef.current[i]) {
         attemptedRef.current[i] = true;
@@ -81,7 +93,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       } else {
         nextWrong[i] = true;
       }
-    });
+    }
 
     setCorrect(nextCorrect);
     setWrongAttempted(nextWrong);
@@ -114,7 +126,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 // only ever shows once the caller says the whole card has been submitted,
 // and re-colors live from then on as the student keeps editing.
 const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
-  const blankCount = question.blanks.length;
+  const blankCount = countBlanksInText(question.text);
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
 
   useEffect(() => {
