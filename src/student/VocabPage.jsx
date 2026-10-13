@@ -434,6 +434,7 @@ export default function VocabPage() {
                 word={currentStudyWord}
                 direction={cardDirection}
                 onCorrectAnswer={handleTypedCorrect}
+                onNext={nextCard}
               />
             )}
 
@@ -557,7 +558,17 @@ export default function VocabPage() {
 // Keyed by word+direction in the parent so navigating, shuffling, or
 // switching direction always remounts this with fresh (empty) state rather
 // than carrying over a stale typed answer/result from the previous word.
-function TypeCard({ word, direction, onCorrectAnswer }) {
+// Drops a leading English infinitive marker ("to speak" -> "speak") so a
+// student who skips it isn't marked wrong — Spanish infinitives almost
+// always translate as "to ___", and typing the bare verb is the natural
+// instinct. Returns '' when there's nothing left to offer as a second
+// accepted variant (the translation didn't start with "to ").
+const stripLeadingTo = (s) => {
+  const stripped = (s || '').replace(/^to\s+/i, '').trim();
+  return stripped !== (s || '').trim() ? stripped : '';
+};
+
+function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
   const [value, setValue] = useState('');
   const [result, setResult] = useState(null); // null | { correct, correctAnswer }
 
@@ -567,10 +578,14 @@ function TypeCard({ word, direction, onCorrectAnswer }) {
     if (!value.trim() || result) return;
     let correct, correctAnswer;
     if (direction === 'es-en') {
-      // Prompted with Spanish, typing the English translation — no accepted
-      // synonyms stored for this side, just the one translation on file.
-      correct = checkAnswerLeniently(value, word.traduccion || '', false).correct;
-      correctAnswer = word.traduccion;
+      // Prompted with Spanish, typing the English translation. No alt_answers
+      // stored for this side, but "to ___" is accepted with or without the
+      // infinitive marker.
+      const translation = word.traduccion || '';
+      const noTo = stripLeadingTo(translation);
+      const accepted = noTo ? `${translation}, ${noTo}` : translation;
+      correct = checkAnswerLeniently(value, accepted, false).correct;
+      correctAnswer = translation;
     } else {
       // Prompted with English, typing Spanish — alt_answers (synonyms, e.g.
       // "sano" for "saludable") widen what's accepted, same as everywhere
@@ -604,8 +619,14 @@ function TypeCard({ word, direction, onCorrectAnswer }) {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') checkAnswer(); }}
-          disabled={!!result}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            // Checks on the first Enter; once answered, a second Enter
+            // advances to the next card — keyboard-only flow through the deck.
+            if (result) onNext?.();
+            else checkAnswer();
+          }}
+          readOnly={!!result}
           autoFocus
           placeholder={direction === 'es-en' ? 'Escribe en inglés...' : 'Escribe en español...'}
           className={`w-full text-center text-lg font-bold px-4 py-3 rounded-xl border-2 outline-none transition-colors ${
@@ -625,9 +646,14 @@ function TypeCard({ word, direction, onCorrectAnswer }) {
             Revisar
           </button>
         ) : (
-          <p className={`text-sm font-bold ${result.correct ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {result.correct ? '¡Correcto! ✓' : `Respuesta: ${result.correctAnswer}`}
-          </p>
+          <>
+            <p className={`text-sm font-bold ${result.correct ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {result.correct ? '¡Correcto! ✓' : `Respuesta: ${result.correctAnswer}`}
+            </p>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+              Presiona Enter para continuar →
+            </p>
+          </>
         )}
       </div>
     </div>
