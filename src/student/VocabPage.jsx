@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { useAuth } from '../context/AuthContext';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
+import { awardPoints } from '../utils/pointsHelper';
 
 // The vocab collection has words in two different shapes for
 // definiciones.nivelN, depending on which tool/import created them:
@@ -37,8 +38,19 @@ const projectorScaleFor = (count) => {
 export default function VocabPage() {
   const { bundleId } = useParams();
   const [searchParams] = useSearchParams();
-  const { userData } = useAuth();
+  const { userData, currentUser } = useAuth();
   const isAdmin = userData?.role === 'admin';
+  // Escribir mode only (never the flip cards, so students always have an
+  // ungraded way to just review) — every 2nd correct typed answer this
+  // session earns a leaderboard point. Counted with a ref since it doesn't
+  // need to drive any render, just the awardPoints call on every other hit.
+  const typedCorrectCountRef = useRef(0);
+  const handleTypedCorrect = useCallback(() => {
+    typedCorrectCountRef.current += 1;
+    if (typedCorrectCountRef.current % 2 === 0 && currentUser?.uid) {
+      awardPoints(currentUser.uid, 1).catch((err) => console.error('Error awarding points:', err));
+    }
+  }, [currentUser]);
   // An admin previewing a course via the Dashboard's S2/S4 toggle arrives
   // here with that course in the URL (see Dashboard's vocab card Link) —
   // carry it forward into the index link below too, so "Ver Índice
@@ -421,6 +433,7 @@ export default function VocabPage() {
                 key={`${currentStudyWord.id || activeCardIndex}-${cardDirection}`}
                 word={currentStudyWord}
                 direction={cardDirection}
+                onCorrectAnswer={handleTypedCorrect}
               />
             )}
 
@@ -544,7 +557,7 @@ export default function VocabPage() {
 // Keyed by word+direction in the parent so navigating, shuffling, or
 // switching direction always remounts this with fresh (empty) state rather
 // than carrying over a stale typed answer/result from the previous word.
-function TypeCard({ word, direction }) {
+function TypeCard({ word, direction, onCorrectAnswer }) {
   const [value, setValue] = useState('');
   const [result, setResult] = useState(null); // null | { correct, correctAnswer }
 
@@ -552,20 +565,23 @@ function TypeCard({ word, direction }) {
 
   const checkAnswer = () => {
     if (!value.trim() || result) return;
+    let correct, correctAnswer;
     if (direction === 'es-en') {
       // Prompted with Spanish, typing the English translation — no accepted
       // synonyms stored for this side, just the one translation on file.
-      const { correct } = checkAnswerLeniently(value, word.traduccion || '', false);
-      setResult({ correct, correctAnswer: word.traduccion });
+      correct = checkAnswerLeniently(value, word.traduccion || '', false).correct;
+      correctAnswer = word.traduccion;
     } else {
       // Prompted with English, typing Spanish — alt_answers (synonyms, e.g.
       // "sano" for "saludable") widen what's accepted, same as everywhere
       // else a typed Spanish answer is graded (see utils/checkAnswer.js).
       const altAnswers = (word.alt_answers || []).map((a) => (a || '').trim()).filter(Boolean);
       const accepted = [word.palabra, ...altAnswers].filter(Boolean).join(', ');
-      const { correct } = checkAnswerLeniently(value, accepted, false);
-      setResult({ correct, correctAnswer: word.palabra });
+      correct = checkAnswerLeniently(value, accepted, false).correct;
+      correctAnswer = word.palabra;
     }
+    setResult({ correct, correctAnswer });
+    if (correct) onCorrectAnswer?.();
   };
 
   return (
