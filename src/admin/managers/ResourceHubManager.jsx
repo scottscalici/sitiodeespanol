@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useNavigate } from 'react-router-dom';
+import ImageUploadField from '../shared/ImageUploadField';
 
 export default function ResourceHubManager() {
   const navigate = useNavigate();
@@ -106,49 +107,50 @@ export default function ResourceHubManager() {
           {items.map((item, index) => (
             <div key={index} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                
+
                 {/* Title */}
-                <div className="sm:col-span-4 flex flex-col gap-1">
+                <div className="sm:col-span-5 flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Título del Enlace</label>
-                  <input 
-                    type="text" 
-                    value={item.title || ''} 
+                  <input
+                    type="text"
+                    value={item.title || ''}
                     onChange={(e) => handleInputChange(index, 'title', e.target.value)}
                     className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500 font-bold"
                   />
                 </div>
 
                 {/* URL */}
-                <div className="sm:col-span-3 flex flex-col gap-1">
+                <div className="sm:col-span-4 flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">URL / Ruta</label>
-                  <input 
-                    type="text" 
-                    value={item.url || ''} 
+                  <input
+                    type="text"
+                    value={item.url || ''}
                     onChange={(e) => handleInputChange(index, 'url', e.target.value)}
                     className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-cyan-400 font-mono outline-none focus:border-cyan-500"
                   />
                 </div>
 
-                {/* Image URL */}
+                {/* Category */}
                 <div className="sm:col-span-3 flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Imagen / Miniatura URL</label>
-                  <input 
-                    type="text" 
-                    value={item.image || ''} 
-                    onChange={(e) => handleInputChange(index, 'image', e.target.value)}
-                    placeholder="https://..."
-                    className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-amber-400 font-mono outline-none focus:border-cyan-500"
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría</label>
+                  <input
+                    type="text"
+                    value={item.category || ''}
+                    onChange={(e) => handleInputChange(index, 'category', e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-cyan-500"
                   />
                 </div>
 
-                {/* Category */}
-                <div className="sm:col-span-2 flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categoría</label>
-                  <input 
-                    type="text" 
-                    value={item.category || ''} 
-                    onChange={(e) => handleInputChange(index, 'category', e.target.value)}
-                    className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-cyan-500"
+                {/* Image URL — own full-width row since the upload/browse
+                    buttons need more room than a narrow 3/12 column allows */}
+                <div className="sm:col-span-12 flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Imagen / Miniatura</label>
+                  <ImageUploadField
+                    value={item.image || ''}
+                    onChange={(url) => handleInputChange(index, 'image', url)}
+                    folder="recursos"
+                    placeholder="https://..."
+                    inputClassName="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-amber-400 font-mono outline-none focus:border-cyan-500"
                   />
                 </div>
 
