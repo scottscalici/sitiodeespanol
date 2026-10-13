@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
 const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  // Lets an external link (e.g. from Schoology) deep-link straight to this
+  // modal instead of landing on the dashboard and requiring a manual click —
+  // e.g. https://<site>/?calendario=1
+  useEffect(() => {
+    if (searchParams.get('calendario') === '1') setIsModalOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { theme } = useActiveTheme() || {};
   const themeStyle = getThemedCardStyle(
     theme?.styles?.cardOverrides?.evaluacion,
@@ -18,6 +28,14 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
 
   // Filter out 'Nada' for the full calendar view
   const actualEvals = evals.filter((e) => e.label && e.label !== 'Nada');
+
+  // The full-detail list stays short and current: anything upcoming plus
+  // the last few classes back. Older entries move into a collapsed
+  // "Archivadas" section at the bottom instead of pushing the modal into
+  // an ever-growing scroll of stuff that's long since passed.
+  const ARCHIVE_THRESHOLD_DIAS = 3;
+  const recentEvals = actualEvals.filter((e) => e.dia >= liveDia - ARCHIVE_THRESHOLD_DIAS);
+  const archivedEvals = actualEvals.filter((e) => e.dia < liveDia - ARCHIVE_THRESHOLD_DIAS);
 
   // Find the next 2 upcoming evaluations
   const upcomingEvals = actualEvals
@@ -144,49 +162,80 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
                   No hay evaluaciones programadas.
                 </p>
               ) : (
-                actualEvals.map((item, idx) => {
-                  const isPast = item.dia < liveDia;
-                  const isToday = item.dia === liveDia;
-                  const datesStr = getDatesForDia(item.dia);
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`p-4 rounded-xl border flex items-center gap-4 transition-all ${
-                        isToday 
-                          ? 'bg-rose-50 border-rose-200 shadow-md transform scale-[1.02]' 
-                          : isPast 
-                            ? 'bg-white border-slate-200 opacity-60' 
-                            : 'bg-white border-slate-200 shadow-sm'
-                      }`}
-                    >
-                      <div className={`flex flex-col items-center justify-center min-w-[70px] px-2 py-2 rounded-lg shrink-0 ${
-                        isToday ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Día {item.dia}</span>
-                        <span className="text-[9px] font-bold leading-none text-center opacity-80">{datesStr}</span>
-                      </div>
-                      <div>
-                        {isToday && (
-                          <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 block mb-0.5">
-                            HOY
-                          </span>
-                        )}
-                        <p className={`font-bold text-sm ${isToday ? 'text-rose-900' : 'text-slate-700'}`}>
-                          {item.label}
-                        </p>
-                      </div>
-                      {isPast && !isToday && (
-                        <div className="ml-auto text-emerald-500 text-xl font-bold" title="Completado">
-                          ✓
+                <>
+                  {recentEvals.length === 0 ? (
+                    <p className="text-center text-slate-500 italic font-bold py-4">
+                      Nada reciente — mira abajo en Archivadas.
+                    </p>
+                  ) : (
+                    recentEvals.map((item, idx) => (
+                      <EvalItemCard key={idx} item={item} liveDia={liveDia} datesStr={getDatesForDia(item.dia)} />
+                    ))
+                  )}
+
+                  {archivedEvals.length > 0 && (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setShowArchived((v) => !v)}
+                        className="w-full flex items-center justify-between text-left text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 py-2"
+                      >
+                        <span>Archivadas ({archivedEvals.length})</span>
+                        <span>{showArchived ? '▲' : '▼'}</span>
+                      </button>
+                      {showArchived && (
+                        <div className="space-y-2 mt-1">
+                          {archivedEvals.map((item, idx) => (
+                            <EvalItemCard key={idx} item={item} liveDia={liveDia} datesStr={getDatesForDia(item.dia)} compact />
+                          ))}
                         </div>
                       )}
                     </div>
-                  )
-                })
+                  )}
+                </>
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// One evaluation row in the Calendario modal — shared by the recent list
+// (full-size, today highlighted) and the collapsed Archivadas list
+// (`compact`: smaller padding/text, no "HOY" treatment since by definition
+// nothing archived is today or upcoming).
+const EvalItemCard = ({ item, liveDia, datesStr, compact = false }) => {
+  const isPast = item.dia < liveDia;
+  const isToday = item.dia === liveDia;
+
+  return (
+    <div
+      className={`rounded-xl border flex items-center gap-4 transition-all ${compact ? 'p-2.5' : 'p-4'} ${
+        isToday
+          ? 'bg-rose-50 border-rose-200 shadow-md transform scale-[1.02]'
+          : isPast
+          ? 'bg-white border-slate-200 opacity-60'
+          : 'bg-white border-slate-200 shadow-sm'
+      }`}
+    >
+      <div
+        className={`flex flex-col items-center justify-center min-w-[70px] px-2 py-2 rounded-lg shrink-0 ${
+          isToday ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'
+        }`}
+      >
+        <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Día {item.dia}</span>
+        <span className="text-[9px] font-bold leading-none text-center opacity-80">{datesStr}</span>
+      </div>
+      <div>
+        {isToday && (
+          <span className="text-[9px] font-black uppercase tracking-widest text-rose-500 block mb-0.5">HOY</span>
+        )}
+        <p className={`font-bold text-sm ${isToday ? 'text-rose-900' : 'text-slate-700'}`}>{item.label}</p>
+      </div>
+      {isPast && !isToday && (
+        <div className="ml-auto text-emerald-500 text-xl font-bold" title="Completado">
+          ✓
         </div>
       )}
     </div>
