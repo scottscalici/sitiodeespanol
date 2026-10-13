@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
+import { importImageFromUrl } from '../../utils/imageUpload';
+import ImageUploadField from '../shared/ImageUploadField';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -117,6 +119,30 @@ const DestacadoManager = () => {
 
     fetchData();
   }, []);
+
+  const [reimportingId, setReimportingId] = useState(null);
+  const [reimportError, setReimportError] = useState({});
+
+  // Lets the admin fix an image showing "Roto" without leaving this page to
+  // download + re-upload it — tries fetching whatever URL is currently
+  // stored (often an old raw.githubusercontent.com link some networks block
+  // as an embedded <img>) and re-hosting it in Firebase Storage. If the
+  // source is itself unreachable this just fails with a clear message; it's
+  // not magic, just skips the manual download/upload round-trip when it works.
+  const handleReimportImage = async (item) => {
+    if (!item.image_url) return;
+    setReimportingId(item.id);
+    setReimportError((prev) => ({ ...prev, [item.id]: '' }));
+    try {
+      const url = await importImageFromUrl(item.image_url, 'destacados', `${item.id}.png`);
+      handleInputChange(item.id, 'image_url', url);
+    } catch (err) {
+      console.error(`Error re-importing image for ${item.id}:`, err);
+      setReimportError((prev) => ({ ...prev, [item.id]: 'No se pudo. Sube el archivo manualmente.' }));
+    } finally {
+      setReimportingId(null);
+    }
+  };
 
   const handleInputChange = (id, field, value) => {
     setItems(prev => prev.map(item => {
@@ -393,13 +419,31 @@ const DestacadoManager = () => {
       <span className="text-[9px] font-black text-slate-400">N/A</span>
     )}
   </div>
-  <input 
-    type="text" 
-    value={item.image_url || ''}
-    onChange={(e) => handleInputChange(item.id, 'image_url', e.target.value)}
-    className="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
-    placeholder="https://..."
-  />
+  <div className="w-full">
+    <div className="flex items-center gap-2">
+      <ImageUploadField
+        value={item.image_url || ''}
+        onChange={(url) => handleInputChange(item.id, 'image_url', url)}
+        folder="destacados"
+        placeholder="https://..."
+        inputClassName="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
+      />
+      {item.image_url && !item.image_url.includes('firebasestorage') && (
+        <button
+          type="button"
+          onClick={() => handleReimportImage(item)}
+          disabled={reimportingId === item.id}
+          title="Intenta descargar esta imagen y volver a alojarla en Firebase Storage"
+          className="shrink-0 px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest rounded-md transition-colors"
+        >
+          {reimportingId === item.id ? '⏳' : '📥 Re-subir'}
+        </button>
+      )}
+    </div>
+    {reimportError[item.id] && (
+      <p className="text-[9px] text-rose-500 font-bold mt-1">{reimportError[item.id]}</p>
+    )}
+  </div>
 </div>
                 <div className="col-span-1 font-mono text-[9px] text-slate-400 font-bold truncate px-2 text-center" title={item.id}>
                   {item.id}

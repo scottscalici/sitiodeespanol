@@ -157,6 +157,25 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       }
     });
 
+    // Same shared-bank depletion hazard as word_bank_cloze (see its own
+    // handleRevisar for the full explanation): the same word can be
+    // sitting in two blanks at once pre-Revisar, and confirming one of
+    // them silently orphans the other's selection — a <select> showing a
+    // value no longer in its own option list, which the browser falls
+    // back to displaying as something else with no onChange ever firing,
+    // leaving every later Revisar click failing for no visible reason.
+    // Doesn't apply when allowRepeats is on: there, a word legitimately
+    // stays correct at multiple positions at once (e.g. "lo"), so it's
+    // never actually orphaned by another blank's confirmation.
+    const nextSelections = question.allowRepeats
+      ? selections
+      : selections.map((sel, i) => {
+          if (nextCorrect[i] || !sel) return sel;
+          const orphaned = question.answers.some((a, j) => j !== i && nextCorrect[j] && sameWord(a, sel));
+          return orphaned ? '' : sel;
+        });
+
+    setSelections(nextSelections);
     setCorrect(nextCorrect);
     setWrongAttempted(nextWrong);
     if (nextCorrect.every(Boolean)) onAllCorrect();

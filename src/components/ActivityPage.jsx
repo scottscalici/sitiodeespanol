@@ -297,7 +297,11 @@ const ConversacionLayout = ({ activity }) => {
     .split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n) && n > 0);
-  const basePrep = raw.prep_seconds ?? 0;
+  // Stored via a generic <input type="number"> onChange that doesn't coerce
+  // (FormConversaciones/ConversacionContentModal), so this can be a string
+  // in Firestore — Number() here keeps isOpenFormat's strict `=== 0` check
+  // (and every arithmetic use of basePrep) correct either way.
+  const basePrep = Number(raw.prep_seconds) || 0;
   const isOpenFormat = basePrep === 0 && baseSegments.length === 0;
 
   const [simMode, setSimMode] = useState(false);
@@ -307,6 +311,7 @@ const ConversacionLayout = ({ activity }) => {
   const [phase, setPhase] = useState(isOpenFormat ? 'end' : 'idle'); // idle -> prep -> waitToSpeak -> speak -> end
   const [seconds, setSeconds] = useState(prepSeconds);
   const [segIndex, setSegIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => () => clearInterval(intervalRef.current), []);
@@ -315,10 +320,11 @@ const ConversacionLayout = ({ activity }) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
   };
 
-  const startPrep = () => {
-    clearTimer();
-    setPhase('prep');
-    setSeconds(prepSeconds);
+  // Ticking logic extracted so pausing (clear the interval, keep `seconds`
+  // as-is) and resuming (start a fresh interval from that same `seconds`)
+  // can reuse it without re-running startPrep/startSpeak's own reset of
+  // `seconds` back to the full duration.
+  const tickPrep = () => {
     intervalRef.current = setInterval(() => {
       setSeconds((prev) => {
         if (prev <= 1) {
@@ -331,14 +337,49 @@ const ConversacionLayout = ({ activity }) => {
     }, 1000);
   };
 
-  const startSpeak = () => {
-    clearTimer();
-    setSegIndex(0);
-    setPhase('speak');
-    setSeconds(segments[0] ?? 0);
+  const tickSpeak = () => {
     intervalRef.current = setInterval(() => {
       setSeconds((prev) => prev - 1);
     }, 1000);
+  };
+
+  const startPrep = () => {
+    clearTimer();
+    setIsPaused(false);
+    setPhase('prep');
+    setSeconds(prepSeconds);
+    tickPrep();
+  };
+
+  const startSpeak = () => {
+    clearTimer();
+    setIsPaused(false);
+    setSegIndex(0);
+    setPhase('speak');
+    setSeconds(segments[0] ?? 0);
+    tickSpeak();
+  };
+
+  // Lets a teacher move straight to the presentation when a student is
+  // ready before the full prep time elapses, without waiting it out.
+  const skipToSpeak = () => {
+    clearTimer();
+    setIsPaused(false);
+    setPhase('waitToSpeak');
+  };
+
+  // Pausing clears the interval but leaves `seconds`/`phase` untouched;
+  // resuming restarts ticking from wherever it left off — covers an
+  // interruption during either prep or the presentation itself.
+  const togglePause = () => {
+    if (isPaused) {
+      setIsPaused(false);
+      if (phase === 'prep') tickPrep();
+      else if (phase === 'speak') tickSpeak();
+    } else {
+      clearTimer();
+      setIsPaused(true);
+    }
   };
 
   const nextSegment = () => {
@@ -355,6 +396,7 @@ const ConversacionLayout = ({ activity }) => {
   const resetAll = () => {
     clearTimer();
     setSimMode(false);
+    setIsPaused(false);
     setPhase(isOpenFormat ? 'end' : 'idle');
     setSeconds(basePrep);
     setSegIndex(0);
@@ -363,18 +405,10 @@ const ConversacionLayout = ({ activity }) => {
   const startSimulacion = () => {
     setSimMode(true);
     clearTimer();
+    setIsPaused(false);
     setPhase('prep');
     setSeconds(900);
-    intervalRef.current = setInterval(() => {
-      setSeconds((prev) => {
-        if (prev <= 1) {
-          clearTimer();
-          setPhase('waitToSpeak');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    tickPrep();
   };
 
   const spoken = phase === 'speak' ? (segments[segIndex] ?? 0) - seconds : 0;
@@ -735,8 +769,24 @@ const ConversacionLayout = ({ activity }) => {
 
             {phase === 'prep' && (
               <>
-                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Preparando...</p>
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">
+                  {isPaused ? '⏸️ Pausado' : 'Preparando...'}
+                </p>
                 <p className="text-white text-6xl font-black tabular-nums">{formatConvTime(seconds)}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={togglePause}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-black uppercase tracking-widest text-xs px-5 py-3 rounded-xl transition-colors"
+                  >
+                    {isPaused ? '▶️ Reanudar' : '⏸️ Pausar'}
+                  </button>
+                  <button
+                    onClick={skipToSpeak}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs px-5 py-3 rounded-xl transition-colors"
+                  >
+                    ⏭️ Saltar a Presentación
+                  </button>
+                </div>
               </>
             )}
 
@@ -755,7 +805,7 @@ const ConversacionLayout = ({ activity }) => {
             {phase === 'speak' && (
               <>
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest">
-                  Segmento {segIndex + 1} de {segments.length}
+                  {isPaused ? '⏸️ Pausado — ' : ''}Segmento {segIndex + 1} de {segments.length}
                 </p>
                 <p
                   className={`text-6xl font-black tabular-nums ${
@@ -765,12 +815,20 @@ const ConversacionLayout = ({ activity }) => {
                   {formatConvTime(seconds)}
                 </p>
                 {isOvertime && <p className="text-rose-400 text-xs font-black uppercase tracking-widest">Tiempo Extra</p>}
-                <button
-                  onClick={nextSegment}
-                  className="bg-white hover:bg-slate-200 text-slate-900 font-black uppercase tracking-widest text-sm px-8 py-4 rounded-xl transition-colors"
-                >
-                  {segIndex + 1 < segments.length ? 'Siguiente Segmento' : 'Terminar'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={togglePause}
+                    className="bg-slate-700 hover:bg-slate-600 text-white font-black uppercase tracking-widest text-xs px-5 py-4 rounded-xl transition-colors"
+                  >
+                    {isPaused ? '▶️ Reanudar' : '⏸️ Pausar'}
+                  </button>
+                  <button
+                    onClick={nextSegment}
+                    className="bg-white hover:bg-slate-200 text-slate-900 font-black uppercase tracking-widest text-sm px-8 py-4 rounded-xl transition-colors"
+                  >
+                    {segIndex + 1 < segments.length ? 'Siguiente Segmento' : 'Terminar'}
+                  </button>
+                </div>
               </>
             )}
 

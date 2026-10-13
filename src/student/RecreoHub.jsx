@@ -1,14 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getArcadeTileImages, ARCADE_TILE_FALLBACK_IMAGES } from '../utils/arcadeTiles';
 
 const RecreoHub = () => {
+  const [tileImages, setTileImages] = useState({});
+
+  useEffect(() => {
+    getArcadeTileImages()
+      .then(setTileImages)
+      .catch((err) => console.error('Error loading arcade tile images:', err));
+  }, []);
+
+  const imageFor = (tileId) => tileImages[tileId] || ARCADE_TILE_FALLBACK_IMAGES[tileId];
+
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden">
-      
+
       {/* HEADER SECTION */}
       <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
         <Link to="/" className="text-indigo-400 font-bold mb-8 inline-flex items-center gap-2 hover:text-indigo-300 transition-colors group">
-          <span className="text-xl leading-none group-hover:-translate-x-1 transition-transform">←</span> 
+          <span className="text-xl leading-none group-hover:-translate-x-1 transition-transform">←</span>
           Volver al Gym
         </Link>
 
@@ -23,16 +34,16 @@ const RecreoHub = () => {
 
         {/* ARCADE CABINETS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
+
           {/* 1. SEÑORDLE */}
           <Link to="/juegos/senordle" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-emerald-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:-translate-y-2">
             <div className="absolute top-4 right-4 z-20 bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/50">
               Diario
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/senordle.png" 
-                 alt="Señordle" 
+               <img
+                 src={imageFor('senordle')}
+                 alt="Señordle"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -46,9 +57,9 @@ const RecreoHub = () => {
           {/* 2. ESLABONES */}
           <Link to="/juegos/eslabones" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-cyan-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:-translate-y-2">
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/eslabon.png" 
-                 alt="Eslabones" 
+               <img
+                 src={imageFor('eslabones')}
+                 alt="Eslabones"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -62,9 +73,9 @@ const RecreoHub = () => {
           {/* 3. ATANDO CABOS */}
           <Link to="/juegos/atandocabos" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-fuchsia-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,70,239,0.3)] hover:-translate-y-2">
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/atando_cabos.png" 
-                 alt="Atando Cabos" 
+               <img
+                 src={imageFor('atandocabos')}
+                 alt="Atando Cabos"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -81,9 +92,9 @@ const RecreoHub = () => {
               Nuevo
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
-               <img 
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/tico_talk.png" 
-                 alt="Tico Talk" 
+               <img
+                 src={imageFor('ticotalk')}
+                 alt="Tico Talk"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
             </div>
@@ -98,10 +109,12 @@ const RecreoHub = () => {
             <div className="absolute top-4 right-4 z-20 bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-500/50">
               Nuevo
             </div>
-            <img src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/impostor.png" 
-                 alt="Impostor" 
-                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-               />
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img src={imageFor('impostor')}
+                   alt="Impostor"
+                   className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                 />
+            </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Impostor</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra al impostor en tu mesa. Juega en grupo, en vivo, en español.</p>
             <div className="text-indigo-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
@@ -116,7 +129,7 @@ const RecreoHub = () => {
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
                <img
-                 src="https://raw.githubusercontent.com/scottscalici/imagenes/main/juegos/silabazo.png"
+                 src={imageFor('silabas')}
                  alt="Sílabas"
                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                />
@@ -127,6 +140,45 @@ const RecreoHub = () => {
               JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
+
+          {/* 7. RÁFAGA */}
+          <Link to="/juegos/rafaga" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-orange-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:-translate-y-2 overflow-hidden">
+            <div className="absolute top-4 right-4 z-20 bg-orange-500/20 text-orange-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-orange-500/50">
+              Nuevo
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img
+                src={imageFor('rafaga')}
+                alt="Ráfaga"
+                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+              />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-orange-400 transition-colors">Ráfaga</h2>
+            <p className="text-slate-400 text-sm font-medium mb-8">Compite con toda la clase en tiempo real. Únete con el código que te dé tu profesor.</p>
+            <div className="text-orange-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
+            </div>
+          </Link>
+
+          {/* 8. ¡ZAS! — logo in place, game not built yet; not a Link since
+              there's nowhere to send a click until it exists. */}
+          <div className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 overflow-hidden opacity-60 cursor-not-allowed">
+            <div className="absolute top-4 right-4 z-20 bg-slate-700 text-slate-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-slate-600">
+              Próximamente
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+              <img
+                src={imageFor('zas')}
+                alt="¡Zas!"
+                className="w-full h-full object-contain grayscale"
+              />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 text-slate-400">¡Zas!</h2>
+            <p className="text-slate-500 text-sm font-medium mb-8">Un nuevo juego está en camino. Vuelve pronto.</p>
+            <div className="text-slate-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              MUY PRONTO
+            </div>
+          </div>
 
         </div>
       </div>

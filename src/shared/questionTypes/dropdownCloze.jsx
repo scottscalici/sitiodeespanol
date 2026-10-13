@@ -5,10 +5,20 @@ import { renderClozeText, ClozeChrome } from './clozeShared';
 export const TYPE_KEY = 'dropdown_cloze';
 export const TYPE_LABEL = 'Cloze con Menús';
 export const BLANK_TOKEN = '{{blank}}';
-const countBlanks = (text) => (text.match(/\{\{blank\}\}/g) || []).length;
+
+// The text is what's actually rendered — one <select> per occurrence of
+// BLANK_TOKEN — so it's the only reliable source of "how many blanks does
+// this question really have". `question.blanks` is supposed to track it
+// 1:1, but a stray extra (or missing) entry left over from an older edit
+// can't be ruled out for already-saved data. Deriving the count from the
+// text, everywhere a blank count is needed, means a mismatched `blanks`
+// array can never leave a student stuck on a blank with no corresponding
+// control anywhere on the page — the single most confusing way this could
+// fail, since there'd be nothing visible to even point at.
+const countBlanksInText = (text) => (text || '').split(BLANK_TOKEN).length - 1;
 
 export const emptyQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
-export const getItemCount = (q) => q.blanks.length;
+export const getItemCount = (q) => countBlanksInText(q.text);
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
 
@@ -18,7 +28,8 @@ export const reconstructQuestion = (q) => q;
 // Practice Cards' whole-card grading at Enviar time.
 export const gradeState = (question, state) => {
   const selections = state?.selections || [];
-  return question.blanks.map((blank, i) => blank.answer === selections[i]);
+  const blankCount = countBlanksInText(question.text);
+  return Array.from({ length: blankCount }, (_, i) => question.blanks[i]?.answer === selections[i]);
 };
 
 // --- Student-facing renderer ---
@@ -38,7 +49,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // counts as its "first attempt" for scoring, not the dropdown selection
 // itself — re-picking a wrong blank and re-submitting doesn't re-trigger it.
 const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
-  const blankCount = question.blanks.length;
+  const blankCount = countBlanksInText(question.text);
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
   const [correct, setCorrect] = useState(() => initialState?.correct || Array(blankCount).fill(false));
   const [wrongAttempted, setWrongAttempted] = useState(() => initialState?.wrongAttempted || Array(blankCount).fill(false));
@@ -67,9 +78,9 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
     const nextCorrect = [...correct];
     const nextWrong = [...wrongAttempted];
 
-    question.blanks.forEach((blank, i) => {
-      if (nextCorrect[i]) return; // already locked correct — nothing to re-check
-      const isCorrect = blank.answer === selections[i];
+    for (let i = 0; i < blankCount; i++) {
+      if (nextCorrect[i]) continue; // already locked correct — nothing to re-check
+      const isCorrect = question.blanks[i]?.answer === selections[i];
 
       if (!attemptedRef.current[i]) {
         attemptedRef.current[i] = true;
@@ -82,7 +93,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       } else {
         nextWrong[i] = true;
       }
-    });
+    }
 
     setCorrect(nextCorrect);
     setWrongAttempted(nextWrong);
@@ -115,7 +126,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 // only ever shows once the caller says the whole card has been submitted,
 // and re-colors live from then on as the student keeps editing.
 const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
-  const blankCount = question.blanks.length;
+  const blankCount = countBlanksInText(question.text);
   const [selections, setSelections] = useState(() => initialState?.selections || Array(blankCount).fill(''));
 
   useEffect(() => {
@@ -152,15 +163,43 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 // `instanceId` scopes each blank's radio group `name` so multiple
 // dropdown_cloze questions in the same list don't cross-interfere.
 export const Editor = ({ question: q, onChange, instanceId }) => {
+  // Re-anchors existing blanks by POSITION when the text changes, instead
+  // of only ever appending new blank configs to the end or truncating from
+  // the end. Inserting or removing a {{blank}} in the MIDDLE of an
+  // already-configured paragraph used to silently shift every blank after
+  // that point onto the wrong slot — its stored options/answer then belong
+  // to a different spot in the text than where it now renders, so no
+  // selection there can ever be marked correct again, permanently stranding
+  // a student on that question. Finds the longest matching prefix/suffix of
+  // segments-between-blanks on both the old and new text; blanks inside
+  // that matching window are kept as-is (by position), new default blanks
+  // are only created for the genuinely new/changed span in the middle.
   const updateText = (text) => {
-    const needed = countBlanks(text);
-    let blanks = q.blanks || [];
-    if (needed > blanks.length) {
-      blanks = [...blanks, ...Array.from({ length: needed - blanks.length }, () => ({ options: ['', ''], answer: '' }))];
-    } else if (needed < blanks.length) {
-      blanks = blanks.slice(0, needed);
+    const oldSegments = (q.text || '').split(BLANK_TOKEN);
+    const newSegments = text.split(BLANK_TOKEN);
+    const oldBlanks = q.blanks || [];
+    const makeDefault = () => ({ options: ['', ''], answer: '' });
+
+    let prefix = 0;
+    const maxPrefix = Math.min(oldSegments.length, newSegments.length) - 1;
+    while (prefix < maxPrefix && oldSegments[prefix] === newSegments[prefix]) prefix++;
+
+    let suffix = 0;
+    const maxSuffix = Math.min(oldSegments.length, newSegments.length) - 1 - prefix;
+    while (
+      suffix < maxSuffix &&
+      oldSegments[oldSegments.length - 1 - suffix] === newSegments[newSegments.length - 1 - suffix]
+    ) {
+      suffix++;
     }
-    onChange({ text, blanks });
+
+    const newBlankCount = newSegments.length - 1;
+    const keptStart = oldBlanks.slice(0, prefix);
+    const keptEnd = suffix > 0 ? oldBlanks.slice(oldBlanks.length - suffix) : [];
+    const middleCount = Math.max(0, newBlankCount - prefix - suffix);
+    const middle = Array.from({ length: middleCount }, makeDefault);
+
+    onChange({ text, blanks: [...keptStart, ...middle, ...keptEnd] });
   };
 
   const addOption = (bIdx) => {

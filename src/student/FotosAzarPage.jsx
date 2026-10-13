@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { listAdminImages } from '../utils/imageUpload';
+
+const STORAGE_FOLDER = 'randomimage/rondarelampago';
 
 export default function FotosAzarPage() {
   const navigate = useNavigate();
-  const baseUrl = "https://raw.githubusercontent.com/scottscalici/imagenes/main/randomimage/rondarelampago/";
-  const jsonUrl = baseUrl + "images.json";
 
   const [images, setImages] = useState([]);
   const [currentImage, setCurrentImage] = useState('');
@@ -18,17 +19,18 @@ export default function FotosAzarPage() {
 
   const timerRef = useRef(null);
 
-  // Fetch image array from GitHub
+  // Fetch the image list from Firebase Storage (was GitHub raw content —
+  // moved here since some school networks block image downloads from that
+  // domain outright, even though plain JSON/text from it loads fine).
   useEffect(() => {
     const loadImages = async () => {
       try {
-        const response = await fetch(jsonUrl + "?t=" + new Date().getTime());
-        const data = await response.json();
+        const data = await listAdminImages(STORAGE_FOLDER);
         setImages(data);
         setCurrentImage("https://placehold.co/600x400?text=¡Listo+para+hablar!");
       } catch (error) {
         console.error("Fetch error:", error);
-        setErrorMsg("Error al cargar las imágenes. Revisa el enlace de GitHub.");
+        setErrorMsg("Error al cargar las imágenes.");
       } finally {
         setLoading(false);
       }
@@ -64,8 +66,7 @@ export default function FotosAzarPage() {
   const loadNextRandomImage = () => {
     if (images.length === 0) return;
     const randomIndex = Math.floor(Math.random() * images.length);
-    const imgFileName = images[randomIndex];
-    setCurrentImage(baseUrl + imgFileName);
+    setCurrentImage(images[randomIndex].url);
     setSecondsRemaining(timerInputVal);
   };
 

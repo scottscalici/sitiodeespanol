@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
+import { importImageFromUrl } from '../../utils/imageUpload';
 import ImageUploadField from '../shared/ImageUploadField';
 import CuriosidadQuestionsModal from './CuriosidadQuestionsModal';
 
@@ -123,6 +124,51 @@ const CuriosidadesManager = () => {
       }
       return item;
     }));
+  };
+
+  const [reimportingId, setReimportingId] = useState(null);
+  const [reimportError, setReimportError] = useState({});
+  const [bulkImportStatus, setBulkImportStatus] = useState(null); // { done, total, failed }
+
+  // Most curiosidades' images are still a GitHub link from before this field
+  // supported uploading — fine most of the time, but broken on networks that
+  // block embedded <img> loads from that domain. This re-fetches whatever
+  // URL is currently stored and re-hosts it in Firebase Storage instead, so
+  // fixing one doesn't require downloading + re-uploading it by hand. Like
+  // any other field edit here, this only updates local state — "Guardar
+  // Cambios" still needs to be clicked to persist it.
+  const handleReimportImage = async (item) => {
+    if (!item.img) return;
+    setReimportingId(item.id);
+    setReimportError((prev) => ({ ...prev, [item.id]: '' }));
+    try {
+      const url = await importImageFromUrl(item.img, 'curiosidades', `${item.id}.png`);
+      handleInputChange(item.id, 'img', url);
+    } catch (err) {
+      console.error(`Error re-importing image for ${item.id}:`, err);
+      setReimportError((prev) => ({ ...prev, [item.id]: 'No se pudo. Sube el archivo manualmente.' }));
+    } finally {
+      setReimportingId(null);
+    }
+  };
+
+  // Same idea as handleReimportImage, but for every legacy item at once —
+  // given how many curiosidades were never re-uploaded, fixing them one by
+  // one would take forever. Skips anything already on Firebase Storage.
+  const handleBulkReimportImages = async () => {
+    const targets = items.filter((item) => item.img && !item.img.includes('firebasestorage'));
+    setBulkImportStatus({ done: 0, total: targets.length, failed: 0 });
+    let failed = 0;
+    for (const item of targets) {
+      try {
+        const url = await importImageFromUrl(item.img, 'curiosidades', `${item.id}.png`);
+        handleInputChange(item.id, 'img', url);
+      } catch (err) {
+        console.error(`Error re-importing image for ${item.id}:`, err);
+        failed += 1;
+      }
+      setBulkImportStatus((prev) => ({ ...prev, done: prev.done + 1, failed }));
+    }
   };
 
   // New rows only exist in local state until the top-level "Guardar
@@ -357,6 +403,36 @@ const CuriosidadesManager = () => {
           </div>
         )}
 
+        {/* BULK IMAGE MIGRATION — most curiosidades' images are still a
+            GitHub link from before this field supported uploading. */}
+        {items.some((item) => item.img && !item.img.includes('firebasestorage')) && (
+          <div className="p-4 bg-emerald-50 border-b-2 border-emerald-300 flex flex-col gap-2">
+            <p className="text-xs font-black text-emerald-800 uppercase tracking-widest">
+              📥 {items.filter((item) => item.img && !item.img.includes('firebasestorage')).length} imagen(es) todavía en GitHub
+            </p>
+            <p className="text-xs text-emerald-700">
+              Intenta descargar cada una y volver a alojarla en Firebase Storage automáticamente — las que no se
+              puedan (bloqueadas) quedan igual que antes, y las puedes subir a mano. No olvides hacer clic en
+              "Guardar Cambios" después para que quede guardado.
+            </p>
+            <button
+              type="button"
+              onClick={handleBulkReimportImages}
+              disabled={!!bulkImportStatus && bulkImportStatus.done < bulkImportStatus.total}
+              className="self-start px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-xs uppercase tracking-widest disabled:opacity-50"
+            >
+              {bulkImportStatus && bulkImportStatus.done < bulkImportStatus.total
+                ? `Importando... ${bulkImportStatus.done} / ${bulkImportStatus.total}`
+                : '📥 Importar Todas de GitHub'}
+            </button>
+            {bulkImportStatus && bulkImportStatus.done === bulkImportStatus.total && bulkImportStatus.total > 0 && (
+              <p className="text-xs font-bold text-emerald-800">
+                Listo: {bulkImportStatus.total - bulkImportStatus.failed} importadas, {bulkImportStatus.failed} bloqueadas. Recuerda hacer clic en "Guardar Cambios".
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Updated Grid Headers for 14 columns */}
         <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
           <div className="col-span-1 text-center">Día S2</div>
@@ -424,12 +500,30 @@ const CuriosidadesManager = () => {
                     <span className="text-[9px] font-black text-slate-400">N/A</span>
                   )}
                 </div>
-                <ImageUploadField
-                  value={item.img}
-                  onChange={(url) => handleInputChange(item.id, 'img', url)}
-                  folder="curiosidades"
-                  inputClassName="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
-                />
+                <div className="w-full">
+                  <div className="flex items-center gap-2">
+                    <ImageUploadField
+                      value={item.img}
+                      onChange={(url) => handleInputChange(item.id, 'img', url)}
+                      folder="curiosidades"
+                      inputClassName="w-full bg-transparent border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md p-2 text-[10px] font-mono outline-none transition-all text-slate-500"
+                    />
+                    {item.img && !item.img.includes('firebasestorage') && (
+                      <button
+                        type="button"
+                        onClick={() => handleReimportImage(item)}
+                        disabled={reimportingId === item.id}
+                        title="Intenta descargar esta imagen y volver a alojarla en Firebase Storage"
+                        className="shrink-0 px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest rounded-md transition-colors"
+                      >
+                        {reimportingId === item.id ? '⏳' : '📥'}
+                      </button>
+                    )}
+                  </div>
+                  {reimportError[item.id] && (
+                    <p className="text-[9px] text-rose-500 font-bold mt-1">{reimportError[item.id]}</p>
+                  )}
+                </div>
               </div>
 
               <div className="col-span-3">

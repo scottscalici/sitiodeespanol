@@ -1,4 +1,5 @@
 import React from 'react';
+import ImageUploadField from '../../shared/ImageUploadField';
 
 export default function FormDestacadoDiario({ actividad, setActividad, handleChange }) {
   
@@ -78,7 +79,14 @@ export default function FormDestacadoDiario({ actividad, setActividad, handleCha
       {/* MEDIA PREVIEW */}
       <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#f1f1f1', padding: '15px', borderRadius: '8px' }}>
         <label>Image URL</label>
-        <input type="text" name="image_url" value={actividad.image_url || ""} onChange={handleChange} style={{ padding: '8px', marginBottom: '10px' }} />
+        <div style={{ marginBottom: '10px' }}>
+          <ImageUploadField
+            value={actividad.image_url || ''}
+            onChange={(url) => setActividad({ ...actividad, image_url: url })}
+            folder="destacados"
+            inputClassName="w-full"
+          />
+        </div>
         {actividad.image_url && (
           <img src={actividad.image_url} alt="Destacado Preview" style={{ maxHeight: '200px', objectFit: 'contain', alignSelf: 'flex-start', border: '1px solid #ccc' }} />
         )}

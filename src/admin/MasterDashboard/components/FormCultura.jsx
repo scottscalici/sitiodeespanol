@@ -1,4 +1,5 @@
 import React from 'react';
+import ImageUploadField from '../../shared/ImageUploadField';
 
 export default function FormCulture({ actividad, setActividad, handleChange }) {
 
@@ -63,7 +64,12 @@ export default function FormCulture({ actividad, setActividad, handleChange }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '10px' }}>
           <label>Header Image URL</label>
-          <input value={actividad.header?.image || ""} onChange={(e) => handleNestedChange('header', 'image', e.target.value)} style={{ padding: '8px' }} />
+          <ImageUploadField
+            value={actividad.header?.image || ""}
+            onChange={(url) => handleNestedChange('header', 'image', url)}
+            folder="cultura"
+            inputClassName="w-full p-2 border border-gray-300 rounded"
+          />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label>Caption</label>
@@ -111,7 +117,13 @@ export default function FormCulture({ actividad, setActividad, handleChange }) {
               <h5 style={{ margin: '0 0 10px 0', color: '#555' }}>Subtema {index + 1}</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <input placeholder="Título del subtema" value={sub.title} onChange={(e) => handleSubTopicChange(index, 'title', e.target.value)} style={{ padding: '8px' }} />
-                <input placeholder="URL de imagen" value={sub.image} onChange={(e) => handleSubTopicChange(index, 'image', e.target.value)} style={{ padding: '8px' }} />
+                <ImageUploadField
+                  value={sub.image || ""}
+                  onChange={(url) => handleSubTopicChange(index, 'image', url)}
+                  folder="cultura"
+                  placeholder="URL de imagen"
+                  inputClassName="w-full p-2 border border-gray-300 rounded"
+                />
                 <textarea placeholder="Texto del subtema..." value={sub.text} onChange={(e) => handleSubTopicChange(index, 'text', e.target.value)} style={{ padding: '8px', minHeight: '80px' }} />
               </div>
             </div>

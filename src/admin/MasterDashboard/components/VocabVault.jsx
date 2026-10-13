@@ -70,14 +70,41 @@ const getSafeSectionsArray = (metadata) => {
 };
 
 // --- CHAPTER FILTER LOGIC ---
-const isWordInTargetSection = (word, targetSection) => {
+const sectionMatchesTarget = (sec, targetSection) => {
   if (!targetSection || targetSection === "all") return true;
-  const wordSections = getSafeSectionsArray(word?.metadata);
   if (targetSection.startsWith("chapter_")) {
     const chap = targetSection.replace("chapter_", "");
-    return wordSections.some(s => s === chap || s.startsWith(`${chap}.`));
+    return sec === chap || sec.startsWith(`${chap}.`);
   }
-  return wordSections.includes(targetSection);
+  return sec === targetSection;
+};
+
+const isWordInTargetSection = (word, targetSection) => {
+  const wordSections = getSafeSectionsArray(word?.metadata);
+  return wordSections.some(s => sectionMatchesTarget(s, targetSection));
+};
+
+// --- "UP TO SECTION X.Y" ORDINAL FILTER (for the current step in Auto-Pilot) ---
+// Sections are "chapter.subsection" strings (e.g. "1.1", "9.3"); a bare
+// chapter marker like "9" sorts as "9.0". Comparing these numerically lets
+// the baker include only what's been covered so far within the CURRENT
+// step's textbook, instead of either "all of this chapter" or "nothing".
+const parseSectionKey = (sec) => {
+  const [chap, sub] = String(sec).split('.');
+  return [parseInt(chap, 10) || 0, parseInt(sub, 10) || 0];
+};
+
+const compareSectionKeys = (a, b) => {
+  const [a1, a2] = parseSectionKey(a);
+  const [b1, b2] = parseSectionKey(b);
+  return a1 !== b1 ? a1 - b1 : a2 - b2;
+};
+
+const isWordUpToSection = (word, maxSection) => {
+  if (!maxSection || maxSection === 'all') return true;
+  const wordSections = getSafeSectionsArray(word?.metadata);
+  if (wordSections.length === 0) return false;
+  return wordSections.some(s => compareSectionKeys(s, maxSection) <= 0);
 };
 
 const formatSectionLabel = (sec) => {
@@ -124,6 +151,7 @@ const VocabVault = () => {
   // Path Auto-Pilot States
   const [selectedPathId, setSelectedPathId] = useState("");
   const [currentLocationIndex, setCurrentLocationIndex] = useState(0);
+  const [currentMaxSection, setCurrentMaxSection] = useState("all");
   const [targetWordCount, setTargetWordCount] = useState(30);
 
   // Drag and Drop States
@@ -179,6 +207,17 @@ const VocabVault = () => {
       if (s && s.includes('.')) chapters.add(s.split('.')[0]);
     });
     return [...chapters].sort((a, b) => parseInt(a) - parseInt(b));
+  };
+
+  // The specific subsections (e.g. "1.1", "1.2") that fall within a given
+  // Auto-Pilot step's own textbook + preset section/chapter — used to build
+  // the "Up to Section..." narrowing dropdown for whichever step is current.
+  const getSubsectionsForStep = (step) => {
+    if (!step?.textbook) return [];
+    const sections = getSectionsForTextbook(step.textbook);
+    return sections
+      .filter(s => s.includes('.') && sectionMatchesTarget(s, step.section))
+      .sort(compareSectionKeys);
   };
 
   const renderSectionDropdown = (textbook, value, onChangeHandler, disabled = false) => {
@@ -435,6 +474,9 @@ const VocabVault = () => {
       if (!block.textbook || block.count === 0) continue;
       let eligible = fullVocab.filter(v => (v?.metadata?.textbook || "").trim().toLowerCase() === block.textbook.trim().toLowerCase());
       eligible = eligible.filter(v => isWordInTargetSection(v, block.section));
+      if (block.maxSection && block.maxSection !== 'all') {
+        eligible = eligible.filter(v => isWordUpToSection(v, block.maxSection));
+      }
       if (eligible.length === 0) continue;
       const shuffled = shuffleArray(eligible);
       const selected = shuffled.slice(0, block.count);
@@ -471,10 +513,19 @@ const VocabVault = () => {
     const baseAmount = Math.floor(count / pastSteps.length);
     let remainder = count % pastSteps.length;
 
-    const autoBlocks = pastSteps.map(step => {
+    const autoBlocks = pastSteps.map((step, idx) => {
       let stepCount = baseAmount;
       if (remainder > 0) { stepCount++; remainder--; }
-      return { textbook: step.textbook, section: step.section, count: stepCount };
+      // Only the CURRENT step (the last one in pastSteps) gets narrowed to
+      // "up to section X.Y" — earlier steps are fully-covered ground, so
+      // they keep baking from their whole preset section as before.
+      const isCurrentStep = idx === pastSteps.length - 1;
+      return {
+        textbook: step.textbook,
+        section: step.section,
+        count: stepCount,
+        ...(isCurrentStep ? { maxSection: currentMaxSection } : {}),
+      };
     });
 
     performBakeLogic(autoBlocks);
@@ -557,6 +608,9 @@ const VocabVault = () => {
   };
 
   if (isLoading) return <div style={s.centerScreen}><h2>Loading Vocab Vault...</h2></div>;
+
+  const currentAutoPilotStep = savedPaths.find(p => p.id === selectedPathId)?.steps?.[parseInt(currentLocationIndex)];
+  const currentStepSubsections = currentAutoPilotStep ? getSubsectionsForStep(currentAutoPilotStep) : [];
 
   const filteredVocabList = fullVocab.filter(v => {
     if (libraryTextbookFilter !== 'all' && (v?.metadata?.textbook || '') !== libraryTextbookFilter) return false;
@@ -712,7 +766,7 @@ const VocabVault = () => {
               <div style={{display: 'flex', gap: '20px', alignItems: 'flex-end', background: '#111', padding: '20px', borderRadius: '8px'}}>
                 <div style={s.inputBox}>
                   <label style={s.label}>1. Select Curriculum Path</label>
-                  <select value={selectedPathId} onChange={e => {setSelectedPathId(e.target.value); setCurrentLocationIndex(0);}} style={s.selectBox}>
+                  <select value={selectedPathId} onChange={e => {setSelectedPathId(e.target.value); setCurrentLocationIndex(0); setCurrentMaxSection('all');}} style={s.selectBox}>
                     <option value="">-- Choose Path --</option>
                     {savedPaths.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -721,10 +775,20 @@ const VocabVault = () => {
                 {selectedPathId && (
                   <div style={s.inputBox}>
                     <label style={s.label}>2. We are currently on...</label>
-                    <select value={currentLocationIndex} onChange={e => setCurrentLocationIndex(e.target.value)} style={s.selectBox}>
+                    <select value={currentLocationIndex} onChange={e => {setCurrentLocationIndex(e.target.value); setCurrentMaxSection('all');}} style={s.selectBox}>
                       {savedPaths.find(p => p.id === selectedPathId)?.steps.map((step, idx) => (
                         <option key={idx} value={idx}>Step {idx + 1}: {step.textbook} ({formatSectionLabel(step.section)})</option>
                       ))}
+                    </select>
+                  </div>
+                )}
+
+                {selectedPathId && currentStepSubsections.length > 1 && (
+                  <div style={s.inputBox}>
+                    <label style={s.label}>2b. ...up to section</label>
+                    <select value={currentMaxSection} onChange={e => setCurrentMaxSection(e.target.value)} style={s.selectBox}>
+                      <option value="all">All of this step</option>
+                      {currentStepSubsections.map(sec => <option key={sec} value={sec}>Up to Section {sec}</option>)}
                     </select>
                   </div>
                 )}

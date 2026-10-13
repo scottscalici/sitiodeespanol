@@ -1,4 +1,5 @@
 import React from 'react';
+import ImageUploadField from '../../shared/ImageUploadField';
 
 export default function FormAnuncios({ actividad, setActividad, handleChange }) {
 
@@ -68,11 +69,11 @@ export default function FormAnuncios({ actividad, setActividad, handleChange }) 
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <label>Miniatura (Thumbnail URL)</label>
-        <input 
-          name="thumbnail" 
-          value={actividad.thumbnail || ""} 
-          onChange={handleChange} 
-          style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }} 
+        <ImageUploadField
+          value={actividad.thumbnail || ""}
+          onChange={(url) => setActividad({ ...actividad, thumbnail: url })}
+          folder="anuncios"
+          inputClassName="w-full p-2 border border-gray-300 rounded"
         />
       </div>
 

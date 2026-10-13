@@ -25,6 +25,34 @@ export const uploadAdminImage = async (file, folder = 'misc') => {
   return getDownloadURL(fileRef);
 };
 
+// Fetches an image from an arbitrary URL (e.g. a GitHub raw-content link
+// that's broken as an embedded <img> on some networks' content filters but
+// may still succeed as a fetch() from the browser) and re-uploads it to
+// Firebase Storage — lets an admin migrate an existing image without first
+// downloading it to their device and re-selecting it through a file picker.
+// If the source request itself is blocked the same way the <img> tag was,
+// this throws just like any other failed fetch — there's no way around a
+// filter that blocks the image bytes themselves rather than just <img> tags.
+export const importImageFromUrl = async (sourceUrl, folder = 'misc', filename = 'imagen.png') => {
+  const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar la imagen (${response.status}).`);
+  }
+  const blob = await response.blob();
+  if (!blob.type.startsWith('image/')) {
+    throw new Error('El archivo descargado no es una imagen.');
+  }
+  if (blob.size > MAX_IMAGE_BYTES) {
+    throw new Error('La imagen es demasiado grande (máximo 10MB).');
+  }
+
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, blob);
+  return getDownloadURL(fileRef);
+};
+
 // Lists every image already uploaded to a folder, newest first — lets an
 // admin reuse an existing image instead of uploading the same file again
 // (e.g. after redoing a curiosidad's questions a few times). Storage's

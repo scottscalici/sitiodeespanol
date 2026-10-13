@@ -96,6 +96,25 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       }
     });
 
+    // The same word can be sitting (tentatively, pre-Revisar) in two
+    // different blanks at once — nothing stops that while neither is
+    // confirmed correct yet. The instant ONE of them gets confirmed here,
+    // that word disappears from the shared bank, so any OTHER still-wrong
+    // blank holding it is left pointing at an option that no longer
+    // exists in its own <select>. The browser then silently falls back to
+    // displaying some other option with no onChange ever firing — the
+    // screen can show what looks like a different, even correct-looking
+    // word selected while this component's own `selections` state never
+    // actually changed, so every subsequent Revisar click keeps failing
+    // with no visible reason why. Clearing that blank back to unanswered
+    // forces its dropdown to honestly show "pick again" instead.
+    const nextSelections = selections.map((sel, i) => {
+      if (nextCorrect[i] || !sel) return sel;
+      const orphaned = question.answers.some((a, j) => j !== i && nextCorrect[j] && sameWord(a, sel));
+      return orphaned ? '' : sel;
+    });
+
+    setSelections(nextSelections);
     setCorrect(nextCorrect);
     setWrongAttempted(nextWrong);
     if (nextCorrect.every(Boolean)) onAllCorrect();
