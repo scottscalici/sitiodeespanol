@@ -60,6 +60,16 @@ export default function ResourceHubManager() {
     setItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
+  const handleMoveItem = (index, direction) => {
+    const targetIndex = index + direction;
+    setItems(prev => {
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setStatus('');
@@ -182,12 +192,30 @@ export default function ResourceHubManager() {
                   </label>
                 </div>
 
-                <button 
-                  onClick={() => handleDeleteItem(index)}
-                  className="text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-900/50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                >
-                  🗑️ Eliminar
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleMoveItem(index, -1)}
+                    disabled={index === 0}
+                    className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Mover arriba"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => handleMoveItem(index, 1)}
+                    disabled={index === items.length - 1}
+                    className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Mover abajo"
+                  >
+                    ▼
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(index)}
+                    className="text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-950/40 border border-rose-900/50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
               </div>
 
             </div>
