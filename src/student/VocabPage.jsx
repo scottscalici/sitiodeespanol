@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { useAuth } from '../context/AuthContext';
+import { checkAnswerLeniently } from '../utils/checkAnswer';
 
 // The vocab collection has words in two different shapes for
 // definiciones.nivelN, depending on which tool/import created them:
@@ -59,6 +60,10 @@ export default function VocabPage() {
   const [isFlipped, setIsFlipped] = useState(false);
   // Tarjetas only: which language shows on the front of the card.
   const [cardDirection, setCardDirection] = useState('es-en');
+  // Tarjetas only: 'flip' (classic, click to reveal) or 'type' (type the
+  // answer and have it checked) — independent of direction, so either
+  // study method works in either direction.
+  const [cardMode, setCardMode] = useState('flip');
 
   // Theme colors for the list sections
   const sectionThemes = [
@@ -290,19 +295,37 @@ export default function VocabPage() {
             </div>
 
             {viewMode === 'tarjetas' && (
-              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl shrink-0">
-                <button
-                  onClick={() => { setCardDirection('es-en'); setIsFlipped(false); }}
-                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'es-en' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Español → Inglés
-                </button>
-                <button
-                  onClick={() => { setCardDirection('en-es'); setIsFlipped(false); }}
-                  className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'en-es' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  Inglés → Español
-                </button>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => { setCardDirection('es-en'); setIsFlipped(false); }}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'es-en' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Español → Inglés
+                  </button>
+                  <button
+                    onClick={() => { setCardDirection('en-es'); setIsFlipped(false); }}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardDirection === 'en-es' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Inglés → Español
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setCardMode('flip')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardMode === 'flip' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="Voltear la tarjeta para revelar la respuesta"
+                  >
+                    🔄 Voltear
+                  </button>
+                  <button
+                    onClick={() => setCardMode('type')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${cardMode === 'type' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="Escribir la respuesta y revisarla"
+                  >
+                    ⌨️ Escribir
+                  </button>
+                </div>
               </div>
             )}
 
@@ -359,39 +382,47 @@ export default function VocabPage() {
               </span>
             </div>
 
-            <div 
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="relative w-full h-[400px] cursor-pointer group"
-              style={{ perspective: "1000px" }}
-            >
-              <div className="w-full h-full transition-transform duration-500 ease-in-out" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0)' }}>
-                
-                {/* FRONT */}
-                <div className="absolute inset-0 w-full h-full bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden' }}>
-                  <div className="absolute top-6 left-6 flex gap-2">
-                    <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
-                      Sec. {currentStudyWord.metadata?.secciones?.[0] || '-'}
-                    </span>
-                    <span className="bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-100">
-                      {currentStudyWord.metadata?.tipo || 'Término'}
-                    </span>
-                  </div>
-                  <h2 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tighter">
-                    {cardDirection === 'es-en' ? currentStudyWord.palabra : currentStudyWord.traduccion}
-                  </h2>
-                  <p className="absolute bottom-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                    Toca para voltear
-                  </p>
-                </div>
+            {cardMode === 'flip' ? (
+              <div
+                onClick={() => setIsFlipped(!isFlipped)}
+                className="relative w-full h-[400px] cursor-pointer group"
+                style={{ perspective: "1000px" }}
+              >
+                <div className="w-full h-full transition-transform duration-500 ease-in-out" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0)' }}>
 
-                {/* BACK */}
-                <div className="absolute inset-0 w-full h-full bg-indigo-600 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                  <h3 className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
-                    {cardDirection === 'es-en' ? currentStudyWord.traduccion : currentStudyWord.palabra}
-                  </h3>
+                  {/* FRONT */}
+                  <div className="absolute inset-0 w-full h-full bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden' }}>
+                    <div className="absolute top-6 left-6 flex gap-2">
+                      <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
+                        Sec. {currentStudyWord.metadata?.secciones?.[0] || '-'}
+                      </span>
+                      <span className="bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-100">
+                        {currentStudyWord.metadata?.tipo || 'Término'}
+                      </span>
+                    </div>
+                    <h2 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tighter">
+                      {cardDirection === 'es-en' ? currentStudyWord.palabra : currentStudyWord.traduccion}
+                    </h2>
+                    <p className="absolute bottom-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                      Toca para voltear
+                    </p>
+                  </div>
+
+                  {/* BACK */}
+                  <div className="absolute inset-0 w-full h-full bg-indigo-600 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                    <h3 className="text-4xl sm:text-5xl font-black text-white tracking-tighter">
+                      {cardDirection === 'es-en' ? currentStudyWord.traduccion : currentStudyWord.palabra}
+                    </h3>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <TypeCard
+                key={`${currentStudyWord.id || activeCardIndex}-${cardDirection}`}
+                word={currentStudyWord}
+                direction={cardDirection}
+              />
+            )}
 
             {/* CONTROLS */}
             <div className="flex gap-6 mt-8">
@@ -504,6 +535,85 @@ export default function VocabPage() {
           })()}
         </div>
       )}
+    </div>
+  );
+}
+
+// "Escribir" study mode: the single-sided counterpart to the flip card —
+// shows the prompt and a text input instead of a reveal-on-click back face.
+// Keyed by word+direction in the parent so navigating, shuffling, or
+// switching direction always remounts this with fresh (empty) state rather
+// than carrying over a stale typed answer/result from the previous word.
+function TypeCard({ word, direction }) {
+  const [value, setValue] = useState('');
+  const [result, setResult] = useState(null); // null | { correct, correctAnswer }
+
+  const promptText = direction === 'es-en' ? word.palabra : word.traduccion;
+
+  const checkAnswer = () => {
+    if (!value.trim() || result) return;
+    if (direction === 'es-en') {
+      // Prompted with Spanish, typing the English translation — no accepted
+      // synonyms stored for this side, just the one translation on file.
+      const { correct } = checkAnswerLeniently(value, word.traduccion || '', false);
+      setResult({ correct, correctAnswer: word.traduccion });
+    } else {
+      // Prompted with English, typing Spanish — alt_answers (synonyms, e.g.
+      // "sano" for "saludable") widen what's accepted, same as everywhere
+      // else a typed Spanish answer is graded (see utils/checkAnswer.js).
+      const altAnswers = (word.alt_answers || []).map((a) => (a || '').trim()).filter(Boolean);
+      const accepted = [word.palabra, ...altAnswers].filter(Boolean).join(', ');
+      const { correct } = checkAnswerLeniently(value, accepted, false);
+      setResult({ correct, correctAnswer: word.palabra });
+    }
+  };
+
+  return (
+    <div className="relative w-full min-h-[400px] bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl gap-6">
+      <div className="absolute top-6 left-6 flex gap-2">
+        <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
+          Sec. {word.metadata?.secciones?.[0] || '-'}
+        </span>
+        <span className="bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-100">
+          {word.metadata?.tipo || 'Término'}
+        </span>
+      </div>
+
+      <h2 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tighter">
+        {promptText}
+      </h2>
+
+      <div className="w-full max-w-sm flex flex-col items-center gap-3">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') checkAnswer(); }}
+          disabled={!!result}
+          autoFocus
+          placeholder={direction === 'es-en' ? 'Escribe en inglés...' : 'Escribe en español...'}
+          className={`w-full text-center text-lg font-bold px-4 py-3 rounded-xl border-2 outline-none transition-colors ${
+            result
+              ? result.correct
+                ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                : 'border-rose-400 bg-rose-50 text-rose-700'
+              : 'border-slate-200 focus:border-indigo-400 text-slate-800'
+          }`}
+        />
+        {!result ? (
+          <button
+            onClick={checkAnswer}
+            disabled={!value.trim()}
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95"
+          >
+            Revisar
+          </button>
+        ) : (
+          <p className={`text-sm font-bold ${result.correct ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {result.correct ? '¡Correcto! ✓' : `Respuesta: ${result.correctAnswer}`}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
