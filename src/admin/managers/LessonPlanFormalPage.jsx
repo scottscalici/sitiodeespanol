@@ -169,9 +169,15 @@ export default function LessonPlanFormalPage() {
                 <StandardTag standard={SECTION_STANDARDS.calentamiento} />
               </div>
               <ul className="list-disc pl-5 space-y-1">
-                {planData.calentamiento.verbs.map((c) => <li key={`v-${c.id}`}>Verbos: {c.title}</li>)}
-                {planData.calentamiento.vocab.map((v) => <li key={`voc-${v.id}`}>Vocabulario: {v.name}</li>)}
+                {planData.calentamiento.verbs.map((c) => (
+                  <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
+                ))}
+                {planData.calentamiento.vocab.map((v) => (
+                  <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
+                ))}
               </ul>
+              {planData.calentamiento.verbList && <p className="text-sm font-sans text-gray-700 mt-2">{planData.calentamiento.verbList}</p>}
+              {planData.calentamiento.vocabList && <p className="text-sm font-sans text-gray-700 mt-1">{planData.calentamiento.vocabList}</p>}
             </div>
           )}
 
