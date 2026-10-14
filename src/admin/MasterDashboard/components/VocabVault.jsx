@@ -136,6 +136,7 @@ const VocabVault = () => {
   const [selectedWords, setSelectedWords] = useState([]);
   const [bulkTextbook, setBulkTextbook] = useState("");
   const [bulkSection, setBulkSection] = useState("");
+  const [bulkEvaluacion, setBulkEvaluacion] = useState(""); // '' = no change, 'true'/'false' = set Testable
 
   // --- BAKING STATION STATES ---
   const [editingWarmupId, setEditingWarmupId] = useState(null);
@@ -420,7 +421,8 @@ const VocabVault = () => {
         const updatedMetadata = {
           ...word.metadata,
           textbook: bulkTextbook || word.metadata?.textbook || "",
-          secciones: bulkSection ? bulkSection.split(',').map(s => s.trim()).filter(Boolean) : getSafeSectionsArray(word.metadata)
+          secciones: bulkSection ? bulkSection.split(',').map(s => s.trim()).filter(Boolean) : getSafeSectionsArray(word.metadata),
+          ...(bulkEvaluacion ? { evaluacion: bulkEvaluacion === 'true' } : {}),
         };
         if (updatedMetadata.seccion !== undefined) delete updatedMetadata.seccion;
         await updateDoc(docRef, { metadata: updatedMetadata });
@@ -432,7 +434,7 @@ const VocabVault = () => {
         return up ? { ...w, metadata: up.updatedMetadata } : w;
       }));
       invalidateCollectionCache("vocabulary");
-      setSelectedWords([]); setBulkTextbook(""); setBulkSection("");
+      setSelectedWords([]); setBulkTextbook(""); setBulkSection(""); setBulkEvaluacion("");
       alert(`Updated ${results.length} words!`);
     } catch (e) { alert("Error bulk updating."); }
   };
@@ -477,6 +479,14 @@ const VocabVault = () => {
       if (block.maxSection && block.maxSection !== 'all') {
         eligible = eligible.filter(v => isWordUpToSection(v, block.maxSection));
       }
+      // Reference-only words (e.g. a textbook's final "not assessed" section
+      // per unit) are tagged Testable=false in the Library editor — keep
+      // them out of what gets baked into a graded Calentamiento, same as
+      // every other block in this bake. Only an EXPLICIT false excludes a
+      // word; older words with no evaluacion field at all still bake in, so
+      // this doesn't silently empty out content tagged before this flag did
+      // anything.
+      eligible = eligible.filter(v => v?.metadata?.evaluacion !== false);
       if (eligible.length === 0) continue;
       const shuffled = shuffleArray(eligible);
       const selected = shuffled.slice(0, block.count);
@@ -690,6 +700,14 @@ const VocabVault = () => {
                  <h2 style={{color: '#ff9a40'}}>Bulk Tag {selectedWords.length} Words</h2>
                  <div style={s.inputBox}><label style={s.label}>Textbook</label><input type="text" value={bulkTextbook} onChange={e=>setBulkTextbook(e.target.value)} style={s.inputLarge} /></div>
                  <div style={s.inputBox}><label style={s.label}>Sections</label><input type="text" value={bulkSection} onChange={e=>setBulkSection(e.target.value)} style={s.inputLarge} /></div>
+                 <div style={s.inputBox}>
+                   <label style={s.label}>Testable (e.g. a reference-only section that shouldn't be assessed)</label>
+                   <select value={bulkEvaluacion} onChange={e=>setBulkEvaluacion(e.target.value)} style={s.selectBox}>
+                     <option value="">— No cambiar —</option>
+                     <option value="true">✅ Marcar Testable</option>
+                     <option value="false">🚫 Marcar NO Testable (solo referencia)</option>
+                   </select>
+                 </div>
                  <button onClick={applyBulkTags} style={s.primaryBtn}>Apply</button>
                </div>
              ) : editingWord ? (
