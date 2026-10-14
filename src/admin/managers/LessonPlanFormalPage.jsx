@@ -4,9 +4,24 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { COURSE_TITLES, SECTION_STANDARDS, ACTIVITY_STANDARDS, getEvaluacionStandard } from '../../utils/lessonPlanStandards';
+import { TYPE_LABELS } from '../../shared/questionTypes';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
+
+// A one-line preview of a Curiosidad question, for the printout — every
+// question type stores its own intro in `prompt`, but the cloze types
+// often leave that blank and put the actual sentence in `text`/`lines`
+// instead, so this falls back to that (with {{blanks}} shown as blanks)
+// rather than printing an empty line.
+const stripBlankTokens = (s) => (s || '').replace(/\{\{.*?\}\}/g, '____');
+const getQuestionPreview = (q) => {
+  if (q?.prompt?.trim()) return q.prompt.trim();
+  if (q?.type === 'dropdown_cloze' || q?.type === 'word_bank_cloze') return stripBlankTokens(q.text);
+  if (q?.type === 'line_bank_cloze') return (q.lines || []).map((l) => stripBlankTokens(l.text)).filter(Boolean).join(' / ');
+  if (q?.type === 'matching') return (q.pairs || []).map((p) => p.left?.text).filter(Boolean).join(', ');
+  return '';
+};
 
 // A standard tag next to a section/activity heading — small-caps pill,
 // consistent wherever one appears on this page.
@@ -199,9 +214,23 @@ export default function LessonPlanFormalPage() {
                 <h3 className="text-base font-bold uppercase tracking-wide">💡 Curiosidad</h3>
                 <StandardTag standard={SECTION_STANDARDS.curiosidad} />
               </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.curiosidad.map((c) => <li key={c.id}>{c.title}</li>)}
-              </ul>
+              <div className="space-y-3">
+                {planData.curiosidad.map((c) => (
+                  <div key={c.id}>
+                    <p className="font-bold">{c.title} ({(c.questions || []).length} preguntas)</p>
+                    {(c.questions || []).length > 0 && (
+                      <ol className="list-decimal pl-6 space-y-0.5 text-sm font-sans text-gray-700">
+                        {c.questions.map((q, idx) => (
+                          <li key={idx}>
+                            <span className="text-gray-400">[{TYPE_LABELS[q.type] || q.type}]</span>{' '}
+                            {getQuestionPreview(q) || '(sin texto)'}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
