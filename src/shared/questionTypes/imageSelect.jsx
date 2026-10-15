@@ -108,7 +108,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
                   : 'border-slate-700 hover:border-slate-500'
               } ${done && !isSelected ? 'opacity-40' : ''}`}
             >
-              <img src={opt.img} alt={opt.label || ''} className="w-full h-32 object-contain bg-slate-950" />
+              <img src={opt.img} alt={opt.label || ''} className="w-full h-32 object-contain bg-white" />
               {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
             </button>
           );
@@ -174,7 +174,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
                   : 'border-slate-700 hover:border-slate-500'
               }`}
             >
-              <img src={opt.img} alt={opt.label || ''} className="w-full h-32 object-contain bg-slate-950" />
+              <img src={opt.img} alt={opt.label || ''} className="w-full h-32 object-contain bg-white" />
               {opt.label && <p className="text-[10px] font-bold text-slate-300 p-1.5">{opt.label}</p>}
             </button>
           );
