@@ -631,6 +631,19 @@ const VocabVault = () => {
     setWarmupName("");
   };
 
+  const deleteSavedPractice = async (practiceId) => {
+    if (!window.confirm("Delete this saved practice permanently? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "dailyVocabWarmups", practiceId));
+      invalidateCollectionCache("dailyVocabWarmups");
+      setSavedWarmups(prev => prev.filter(p => p.id !== practiceId));
+      if (editingWarmupId === practiceId) clearBakingStation();
+    } catch (e) {
+      console.error(e);
+      alert("Error deleting practice.");
+    }
+  };
+
   if (isLoading) return <div style={s.centerScreen}><h2>Loading Vocab Vault...</h2></div>;
 
   const currentAutoPilotStep = savedPaths.find(p => p.id === selectedPathId)?.steps?.[parseInt(currentLocationIndex)];
@@ -932,7 +945,12 @@ const VocabVault = () => {
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px'}}>
             {savedWarmups.length === 0 ? <p style={{color: '#666'}}>No practices saved yet. Bake and save one in the Baking Station!</p> : null}
             {savedWarmups.map((practice) => (
-              <div key={practice.id} style={{background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s'}} onClick={() => loadSavedPractice(practice)}>
+              <div key={practice.id} style={{background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s', position: 'relative'}} onClick={() => loadSavedPractice(practice)}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteSavedPractice(practice.id); }}
+                  title="Delete this saved practice"
+                  style={{position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#f44', fontSize: '16px', cursor: 'pointer', lineHeight: 1}}
+                >🗑️</button>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <div style={{color: '#ff9a40', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px'}}>DÍA {practice.dia}</div>
                   <div style={{color: '#888', fontSize: '11px', textTransform: 'uppercase'}}>{practice.course || 's2'}</div>
