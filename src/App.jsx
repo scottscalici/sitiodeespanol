@@ -52,6 +52,7 @@ import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
 import LessonPlanFormalPage from './admin/managers/LessonPlanFormalPage';
+import LessonPlanOverviewPage from './admin/managers/LessonPlanOverviewPage';
 import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
@@ -454,6 +455,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <LessonPlanFormalPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-lesson-plan-overview"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LessonPlanOverviewPage />
                 </AdminRoute>
               }
             />
