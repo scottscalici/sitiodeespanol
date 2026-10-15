@@ -286,9 +286,15 @@ const VocabVault = () => {
 
   // --- LOGIC: UPLOADER ---
   const handleUpload = async () => {
+    let data;
     try {
-      const data = JSON.parse(jsonInput);
-      setUploadStatus('⏳ Processing...');
+      data = JSON.parse(jsonInput);
+    } catch (error) {
+      setUploadStatus('❌ Error: Invalid JSON — ' + error.message);
+      return;
+    }
+    setUploadStatus('⏳ Processing...');
+    try {
       for (const item of data) {
         const docId = buildWordId(item.metadata?.textbook, item.palabra);
         await setDoc(doc(db, "vocabulary", docId), { ...item, lastUpdated: serverTimestamp() });
@@ -296,8 +302,11 @@ const VocabVault = () => {
       setJsonInput('');
       invalidateCollectionCache("vocabulary");
       await fetchData();
-      setUploadStatus('✅ Library updated.');
-    } catch (error) { setUploadStatus('❌ Error: Invalid JSON'); }
+      setUploadStatus(`✅ Library updated (${data.length} words).`);
+    } catch (error) {
+      console.error('Error uploading vocabulary:', error);
+      setUploadStatus('❌ Error writing to Firestore: ' + error.message);
+    }
   };
 
   // --- LOGIC: EDITOR & BULK ---
@@ -663,7 +672,10 @@ const VocabVault = () => {
             <pre style={s.exampleBlock}>{EXAMPLE_JSON}</pre>
           )}
           <textarea style={s.jsonTextarea} value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder='Paste JSON array here, or click "Load Example Into Editor" above to start from a template...' />
-          <button onClick={handleUpload} style={{...s.primaryBtn, marginTop: '15px'}}>Push to Firestore</button>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginTop: '15px'}}>
+            <button onClick={handleUpload} style={s.primaryBtn}>Push to Firestore</button>
+            {uploadStatus && <span style={{fontSize: '13px', fontWeight: 'bold', color: uploadStatus.includes('❌') ? '#f44' : '#ff9a40'}}>{uploadStatus}</span>}
+          </div>
         </div>
       )}
 
