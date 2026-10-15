@@ -131,6 +131,7 @@ const VocabVault = () => {
   const [librarySearch, setLibrarySearch] = useState("");
   const [auditFilter, setAuditFilter] = useState("all");
   const [libraryTextbookFilter, setLibraryTextbookFilter] = useState("all");
+  const [librarySectionFilter, setLibrarySectionFilter] = useState("all");
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedWords, setSelectedWords] = useState([]);
   const [bulkTextbook, setBulkTextbook] = useState("");
@@ -649,8 +650,13 @@ const VocabVault = () => {
   const currentAutoPilotStep = savedPaths.find(p => p.id === selectedPathId)?.steps?.[parseInt(currentLocationIndex)];
   const currentStepSubsections = currentAutoPilotStep ? getSubsectionsForStep(currentAutoPilotStep) : [];
 
+  const librarySectionOptions = libraryTextbookFilter === 'all'
+    ? [...new Set(fullVocab.flatMap(v => getSafeSectionsArray(v?.metadata)))].sort()
+    : getSectionsForTextbook(libraryTextbookFilter);
+
   const filteredVocabList = fullVocab.filter(v => {
     if (libraryTextbookFilter !== 'all' && (v?.metadata?.textbook || '') !== libraryTextbookFilter) return false;
+    if (librarySectionFilter !== 'all' && !getSafeSectionsArray(v?.metadata).includes(librarySectionFilter)) return false;
     if (auditFilter === 'no_section') return getSafeSectionsArray(v?.metadata).length === 0;
     if (auditFilter === 'no_book') return !v?.metadata?.textbook;
     const term = librarySearch.toLowerCase();
@@ -702,9 +708,14 @@ const VocabVault = () => {
                {uploadStatus && <div style={{fontSize: '11px', color: '#ff9a40', marginTop: '5px', textAlign: 'center'}}>{uploadStatus}</div>}
             </div>
 
-            <select value={libraryTextbookFilter} onChange={e => setLibraryTextbookFilter(e.target.value)} style={{...s.selectBox, marginBottom: '10px'}}>
+            <select value={libraryTextbookFilter} onChange={e => {setLibraryTextbookFilter(e.target.value); setLibrarySectionFilter('all');}} style={{...s.selectBox, marginBottom: '10px'}}>
               <option value="all">All Textbooks</option>
               {availableTextbooks.map(tb => <option key={tb} value={tb}>{tb}</option>)}
+            </select>
+
+            <select value={librarySectionFilter} onChange={e => setLibrarySectionFilter(e.target.value)} style={{...s.selectBox, marginBottom: '10px'}}>
+              <option value="all">All Sections</option>
+              {librarySectionOptions.map(sec => <option key={sec} value={sec}>{formatVocabSectionLabel(sec)} ({sec})</option>)}
             </select>
 
             <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>

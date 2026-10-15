@@ -19,10 +19,12 @@ export const getDefaultTextbook = (course) =>
 
 // A vocab_bundles doc's `textbook` field is whatever free-text an admin
 // typed into VocabVault when adding those words — not a fixed enum — so an
-// exact string match (e.g. "Reporteros 4" vs "reporteros  4" vs a trailing
+// exact string match (e.g. "Reporteros 4" vs "Reporteros4" vs a trailing
 // space) can silently hide a whole book's chapters from the index. This
-// normalizes case/whitespace before comparing, same leniency
-// vocabUnitLabel.js already assumes elsewhere for this same field.
-export const normalizeTextbookName = (name) => (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+// strips ALL whitespace (not just collapsing runs of it) before comparing,
+// so a missing/extra space in how a book's name was typed doesn't split it
+// into two "different" books — same leniency vocabUnitLabel.js already
+// assumes elsewhere for this same field.
+export const normalizeTextbookName = (name) => (name || '').trim().toLowerCase().replace(/\s+/g, '');
 
 export const textbookMatches = (a, b) => normalizeTextbookName(a) === normalizeTextbookName(b);
