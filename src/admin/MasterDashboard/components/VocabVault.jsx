@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js';
 import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
+import { isReferenceSection, formatVocabSectionLabel } from '../../../utils/vocabSectionLabel';
 
 // --- SLUG HELPERS (shared by bulk importer + single-word editor) ---
 const slugifyBook = (textbook) => (textbook || 'unknown_book').replace(/\s+/g, '_').toLowerCase();
@@ -89,9 +90,13 @@ const isWordInTargetSection = (word, targetSection) => {
 // chapter marker like "9" sorts as "9.0". Comparing these numerically lets
 // the baker include only what's been covered so far within the CURRENT
 // step's textbook, instead of either "all of this chapter" or "nothing".
+// A non-numeric subsection (the "referencias" reference section) sorts as
+// Infinity — always LAST — rather than falling back to 0 and sorting
+// first, which would wrongly treat it as "already covered" by any cutoff.
 const parseSectionKey = (sec) => {
   const [chap, sub] = String(sec).split('.');
-  return [parseInt(chap, 10) || 0, parseInt(sub, 10) || 0];
+  const subNum = parseInt(sub, 10);
+  return [parseInt(chap, 10) || 0, Number.isNaN(subNum) ? Infinity : subNum];
 };
 
 const compareSectionKeys = (a, b) => {
@@ -105,12 +110,6 @@ const isWordUpToSection = (word, maxSection) => {
   const wordSections = getSafeSectionsArray(word?.metadata);
   if (wordSections.length === 0) return false;
   return wordSections.some(s => compareSectionKeys(s, maxSection) <= 0);
-};
-
-const formatSectionLabel = (sec) => {
-  if (!sec || sec === "all") return "All Sections";
-  if (sec.startsWith("chapter_")) return `Chapter ${sec.replace("chapter_", "")}`;
-  return `Section ${sec}`;
 };
 
 const VocabVault = () => {
@@ -213,22 +212,28 @@ const VocabVault = () => {
   // The specific subsections (e.g. "1.1", "1.2") that fall within a given
   // Auto-Pilot step's own textbook + preset section/chapter — used to build
   // the "Up to Section..." narrowing dropdown for whichever step is current.
+  // Excludes the reference section: "up to section X" is about sequential
+  // quiz progress, which a reference-only section isn't part of.
   const getSubsectionsForStep = (step) => {
     if (!step?.textbook) return [];
     const sections = getSectionsForTextbook(step.textbook);
     return sections
-      .filter(s => s.includes('.') && sectionMatchesTarget(s, step.section))
+      .filter(s => s.includes('.') && !isReferenceSection(s) && sectionMatchesTarget(s, step.section))
       .sort(compareSectionKeys);
   };
 
   const renderSectionDropdown = (textbook, value, onChangeHandler, disabled = false) => {
-    const sections = getSectionsForTextbook(textbook);
+    // The reference section is excluded from "Specific Subsections" here —
+    // every use of this dropdown targets a BAKE (Path step, manual block,
+    // the Override search), and reference words are marked not-Testable,
+    // so targeting it would only ever yield zero eligible words.
+    const sections = getSectionsForTextbook(textbook).filter(s => !isReferenceSection(s));
     const chapters = getChaptersForTextbook(textbook);
     return (
       <select value={value} onChange={onChangeHandler} style={s.selectBox} disabled={disabled}>
         <option value="all">All Sections</option>
         {chapters.length > 0 && <optgroup label="Entire Chapters">{chapters.map(c => <option key={`ch_${c}`} value={`chapter_${c}`}>Chapter {c}</option>)}</optgroup>}
-        {sections.length > 0 && <optgroup label="Specific Subsections">{sections.map(sec => <option key={sec} value={sec}>Section {sec}</option>)}</optgroup>}
+        {sections.length > 0 && <optgroup label="Specific Subsections">{sections.map(sec => <option key={sec} value={sec}>{formatVocabSectionLabel(sec)}</option>)}</optgroup>}
       </select>
     );
   };
@@ -795,7 +800,7 @@ const VocabVault = () => {
                     <label style={s.label}>2. We are currently on...</label>
                     <select value={currentLocationIndex} onChange={e => {setCurrentLocationIndex(e.target.value); setCurrentMaxSection('all');}} style={s.selectBox}>
                       {savedPaths.find(p => p.id === selectedPathId)?.steps.map((step, idx) => (
-                        <option key={idx} value={idx}>Step {idx + 1}: {step.textbook} ({formatSectionLabel(step.section)})</option>
+                        <option key={idx} value={idx}>Step {idx + 1}: {step.textbook} ({formatVocabSectionLabel(step.section)})</option>
                       ))}
                     </select>
                   </div>

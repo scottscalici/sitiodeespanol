@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
 export default function VaultSidebar({
   vaultSource,
@@ -203,7 +204,7 @@ export default function VaultSidebar({
                   )}
                   {availableSections.map((sec) => (
                     <option key={sec} value={sec}>
-                      Sección {sec}
+                      {isReferenceSection(sec) ? 'Referencias' : `Sección ${sec}`}
                     </option>
                   ))}
                 </select>
