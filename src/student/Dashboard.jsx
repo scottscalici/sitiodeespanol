@@ -9,6 +9,7 @@ import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeCo
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
+import { getCanonicalTextbookName } from '../utils/textbookAccess';
 
 // Components
 import Header from '../components/Header';
@@ -612,7 +613,7 @@ const Dashboard = () => {
               {activeVocabBundles.map(bundleId => {
                 const bundleDetails = vocabBundleDetails[bundleId];
                 const bundleTitle = bundleDetails
-                  ? `${bundleDetails.textbook} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
+                  ? `${getCanonicalTextbookName(bundleDetails.textbook)} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
                   : bundleId.replace(/_/g, ' ');
 
                 return (

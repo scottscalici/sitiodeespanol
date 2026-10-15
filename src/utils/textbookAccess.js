@@ -28,3 +28,12 @@ export const getDefaultTextbook = (course) =>
 export const normalizeTextbookName = (name) => (name || '').trim().toLowerCase().replace(/\s+/g, '');
 
 export const textbookMatches = (a, b) => normalizeTextbookName(a) === normalizeTextbookName(b);
+
+// Student-facing display should always show the canonical "Reporteros 4" /
+// "Descubre 1" spelling, never whatever an admin happened to type into
+// VocabVault ("Reporteros4", "reporteros 4", etc.) — this maps a raw stored
+// textbook name onto its canonical entry in TEXTBOOK_ORDER by the same
+// whitespace-insensitive match textbookMatches uses, falling back to the
+// raw name unchanged for a textbook that isn't in that list at all.
+export const getCanonicalTextbookName = (name) =>
+  TEXTBOOK_ORDER.find((canonical) => textbookMatches(canonical, name)) || name;

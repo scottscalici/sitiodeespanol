@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
+import { getCanonicalTextbookName } from '../utils/textbookAccess';
 import { useAuth } from '../context/AuthContext';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
 import { awardPoints } from '../utils/pointsHelper';
@@ -304,7 +305,7 @@ export default function VocabPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <p className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">
-              {bundleData.textbook}
+              {getCanonicalTextbookName(bundleData.textbook)}
             </p>
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
               {getVocabUnitWord(bundleData.textbook)} {bundleData.chapter}
