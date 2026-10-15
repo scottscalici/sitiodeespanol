@@ -703,6 +703,57 @@ const Dashboard = () => {
             {/* RIGHT: SIDEBAR */}
             <div className="space-y-6">
               <GamesSidebar />
+
+              <div
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
+                style={themeGradientStyle('tareas')}
+              >
+                <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="relative flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span className="text-3xl drop-shadow">📝</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
+                  </div>
+                </div>
+
+                <div className="relative space-y-3">
+                  {courseTasks.length === 0 ? (
+                    <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
+                  ) : (
+                    courseTasks.map((t, idx) => {
+                      const TaskTag = t.url ? 'a' : 'div';
+                      const taskProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
+                      // Color-codes how urgent this is relative to today's
+                      // día, so "due date" isn't just small muted text a
+                      // student has to go looking for.
+                      const diasRestantes = Number(t.day_due) - Number(liveDia);
+                      const dueBadgeClass =
+                        diasRestantes <= 0
+                          ? 'bg-rose-500 text-white'
+                          : diasRestantes === 1
+                          ? 'bg-amber-400 text-slate-900'
+                          : 'bg-white/20 text-white';
+                      return (
+                        <TaskTag
+                          key={idx}
+                          {...taskProps}
+                          className={`block bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10 ${t.url ? 'hover:bg-white/20 transition-colors cursor-pointer' : ''}`}
+                        >
+                          <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}{t.url && ' ↗'}</h4>
+                          <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${dueBadgeClass}`}>
+                            Vence: {formatDueDate(t.day_due)}
+                          </span>
+                        </TaskTag>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
               <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
               <PracticeHubTile course={course} />
               <LeaderboardCard course={course} />
@@ -710,46 +761,8 @@ const Dashboard = () => {
               <div className="pt-6 border-t border-slate-200 space-y-6">
                 {/* 🟢 FIXED RESOURCE HUB PROP */}
                 <ResourceHub course={course} />
-  
+
                 <Countdown course={course} />
-  
-                <div
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
-                  style={themeGradientStyle('tareas')}
-                >
-                  <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
-                  <div className="relative flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                      <span className="text-3xl drop-shadow">📝</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
-                      <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
-                    </div>
-                  </div>
-  
-                  <div className="relative space-y-3">
-                    {courseTasks.length === 0 ? (
-                      <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
-                    ) : (
-                      courseTasks.map((t, idx) => {
-                        const TaskTag = t.url ? 'a' : 'div';
-                        const taskProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
-                        return (
-                          <TaskTag
-                            key={idx}
-                            {...taskProps}
-                            className={`block bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10 ${t.url ? 'hover:bg-white/20 transition-colors cursor-pointer' : ''}`}
-                          >
-                            <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}{t.url && ' ↗'}</h4>
-                            <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: {formatDueDate(t.day_due)}</p>
-                          </TaskTag>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           </div>
