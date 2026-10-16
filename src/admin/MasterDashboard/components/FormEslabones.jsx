@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { Link } from 'react-router-dom';
+
+const todayStr = () => new Date().toLocaleDateString('en-CA');
 
 const EXAMPLE = `PAN
 PANADERO
@@ -21,6 +23,37 @@ export default function FormEslabones() {
   const [chainText, setChainText] = useState('');
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // SCHEDULE PREVIEW — same idea as Señordle's "Calendario Programado", so
+  // it's just as easy to check whether a chain already exists for a given
+  // day here as it is there.
+  const [scheduleItems, setScheduleItems] = useState(null);
+  const [scheduleCourse, setScheduleCourse] = useState('s2');
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+
+  const loadSchedule = async () => {
+    setScheduleLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'juego_eslabones'));
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+      setScheduleItems(items);
+    } catch (error) {
+      console.error('Error loading Eslabones schedule:', error);
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedule();
+  }, []);
+
+  const scheduleForCourse = useMemo(
+    () => (scheduleItems || []).filter((item) => item.course === scheduleCourse),
+    [scheduleItems, scheduleCourse]
+  );
+  const todayScheduled = scheduleForCourse.some((item) => item.fecha === todayStr());
 
   const parsedChain = parseChain(chainText);
 
@@ -45,6 +78,7 @@ export default function FormEslabones() {
       });
       setStatus(`✅ ¡Éxito! Cadena programada para ${course.toUpperCase()} el ${date}.`);
       setChainText('');
+      await loadSchedule();
     } catch (error) {
       console.error('Error saving Eslabones chain:', error);
       setStatus('❌ Error al guardar en Firebase.');
@@ -125,6 +159,73 @@ export default function FormEslabones() {
             {saving ? 'Guardando...' : 'Guardar Cadena'}
           </button>
         </form>
+
+        {/* SCHEDULE PREVIEW — always on, so you can check whether a chain
+            is already scheduled for a given day before/after saving. */}
+        <div className="mt-8 pt-6 border-t border-slate-700">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-black text-cyan-400 uppercase tracking-widest">
+              📅 Calendario Programado
+            </h3>
+            <div className="flex items-center gap-3">
+              <div className="flex bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
+                {['s2', 's4'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setScheduleCourse(c)}
+                    className={`px-3 py-1.5 text-xs font-black uppercase ${
+                      scheduleCourse === c ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={loadSchedule}
+                disabled={scheduleLoading}
+                className="text-xs font-bold text-slate-400 hover:text-white disabled:opacity-50"
+              >
+                {scheduleLoading ? 'Cargando...' : '🔄 Actualizar'}
+              </button>
+            </div>
+          </div>
+
+          {!todayScheduled && scheduleItems && (
+            <p className="text-xs font-bold text-rose-400 bg-rose-950/40 border border-rose-800 rounded-lg px-3 py-2 mb-3">
+              ⚠️ No hay cadena programada para hoy ({todayStr()}, {scheduleCourse.toUpperCase()}).
+            </p>
+          )}
+
+          <div className="max-h-64 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg divide-y divide-slate-700/60">
+            {scheduleForCourse.length === 0 ? (
+              <p className="text-xs text-slate-500 italic p-3">
+                {scheduleItems ? `Sin cadenas programadas para ${scheduleCourse.toUpperCase()}.` : 'Cargando...'}
+              </p>
+            ) : (
+              scheduleForCourse.map((item) => {
+                const chain = item.chain || [];
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex justify-between items-center px-3 py-1.5 text-xs ${
+                      item.fecha === todayStr() ? 'bg-cyan-950/50' : ''
+                    }`}
+                  >
+                    <span className={`font-mono ${item.fecha === todayStr() ? 'text-cyan-300 font-bold' : 'text-slate-400'}`}>
+                      {item.fecha} {item.fecha === todayStr() ? '(Hoy)' : ''}
+                    </span>
+                    <span className="font-bold text-white truncate max-w-[60%] text-right">
+                      {chain.length > 0 ? `${chain[0]} → ${chain[chain.length - 1]} (${chain.length})` : '(sin palabras)'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
