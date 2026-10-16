@@ -50,7 +50,7 @@ const PLATFORM_TAREA_INFO = {
 
 const Dashboard = () => {
   const { userData } = useAuth();
-  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate } = useActiveTheme() || {};
+  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate, isPreviewing } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
   // The student's own A/B block-schedule cycle (trailing letter of their
@@ -368,6 +368,11 @@ const Dashboard = () => {
   const themeCardOverrides = theme?.styles?.cardOverrides || {};
   const themeTextures = theme?.styles?.textures || {};
   const themeGradientStyle = (key) => getThemedCardStyle(themeCardOverrides[key], themeAccent, themeTextures[key]);
+  // Replaces a card's default emoji badge with a themed image while this
+  // theme is active (e.g. a pumpkin icon for Calentamiento during a
+  // Halloween theme) — null outside any theme's active window, or if this
+  // theme just doesn't set one for that card, so the emoji fallback shows.
+  const themeImage = (key) => theme?.styles?.imageOverrides?.[key];
 
   return (
     // A nested provider so every card below (Header, Countdown, Curiosidad,
@@ -383,6 +388,11 @@ const Dashboard = () => {
   
           {/* HEADER */}
           <div className="space-y-4">
+            {isPreviewing && (
+              <div className="bg-amber-400 text-slate-900 text-xs font-black uppercase tracking-widest text-center py-2 rounded-xl shadow">
+                👁️ Vista Previa de Tema — esto no es lo que ven los estudiantes ahora mismo
+              </div>
+            )}
             <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
           </div>
   
@@ -410,8 +420,12 @@ const Dashboard = () => {
   
                   <div className="flex items-center gap-4">
                     {/* Flame Badge */}
-                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                      <span className="text-3xl drop-shadow">🔥</span>
+                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+                      {themeImage('calentamiento') ? (
+                        <img src={themeImage('calentamiento')} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl drop-shadow">🔥</span>
+                      )}
                     </div>
   
                     <div className="min-w-0 flex-1">
@@ -495,8 +509,8 @@ const Dashboard = () => {
   
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {conv.img ? (
-                        <img src={conv.img} alt={conv.title} className="w-full h-full object-cover" />
+                      {conv.img || themeImage('conversacion') ? (
+                        <img src={conv.img || themeImage('conversacion')} alt={conv.title} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-3xl drop-shadow">🗣️</span>
                       )}
@@ -633,8 +647,12 @@ const Dashboard = () => {
                     <div className="relative w-16 h-16 shrink-0">
                       <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
                       <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
-                      <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner">
-                        <span className="text-2xl drop-shadow">🧠</span>
+                      <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner overflow-hidden">
+                        {themeImage('vocabulario') ? (
+                          <img src={themeImage('vocabulario')} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl drop-shadow">🧠</span>
+                        )}
                       </div>
                     </div>
 
@@ -714,8 +732,12 @@ const Dashboard = () => {
                 <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
                 <div className="relative flex items-center gap-4 mb-4">
-                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                    <span className="text-3xl drop-shadow">📝</span>
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+                    {themeImage('tareas') ? (
+                      <img src={themeImage('tareas')} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl drop-shadow">📝</span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
