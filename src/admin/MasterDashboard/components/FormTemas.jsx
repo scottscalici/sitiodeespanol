@@ -33,7 +33,7 @@ const CARD_KEYS = [
 // Card keys whose Dashboard component actually checks for an image
 // override today (the rest can still be set here — saved for when more
 // cards get wired up — but won't visibly change anything yet).
-const IMAGE_WIRED_KEYS = new Set(['calentamiento', 'conversacion', 'vocabulario', 'tareas']);
+const IMAGE_WIRED_KEYS = new Set(['calentamiento', 'conversacion', 'vocabulario', 'tareas', 'evaluacion']);
 
 const MASCOT_KEYS = [
   { key: 'sloth', label: 'Perezoso' },
