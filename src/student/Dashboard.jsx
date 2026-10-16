@@ -53,7 +53,12 @@ const Dashboard = () => {
   const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
-  const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse);
+  // The student's own A/B block-schedule cycle (trailing letter of their
+  // section, e.g. "4B" -> "B") — shared by useGymData's own "today's día"
+  // calculation below and fechaByDia/maxAllowedDay further down, so all
+  // three agree on which cycle's calendar entries apply to this student.
+  const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
+  const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse, userCiclo);
 
   // The day being viewed keeps ITS OWN calendar date's theme permanently —
   // browsing an old lesson day shows that day's era-correct theme instead of
@@ -67,7 +72,6 @@ const Dashboard = () => {
   // día resolves to the date THEY will actually see it on, not whichever
   // cycle's entry happened to come last in the calendar array.
   const fechaByDia = useMemo(() => {
-    const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
     const map = {};
     (data?.cal || []).forEach((c) => {
       if (c.dia == null || !c.fecha) return;
@@ -75,7 +79,7 @@ const Dashboard = () => {
       map[Number(c.dia)] = c.fecha;
     });
     return map;
-  }, [data?.cal, userData?.section]);
+  }, [data?.cal, userCiclo]);
 
   // "Día N" plus its actual calendar date where possible (e.g. "Día 9 (28
   // sept)"), falling back to just "Día N" when that día isn't in the
@@ -279,7 +283,6 @@ const Dashboard = () => {
   // --- CALCULATE MAX DAY SAFELY ---
   const maxAllowedDay = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
     let maxDay = liveDia || 1;
 
     if (data?.cal && data.cal.length > 0) {
@@ -293,7 +296,7 @@ const Dashboard = () => {
       }
     }
     return maxDay;
-  }, [data?.cal, liveDia, userData?.section]);
+  }, [data?.cal, liveDia, userCiclo]);
 
   // --- ENFORCE FUTURE DAY BLOCK FOR STUDENTS ---
   useEffect(() => {
