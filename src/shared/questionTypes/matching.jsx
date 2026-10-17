@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
-import { shuffle } from './clozeShared';
+import { shuffle, PromptImage } from './clozeShared';
 
 export const TYPE_KEY = 'matching';
 export const TYPE_LABEL = 'Emparejar';
@@ -26,6 +26,7 @@ const normalizePair = (pair) => ({
 export const emptyQuestion = () => ({
   type: 'matching',
   prompt: '',
+  promptImage: '',
   pairs: [{ left: { text: '', image: '' }, right: { text: '', image: '' } }],
   distractorsText: '',
 });
@@ -138,6 +139,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
   return (
     <div>
+      <PromptImage src={question.promptImage} />
       {question.pairs.length > 1 && (
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
           {matchedPairIdx.length} de {question.pairs.length} emparejados
@@ -220,6 +222,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 
   return (
     <div>
+      <PromptImage src={question.promptImage} />
       {pairCount > 1 && (
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
           {completedCount} de {pairCount} {submitted ? 'correctos' : 'emparejados'}
@@ -326,6 +329,23 @@ export const Editor = ({ question: q, onChange }) => {
 
   return (
     <>
+      <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">
+          Imagen de la pregunta (opcional — distinta de las imágenes por par abajo)
+        </label>
+        <div className="flex items-center gap-2">
+          {q.promptImage && (
+            <img src={q.promptImage} alt="" className="w-12 h-12 object-cover rounded-md border border-slate-200 shrink-0" />
+          )}
+          <ImageUploadField
+            value={q.promptImage || ''}
+            onChange={(url) => onChange({ promptImage: url })}
+            folder="curiosidades"
+            inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+          />
+        </div>
+      </div>
+
       <div className="space-y-2">
         {q.pairs.map((rawPair, pIdx) => {
           const pair = normalizePair(rawPair);

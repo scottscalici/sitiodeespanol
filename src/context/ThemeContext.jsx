@@ -64,7 +64,25 @@ export function ThemeProvider({ children }) {
 
   // MM-DD of today, in the local timezone (matches how theme start/end are authored).
   const todayMD = useMemo(() => new Date().toLocaleDateString('en-CA').slice(5), []);
-  const theme = useMemo(() => (loaded ? resolveActiveTheme(themes, todayMD) : null), [themes, loaded, todayMD]);
+
+  // Lets the Theme Editor's "Vista Previa" button force a specific theme on
+  // the real, live Dashboard (via a ?previewThemeId=<id> query param) so the
+  // teacher can see exactly what students would see, instead of maintaining
+  // a separate preview page that could drift out of sync. Falls back to the
+  // normal date-based resolution if the id doesn't match any saved theme.
+  const previewThemeId = useMemo(
+    () => new URLSearchParams(window.location.search).get('previewThemeId'),
+    []
+  );
+  const previewTheme = useMemo(
+    () => (previewThemeId ? themes.find((t) => t.id === previewThemeId) : null),
+    [themes, previewThemeId]
+  );
+  const theme = useMemo(
+    () => (loaded ? previewTheme || resolveActiveTheme(themes, todayMD) : null),
+    [themes, loaded, todayMD, previewTheme]
+  );
+  const isPreviewing = !!previewTheme;
 
   // Lets a descendant resolve the theme active on ANY date, not just today —
   // e.g. a specific lesson day's own calendar date, so browsing an old day
@@ -78,7 +96,7 @@ export function ThemeProvider({ children }) {
   }, [themes, loaded]);
 
   return (
-    <ThemeContext.Provider value={{ theme, loaded, resolveThemeForDate }}>
+    <ThemeContext.Provider value={{ theme, loaded, resolveThemeForDate, isPreviewing }}>
       <ThemeStyleSync theme={theme} />
       {children}
     </ThemeContext.Provider>

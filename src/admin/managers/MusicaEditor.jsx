@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import ImageUploadField from '../shared/ImageUploadField';
+import MusicaQuestionsModal from './MusicaQuestionsModal';
 
 const MusicaEditor = () => {
   const { id } = useParams();
@@ -9,7 +11,8 @@ const MusicaEditor = () => {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
+  const [questionsModalOpen, setQuestionsModalOpen] = useState(false);
+
   const [song, setSong] = useState({
     titulo: '',
     artista: '',
@@ -19,7 +22,7 @@ const MusicaEditor = () => {
     youtube_url: '',
     spotify_url: '',
     letras: '',
-    preguntas: [] // Array of { q: '', a: '' }
+    questions: [] // Shared question-type engine — see src/shared/questionTypes
   });
 
   useEffect(() => {
@@ -38,7 +41,7 @@ const MusicaEditor = () => {
             youtube_url: data.youtube_url || '',
             spotify_url: data.spotify_url || '',
             letras: data.letras || '',
-            preguntas: data.preguntas || []
+            questions: data.questions || []
           });
         }
       } catch (error) {
@@ -66,25 +69,6 @@ const MusicaEditor = () => {
         ? prev.course.filter((c) => c !== courseId)
         : [...prev.course, courseId],
     }));
-  };
-
-  // --- COMPREHENSION QUESTIONS BUILDER ---
-  const handleAddQuestion = () => {
-    setSong(prev => ({
-      ...prev,
-      preguntas: [...prev.preguntas, { q: '', a: '' }]
-    }));
-  };
-
-  const handleUpdateQuestion = (index, field, value) => {
-    const updated = [...song.preguntas];
-    updated[index][field] = value;
-    setSong(prev => ({ ...prev, preguntas: updated }));
-  };
-
-  const handleRemoveQuestion = (index) => {
-    const updated = song.preguntas.filter((_, i) => i !== index);
-    setSong(prev => ({ ...prev, preguntas: updated }));
   };
 
   // --- URL EXTRACTORS ---
@@ -214,8 +198,16 @@ const MusicaEditor = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Imagen de Portada (URL)</label>
-                <input type="text" value={song.imagen} onChange={(e) => handleInputChange('imagen', e.target.value)} placeholder="https://..." className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs text-slate-600" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">Imagen de Portada</label>
+                <ImageUploadField
+                  value={song.imagen}
+                  onChange={(url) => handleInputChange('imagen', url)}
+                  folder="musica"
+                  inputClassName="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs text-slate-600"
+                />
+                {song.imagen && (
+                  <img src={song.imagen} alt="" className="mt-2 h-20 rounded-lg border border-slate-200 object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                )}
               </div>
             </div>
 
@@ -249,26 +241,18 @@ const MusicaEditor = () => {
               </div>
             </div>
 
-            {/* Comprehension Questions */}
+            {/* Comprehension Questions — shared question-type engine, same as Curiosidades/Práctica */}
             <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200 space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-xs font-black text-amber-600 uppercase tracking-widest">Preguntas de Comprensión</h2>
-                <button onClick={handleAddQuestion} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm">+ Añadir</button>
-              </div>
-              
-              <div className="space-y-3">
-                {song.preguntas.length === 0 && <p className="text-amber-700/50 text-xs italic font-bold">No hay preguntas generadas.</p>}
-                
-                {song.preguntas.map((p, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded-xl border border-amber-200 flex gap-3 relative group">
-                    <span className="text-amber-400 font-black mt-2">{idx + 1}.</span>
-                    <div className="flex-1 space-y-2">
-                      <input type="text" value={p.q} onChange={(e) => handleUpdateQuestion(idx, 'q', e.target.value)} placeholder="Pregunta (Español)" className="w-full p-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-800" />
-                      <input type="text" value={p.a} onChange={(e) => handleUpdateQuestion(idx, 'a', e.target.value)} placeholder="Respuesta Esperada" className="w-full p-2 rounded-lg border border-slate-200 text-sm italic text-slate-600 bg-slate-50" />
-                    </div>
-                    <button onClick={() => handleRemoveQuestion(idx)} className="text-rose-400 hover:text-rose-600 font-bold self-start mt-2 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                  </div>
-                ))}
+                <div>
+                  <h2 className="text-xs font-black text-amber-600 uppercase tracking-widest">Preguntas de Comprensión</h2>
+                  <p className="text-[10px] text-amber-700/60 mt-0.5">
+                    {song.questions.length} pregunta{song.questions.length === 1 ? '' : 's'} — opción múltiple, selección de imagen, cloze, etc.
+                  </p>
+                </div>
+                <button onClick={() => setQuestionsModalOpen(true)} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm">
+                  🧩 Editar Preguntas
+                </button>
               </div>
             </div>
 
@@ -307,6 +291,14 @@ const MusicaEditor = () => {
 
         </div>
       </div>
+
+      {questionsModalOpen && (
+        <MusicaQuestionsModal
+          cancion={song}
+          onClose={() => setQuestionsModalOpen(false)}
+          onSave={async (questions) => setSong((prev) => ({ ...prev, questions }))}
+        />
+      )}
     </div>
   );
 };

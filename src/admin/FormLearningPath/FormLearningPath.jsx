@@ -8,6 +8,7 @@ import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionC
 import { QUESTION_TYPE_DEFAULTS, PRACTICE_BOSS_BATTLE_MIX, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
+import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
 // mode='learningPath' (default): the graded, sequential Dominio builder,
 // saving to learning_paths. mode='practiceHub': same vault + pod/segment

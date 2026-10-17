@@ -9,6 +9,7 @@ import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeCo
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
+import { getCanonicalTextbookName } from '../utils/textbookAccess';
 
 // Components
 import Header from '../components/Header';
@@ -49,10 +50,15 @@ const PLATFORM_TAREA_INFO = {
 
 const Dashboard = () => {
   const { userData } = useAuth();
-  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate } = useActiveTheme() || {};
+  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate, isPreviewing } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
-  const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse);
+  // The student's own A/B block-schedule cycle (trailing letter of their
+  // section, e.g. "4B" -> "B") — shared by useGymData's own "today's día"
+  // calculation below and fechaByDia/maxAllowedDay further down, so all
+  // three agree on which cycle's calendar entries apply to this student.
+  const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
+  const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse, userCiclo);
 
   // The day being viewed keeps ITS OWN calendar date's theme permanently —
   // browsing an old lesson day shows that day's era-correct theme instead of
@@ -66,7 +72,6 @@ const Dashboard = () => {
   // día resolves to the date THEY will actually see it on, not whichever
   // cycle's entry happened to come last in the calendar array.
   const fechaByDia = useMemo(() => {
-    const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
     const map = {};
     (data?.cal || []).forEach((c) => {
       if (c.dia == null || !c.fecha) return;
@@ -74,7 +79,7 @@ const Dashboard = () => {
       map[Number(c.dia)] = c.fecha;
     });
     return map;
-  }, [data?.cal, userData?.section]);
+  }, [data?.cal, userCiclo]);
 
   // "Día N" plus its actual calendar date where possible (e.g. "Día 9 (28
   // sept)"), falling back to just "Día N" when that día isn't in the
@@ -278,7 +283,6 @@ const Dashboard = () => {
   // --- CALCULATE MAX DAY SAFELY ---
   const maxAllowedDay = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
     let maxDay = liveDia || 1;
 
     if (data?.cal && data.cal.length > 0) {
@@ -292,7 +296,7 @@ const Dashboard = () => {
       }
     }
     return maxDay;
-  }, [data?.cal, liveDia, userData?.section]);
+  }, [data?.cal, liveDia, userCiclo]);
 
   // --- ENFORCE FUTURE DAY BLOCK FOR STUDENTS ---
   useEffect(() => {
@@ -364,6 +368,11 @@ const Dashboard = () => {
   const themeCardOverrides = theme?.styles?.cardOverrides || {};
   const themeTextures = theme?.styles?.textures || {};
   const themeGradientStyle = (key) => getThemedCardStyle(themeCardOverrides[key], themeAccent, themeTextures[key]);
+  // Replaces a card's default emoji badge with a themed image while this
+  // theme is active (e.g. a pumpkin icon for Calentamiento during a
+  // Halloween theme) — null outside any theme's active window, or if this
+  // theme just doesn't set one for that card, so the emoji fallback shows.
+  const themeImage = (key) => theme?.styles?.imageOverrides?.[key];
 
   return (
     // A nested provider so every card below (Header, Countdown, Curiosidad,
@@ -379,6 +388,11 @@ const Dashboard = () => {
   
           {/* HEADER */}
           <div className="space-y-4">
+            {isPreviewing && (
+              <div className="bg-amber-400 text-slate-900 text-xs font-black uppercase tracking-widest text-center py-2 rounded-xl shadow">
+                👁️ Vista Previa de Tema — esto no es lo que ven los estudiantes ahora mismo
+              </div>
+            )}
             <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
           </div>
   
@@ -406,8 +420,12 @@ const Dashboard = () => {
   
                   <div className="flex items-center gap-4">
                     {/* Flame Badge */}
-                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                      <span className="text-3xl drop-shadow">🔥</span>
+                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+                      {themeImage('calentamiento') ? (
+                        <img src={themeImage('calentamiento')} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl drop-shadow">🔥</span>
+                      )}
                     </div>
   
                     <div className="min-w-0 flex-1">
@@ -491,8 +509,8 @@ const Dashboard = () => {
   
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {conv.img ? (
-                        <img src={conv.img} alt={conv.title} className="w-full h-full object-cover" />
+                      {conv.img || themeImage('conversacion') ? (
+                        <img src={conv.img || themeImage('conversacion')} alt={conv.title} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-3xl drop-shadow">🗣️</span>
                       )}
@@ -612,7 +630,7 @@ const Dashboard = () => {
               {activeVocabBundles.map(bundleId => {
                 const bundleDetails = vocabBundleDetails[bundleId];
                 const bundleTitle = bundleDetails
-                  ? `${bundleDetails.textbook} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
+                  ? `${getCanonicalTextbookName(bundleDetails.textbook)} — ${getVocabUnitWord(bundleDetails.textbook)} ${bundleDetails.chapter}`
                   : bundleId.replace(/_/g, ' ');
 
                 return (
@@ -629,8 +647,12 @@ const Dashboard = () => {
                     <div className="relative w-16 h-16 shrink-0">
                       <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
                       <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
-                      <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner">
-                        <span className="text-2xl drop-shadow">🧠</span>
+                      <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner overflow-hidden">
+                        {themeImage('vocabulario') ? (
+                          <img src={themeImage('vocabulario')} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl drop-shadow">🧠</span>
+                        )}
                       </div>
                     </div>
 
@@ -702,6 +724,61 @@ const Dashboard = () => {
             {/* RIGHT: SIDEBAR */}
             <div className="space-y-6">
               <GamesSidebar />
+
+              <div
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
+                style={themeGradientStyle('tareas')}
+              >
+                <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div className="relative flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+                    {themeImage('tareas') ? (
+                      <img src={themeImage('tareas')} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-3xl drop-shadow">📝</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
+                  </div>
+                </div>
+
+                <div className="relative space-y-3">
+                  {courseTasks.length === 0 ? (
+                    <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
+                  ) : (
+                    courseTasks.map((t, idx) => {
+                      const TaskTag = t.url ? 'a' : 'div';
+                      const taskProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
+                      // Color-codes how urgent this is relative to today's
+                      // día, so "due date" isn't just small muted text a
+                      // student has to go looking for.
+                      const diasRestantes = Number(t.day_due) - Number(liveDia);
+                      const dueBadgeClass =
+                        diasRestantes <= 0
+                          ? 'bg-rose-500 text-white'
+                          : diasRestantes === 1
+                          ? 'bg-amber-400 text-slate-900'
+                          : 'bg-white/20 text-white';
+                      return (
+                        <TaskTag
+                          key={idx}
+                          {...taskProps}
+                          className={`block bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10 ${t.url ? 'hover:bg-white/20 transition-colors cursor-pointer' : ''}`}
+                        >
+                          <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}{t.url && ' ↗'}</h4>
+                          <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${dueBadgeClass}`}>
+                            Vence: {formatDueDate(t.day_due)}
+                          </span>
+                        </TaskTag>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
               <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
               <PracticeHubTile course={course} />
               <LeaderboardCard course={course} />
@@ -709,46 +786,8 @@ const Dashboard = () => {
               <div className="pt-6 border-t border-slate-200 space-y-6">
                 {/* 🟢 FIXED RESOURCE HUB PROP */}
                 <ResourceHub course={course} />
-  
+
                 <Countdown course={course} />
-  
-                <div
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
-                  style={themeGradientStyle('tareas')}
-                >
-                  <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
-                  <div className="relative flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-                      <span className="text-3xl drop-shadow">📝</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
-                      <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
-                    </div>
-                  </div>
-  
-                  <div className="relative space-y-3">
-                    {courseTasks.length === 0 ? (
-                      <p className="text-xs text-white/60 italic text-center py-2">No hay tareas.</p>
-                    ) : (
-                      courseTasks.map((t, idx) => {
-                        const TaskTag = t.url ? 'a' : 'div';
-                        const taskProps = t.url ? { href: t.url, target: '_blank', rel: 'noopener noreferrer' } : {};
-                        return (
-                          <TaskTag
-                            key={idx}
-                            {...taskProps}
-                            className={`block bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/10 ${t.url ? 'hover:bg-white/20 transition-colors cursor-pointer' : ''}`}
-                          >
-                            <h4 className="font-bold text-white text-xs leading-tight">{t.titulo}{t.url && ' ↗'}</h4>
-                            <p className="text-[9px] text-indigo-200 font-bold uppercase mt-1">Vence: {formatDueDate(t.day_due)}</p>
-                          </TaskTag>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           </div>

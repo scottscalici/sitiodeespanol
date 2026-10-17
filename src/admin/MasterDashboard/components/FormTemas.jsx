@@ -1,4 +1,5 @@
 import React from 'react';
+import ImageUploadField from '../../shared/ImageUploadField';
 
 // Every card key the live Dashboard actually reads a theme color for.
 // Deliberately excludes Destacado (it picks its own color from real
@@ -23,11 +24,17 @@ const CARD_KEYS = [
   { key: 'practicaCard', label: 'Práctica (Gustar, etc.)', texture: true },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
+  { key: 'notaGramatica', label: 'Nota de Gramática' },
   { key: 'practica', label: 'Practice Hub' },
   { key: 'learningPath', label: 'Ruta de Aprendizaje' },
   { key: 'recreo', label: 'El Recreo' },
   { key: 'leaderboard', label: 'Tabla de Líderes' },
 ];
+
+// Card keys whose Dashboard component actually checks for an image
+// override today (the rest can still be set here — saved for when more
+// cards get wired up — but won't visibly change anything yet).
+const IMAGE_WIRED_KEYS = new Set(['calentamiento', 'conversacion', 'vocabulario', 'tareas', 'evaluacion']);
 
 const MASCOT_KEYS = [
   { key: 'sloth', label: 'Perezoso' },
@@ -43,6 +50,7 @@ export default function FormTemas({ actividad, setActividad }) {
   const styles = actividad?.styles || {};
   const overrides = styles?.cardOverrides || {};
   const textures = styles?.textures || {};
+  const imageOverrides = styles?.imageOverrides || {};
   const themeName = actividad?.name || actividad?.titulo || '';
   const hero = actividad?.hero || {};
   const mascots = actividad?.mascots || {};
@@ -61,6 +69,17 @@ export default function FormTemas({ actividad, setActividad }) {
     if (value) next[key] = value;
     else delete next[key];
     updateStyles({ textures: next });
+  };
+
+  // A card's real content image (replaces its default emoji badge on the
+  // Dashboard while this theme is active) — separate from `textures` above,
+  // which is only ever a small decorative watermark blended into a card's
+  // gradient background, not a full icon/content replacement.
+  const handleImageOverrideChange = (key, value) => {
+    const next = { ...(styles.imageOverrides || {}) };
+    if (value) next[key] = value;
+    else delete next[key];
+    updateStyles({ imageOverrides: next });
   };
 
   // A card's color override is either present (checkbox on) or absent
@@ -95,15 +114,28 @@ export default function FormTemas({ actividad, setActividad }) {
 
         {/* CONTROLS COLUMN */}
         <div className="w-full xl:w-1/2 flex flex-col gap-4">
-          <div className="flex flex-col">
-            <label className="font-bold mb-1">Theme Name</label>
-            <input
-              type="text"
-              name="name"
-              value={themeName}
-              onChange={(e) => setActividad({ ...actividad, name: e.target.value, titulo: e.target.value })}
-              className="p-2 border rounded"
-            />
+          <div className="flex items-end gap-3">
+            <div className="flex flex-col flex-1">
+              <label className="font-bold mb-1">Theme Name</label>
+              <input
+                type="text"
+                name="name"
+                value={themeName}
+                onChange={(e) => setActividad({ ...actividad, name: e.target.value, titulo: e.target.value })}
+                className="p-2 border rounded"
+              />
+            </div>
+            {actividad?.id && (
+              <a
+                href={`/?previewThemeId=${encodeURIComponent(actividad.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abre el Dashboard real con este tema forzado, para ver exactamente lo que verían los estudiantes"
+                className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded"
+              >
+                👁️ Vista Previa
+              </a>
+            )}
           </div>
 
           <div className="flex gap-4">
@@ -121,12 +153,12 @@ export default function FormTemas({ actividad, setActividad }) {
           <div className="bg-gray-50 p-3 rounded border">
             <h3 className="font-bold mb-2 text-sm">Hero Banner Settings</h3>
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold">Image URL</label>
-              <input
-                type="text"
+              <label className="text-xs font-semibold">Imagen</label>
+              <ImageUploadField
                 value={hero.img || ''}
-                onChange={(e) => handleHeroChange('img', e.target.value)}
-                className="p-1 border rounded text-sm w-full"
+                onChange={(url) => handleHeroChange('img', url)}
+                folder="temas"
+                inputClassName="p-1 border rounded text-sm w-full"
               />
               <label className="text-xs font-semibold">Message</label>
               <input
@@ -213,12 +245,11 @@ export default function FormTemas({ actividad, setActividad }) {
               {MASCOT_KEYS.map(({ key, label }) => (
                 <div key={key} className="flex items-center gap-2">
                   <span className="text-xs font-semibold w-28 shrink-0">{label}</span>
-                  <input
-                    type="text"
+                  <ImageUploadField
                     value={mascots[key] || ''}
-                    onChange={(e) => handleMascotChange(key, e.target.value)}
-                    className="p-1 border rounded text-xs flex-1"
-                    placeholder="https://..."
+                    onChange={(url) => handleMascotChange(key, url)}
+                    folder="temas"
+                    inputClassName="p-1 border rounded text-xs flex-1"
                   />
                 </div>
               ))}
@@ -244,18 +275,48 @@ export default function FormTemas({ actividad, setActividad }) {
                     className="w-8 h-8 cursor-pointer rounded border-0 p-0 bg-transparent disabled:opacity-30"
                   />
                   {texture && (
-                    <input
-                      type="text"
-                      value={textures[key] || ''}
-                      onChange={(e) => handleTextureChange(key, e.target.value)}
-                      disabled={!enabled}
-                      placeholder="Textura (URL opcional)"
-                      className="p-1 border rounded text-xs w-40 disabled:opacity-30"
-                    />
+                    <div className={`w-48 ${!enabled ? 'opacity-30 pointer-events-none' : ''}`}>
+                      <ImageUploadField
+                        value={textures[key] || ''}
+                        onChange={(url) => handleTextureChange(key, url)}
+                        folder="temas"
+                        placeholder="Textura (opcional)"
+                        inputClassName="p-1 border rounded text-xs w-full"
+                      />
+                    </div>
                   )}
                 </div>
               );
             })}
+          </div>
+
+          {/* Card Content Images — replaces a card's default emoji badge */}
+          <h3 className="font-bold mt-2 border-b pb-1">Imágenes por Tarjeta</h3>
+          <p className="text-xs text-gray-500 -mt-2">
+            Reemplaza el emoji por defecto de una tarjeta mientras este tema esté activo. Las tarjetas marcadas
+            "⏳ aún no conectado" se guardan, pero el Dashboard todavía no las usa.
+          </p>
+          <div className="flex flex-col gap-2">
+            {CARD_KEYS.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-3 bg-gray-50 p-2 rounded border">
+                <span className="text-sm flex-1 flex items-center gap-2">
+                  {label}
+                  {IMAGE_WIRED_KEYS.has(key) ? (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">✅ Activo</span>
+                  ) : (
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded">⏳ Aún no conectado</span>
+                  )}
+                </span>
+                <div className="w-56">
+                  <ImageUploadField
+                    value={imageOverrides[key] || ''}
+                    onChange={(url) => handleImageOverrideChange(key, url)}
+                    folder="temas"
+                    inputClassName="p-1 border rounded text-xs w-full"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

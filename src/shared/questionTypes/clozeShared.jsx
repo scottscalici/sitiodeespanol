@@ -4,6 +4,12 @@ import React from 'react';
 // simple random sort is fine for a handful of tiles/options).
 export const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
+// Shared by multiple_choice, ordering, write, and matching — a question's
+// own optional illustrative image (distinct from per-option/per-pair
+// images), rendered the same way regardless of type.
+export const PromptImage = ({ src }) =>
+  src ? <img src={src} alt="" className="w-full max-h-64 object-contain bg-slate-950 rounded-xl mb-4" /> : null;
+
 // Shared by word_bank_cloze and line_bank_cloze: "Lo" and "lo" are the same
 // underlying word, differing only because Spanish capitalizes whichever
 // one happens to start a sentence — not a grammar distinction either type

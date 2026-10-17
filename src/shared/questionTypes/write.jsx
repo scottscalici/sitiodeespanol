@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { checkAnswerLeniently } from '../../utils/checkAnswer';
+import ImageUploadField from '../../admin/shared/ImageUploadField';
+import { PromptImage } from './clozeShared';
 
 // One-shot free-text type ported from Practice Cards: unlike the
 // retry-until-correct types above, this grades a single attempt and then
@@ -9,7 +11,7 @@ import { checkAnswerLeniently } from '../../utils/checkAnswer';
 export const TYPE_KEY = 'write';
 export const TYPE_LABEL = 'Escribir';
 
-export const emptyQuestion = () => ({ type: 'write', prompt: '', answer: '' });
+export const emptyQuestion = () => ({ type: 'write', prompt: '', promptImage: '', answer: '' });
 export const getItemCount = () => 1;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
@@ -54,6 +56,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
   return (
     <div className="space-y-4">
+      <PromptImage src={question.promptImage} />
       <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
       <input
         type="text"
@@ -99,6 +102,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 
   return (
     <div className="space-y-4">
+      <PromptImage src={question.promptImage} />
       <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
       <input
         type="text"
@@ -132,6 +136,18 @@ export const Editor = ({ question: q, onChange }) => (
       placeholder="Pregunta (inglés o instrucción)"
       className="w-full border border-slate-300 rounded-md p-2 text-sm"
     />
+    <div className="flex items-center gap-2">
+      {q.promptImage && (
+        <img src={q.promptImage} alt="" className="w-12 h-12 object-cover rounded-md border border-slate-200 shrink-0" />
+      )}
+      <ImageUploadField
+        value={q.promptImage || ''}
+        onChange={(url) => onChange({ promptImage: url })}
+        folder="curiosidades"
+        placeholder="Imagen opcional"
+        inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+      />
+    </div>
     <input
       type="text"
       value={q.answer}

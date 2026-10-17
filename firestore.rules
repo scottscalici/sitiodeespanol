@@ -84,6 +84,17 @@ service cloud.firestore {
       allow read, write: if isLoggedIn();
     }
 
+    // --- RÁFAGA / TRIVIA GAME (ephemeral multiplayer lobbies) ---
+    // Same posture as impostor_rooms above — a student joining a room writes
+    // their own doc under trivia_rooms/{code}/players/{uid}, and during play
+    // writes to trivia_rooms/{code}/answers/{...} and advances gameState on
+    // the room doc itself — all of which the master catch-all below would
+    // otherwise reject (admin-only writes), which is exactly what made
+    // students unable to join a room at all before this rule existed.
+    match /trivia_rooms/{document=**} {
+      allow read, write: if isLoggedIn();
+    }
+
     // --- RECUPERACIÓN (reflection + practice gate attempts) ---
     // Doc ID is `${uid}__${circleId}`, but that's not checkable directly, so
     // ownership is verified against the document's own `uid` field instead —

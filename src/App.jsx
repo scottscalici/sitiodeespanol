@@ -52,6 +52,7 @@ import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
 import LessonPlanFormalPage from './admin/managers/LessonPlanFormalPage';
+import LessonPlanOverviewPage from './admin/managers/LessonPlanOverviewPage';
 import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
@@ -84,6 +85,8 @@ import VideosManager from './admin/managers/VideosManager';
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
 import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
+import GrammarNotesManager from './admin/managers/GrammarNotesManager';
+import GrammarNotesUploader from './admin/uploaders/GrammarNotesUploader';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
@@ -458,6 +461,14 @@ function App() {
               }
             />
             <Route
+              path="/admin-lesson-plan-overview"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LessonPlanOverviewPage />
+                </AdminRoute>
+              }
+            />
+            <Route
               path="/admin-secret-portal-learning-path"
               element={
                 <AdminRoute user={user} role={role}>
@@ -502,6 +513,22 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <GramaticaSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesUploader />
                 </AdminRoute>
               }
             />

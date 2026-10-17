@@ -1,15 +1,21 @@
 import { useState, useMemo } from 'react';
 import { wordIntroSegmentCount, generatePodsForSections } from '../../utils/podGenerator';
 import { QUESTION_TYPE_DEFAULTS, QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, sumMix } from '../../utils/questionTypes';
+import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
 // Builds a "Nivel N: word-intro" + "Nivel N+1: boss battle" pod pair for
 // each chosen vocab section in the currently-selected chapter — see
 // podGenerator.js for the actual pattern. Generated pods are appended to
 // whatever's already in the path, never replacing existing pods, so this
 // is safe to run more than once (e.g. adding a chapter's remaining
-// sections after already generating a few).
+// sections after already generating a few). The reference-only section
+// (not assessed) is excluded entirely — this generator always produces
+// GRADED pods, so there's no "uncheck it" workflow to rely on; a teacher
+// who wants reference words in a path still can, by hand, via the
+// section picker in VaultSidebar instead.
 export default function VocabPodGeneratorModal({ rawChapterData, availableSections, selectedChapter, existingPodCount, onGenerate, onClose }) {
-  const [checkedSections, setCheckedSections] = useState(() => new Set(availableSections));
+  const gradableSections = useMemo(() => availableSections.filter((s) => !isReferenceSection(s)), [availableSections]);
+  const [checkedSections, setCheckedSections] = useState(() => new Set(gradableSections));
   // Every intro segment gets this same mix; boss segments ignore the mix at
   // runtime (a speed round always drills plain recall) so only their
   // question COUNT is editable, same split PathBuilder's own per-segment
@@ -18,11 +24,11 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
   const [bossTotalQuestions, setBossTotalQuestions] = useState(sumMix(QUESTION_TYPE_DEFAULTS));
 
   const sectionInfo = useMemo(() => {
-    return availableSections.map((section) => {
+    return gradableSections.map((section) => {
       const words = (rawChapterData?.words || []).filter((w) => w.metadata?.secciones?.includes(section));
       return { section, words, segmentCount: wordIntroSegmentCount(words.length) };
     });
-  }, [availableSections, rawChapterData]);
+  }, [gradableSections, rawChapterData]);
 
   const toggleSection = (section) => {
     setCheckedSections((prev) => {
@@ -119,7 +125,7 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
                     onChange={() => toggleSection(section)}
                     disabled={words.length === 0}
                   />
-                  <span className="font-bold text-slate-800">Sección {section}</span>
+                  <span className="font-bold text-slate-800">{isReferenceSection(section) ? 'Referencias' : `Sección ${section}`}</span>
                 </span>
                 <span className="text-xs text-slate-500 font-semibold">
                   {words.length === 0

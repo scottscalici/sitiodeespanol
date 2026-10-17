@@ -3,9 +3,11 @@ import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
+import { getCanonicalTextbookName } from '../utils/textbookAccess';
 import { useAuth } from '../context/AuthContext';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
 import { awardPoints } from '../utils/pointsHelper';
+import { isReferenceSection, formatVocabSectionLabel } from '../utils/vocabSectionLabel';
 
 // The vocab collection has words in two different shapes for
 // definiciones.nivelN, depending on which tool/import created them:
@@ -34,6 +36,21 @@ const projectorScaleFor = (count) => {
   if (count <= 40) return { columns: 'columns-4', text: 'text-2xl' };
   return { columns: 'columns-5', text: 'text-xl' };
 };
+
+// The Referencias view groups by tipo_texto (the textbook's own "where you'd
+// use this" categories) rather than alphabetically. These headings are
+// looked up by the raw value itself — not per-unit — so a future unit
+// reusing "conversación" automatically gets the same heading; anything not
+// in this table (including Unidad 1's own "artículo de opinión") falls back
+// to its capitalized raw text instead of needing a code change.
+const TIPO_TEXTO_LABELS = {
+  'conversación': 'Conversar en un intercambio',
+  'correo formal': 'El correo electrónico formal',
+  'texto argumentativo': 'El texto argumentativo',
+  'presentación oral': 'La presentación oral',
+  'conectores': 'Conectores',
+};
+const formatTipoTextoLabel = (tipo) => TIPO_TEXTO_LABELS[tipo] || (tipo.charAt(0).toUpperCase() + tipo.slice(1));
 
 export default function VocabPage() {
   const { bundleId } = useParams();
@@ -136,6 +153,58 @@ export default function VocabPage() {
     return { sortedWords: sorted, groupedWords: grouped, allSections: uniqueSections };
   }, [bundleData]);
 
+  // Referencias view: the reference section's words grouped first by each
+  // value in tipo_texto (a word with several values appears under EACH one,
+  // e.g. "podríamos" under both conversación and correo formal), then by
+  // funcion within that. Both groups and entries keep the order they first
+  // appear in — never alphabetical — using metadata.orden when present
+  // (set at import time) so the order survives the round-trip through
+  // Firestore, which doesn't preserve upload order on its own; words
+  // without it keep whatever order the fetch returned, appended after any
+  // explicitly-ordered ones.
+  const { referenciaGroups, hasReferenciaWords } = useMemo(() => {
+    if (!bundleData?.words) return { referenciaGroups: [], hasReferenciaWords: false };
+
+    const refWords = bundleData.words.filter((w) =>
+      (w.metadata?.secciones || []).some((s) => isReferenceSection(s))
+    );
+    if (refWords.length === 0) return { referenciaGroups: [], hasReferenciaWords: false };
+
+    const ordered = [...refWords].sort((a, b) => {
+      const oa = a.metadata?.orden;
+      const ob = b.metadata?.orden;
+      if (oa != null && ob != null) return oa - ob;
+      if (oa != null) return -1;
+      if (ob != null) return 1;
+      return 0; // stable: keeps original fetch order for ties
+    });
+
+    const groups = [];
+    const groupIndex = new Map();
+    ordered.forEach((word) => {
+      const tipos = Array.isArray(word.metadata?.tipo_texto) && word.metadata.tipo_texto.length > 0
+        ? word.metadata.tipo_texto
+        : ['Sin categoría'];
+      tipos.forEach((tipo) => {
+        if (!groupIndex.has(tipo)) {
+          const group = { tipo, funcionGroups: [], funcionIndex: new Map() };
+          groupIndex.set(tipo, group);
+          groups.push(group);
+        }
+        const group = groupIndex.get(tipo);
+        const funcion = word.metadata?.funcion || 'Sin función';
+        if (!group.funcionIndex.has(funcion)) {
+          const funcionGroup = { funcion, words: [] };
+          group.funcionIndex.set(funcion, funcionGroup);
+          group.funcionGroups.push(funcionGroup);
+        }
+        group.funcionIndex.get(funcion).words.push(word);
+      });
+    });
+
+    return { referenciaGroups: groups, hasReferenciaWords: true };
+  }, [bundleData]);
+
   // 3. Initialize Filters (Check all sections by default when data loads)
   useEffect(() => {
     if (allSections.length > 0 && activeFilters.length === 0) {
@@ -236,7 +305,7 @@ export default function VocabPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <p className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">
-              {bundleData.textbook}
+              {getCanonicalTextbookName(bundleData.textbook)}
             </p>
             <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
               {getVocabUnitWord(bundleData.textbook)} {bundleData.chapter}
@@ -278,6 +347,14 @@ export default function VocabPage() {
            >
              🗣️ Tabú
            </button>
+           {hasReferenciaWords && (
+             <button
+               onClick={() => handleModeChange('referencias')}
+               className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'referencias' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+             >
+               📎 Referencias
+             </button>
+           )}
            {isAdmin && allSections.length > 0 && (
              <button
                onClick={() => setProjectorSection(allSections[0])}
@@ -301,7 +378,7 @@ export default function VocabPage() {
                     onChange={() => toggleFilter(sec)}
                     className="accent-indigo-600 w-4 h-4 cursor-pointer"
                   />
-                  <span className={`text-xs font-bold ${activeFilters.includes(sec) ? 'text-indigo-700' : 'text-slate-500'}`}>{sec}</span>
+                  <span className={`text-xs font-bold ${activeFilters.includes(sec) ? 'text-indigo-700' : 'text-slate-500'}`}>{isReferenceSection(sec) ? 'Referencias' : sec}</span>
                 </label>
               ))}
             </div>
@@ -358,7 +435,7 @@ export default function VocabPage() {
               return (
                 <section key={section} className={`bg-white rounded-2xl shadow-sm p-6 sm:p-8 border-l-4 ${theme.border}`}>
                   <h2 className={`text-xl font-bold mb-4 ${theme.text}`}>
-                    Sección {section}
+                    {isReferenceSection(section) ? 'Referencias' : `Sección ${section}`}
                   </h2>
                   <div className="overflow-auto">
                     <table className="min-w-full text-sm sm:text-base">
@@ -379,6 +456,46 @@ export default function VocabPage() {
                 </section>
               );
             })}
+          </div>
+        )}
+
+        {/* 📎 VIEW: REFERENCIAS — grouped by tipo_texto, then by funcion,
+            in file order (never alphabetical); see the referenciaGroups
+            memo above for how that grouping/ordering is built. */}
+        {viewMode === 'referencias' && (
+          <div className="space-y-8">
+            {referenciaGroups.map((group) => (
+              <section key={group.tipo} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 border-l-4 border-emerald-500">
+                <h2 className="text-xl font-bold mb-5 text-emerald-700">
+                  {formatTipoTextoLabel(group.tipo)}
+                </h2>
+                <div className="space-y-5">
+                  {group.funcionGroups.map((funcionGroup) => (
+                    <div key={funcionGroup.funcion}>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                        {funcionGroup.funcion}
+                      </h3>
+                      <div className="overflow-auto">
+                        <table className="min-w-full text-sm sm:text-base">
+                          <tbody className="divide-y divide-slate-100">
+                            {funcionGroup.words.map((w, idx) => (
+                              <tr key={idx} className="hover:bg-emerald-50 transition-colors group">
+                                <td className="py-3 pr-4 font-bold text-slate-800 w-1/2 align-top">
+                                  {w.palabra}
+                                </td>
+                                <td className="py-3 text-slate-600 w-1/2 align-top">
+                                  {w.traduccion}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
@@ -406,7 +523,9 @@ export default function VocabPage() {
                   <div className="absolute inset-0 w-full h-full bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl" style={{ backfaceVisibility: 'hidden' }}>
                     <div className="absolute top-6 left-6 flex gap-2">
                       <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
-                        Sec. {currentStudyWord.metadata?.secciones?.[0] || '-'}
+                        {isReferenceSection(currentStudyWord.metadata?.secciones?.[0])
+                          ? 'Referencias'
+                          : `Sec. ${currentStudyWord.metadata?.secciones?.[0] || '-'}`}
                       </span>
                       <span className="bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-100">
                         {currentStudyWord.metadata?.tipo || 'Término'}
@@ -515,7 +634,7 @@ export default function VocabPage() {
               className="text-lg font-black text-slate-700 uppercase tracking-widest border-2 border-slate-200 rounded-xl px-4 py-2 bg-white focus:outline-none focus:border-indigo-400"
             >
               {allSections.map((sec) => (
-                <option key={sec} value={sec}>Sección {sec}</option>
+                <option key={sec} value={sec}>{isReferenceSection(sec) ? 'Referencias' : `Sección ${sec}`}</option>
               ))}
             </select>
             <div className="flex gap-2">
@@ -603,7 +722,9 @@ function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
     <div className="relative w-full min-h-[400px] bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center shadow-xl gap-6">
       <div className="absolute top-6 left-6 flex gap-2">
         <span className="bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-slate-200">
-          Sec. {word.metadata?.secciones?.[0] || '-'}
+          {isReferenceSection(word.metadata?.secciones?.[0])
+            ? 'Referencias'
+            : `Sec. ${word.metadata?.secciones?.[0] || '-'}`}
         </span>
         <span className="bg-indigo-50 text-indigo-500 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-100">
           {word.metadata?.tipo || 'Término'}

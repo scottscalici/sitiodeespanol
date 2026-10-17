@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js';
 import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
+import { isReferenceSection, formatVocabSectionLabel } from '../../../utils/vocabSectionLabel';
 
 // --- SLUG HELPERS (shared by bulk importer + single-word editor) ---
 const slugifyBook = (textbook) => (textbook || 'unknown_book').replace(/\s+/g, '_').toLowerCase();
@@ -89,9 +90,13 @@ const isWordInTargetSection = (word, targetSection) => {
 // chapter marker like "9" sorts as "9.0". Comparing these numerically lets
 // the baker include only what's been covered so far within the CURRENT
 // step's textbook, instead of either "all of this chapter" or "nothing".
+// A non-numeric subsection (the "referencias" reference section) sorts as
+// Infinity — always LAST — rather than falling back to 0 and sorting
+// first, which would wrongly treat it as "already covered" by any cutoff.
 const parseSectionKey = (sec) => {
   const [chap, sub] = String(sec).split('.');
-  return [parseInt(chap, 10) || 0, parseInt(sub, 10) || 0];
+  const subNum = parseInt(sub, 10);
+  return [parseInt(chap, 10) || 0, Number.isNaN(subNum) ? Infinity : subNum];
 };
 
 const compareSectionKeys = (a, b) => {
@@ -105,12 +110,6 @@ const isWordUpToSection = (word, maxSection) => {
   const wordSections = getSafeSectionsArray(word?.metadata);
   if (wordSections.length === 0) return false;
   return wordSections.some(s => compareSectionKeys(s, maxSection) <= 0);
-};
-
-const formatSectionLabel = (sec) => {
-  if (!sec || sec === "all") return "All Sections";
-  if (sec.startsWith("chapter_")) return `Chapter ${sec.replace("chapter_", "")}`;
-  return `Section ${sec}`;
 };
 
 const VocabVault = () => {
@@ -132,10 +131,12 @@ const VocabVault = () => {
   const [librarySearch, setLibrarySearch] = useState("");
   const [auditFilter, setAuditFilter] = useState("all");
   const [libraryTextbookFilter, setLibraryTextbookFilter] = useState("all");
+  const [librarySectionFilter, setLibrarySectionFilter] = useState("all");
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedWords, setSelectedWords] = useState([]);
   const [bulkTextbook, setBulkTextbook] = useState("");
   const [bulkSection, setBulkSection] = useState("");
+  const [bulkEvaluacion, setBulkEvaluacion] = useState(""); // '' = no change, 'true'/'false' = set Testable
 
   // --- BAKING STATION STATES ---
   const [editingWarmupId, setEditingWarmupId] = useState(null);
@@ -212,22 +213,28 @@ const VocabVault = () => {
   // The specific subsections (e.g. "1.1", "1.2") that fall within a given
   // Auto-Pilot step's own textbook + preset section/chapter — used to build
   // the "Up to Section..." narrowing dropdown for whichever step is current.
+  // Excludes the reference section: "up to section X" is about sequential
+  // quiz progress, which a reference-only section isn't part of.
   const getSubsectionsForStep = (step) => {
     if (!step?.textbook) return [];
     const sections = getSectionsForTextbook(step.textbook);
     return sections
-      .filter(s => s.includes('.') && sectionMatchesTarget(s, step.section))
+      .filter(s => s.includes('.') && !isReferenceSection(s) && sectionMatchesTarget(s, step.section))
       .sort(compareSectionKeys);
   };
 
   const renderSectionDropdown = (textbook, value, onChangeHandler, disabled = false) => {
-    const sections = getSectionsForTextbook(textbook);
+    // The reference section is excluded from "Specific Subsections" here —
+    // every use of this dropdown targets a BAKE (Path step, manual block,
+    // the Override search), and reference words are marked not-Testable,
+    // so targeting it would only ever yield zero eligible words.
+    const sections = getSectionsForTextbook(textbook).filter(s => !isReferenceSection(s));
     const chapters = getChaptersForTextbook(textbook);
     return (
       <select value={value} onChange={onChangeHandler} style={s.selectBox} disabled={disabled}>
         <option value="all">All Sections</option>
         {chapters.length > 0 && <optgroup label="Entire Chapters">{chapters.map(c => <option key={`ch_${c}`} value={`chapter_${c}`}>Chapter {c}</option>)}</optgroup>}
-        {sections.length > 0 && <optgroup label="Specific Subsections">{sections.map(sec => <option key={sec} value={sec}>Section {sec}</option>)}</optgroup>}
+        {sections.length > 0 && <optgroup label="Specific Subsections">{sections.map(sec => <option key={sec} value={sec}>{formatVocabSectionLabel(sec)}</option>)}</optgroup>}
       </select>
     );
   };
@@ -280,9 +287,15 @@ const VocabVault = () => {
 
   // --- LOGIC: UPLOADER ---
   const handleUpload = async () => {
+    let data;
     try {
-      const data = JSON.parse(jsonInput);
-      setUploadStatus('⏳ Processing...');
+      data = JSON.parse(jsonInput);
+    } catch (error) {
+      setUploadStatus('❌ Error: Invalid JSON — ' + error.message);
+      return;
+    }
+    setUploadStatus('⏳ Processing...');
+    try {
       for (const item of data) {
         const docId = buildWordId(item.metadata?.textbook, item.palabra);
         await setDoc(doc(db, "vocabulary", docId), { ...item, lastUpdated: serverTimestamp() });
@@ -290,8 +303,11 @@ const VocabVault = () => {
       setJsonInput('');
       invalidateCollectionCache("vocabulary");
       await fetchData();
-      setUploadStatus('✅ Library updated.');
-    } catch (error) { setUploadStatus('❌ Error: Invalid JSON'); }
+      setUploadStatus(`✅ Library updated (${data.length} words).`);
+    } catch (error) {
+      console.error('Error uploading vocabulary:', error);
+      setUploadStatus('❌ Error writing to Firestore: ' + error.message);
+    }
   };
 
   // --- LOGIC: EDITOR & BULK ---
@@ -420,7 +436,8 @@ const VocabVault = () => {
         const updatedMetadata = {
           ...word.metadata,
           textbook: bulkTextbook || word.metadata?.textbook || "",
-          secciones: bulkSection ? bulkSection.split(',').map(s => s.trim()).filter(Boolean) : getSafeSectionsArray(word.metadata)
+          secciones: bulkSection ? bulkSection.split(',').map(s => s.trim()).filter(Boolean) : getSafeSectionsArray(word.metadata),
+          ...(bulkEvaluacion ? { evaluacion: bulkEvaluacion === 'true' } : {}),
         };
         if (updatedMetadata.seccion !== undefined) delete updatedMetadata.seccion;
         await updateDoc(docRef, { metadata: updatedMetadata });
@@ -432,7 +449,7 @@ const VocabVault = () => {
         return up ? { ...w, metadata: up.updatedMetadata } : w;
       }));
       invalidateCollectionCache("vocabulary");
-      setSelectedWords([]); setBulkTextbook(""); setBulkSection("");
+      setSelectedWords([]); setBulkTextbook(""); setBulkSection(""); setBulkEvaluacion("");
       alert(`Updated ${results.length} words!`);
     } catch (e) { alert("Error bulk updating."); }
   };
@@ -477,6 +494,14 @@ const VocabVault = () => {
       if (block.maxSection && block.maxSection !== 'all') {
         eligible = eligible.filter(v => isWordUpToSection(v, block.maxSection));
       }
+      // Reference-only words (e.g. a textbook's final "not assessed" section
+      // per unit) are tagged Testable=false in the Library editor — keep
+      // them out of what gets baked into a graded Calentamiento, same as
+      // every other block in this bake. Only an EXPLICIT false excludes a
+      // word; older words with no evaluacion field at all still bake in, so
+      // this doesn't silently empty out content tagged before this flag did
+      // anything.
+      eligible = eligible.filter(v => v?.metadata?.evaluacion !== false);
       if (eligible.length === 0) continue;
       const shuffled = shuffleArray(eligible);
       const selected = shuffled.slice(0, block.count);
@@ -607,13 +632,31 @@ const VocabVault = () => {
     setWarmupName("");
   };
 
+  const deleteSavedPractice = async (practiceId) => {
+    if (!window.confirm("Delete this saved practice permanently? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "dailyVocabWarmups", practiceId));
+      invalidateCollectionCache("dailyVocabWarmups");
+      setSavedWarmups(prev => prev.filter(p => p.id !== practiceId));
+      if (editingWarmupId === practiceId) clearBakingStation();
+    } catch (e) {
+      console.error(e);
+      alert("Error deleting practice.");
+    }
+  };
+
   if (isLoading) return <div style={s.centerScreen}><h2>Loading Vocab Vault...</h2></div>;
 
   const currentAutoPilotStep = savedPaths.find(p => p.id === selectedPathId)?.steps?.[parseInt(currentLocationIndex)];
   const currentStepSubsections = currentAutoPilotStep ? getSubsectionsForStep(currentAutoPilotStep) : [];
 
+  const librarySectionOptions = libraryTextbookFilter === 'all'
+    ? [...new Set(fullVocab.flatMap(v => getSafeSectionsArray(v?.metadata)))].sort()
+    : getSectionsForTextbook(libraryTextbookFilter);
+
   const filteredVocabList = fullVocab.filter(v => {
     if (libraryTextbookFilter !== 'all' && (v?.metadata?.textbook || '') !== libraryTextbookFilter) return false;
+    if (librarySectionFilter !== 'all' && !getSafeSectionsArray(v?.metadata).includes(librarySectionFilter)) return false;
     if (auditFilter === 'no_section') return getSafeSectionsArray(v?.metadata).length === 0;
     if (auditFilter === 'no_book') return !v?.metadata?.textbook;
     const term = librarySearch.toLowerCase();
@@ -648,7 +691,10 @@ const VocabVault = () => {
             <pre style={s.exampleBlock}>{EXAMPLE_JSON}</pre>
           )}
           <textarea style={s.jsonTextarea} value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder='Paste JSON array here, or click "Load Example Into Editor" above to start from a template...' />
-          <button onClick={handleUpload} style={{...s.primaryBtn, marginTop: '15px'}}>Push to Firestore</button>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginTop: '15px'}}>
+            <button onClick={handleUpload} style={s.primaryBtn}>Push to Firestore</button>
+            {uploadStatus && <span style={{fontSize: '13px', fontWeight: 'bold', color: uploadStatus.includes('❌') ? '#f44' : '#ff9a40'}}>{uploadStatus}</span>}
+          </div>
         </div>
       )}
 
@@ -662,9 +708,14 @@ const VocabVault = () => {
                {uploadStatus && <div style={{fontSize: '11px', color: '#ff9a40', marginTop: '5px', textAlign: 'center'}}>{uploadStatus}</div>}
             </div>
 
-            <select value={libraryTextbookFilter} onChange={e => setLibraryTextbookFilter(e.target.value)} style={{...s.selectBox, marginBottom: '10px'}}>
+            <select value={libraryTextbookFilter} onChange={e => {setLibraryTextbookFilter(e.target.value); setLibrarySectionFilter('all');}} style={{...s.selectBox, marginBottom: '10px'}}>
               <option value="all">All Textbooks</option>
               {availableTextbooks.map(tb => <option key={tb} value={tb}>{tb}</option>)}
+            </select>
+
+            <select value={librarySectionFilter} onChange={e => setLibrarySectionFilter(e.target.value)} style={{...s.selectBox, marginBottom: '10px'}}>
+              <option value="all">All Sections</option>
+              {librarySectionOptions.map(sec => <option key={sec} value={sec}>{formatVocabSectionLabel(sec)} ({sec})</option>)}
             </select>
 
             <div style={{display: 'flex', gap: '8px', marginBottom: '10px'}}>
@@ -690,6 +741,14 @@ const VocabVault = () => {
                  <h2 style={{color: '#ff9a40'}}>Bulk Tag {selectedWords.length} Words</h2>
                  <div style={s.inputBox}><label style={s.label}>Textbook</label><input type="text" value={bulkTextbook} onChange={e=>setBulkTextbook(e.target.value)} style={s.inputLarge} /></div>
                  <div style={s.inputBox}><label style={s.label}>Sections</label><input type="text" value={bulkSection} onChange={e=>setBulkSection(e.target.value)} style={s.inputLarge} /></div>
+                 <div style={s.inputBox}>
+                   <label style={s.label}>Testable (e.g. a reference-only section that shouldn't be assessed)</label>
+                   <select value={bulkEvaluacion} onChange={e=>setBulkEvaluacion(e.target.value)} style={s.selectBox}>
+                     <option value="">— No cambiar —</option>
+                     <option value="true">✅ Marcar Testable</option>
+                     <option value="false">🚫 Marcar NO Testable (solo referencia)</option>
+                   </select>
+                 </div>
                  <button onClick={applyBulkTags} style={s.primaryBtn}>Apply</button>
                </div>
              ) : editingWord ? (
@@ -777,7 +836,7 @@ const VocabVault = () => {
                     <label style={s.label}>2. We are currently on...</label>
                     <select value={currentLocationIndex} onChange={e => {setCurrentLocationIndex(e.target.value); setCurrentMaxSection('all');}} style={s.selectBox}>
                       {savedPaths.find(p => p.id === selectedPathId)?.steps.map((step, idx) => (
-                        <option key={idx} value={idx}>Step {idx + 1}: {step.textbook} ({formatSectionLabel(step.section)})</option>
+                        <option key={idx} value={idx}>Step {idx + 1}: {step.textbook} ({formatVocabSectionLabel(step.section)})</option>
                       ))}
                     </select>
                   </div>
@@ -897,7 +956,12 @@ const VocabVault = () => {
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px'}}>
             {savedWarmups.length === 0 ? <p style={{color: '#666'}}>No practices saved yet. Bake and save one in the Baking Station!</p> : null}
             {savedWarmups.map((practice) => (
-              <div key={practice.id} style={{background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s'}} onClick={() => loadSavedPractice(practice)}>
+              <div key={practice.id} style={{background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s', position: 'relative'}} onClick={() => loadSavedPractice(practice)}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteSavedPractice(practice.id); }}
+                  title="Delete this saved practice"
+                  style={{position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#f44', fontSize: '16px', cursor: 'pointer', lineHeight: 1}}
+                >🗑️</button>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <div style={{color: '#ff9a40', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px'}}>DÍA {practice.dia}</div>
                   <div style={{color: '#888', fontSize: '11px', textTransform: 'uppercase'}}>{practice.course || 's2'}</div>

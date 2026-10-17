@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { QUESTION_TYPES } from '../shared/questionTypes';
 
 const normalize = (str) =>
   (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -22,7 +23,9 @@ const MusicaEngine = () => {
 
   // Store student answers
   const [clozeAnswers, setClozeAnswers] = useState({});
-  const [compAnswers, setCompAnswers] = useState({});
+  // Which comprehension questions (by index) the student has already gotten
+  // right — purely local, ungraded practice, nothing persisted to Firestore.
+  const [completedQuestions, setCompletedQuestions] = useState(() => new Set());
 
   useEffect(() => {
     const fetchSong = async () => {
@@ -48,10 +51,6 @@ const MusicaEngine = () => {
 
   const handleClozeChange = (index, value) => {
     setClozeAnswers(prev => ({ ...prev, [index]: value }));
-  };
-
-  const handleCompChange = (index, value) => {
-    setCompAnswers(prev => ({ ...prev, [index]: value }));
   };
 
   const handleCheck = () => {
@@ -239,24 +238,28 @@ const MusicaEngine = () => {
           </div>
         </div>
 
-        {/* COMPREHENSION QUESTIONS — FULL WIDTH */}
-        {song.preguntas && song.preguntas.length > 0 && (
+        {/* COMPREHENSION QUESTIONS — FULL WIDTH, shared question-type engine */}
+        {song.questions && song.questions.length > 0 && (
           <div className="bg-neutral-900/80 border border-neutral-800 p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
-            <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <span>🤔</span> Preguntas de Comprensión
+            <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center justify-between border-b border-neutral-800 pb-3">
+              <span className="flex items-center gap-2"><span>🤔</span> Preguntas de Comprensión</span>
+              <span className="text-[10px] text-neutral-500 font-mono">{completedQuestions.size}/{song.questions.length} completas</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {song.preguntas.map((p, idx) => (
-                <div key={idx} className="space-y-2">
-                  <p className="font-bold text-sm text-slate-200">{idx + 1}. {p.q}</p>
-                  <textarea
-                    value={compAnswers[idx] || ''}
-                    onChange={(e) => handleCompChange(idx, e.target.value)}
-                    placeholder="Escribe tu respuesta aquí..."
-                    className="w-full p-3 rounded-xl border border-neutral-800 bg-neutral-950 text-white outline-none focus:border-amber-500 resize-none h-24 text-xs font-medium transition-colors"
-                  />
-                </div>
-              ))}
+            <div className="space-y-6">
+              {song.questions.map((q, idx) => {
+                const TypeRenderer = QUESTION_TYPES[q.type]?.Renderer;
+                if (!TypeRenderer) return null;
+                return (
+                  <div key={idx} className="space-y-2">
+                    {q.prompt && <p className="font-bold text-sm text-slate-200">{idx + 1}. {q.prompt}</p>}
+                    <TypeRenderer
+                      question={q}
+                      onItemFirstAttempt={() => {}}
+                      onAllCorrect={() => setCompletedQuestions((prev) => new Set(prev).add(idx))}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

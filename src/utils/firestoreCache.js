@@ -39,7 +39,14 @@ export const getCachedQuery = async (cacheKey, runQuery, { force = false, ttlMs 
   const promise = (async () => {
     try {
       const snap = await runQuery();
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // d.id (the REAL Firestore document path) must win over any `id` field
+      // that happens to live inside the document's own data — e.g. a bulk
+      // import that included one (several admin uploaders do, even though
+      // it's never used to generate the actual doc id). Spreading data()
+      // after `id: d.id` would let a stray data.id silently shadow the real
+      // one, so every caller holding that object would then try to
+      // update/delete/re-fetch a document path that doesn't exist.
+      const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } finally {
@@ -75,7 +82,8 @@ export const getCachedDoc = async (collectionName, docId, { force = false, ttlMs
   const promise = (async () => {
     try {
       const snap = await getDoc(doc(db, collectionName, docId));
-      const data = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      // Same real-id-must-win ordering as getCachedQuery above.
+      const data = snap.exists() ? { ...snap.data(), id: snap.id } : null;
       cache.set(cacheKey, { data, fetchedAt: Date.now() });
       return data;
     } finally {
@@ -123,7 +131,9 @@ export const getCachedBucketedCollection = async (collectionName, opts) => {
   const legacyDocs = [];
   docs.forEach((d) => {
     if (d.items && typeof d.items === 'object') {
-      Object.entries(d.items).forEach(([id, data]) => byId.set(id, { id, ...data }));
+      // Same real-id-must-win ordering as getCachedQuery — the bucket map's
+      // own key is the authoritative id, so it must come after the spread.
+      Object.entries(d.items).forEach(([id, data]) => byId.set(id, { ...data, id }));
     } else {
       legacyDocs.push(d);
     }

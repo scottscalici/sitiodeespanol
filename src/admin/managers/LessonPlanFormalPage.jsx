@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { COURSE_TITLES, SECTION_STANDARDS, ACTIVITY_STANDARDS, getEvaluacionStandard } from '../../utils/lessonPlanStandards';
+import { TYPE_LABELS, getQuestionPreview } from '../../shared/questionTypes';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
@@ -169,9 +170,15 @@ export default function LessonPlanFormalPage() {
                 <StandardTag standard={SECTION_STANDARDS.calentamiento} />
               </div>
               <ul className="list-disc pl-5 space-y-1">
-                {planData.calentamiento.verbs.map((c) => <li key={`v-${c.id}`}>Verbos: {c.title}</li>)}
-                {planData.calentamiento.vocab.map((v) => <li key={`voc-${v.id}`}>Vocabulario: {v.name}</li>)}
+                {planData.calentamiento.verbs.map((c) => (
+                  <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
+                ))}
+                {planData.calentamiento.vocab.map((v) => (
+                  <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
+                ))}
               </ul>
+              {planData.calentamiento.verbList && <p className="text-sm font-sans text-gray-700 mt-2">{planData.calentamiento.verbList}</p>}
+              {planData.calentamiento.vocabList && <p className="text-sm font-sans text-gray-700 mt-1">{planData.calentamiento.vocabList}</p>}
             </div>
           )}
 
@@ -193,9 +200,23 @@ export default function LessonPlanFormalPage() {
                 <h3 className="text-base font-bold uppercase tracking-wide">💡 Curiosidad</h3>
                 <StandardTag standard={SECTION_STANDARDS.curiosidad} />
               </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.curiosidad.map((c) => <li key={c.id}>{c.title}</li>)}
-              </ul>
+              <div className="space-y-3">
+                {planData.curiosidad.map((c) => (
+                  <div key={c.id}>
+                    <p className="font-bold">{c.title} ({(c.questions || []).length} preguntas)</p>
+                    {(c.questions || []).length > 0 && (
+                      <ol className="list-decimal pl-6 space-y-0.5 text-sm font-sans text-gray-700">
+                        {c.questions.map((q, idx) => (
+                          <li key={idx}>
+                            <span className="text-gray-400">[{TYPE_LABELS[q.type] || q.type}]</span>{' '}
+                            {getQuestionPreview(q) || '(sin texto)'}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

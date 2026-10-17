@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
-import { getAllowedTextbooks, getDefaultTextbook, textbookMatches } from '../utils/textbookAccess';
+import { getAllowedTextbooks, getDefaultTextbook, textbookMatches, getCanonicalTextbookName } from '../utils/textbookAccess';
 
 // Landing view is a table of contents — every chapter of the student's
 // default book (their course's current textbook), so they can jump
@@ -134,7 +134,7 @@ export default function VocabIndexPage() {
                     <p className="text-sm text-slate-500 truncate">{w.traduccion}</p>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
-                    {w.textbook} · {getVocabUnitWord(w.textbook)} {w.chapter}
+                    {getCanonicalTextbookName(w.textbook)} · {getVocabUnitWord(w.textbook)} {w.chapter}
                   </span>
                 </Link>
               ))}
@@ -152,7 +152,7 @@ export default function VocabIndexPage() {
                 to={`/vocabulario/${b.id}`}
                 className="bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md hover:-translate-y-0.5 transition-all p-5 flex flex-col gap-1"
               >
-                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">{b.textbook}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">{getCanonicalTextbookName(b.textbook)}</span>
                 <span className="text-lg font-black text-slate-800">{getVocabUnitWord(b.textbook)} {b.chapter}</span>
                 <span className="text-xs text-slate-400 font-medium">{(b.words || []).length} palabras</span>
               </Link>
