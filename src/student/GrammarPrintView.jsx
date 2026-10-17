@@ -67,7 +67,7 @@ export const PrintedNote = ({ note, showEnglish, isLast }) => (
     <h1 className="text-2xl font-black text-slate-900 mb-1">{note.title}</h1>
     {note.category && <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6">{note.category}</p>}
     <div className="space-y-5 text-slate-800">
-      {(note.type === 'landing' ? [] : note.blocks || []).map((block, i) => (
+      {(note.blocks || []).map((block, i) => (
         <PrintBlock key={i} block={block} showEnglish={showEnglish} />
       ))}
       {note.type !== 'landing' && !Array.isArray(note.blocks) && note.htmlContent && (
