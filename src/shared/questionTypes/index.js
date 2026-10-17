@@ -63,6 +63,7 @@ import * as lineBankCloze from './lineBankCloze';
 import * as multipleChoice from './multipleChoice';
 import * as write from './write';
 import * as listen from './listen';
+import * as ordering from './ordering';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -73,6 +74,7 @@ export const QUESTION_TYPES = {
   [multipleChoice.TYPE_KEY]: multipleChoice,
   [write.TYPE_KEY]: write,
   [listen.TYPE_KEY]: listen,
+  [ordering.TYPE_KEY]: ordering,
 };
 
 export const TYPE_LABELS = Object.fromEntries(
@@ -94,6 +96,7 @@ export const getQuestionPreview = (q) => {
   if (q?.type === 'dropdown_cloze' || q?.type === 'word_bank_cloze') return stripBlankTokens(q.text);
   if (q?.type === 'line_bank_cloze') return (q.lines || []).map((l) => stripBlankTokens(l.text)).filter(Boolean).join(' / ');
   if (q?.type === 'matching') return (q.pairs || []).map((p) => p.left?.text).filter(Boolean).join(', ');
+  if (q?.type === 'ordering') return (q.items || []).map((it) => it.text).filter(Boolean).join(' → ');
   return '';
 };
 
