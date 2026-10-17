@@ -85,6 +85,8 @@ import VideosManager from './admin/managers/VideosManager';
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
 import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
+import GrammarNotesManager from './admin/managers/GrammarNotesManager';
+import GrammarNotesUploader from './admin/uploaders/GrammarNotesUploader';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
@@ -511,6 +513,22 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <GramaticaSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesUploader />
                 </AdminRoute>
               }
             />

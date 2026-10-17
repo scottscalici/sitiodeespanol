@@ -24,6 +24,7 @@ const CARD_KEYS = [
   { key: 'practicaCard', label: 'Práctica (Gustar, etc.)', texture: true },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
+  { key: 'notaGramatica', label: 'Nota de Gramática' },
   { key: 'practica', label: 'Practice Hub' },
   { key: 'learningPath', label: 'Ruta de Aprendizaje' },
   { key: 'recreo', label: 'El Recreo' },

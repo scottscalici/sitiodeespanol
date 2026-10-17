@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase'; 
 import { useCalendarMap } from '../../hooks/useCalendarMap'; 
@@ -138,8 +139,14 @@ const GramaticaSequencer = () => {
           <div>
             <h1 className="text-xl font-black text-slate-800 tracking-tight">Gramática Sequencer</h1>
           </div>
-          
+
           <div className="flex items-center gap-3">
+            <Link
+              to="/admin-grammar-notes"
+              className="bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 px-4 py-2 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              📝 Notas (Bloques)
+            </Link>
             <div className="flex bg-slate-100 p-1 rounded-lg">
               <button 
                 onClick={() => setActiveCourse('s2')}
