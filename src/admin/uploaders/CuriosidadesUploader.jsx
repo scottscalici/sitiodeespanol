@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase'; // Adjust relative path to your firebase.js if needed
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -354,7 +355,15 @@ const CuriosidadesUploader = () => {
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12">
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-        <h1 className="text-3xl font-black text-slate-800 mb-2">Curiosidades Bulk Uploader</h1>
+        <div className="flex justify-between items-start mb-2">
+          <h1 className="text-3xl font-black text-slate-800">Curiosidades Bulk Uploader</h1>
+          <Link
+            to="/admin-daily-plan-curiosidades"
+            className="shrink-0 text-slate-500 hover:text-slate-800 text-xs font-bold border border-slate-200 px-3 py-1.5 rounded-lg"
+          >
+            ← Manager
+          </Link>
+        </div>
         <p className="text-slate-500 font-medium mb-6">
           Pega tu arreglo JSON completo abajo. Si alguna curiosidad o pregunta hace referencia a una imagen local (p. ej.{' '}
           <code className="bg-slate-100 px-1 rounded">"img": "fallas.jpg"</code>), selecciona esos archivos abajo también — se
