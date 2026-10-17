@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
+import { PromptImage } from './clozeShared';
 
 // "Put these in the correct order" — items are stored pre-sorted into their
 // correct sequence; the student sees them shuffled and drags (or uses the
@@ -57,9 +58,6 @@ const ItemContent = ({ item }) => (
     {item.text && <span className="text-sm font-bold text-slate-200">{item.text}</span>}
   </>
 );
-
-const PromptImage = ({ src }) =>
-  src ? <img src={src} alt="" className="w-full max-h-64 object-contain bg-slate-950 rounded-xl mb-4" /> : null;
 
 // Shared drag/reorder list for both modes — dragging uses Pointer Events
 // (not HTML5 drag-and-drop, which has no touch support) so mouse, touch and

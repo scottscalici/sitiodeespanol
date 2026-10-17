@@ -167,7 +167,7 @@ const collectImageRefs = (item) => {
   if (item.img !== undefined) refs.push({ obj: item, key: 'img' });
   (item.questions || []).forEach((q) => {
     if (!q || typeof q !== 'object') return;
-    if (q.type === 'multiple_choice' || q.type === 'ordering') {
+    if (q.type === 'multiple_choice' || q.type === 'ordering' || q.type === 'write' || q.type === 'listen' || q.type === 'matching') {
       if (q.promptImage !== undefined) refs.push({ obj: q, key: 'promptImage' });
     }
     if (q.type === 'multiple_choice') {

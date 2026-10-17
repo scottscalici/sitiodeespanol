@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
-import { shuffle } from './clozeShared';
+import { shuffle, PromptImage } from './clozeShared';
 
 export const TYPE_KEY = 'multiple_choice';
 export const TYPE_LABEL = 'Opción Múltiple';
@@ -54,14 +54,6 @@ export const gradeState = (question, state) => [question.options[state?.selected
 // Dispatches on `mode` — see src/shared/questionTypes/index.js for the full
 // contract.
 export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
-
-// The prompt's own image (if any) is rendered here, inside the type's own
-// Renderer, rather than in the shared engine that renders `question.prompt`
-// text — CuriosidadQuizEngine and PracticeCardEngine both just hand the
-// question straight through, so keeping this self-contained means it works
-// in either consumer without either engine needing to know about it.
-const PromptImage = ({ src }) =>
-  src ? <img src={src} alt="" className="w-full max-h-64 object-contain bg-slate-950 rounded-xl mb-4" /> : null;
 
 const OptionContent = ({ text, image }) => (
   <>
