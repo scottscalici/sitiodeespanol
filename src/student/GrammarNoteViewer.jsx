@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { BLOCK_TYPES } from '../shared/noteBlocks';
+import RolodexStrip from './RolodexStrip';
 
 // Renders one note's `blocks` array via the shared block-type registry —
 // the `showEnglish` toggle and `existingIds` (for safe forward-reference
@@ -19,48 +20,18 @@ const BlockList = ({ blocks, showEnglish, existingIds }) => (
   </div>
 );
 
-// One row of a landing page's table of contents — expandable to preview the
-// subtopic's video(s) and a short text preview without leaving the page.
-// A subtopic listed but not yet built (forward reference, since notes are
-// built a couple of topics ahead) shows as "próximamente" instead of a dead
-// link — matching how the `link` block itself handles the same situation.
-const SubtopicRow = ({ entry, allPages }) => {
-  const [expanded, setExpanded] = useState(false);
-  const page = allPages.find((p) => p.id === entry.id);
-  if (!page) {
-    return (
-      <div className="flex items-center justify-between px-4 py-3 text-slate-400">
-        <span className="font-bold">{entry.label || entry.id}</span>
-        <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-full">Próximamente</span>
-      </div>
-    );
-  }
-  const videoBlocks = (page.blocks || []).filter((b) => b.type === 'media' && b.kind === 'video');
-  return (
-    <div>
-      <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 text-left">
-        <span className="font-black text-slate-800">{entry.label || page.title}</span>
-        <span className="flex items-center gap-2 shrink-0">
-          {videoBlocks.length > 0 && (
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">🎥 {videoBlocks.length}</span>
-          )}
-          <span className="text-slate-400 text-xs">{expanded ? '▲' : '▼'}</span>
-        </span>
-      </button>
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3">
-          {videoBlocks.map((b, i) => {
-            const MediaRenderer = BLOCK_TYPES.media.Renderer;
-            return <MediaRenderer key={i} block={b} />;
-          })}
-          <Link to={`/gramatica/${encodeURIComponent(page.id)}`} className="inline-block text-indigo-600 hover:text-indigo-800 underline font-bold text-sm">
-            Ver nota completa →
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-};
+// Resolves a landing page's `subtopics` list against the loaded pages for
+// RolodexStrip — a subtopic not yet built (forward reference, since notes
+// are built a couple of topics ahead) becomes an `exists: false` card
+// instead of a dead link, matching how the `link` block handles the same
+// situation.
+const subtopicsToCards = (subtopics, allPages) =>
+  (subtopics || []).map((entry) => {
+    const page = allPages.find((p) => p.id === entry.id);
+    if (!page) return { id: entry.id, title: entry.label || entry.id, exists: false, videoCount: 0 };
+    const videoCount = (page.blocks || []).filter((b) => b.type === 'media' && b.kind === 'video').length;
+    return { id: page.id, title: entry.label || page.title, exists: true, videoCount };
+  });
 
 export default function GrammarNoteViewer() {
   const { noteId } = useParams();
@@ -98,6 +69,11 @@ export default function GrammarNoteViewer() {
 
   const existingIds = useMemo(() => new Set(allPages.map((p) => p.id)), [allPages]);
   const accentColor = theme?.styles?.cardOverrides?.notaGramatica;
+  const resolvedId = noteId ? noteId.trim().toLowerCase().replace(/\s+/g, '_') : '';
+  const isLandingForPrint = noteData?.type === 'landing';
+  const topicPrintIds = isLandingForPrint
+    ? [resolvedId, ...(noteData.subtopics || []).map((s) => s.id).filter((id) => existingIds.has(id))]
+    : [];
 
   if (loading) {
     return (
@@ -131,6 +107,14 @@ export default function GrammarNoteViewer() {
             </Link>
           </div>
           <div className="flex items-center gap-2">
+            {noteData && (
+              <Link
+                to={`/gramatica/imprimir?ids=${encodeURIComponent(isLandingForPrint ? topicPrintIds.join(',') : resolvedId)}`}
+                className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+              >
+                🖨 {isLandingForPrint ? 'Imprimir Tema' : 'Imprimir'}
+              </Link>
+            )}
             {hasEnglishContent && (
               <button
                 onClick={() => setShowEnglish((v) => !v)}
@@ -167,11 +151,7 @@ export default function GrammarNoteViewer() {
                 </div>
               )}
               <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-3">Subtemas</h2>
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
-                {(noteData.subtopics || []).map((entry, i) => (
-                  <SubtopicRow key={i} entry={entry} allPages={allPages} />
-                ))}
-              </div>
+              <RolodexStrip cards={subtopicsToCards(noteData.subtopics, allPages)} />
             </div>
           ) : isBlockNote ? (
             <div>

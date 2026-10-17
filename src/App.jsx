@@ -27,6 +27,8 @@ import GrammarNoteViewer from './student/GrammarNoteViewer';
 import VocabPage from './student/VocabPage';
 import VocabIndexPage from './student/VocabIndexPage';
 import GrammarIndexPage from './student/GrammarIndexPage';
+import GrammarCategoryPage from './student/GrammarCategoryPage';
+import GrammarPrintView from './student/GrammarPrintView';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import ConexionesCulturalesPage from './student/ConexionesCulturalesPage';
@@ -163,7 +165,7 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {user?.isAnonymous && (
-          <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
+          <div className="print:hidden sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
             <div className="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
               <span className="font-black text-xs sm:text-sm uppercase tracking-wide">
                 👤 Sesión de Invitado — tu progreso no se guardará
@@ -206,6 +208,8 @@ function App() {
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/gramatica" element={<GrammarIndexPage />} />
+            <Route path="/gramatica/imprimir" element={<GrammarPrintView />} />
+            <Route path="/gramatica/categoria/:categoryName" element={<GrammarCategoryPage />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             <Route path="/vocabulario" element={<VocabIndexPage />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
