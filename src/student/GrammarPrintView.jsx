@@ -135,11 +135,12 @@ const PrintBlock = ({ block, showEnglish }) => {
       );
     case 'link':
       return <p className="text-sm text-slate-500">→ {block.label}{block.url ? `: ${block.url}` : ''}</p>;
-    // 'media' (video/slides) and 'question' (practice self-checks) are
-    // deliberately never printed — this view is strictly the notes content,
-    // not a worksheet or a pointer to online-only material.
+    // 'media' (video/slides) and 'question'/'drill' (practice self-checks)
+    // are deliberately never printed — this view is strictly the notes
+    // content, not a worksheet or a pointer to online-only material.
     case 'media':
     case 'question':
+    case 'drill':
       return null;
     default:
       return null;

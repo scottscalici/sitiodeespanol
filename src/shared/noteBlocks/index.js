@@ -23,6 +23,7 @@ import * as link from './link';
 import * as media from './media';
 import * as question from './question';
 import * as comparison from './comparison';
+import * as drill from './drill';
 
 export const BLOCK_TYPES = {
   [rule.TYPE_KEY]: rule,
@@ -32,6 +33,7 @@ export const BLOCK_TYPES = {
   [media.TYPE_KEY]: media,
   [question.TYPE_KEY]: question,
   [comparison.TYPE_KEY]: comparison,
+  [drill.TYPE_KEY]: drill,
 };
 
 export const BLOCK_LABELS = Object.fromEntries(Object.entries(BLOCK_TYPES).map(([key, mod]) => [key, mod.TYPE_LABEL]));

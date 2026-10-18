@@ -68,6 +68,21 @@ const validateBlock = (b, bNum, noteLabel) => {
       else errs.push(...validateQuestion(b.question, 1, tag));
       break;
     }
+    case 'drill': {
+      const colCount = Array.isArray(b.contextColumns) ? b.contextColumns.length : -1;
+      if (colCount < 0) errs.push(`${tag}: "contextColumns" debe ser un arreglo (puede estar vacío).`);
+      if (!Array.isArray(b.rows) || b.rows.length === 0) {
+        errs.push(`${tag}: "rows" debe ser un arreglo no vacío.`);
+      } else {
+        b.rows.forEach((r, i) => {
+          if (!isNonEmptyString(r?.answer)) errs.push(`${tag}, fila ${i + 1}: falta "answer".`);
+          if (colCount >= 0 && (!Array.isArray(r?.context) || r.context.length !== colCount)) {
+            errs.push(`${tag}, fila ${i + 1}: "context" debe tener ${colCount} elemento(s), uno por columna de "contextColumns".`);
+          }
+        });
+      }
+      break;
+    }
     default:
       errs.push(`${tag}: tipo de bloque desconocido "${b.type}".`);
   }
