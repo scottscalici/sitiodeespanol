@@ -9,15 +9,19 @@ import { getCachedCollection } from '../utils/firestoreCache';
 // GrammarNoteViewer; otherwise GrammarCategoryPage's plain Rolodex
 // fallback). Typing in the search box temporarily swaps the gallery for a
 // flat title-match list, so a known note is still one search away.
+// Plain solid colors, not gradients — a gradient card rendered invisible
+// (white-on-white) for at least one real browser, likely because Tailwind
+// v4's gradient CSS relies on newer oklab color-interpolation that doesn't
+// paint everywhere; a solid background-color has no such dependency.
 const CARD_COLORS = [
-  'from-indigo-500 to-indigo-700',
-  'from-emerald-500 to-emerald-700',
-  'from-amber-500 to-amber-700',
-  'from-rose-500 to-rose-700',
-  'from-sky-500 to-sky-700',
-  'from-violet-500 to-violet-700',
-  'from-teal-500 to-teal-700',
-  'from-orange-500 to-orange-700',
+  'bg-indigo-600',
+  'bg-emerald-600',
+  'bg-amber-600',
+  'bg-rose-600',
+  'bg-sky-600',
+  'bg-violet-600',
+  'bg-teal-600',
+  'bg-orange-600',
 ];
 
 export default function GrammarIndexPage() {
@@ -115,7 +119,7 @@ export default function GrammarIndexPage() {
               <Link
                 key={cat.name}
                 to={cat.landing ? `/gramatica/${encodeURIComponent(cat.landing.id)}` : `/gramatica/categoria/${encodeURIComponent(cat.name)}`}
-                className={`bg-gradient-to-br ${CARD_COLORS[i % CARD_COLORS.length]} rounded-2xl shadow-sm p-5 flex flex-col justify-between h-32 text-white hover:-translate-y-1 hover:shadow-lg transition-all`}
+                className={`${CARD_COLORS[i % CARD_COLORS.length]} rounded-2xl shadow-sm p-5 flex flex-col justify-between h-32 text-white hover:-translate-y-1 hover:shadow-lg transition-all`}
               >
                 <span className="font-black uppercase tracking-tight text-lg leading-tight">{cat.name}</span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">

@@ -135,37 +135,13 @@ const PrintBlock = ({ block, showEnglish }) => {
       );
     case 'link':
       return <p className="text-sm text-slate-500">→ {block.label}{block.url ? `: ${block.url}` : ''}</p>;
+    // 'media' (video/slides) and 'question' (practice self-checks) are
+    // deliberately never printed — this view is strictly the notes content,
+    // not a worksheet or a pointer to online-only material.
     case 'media':
-      return (
-        <p className="text-sm text-slate-500 border border-dashed border-slate-300 rounded-lg p-3">
-          {block.kind === 'video' ? '🎥' : '📎'} {block.caption || (block.kind === 'video' ? 'Video' : 'Presentación')} — disponible en línea: {block.url}
-        </p>
-      );
     case 'question':
-      return <PrintQuestion question={block.question} />;
+      return null;
     default:
       return null;
   }
-};
-
-// Printed self-check questions become a worksheet blank, never the
-// interactive on-screen Renderer (no state, no revealing the answer) —
-// multiple_choice gets its options listed to circle, everything else gets a
-// blank line for the student to fill in by hand.
-const PrintQuestion = ({ question }) => {
-  if (!question) return null;
-  return (
-    <div className="border border-slate-300 rounded-lg p-4 bg-slate-50 print:bg-white">
-      <p className="font-bold mb-2">{question.prompt}</p>
-      {question.type === 'multiple_choice' && Array.isArray(question.options) ? (
-        <ul className="space-y-1">
-          {question.options.map((opt, i) => (
-            <li key={i}>☐ {opt}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="border-b border-slate-400 h-6">&nbsp;</p>
-      )}
-    </div>
-  );
 };

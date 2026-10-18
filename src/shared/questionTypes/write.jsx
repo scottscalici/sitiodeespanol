@@ -69,7 +69,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
         placeholder="Escribe tu respuesta..."
         autoFocus
         className={`w-full border rounded-lg p-3 text-base ${
-          checked ? (isCorrect ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-rose-400 bg-rose-50 text-rose-800') : 'border-slate-300'
+          checked ? (isCorrect ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-rose-400 bg-rose-50 text-rose-800') : 'border-slate-300 bg-white text-slate-900'
         }`}
       />
       {checked && !isCorrect && !missedAccent && (
@@ -123,7 +123,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
             ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
             : isCorrect === false
             ? 'border-rose-400 bg-rose-50 text-rose-800'
-            : 'border-slate-300'
+            : 'border-slate-300 bg-white text-slate-900'
         }`}
       />
       {isCorrect === false && !result?.missedAccent && (

@@ -14,8 +14,8 @@ export const Renderer = ({ block }) => {
   const TypeRenderer = q && QUESTION_TYPES[q.type]?.Renderer;
   if (!TypeRenderer) return null;
   return (
-    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">🧠 Practica rápida</p>
+    <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1.5">🧠 Practica rápida</p>
       <TypeRenderer question={q} onItemFirstAttempt={() => {}} onAllCorrect={() => {}} />
     </div>
   );
