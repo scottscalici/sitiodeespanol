@@ -97,6 +97,14 @@ export const validateQuestion = (q, qNum, ownerLabel) => {
       }
       break;
     }
+    case 'hotspot': {
+      if (!isNonEmptyString(q.image)) errs.push(`${tag}: falta "image".`);
+      const t = q.target;
+      if (!t || typeof t !== 'object' || typeof t.x !== 'number' || typeof t.y !== 'number' || typeof t.radius !== 'number') {
+        errs.push(`${tag}: "target" debe ser {x, y, radius} (números, porcentajes 0-100) — estas coordenadas no se pueden adivinar desde una captura de pantalla; colócalas en el editor dentro de la app después de subir esta pregunta.`);
+      }
+      break;
+    }
     case 'line_bank_cloze': {
       if (!Array.isArray(q.lines) || q.lines.length < 1) {
         errs.push(`${tag}: "lines" debe ser un arreglo de al menos 1 línea {img, rawText}.`);

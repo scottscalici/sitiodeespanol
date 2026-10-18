@@ -64,6 +64,7 @@ import * as multipleChoice from './multipleChoice';
 import * as write from './write';
 import * as listen from './listen';
 import * as ordering from './ordering';
+import * as hotspot from './hotspot';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -75,6 +76,7 @@ export const QUESTION_TYPES = {
   [write.TYPE_KEY]: write,
   [listen.TYPE_KEY]: listen,
   [ordering.TYPE_KEY]: ordering,
+  [hotspot.TYPE_KEY]: hotspot,
 };
 
 export const TYPE_LABELS = Object.fromEntries(
