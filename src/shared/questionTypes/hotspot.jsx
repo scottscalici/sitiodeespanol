@@ -174,11 +174,29 @@ const MIN_BOX_SIZE = 3; // percent — guards against a near-zero-size box from 
 export const Editor = ({ question: q, onChange }) => {
   const target = q.target || { shape: 'circle', x: 50, y: 50, radius: 8, width: 20, height: 15 };
   const [drag, setDrag] = useState(null); // { start: {x,y}, current: {x,y} } while drawing a box
+  // A freshly-uploaded board photo can still be decoding when the editor
+  // mounts; its rendered box grows mid-drag as the real dimensions settle,
+  // which desyncs drag-start's percentage (taken against the stale box)
+  // from drag-end's (against the final one) and corrupts the saved target.
+  // Gate interaction on the image actually being loaded to rule that out.
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const imgRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setImgLoaded(false);
+  }, [q.image]);
+
+  const handleImgLoad = () => setImgLoaded(true);
+  // onLoad never fires for an already-cached image mounted complete.
+  const handleImgRef = (el) => {
+    imgRef.current = el;
+    if (el?.complete) setImgLoaded(true);
+  };
 
   const setShape = (shape) => onChange({ target: { ...target, shape } });
 
   const handleMouseDown = (e) => {
-    if (target.shape !== 'box') return;
+    if (target.shape !== 'box' || !imgLoaded) return;
     const pt = posFromEvent(e, e.currentTarget);
     setDrag({ start: pt, current: pt });
   };
@@ -207,6 +225,7 @@ export const Editor = ({ question: q, onChange }) => {
   };
 
   const handleCircleClick = (e) => {
+    if (!imgLoaded) return;
     const pt = posFromEvent(e, e.currentTarget);
     onChange({ target: { ...target, x: pt.x, y: pt.y } });
   };
@@ -269,13 +288,20 @@ export const Editor = ({ question: q, onChange }) => {
             onMouseUp={target.shape === 'box' ? handleMouseUp : undefined}
           >
             <img
+              ref={handleImgRef}
               src={q.image}
               alt=""
+              onLoad={handleImgLoad}
               onClick={target.shape === 'box' ? undefined : handleCircleClick}
               draggable={false}
               className="w-full rounded-lg border border-slate-300 cursor-crosshair"
             />
-            {!drag && <TargetShape target={target} className="border-indigo-600 bg-indigo-400/30" />}
+            {!imgLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 rounded-lg text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                Cargando imagen…
+              </div>
+            )}
+            {imgLoaded && !drag && <TargetShape target={target} className="border-indigo-600 bg-indigo-400/30" />}
             {dragPreview && (
               <div
                 className="absolute border-2 border-indigo-600 bg-indigo-400/30 pointer-events-none"
