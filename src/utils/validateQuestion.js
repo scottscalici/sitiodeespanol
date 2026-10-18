@@ -100,8 +100,12 @@ export const validateQuestion = (q, qNum, ownerLabel) => {
     case 'hotspot': {
       if (!isNonEmptyString(q.image)) errs.push(`${tag}: falta "image".`);
       const t = q.target;
-      if (!t || typeof t !== 'object' || typeof t.x !== 'number' || typeof t.y !== 'number' || typeof t.radius !== 'number') {
-        errs.push(`${tag}: "target" debe ser {x, y, radius} (números, porcentajes 0-100) — estas coordenadas no se pueden adivinar desde una captura de pantalla; colócalas en el editor dentro de la app después de subir esta pregunta.`);
+      const hasCenter = t && typeof t === 'object' && typeof t.x === 'number' && typeof t.y === 'number';
+      const isBox = t?.shape === 'box';
+      if (!hasCenter || (isBox ? typeof t.width !== 'number' || typeof t.height !== 'number' : typeof t.radius !== 'number')) {
+        errs.push(
+          `${tag}: "target" debe ser {x, y, radius} (círculo) o {shape: "box", x, y, width, height} (caja) — porcentajes 0-100. Estas coordenadas no se pueden adivinar desde una captura de pantalla; colócalas en el editor dentro de la app después de subir esta pregunta.`
+        );
       }
       break;
     }
