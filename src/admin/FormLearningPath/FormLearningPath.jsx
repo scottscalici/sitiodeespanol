@@ -128,6 +128,15 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setShowPodGenerator(false);
   };
 
+  // Pasted pods go through the same sanitizer as a loaded path, so a
+  // hand-written/generated JSON doesn't need every optional field spelled
+  // out (badgeAward, gateConfig, etc. default the same way loading does).
+  const handleImportPods = (newPods) => {
+    const sanitized = sanitizePods(newPods);
+    setPods(hasOnlyPlaceholderPod ? sanitized : [...pods, ...sanitized]);
+    setActiveSegmentIdRaw(sanitized[0]?.segments[0]?.id || activeSegmentId);
+  };
+
   // Badge catalog (config/gamification.badges) — pods reference these by id
   // via pod.badgeAward to say "finishing this pod awards X badge/tier".
   // Not applicable to Practice Hub circles (ungated, no badge triggers).
@@ -637,6 +646,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
         isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
         onOpenPodGenerator={() => setShowPodGenerator(true)}
+        onImportPods={handleImportPods}
       />
 
       {showPodGenerator && (
