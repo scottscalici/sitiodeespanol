@@ -14,6 +14,47 @@
 // be run on them before saving.
 export const isNonEmptyString = (v) => typeof v === 'string' && v.trim() !== '';
 
+// Every place a local image filename can appear inside ONE question object,
+// across every type in the shared registry — shared by both bulk importers
+// (Curiosidades' own `questions` array, and Grammar Notes' `question` blocks)
+// so a new type's image field only needs to be taught here once instead of
+// in each importer separately. Returns {obj, key} pairs rather than plain
+// values so the same list can both VALIDATE (read obj[key]) and SUBSTITUTE
+// (write obj[key] = url) once uploads finish, without walking the structure
+// twice with different logic.
+export const collectQuestionImageRefs = (q) => {
+  const refs = [];
+  if (!q || typeof q !== 'object') return refs;
+  if (q.type === 'multiple_choice' || q.type === 'ordering' || q.type === 'write' || q.type === 'listen' || q.type === 'matching') {
+    if (q.promptImage !== undefined) refs.push({ obj: q, key: 'promptImage' });
+  }
+  if (q.type === 'multiple_choice') {
+    (q.optionImages || []).forEach((_, i) => refs.push({ obj: q.optionImages, key: i }));
+  } else if (q.type === 'ordering') {
+    (q.items || []).forEach((it) => {
+      if (it && it.image !== undefined) refs.push({ obj: it, key: 'image' });
+    });
+  } else if (q.type === 'matching') {
+    (q.pairs || []).forEach((p) => {
+      if (p?.left && p.left.image !== undefined) refs.push({ obj: p.left, key: 'image' });
+      if (p?.right && p.right.image !== undefined) refs.push({ obj: p.right, key: 'image' });
+    });
+  } else if (q.type === 'image_select') {
+    (q.options || []).forEach((o) => {
+      if (o && o.img !== undefined) refs.push({ obj: o, key: 'img' });
+    });
+  } else if (q.type === 'dropdown_cloze' || q.type === 'word_bank_cloze') {
+    if (q.img !== undefined) refs.push({ obj: q, key: 'img' });
+  } else if (q.type === 'line_bank_cloze') {
+    (q.lines || []).forEach((l) => {
+      if (l && l.img !== undefined) refs.push({ obj: l, key: 'img' });
+    });
+  } else if (q.type === 'hotspot') {
+    if (q.image !== undefined) refs.push({ obj: q, key: 'image' });
+  }
+  return refs;
+};
+
 export const validateQuestion = (q, qNum, ownerLabel) => {
   const tag = `${ownerLabel}, pregunta ${qNum}`;
   const errs = [];

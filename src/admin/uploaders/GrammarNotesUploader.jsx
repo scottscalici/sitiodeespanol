@@ -5,7 +5,7 @@ import { db } from '../../firebase';
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import { uploadAdminImage } from '../../utils/imageUpload';
 import { finalizeQuestion } from '../../shared/questionTypes';
-import { isNonEmptyString, validateQuestion } from '../../utils/validateQuestion';
+import { isNonEmptyString, validateQuestion, collectQuestionImageRefs } from '../../utils/validateQuestion';
 
 const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
 
@@ -119,14 +119,18 @@ const validateNote = (item, idx) => {
   return errs;
 };
 
-// Only `rule.image` supports a local-filename reference today (media.url is
-// always a direct hosted link — video/YouTube or slides/raw-file — never
+// `rule.image` is the only block-level local-filename reference (media.url
+// is always a direct hosted link — video/YouTube or slides/raw-file — never
 // something this importer uploads itself, since there's no generic
-// non-image file-upload utility in this app).
+// non-image file-upload utility in this app). A `question` block's nested
+// question can have its own image fields (promptImage, a hotspot board,
+// etc.) — collected via the same shared helper the Curiosidades importer
+// uses, so a new question type's image field only needs to be taught once.
 const collectImageRefs = (item) => {
   const refs = [];
   (item.blocks || []).forEach((b) => {
     if (b?.type === 'rule' && b.image !== undefined) refs.push({ obj: b, key: 'image' });
+    if (b?.type === 'question' && b.question) refs.push(...collectQuestionImageRefs(b.question));
   });
   return refs;
 };

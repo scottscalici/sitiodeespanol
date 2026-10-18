@@ -5,7 +5,7 @@ import { db } from '../../firebase'; // Adjust relative path to your firebase.js
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import { uploadAdminImage } from '../../utils/imageUpload';
 import { finalizeQuestion } from '../../shared/questionTypes';
-import { isNonEmptyString, validateQuestion } from '../../utils/validateQuestion';
+import { isNonEmptyString, validateQuestion, collectQuestionImageRefs } from '../../utils/validateQuestion';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -60,34 +60,7 @@ const validateItem = (item, idx) => {
 const collectImageRefs = (item) => {
   const refs = [];
   if (item.img !== undefined) refs.push({ obj: item, key: 'img' });
-  (item.questions || []).forEach((q) => {
-    if (!q || typeof q !== 'object') return;
-    if (q.type === 'multiple_choice' || q.type === 'ordering' || q.type === 'write' || q.type === 'listen' || q.type === 'matching') {
-      if (q.promptImage !== undefined) refs.push({ obj: q, key: 'promptImage' });
-    }
-    if (q.type === 'multiple_choice') {
-      (q.optionImages || []).forEach((_, i) => refs.push({ obj: q.optionImages, key: i }));
-    } else if (q.type === 'ordering') {
-      (q.items || []).forEach((it) => {
-        if (it && it.image !== undefined) refs.push({ obj: it, key: 'image' });
-      });
-    } else if (q.type === 'matching') {
-      (q.pairs || []).forEach((p) => {
-        if (p?.left && p.left.image !== undefined) refs.push({ obj: p.left, key: 'image' });
-        if (p?.right && p.right.image !== undefined) refs.push({ obj: p.right, key: 'image' });
-      });
-    } else if (q.type === 'image_select') {
-      (q.options || []).forEach((o) => {
-        if (o && o.img !== undefined) refs.push({ obj: o, key: 'img' });
-      });
-    } else if (q.type === 'dropdown_cloze' || q.type === 'word_bank_cloze') {
-      if (q.img !== undefined) refs.push({ obj: q, key: 'img' });
-    } else if (q.type === 'line_bank_cloze') {
-      (q.lines || []).forEach((l) => {
-        if (l && l.img !== undefined) refs.push({ obj: l, key: 'img' });
-      });
-    }
-  });
+  (item.questions || []).forEach((q) => refs.push(...collectQuestionImageRefs(q)));
   return refs;
 };
 
