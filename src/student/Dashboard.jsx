@@ -784,8 +784,8 @@ const Dashboard = () => {
               {getAssignedDominioTasks(safeTareas, liveDia).some(
                 (task) => isPastEffectiveDueDate(task, fechaByDia, userData?.progress?.[task.path_id]?.teacherOverride)
               ) && (
-                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">📦 Rutas Archivadas</h3>
+                <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">📦 Rutas Archivadas</h3>
                   <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} fechaByDia={fechaByDia} variant="archived" />
                 </div>
               )}
