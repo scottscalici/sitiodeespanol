@@ -5,7 +5,7 @@ import PathBuilder from './PathBuilder';
 import VocabPodGeneratorModal from './VocabPodGeneratorModal';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
-import { QUESTION_TYPE_DEFAULTS, PRACTICE_BOSS_BATTLE_MIX, sumMix } from '../../utils/questionTypes';
+import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
@@ -66,17 +66,19 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const [availableGrammarTags, setAvailableGrammarTags] = useState([]);
 
   // --- POD BUILDER STATE — one flat pod list for the whole path ---
-  // A new Practice Hub segment defaults to a "boss battle" — 120s speed
-  // round, 15 questions. A new graded Learning Path segment keeps the
-  // original untimed default — 60s (unused unless later switched to a
-  // speed round), 10 questions. Applies to both vocab and verb paths.
+  // A new segment defaults untimed (10 questions, the standard mix) for
+  // BOTH Learning Path and Practice Hub — "boss battle" speed rounds are
+  // now something a teacher opts into explicitly per segment (the
+  // isSpeedRound checkbox in PathBuilder.jsx), never a default. Applies to
+  // both vocab and verb paths. The vocab generator's own "Batalla Final"
+  // pod (podGenerator.js) is unaffected — it sets isSpeedRound itself.
   const makeDefaultSegment = () => {
-    const mix = isPracticeHub ? PRACTICE_BOSS_BATTLE_MIX : QUESTION_TYPE_DEFAULTS;
+    const mix = QUESTION_TYPE_DEFAULTS;
     return {
       id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       total_questions: sumMix(mix),
       questionMix: { ...mix },
-      isSpeedRound: isPracticeHub,
+      isSpeedRound: false,
       timeLimit: isPracticeHub ? 120 : 60,
       targetTense: 'ALL',
       introduced_concepts: [],
