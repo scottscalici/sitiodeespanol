@@ -271,14 +271,25 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const uniqueMasterPool = Array.from(masterPoolMap.values());
       setMasterPool(uniqueMasterPool);
 
-      // Recuperación gate mode: instead of the normal per-question random
-      // draw (with replacement — fine for endless practice, but doesn't
-      // guarantee every concept gets asked), pre-build a shuffled queue that
-      // covers every concept at least once, then pads with extra random
-      // draws if totalQs asks for more than the concept count. The caller is
-      // responsible for bumping totalQs up to at least the concept count so
-      // "full coverage" is a real guarantee, not just a best effort.
-      const fullCoverage = !!segment.fullCoverage;
+      // Full-coverage mode: instead of the normal per-question random draw
+      // (with replacement — fine for endless mixed practice, but can ask
+      // about the same word twice while skipping another entirely), pre-
+      // build a shuffled queue that covers every concept at least once,
+      // then pads with extra random draws if totalQs asks for more than
+      // the concept count. The caller is responsible for setting totalQs
+      // to the concept count (e.g. 26 words → 26 questions) so "full
+      // coverage" means exactly one pass, no repeats.
+      //
+      // On by default for any segment whose assigned concepts are ALL
+      // vocab (no verb objects mixed in) — "show every word once" is a
+      // strictly better default for focused vocab practice than the old
+      // with-replacement draw, with no real downside, so it's not gated
+      // behind an explicit flag the way Recuperación's segment.fullCoverage
+      // forces it on for a mixed vocab+verb gate round. A speed round
+      // keeps today's with-replacement rapid-fire drilling — "every word
+      // once" doesn't fit a boss battle's pacing the same way.
+      const isPureVocabSegment = validVocab.length > 0 && validVerbs.length === 0;
+      const fullCoverage = !!segment.fullCoverage || (isPureVocabSegment && !isSpeedRound);
       let conceptQueue = [];
       if (fullCoverage) {
         const allTargets = shuffle([...validVocab, ...validVerbs]);
