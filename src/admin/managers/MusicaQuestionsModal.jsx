@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion } from '../../shared/questionTypes';
+import { validateQuestion } from '../../utils/validateQuestion';
 
 // Reopening an already-saved song only has each question's final, persisted
 // shape — never the raw, freely-typed text some editors actually edit (e.g.
@@ -10,13 +11,50 @@ const reconstructEditableFields = (rawQuestions) => (rawQuestions || []).map(rec
 
 // Trimmed version of CuriosidadQuestionsModal for Música's "Preguntas de
 // Comprensión" — same question-list/type-dispatch/move/duplicate/remove
-// mechanics, without Jeopardy mode, grading fields, or bulk-import, since
-// these questions are ungraded practice attached to a song, not a scored
-// curiosidad or practice card.
+// mechanics, without Jeopardy mode or the per-item grading fields (gradeWeight,
+// excused), since any score here is completion-based ranking points awarded
+// by MusicaEngine.jsx, never a gradebook percentage.
 const MusicaQuestionsModal = ({ cancion, onClose, onSave }) => {
   const [questions, setQuestions] = useState(() => reconstructEditableFields(cancion.questions));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Bulk-paste importer — accepts a JSON array of question objects (or
+  // { questions: [...] }) in the same raw/editable shape the curiosidades-
+  // importer skill already produces, validated with the same shared
+  // validateQuestion() every other bulk importer uses. Appended straight
+  // into local `questions` state, unfinalized — they go through the same
+  // finalizeQuestion() pass as every manually-added question does on
+  // "Guardar Preguntas", so no extra step is needed here. Images must
+  // already be full URLs — unlike CuriosidadesUploader, this lightweight
+  // in-modal importer has no file-picker/upload step of its own.
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importStatus, setImportStatus] = useState('');
+
+  const handleImport = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(importText);
+    } catch (e) {
+      setImportStatus(`❌ JSON inválido: ${e.message}`);
+      return;
+    }
+    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.questions) ? parsed.questions : null;
+    if (!arr) {
+      setImportStatus('❌ Se espera un arreglo de preguntas, o { "questions": [...] }.');
+      return;
+    }
+    const errors = arr.flatMap((q, i) => validateQuestion(q, i + 1, cancion.titulo || 'Canción'));
+    if (errors.length > 0) {
+      setImportStatus(`❌ ${errors.length} error(es) — nada se importó:\n${errors.join('\n')}`);
+      return;
+    }
+    setQuestions((prev) => [...prev, ...arr]);
+    setImportText('');
+    setImportOpen(false);
+    setImportStatus(`✅ Se importaron ${arr.length} pregunta(s).`);
+  };
 
   const updateQuestion = (qIdx, patch) => {
     setQuestions((prev) => prev.map((q, i) => (i === qIdx ? { ...q, ...patch } : q)));
@@ -151,6 +189,48 @@ const MusicaQuestionsModal = ({ cancion, onClose, onSave }) => {
                 + Pregunta de {mod.TYPE_LABEL}
               </button>
             ))}
+          </div>
+
+          <div className="border-t border-slate-200 pt-4">
+            {!importOpen ? (
+              <button
+                onClick={() => setImportOpen(true)}
+                className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-800"
+              >
+                📋 Importar Preguntas (JSON)
+              </button>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Pega un arreglo JSON de preguntas (p. ej. del skill de curiosidades)
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mb-2">
+                  [{'{'}"type":"word_bank_cloze","prompt":"...","rawText":"...{'{'}{'{'}respuesta{'}'}{'}'}...","distractorsText":"..."{'}'}, ...] — si una pregunta lleva imagen, usa una URL completa (este importador no sube archivos).
+                </p>
+                <textarea
+                  value={importText}
+                  onChange={(e) => { setImportText(e.target.value); setImportStatus(''); }}
+                  rows={6}
+                  placeholder='[{"type":"word_bank_cloze","prompt":"¿Qué metáfora usa el artista?","rawText":"Usa {{el vuelo}} para describir..."}]'
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                />
+                <div className="flex items-center gap-3 mt-2">
+                  <button
+                    onClick={handleImport}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+                  >
+                    Importar
+                  </button>
+                  <button
+                    onClick={() => { setImportOpen(false); setImportText(''); setImportStatus(''); }}
+                    className="text-xs font-bold text-slate-500 uppercase"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+            {importStatus && <p className="text-xs text-slate-600 font-bold mt-2 whitespace-pre-wrap">{importStatus}</p>}
           </div>
         </div>
 
