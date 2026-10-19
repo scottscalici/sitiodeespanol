@@ -2,6 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Required, not leftover: src/admin/MasterDashboard/components/FormTemas.jsx
+         lets a teacher type ANY Tailwind class string (including arbitrary
+         hex colors) into the seasonal theme's header gradient field — no
+         finite build-time safelist (see src/index.css) can cover every
+         value an admin might type. This CDN build's runtime scanner is
+         what actually covers that free-text case; removing it (as an
+         earlier pass here did) breaks any theme whose header class isn't
+         already in the static safelist. -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
