@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { collection, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache, repairSplitBucketFields } from '../../utils/firestoreCache';
@@ -329,6 +330,12 @@ const CuriosidadesManager = () => {
             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Gestor de base de datos</p>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              to="/admin-daily-plan-curiosidadesupload"
+              className="bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              📤 Subir JSON
+            </Link>
             <button
               onClick={handleAddCuriosidad}
               className="bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"

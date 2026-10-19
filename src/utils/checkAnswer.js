@@ -83,8 +83,11 @@ export const checkAnswerLeniently = (userStr, correctStr, isVerb = false) => {
   const normUserStrict = normalize(userStr, true);
   const normCorrectStrict = normalize(correctStr, true);
 
-  if (isVerb && normUserLenient === normCorrectLenient && normUserStrict !== normCorrectStrict) {
-    return { correct: false, missedArticle: false, missedAccent: true };
+  // Reported regardless of `isVerb` so a caller can flag "close, but check
+  // your accents" even while staying lenient — `isVerb` only decides
+  // whether this also flips `correct` to false.
+  if (normUserLenient === normCorrectLenient && normUserStrict !== normCorrectStrict) {
+    return { correct: !isVerb, missedArticle: false, missedAccent: true };
   }
 
   const validVariants = generateAcceptedVariants(correctStr);

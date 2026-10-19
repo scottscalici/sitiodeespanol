@@ -4,21 +4,31 @@
 // without any extra admin action.
 
 // --- SMART SUBJECT PICKER (70/30 Singular/Plural, Vosotros Controlled) ---
-export const getRandomSubject = (targetPref, includeVosotros = false) => {
-  if (targetPref !== 'any') return targetPref;
+// `availableSubjects` is whichever persons this specific verb+tense actually
+// has a saved conjugation for (VerbEditor leaves a subject's cell out
+// entirely when it doesn't apply — e.g. "tú" for the impersonal "haber" in
+// the preterite, which is only ever "hubo"). Picking blind from a fixed
+// 6-person roster meant a verb missing a person could still get asked about
+// it, with no real answer to show. Returns null when there's nothing valid
+// to ask (an explicit subject with no data, or a verb with no data at all
+// for this tense) so the caller can skip that draw instead of faking one.
+export const getRandomSubject = (targetPref, availableSubjects, includeVosotros = false) => {
+  if (targetPref !== 'any') return availableSubjects.includes(targetPref) ? targetPref : null;
 
-  const singulars = ['yo', 'tú', 'él_ella_ud'];
-  const plurals = includeVosotros
+  const singulars = ['yo', 'tú', 'él_ella_ud'].filter((s) => availableSubjects.includes(s));
+  const plurals = (includeVosotros
     ? ['nosotros', 'vosotros', 'ellos_ellas_uds']
-    : ['nosotros', 'ellos_ellas_uds'];
+    : ['nosotros', 'ellos_ellas_uds']
+  ).filter((s) => availableSubjects.includes(s));
 
-  // 70% chance for singular, 30% for plural
-  const isSingular = Math.random() < 0.7;
-  if (isSingular) {
-    return singulars[Math.floor(Math.random() * singulars.length)];
-  } else {
-    return plurals[Math.floor(Math.random() * plurals.length)];
-  }
+  // 70% chance for singular, 30% for plural — falling back to whichever
+  // category actually has data if the preferred one doesn't (e.g. a verb
+  // that's only ever conjugated in the singular).
+  const preferSingular = Math.random() < 0.7;
+  const primary = preferSingular ? singulars : plurals;
+  const secondary = preferSingular ? plurals : singulars;
+  const chosen = primary.length > 0 ? primary : secondary;
+  return chosen.length > 0 ? chosen[Math.floor(Math.random() * chosen.length)] : null;
 };
 
 // English 3rd-person-singular present tense conjugation (he/she — never
@@ -91,12 +101,17 @@ export const generateVerbQuestions = (configBlocks, masterVerbsMap, { includeVos
       const randomVerb = pool[Math.floor(Math.random() * pool.length)];
       const chosenTense = block.tense;
 
-      const rawSubject = getRandomSubject(block.targetSubject, includeVosotros);
-
       const tenseMap = randomVerb.tenses?.[chosenTense] || {};
-      const subjectData = tenseMap[rawSubject] || {};
+      const availableSubjects = Object.keys(tenseMap);
+      const rawSubject = getRandomSubject(block.targetSubject, availableSubjects, includeVosotros);
 
-      const formAnswer = subjectData.target || '???';
+      // No saved conjugation for this verb+tense+subject (either this draw
+      // landed on a person that doesn't apply, or the verb has nothing at
+      // all for this tense) — skip rather than show an unanswerable "???".
+      if (!rawSubject) continue;
+
+      const subjectData = tenseMap[rawSubject];
+      const formAnswer = subjectData.target;
       const rawEnglish = subjectData.english || randomVerb.translations?.infinitivo?.english || '';
 
       const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(rawSubject, rawEnglish, chosenTense);

@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { TIME_BLOCKS, DEFAULT_DURATIONS, computeBlockTimes } from '../../utils/lessonPlanConfig';
+import { TYPE_LABELS, getQuestionPreview } from '../../shared/questionTypes';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
@@ -110,11 +111,23 @@ export default function LessonPlanPage() {
       ),
     curiosidad:
       planData.curiosidad.length === 0 ? null : (
-        <ul className="list-disc pl-5 space-y-1">
+        <div className="space-y-2">
           {planData.curiosidad.map((c) => (
-            <li key={c.id}>{c.title}{c.teacher_notes ? ` — ${c.teacher_notes}` : ''}</li>
+            <div key={c.id}>
+              <p>{c.title}{c.teacher_notes ? ` — ${c.teacher_notes}` : ''}</p>
+              {(c.questions || []).length > 0 && (
+                <ol className="list-decimal pl-6 space-y-0.5 text-sm font-sans text-gray-700 mt-1">
+                  {c.questions.map((q, idx) => (
+                    <li key={idx}>
+                      <span className="text-gray-400">[{TYPE_LABELS[q.type] || q.type}]</span>{' '}
+                      {getQuestionPreview(q) || '(sin texto)'}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
           ))}
-        </ul>
+        </div>
       ),
     actividades:
       (() => {
@@ -190,6 +203,9 @@ export default function LessonPlanPage() {
         </button>
         <Link to={`/admin-lesson-plan-formal/${course}/${selectedDay}`} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest text-center">
           🏛️ Plan Formal
+        </Link>
+        <Link to="/admin-lesson-plan-overview" className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest text-center">
+          📅 Resumen Semanal
         </Link>
         {notesStatus && <p className="text-[10px] font-bold text-slate-600 w-full">{notesStatus}</p>}
       </div>

@@ -188,6 +188,7 @@ const DailyPlanHub = () => {
               <Link to="/admin-question-pool" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🧠 Reserva de Preguntas</Link>
               <Link to="/admin-arcade-tiles" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🕹️ Imágenes de El Recreo</Link>
               <Link to="/admin-media-migration" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📤 Migración de Imágenes</Link>
+              <Link to="/admin-secret-portal-master?tipo=temas" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎨 Temas</Link>
             </div>
           </div>
 
@@ -242,19 +243,19 @@ const DailyPlanHub = () => {
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-rose-400 flex items-center gap-2">🔥 Destacado Diario</h2>
-                <Link to="/admin-daily-plan-destacado" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
+                <Link to="/admin-daily-plan-destacado" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
               </div>
               <div className="space-y-4">
                 {activeDestacados.length === 0 ? (
                   <p className="text-neutral-500 text-sm italic">Sin Destacado asignado.</p>
                 ) : (
                   activeDestacados.map(dest => (
-                    <div key={dest.id} className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
+                    <div key={dest.id} className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 group/item">
                       <span className="text-[10px] font-black uppercase text-rose-500 bg-rose-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-2">
                         {dest.type || 'Destacado'}
                       </span>
                       <h3 className="font-bold text-white text-lg">{dest.header}</h3>
-                      <p className="text-sm text-neutral-400 mt-1">{dest.location}</p>
+                      <p className="text-sm text-neutral-400 mt-1 opacity-0 group-hover/item:opacity-100 transition-opacity">{dest.location}</p>
                     </div>
                   ))
                 )}
@@ -267,7 +268,7 @@ const DailyPlanHub = () => {
                   <h2 className="font-black text-lg text-pink-400 flex items-center gap-2">📸 Tarjetas de Imagen</h2>
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeImageCards.length}</span>
                 </div>
-                <Link to="/admin-image-cards" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
+                <Link to="/admin-image-cards" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
               </div>
               <div className="space-y-3">
                 {activeImageCards.length === 0 ? (
@@ -296,7 +297,7 @@ const DailyPlanHub = () => {
                     {activeCalentamientosVerbs.length + activeCalentamientosVocab.length}
                   </span>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <Link to="/admin-secret-portal-calentamiento" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Verbos</Link>
                   <Link to="/admin-secret-portal-verb-editor" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📖 Editor de Verbos</Link>
                   <Link to="/admin-secret-portal-vocabvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Vocab</Link>
@@ -341,7 +342,7 @@ const DailyPlanHub = () => {
                   <h2 className="font-black text-lg text-violet-400 flex items-center gap-2">✏️ Práctica</h2>
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activePracticeCards.length}</span>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <Link to="/admin-secret-portal-practice-cards" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Editar</Link>
                 </div>
               </div>
@@ -370,24 +371,24 @@ const DailyPlanHub = () => {
                   <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">📚 Gramática & Lección</h2>
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeGramatica.length}</span>
                 </div>
-                <Link to="/admin-daily-plan-gramatica" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
+                <Link to="/admin-daily-plan-gramatica" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
               </div>
               <div className="space-y-4">
                 {activeGramatica.length === 0 ? (
                   <p className="text-neutral-500 text-sm italic">Sin lección de gramática asignada.</p>
                 ) : (
                   activeGramatica.map((gram, idx) => (
-                    <div key={idx} className="bg-neutral-950 p-4 rounded-xl border border-emerald-900/30 flex flex-col gap-3">
+                    <div key={idx} className="bg-neutral-950 p-4 rounded-xl border border-emerald-900/30 flex flex-col gap-3 group/item">
                       {gram.introText && (
                         <div>
                           <span className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Introducir</span>
-                          <p className="text-sm text-white leading-relaxed">{gram.introText}</p>
+                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{gram.introText}</p>
                         </div>
                       )}
                       {gram.repasoText && (
                         <div>
                           <span className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Repasar</span>
-                          <p className="text-sm text-white leading-relaxed">{gram.repasoText}</p>
+                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{gram.repasoText}</p>
                         </div>
                       )}
                       {(gram.enlaces || gram.recursos) && (
@@ -405,7 +406,7 @@ const DailyPlanHub = () => {
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-purple-400 flex items-center gap-2">🎧 Música & Videos</h2>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <Link to="/admin-daily-plan-musica" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎵 Música</Link>
                   <Link to="/admin-daily-plan-videos" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎬 Videos</Link>
                 </div>
@@ -445,7 +446,7 @@ const DailyPlanHub = () => {
                     {activeConversaciones.length}
                   </span>
                 </div>
-                <Link to="/admin-daily-plan-conversaciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
+                <Link to="/admin-daily-plan-conversaciones" className="bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
               </div>
               <div className="space-y-3">
                 {activeConversaciones.length === 0 ? (
@@ -472,7 +473,7 @@ const DailyPlanHub = () => {
             <div className="bg-amber-950/20 border border-amber-900/30 rounded-2xl p-5 shadow-sm group">
               <div className="border-b border-amber-900/50 pb-3 mb-4 flex justify-between items-center">
                 <h2 className="font-black text-lg text-amber-400 flex items-center gap-2">🎯 Evaluaciones</h2>
-                <Link to="/admin-daily-plan-evals" className="opacity-0 group-hover:opacity-100 transition-opacity bg-amber-900/40 hover:bg-amber-900/80 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-700/50">⚙️ Sequencer</Link>
+                <Link to="/admin-daily-plan-evals" className="bg-amber-900/40 hover:bg-amber-900/80 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-700/50">⚙️ Sequencer</Link>
               </div>
               <div className="space-y-3">
                 {activeEvaluaciones.length === 0 ? (
@@ -498,7 +499,7 @@ const DailyPlanHub = () => {
                   </span>
                 </div>
                 {/* Adjust this Link path to match your App.jsx routing for the Sequencer! */}
-                <Link to="/admin-vocab-sequencer" className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-700/50">⚙️ Sequencer</Link>
+                <Link to="/admin-vocab-sequencer" className="bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-700/50">⚙️ Sequencer</Link>
               </div>
               <div className="space-y-3">
                 {activeVocabBundles.length === 0 ? (
@@ -520,21 +521,21 @@ const DailyPlanHub = () => {
                   <h2 className="font-black text-lg text-yellow-400 flex items-center gap-2">💡 Curiosidades</h2>
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeCuriosidades.length}</span>
                 </div>
-                <Link to="/admin-daily-plan-curiosidades" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Manager</Link>
+                <Link to="/admin-daily-plan-curiosidades" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Manager</Link>
               </div>
               <div className="space-y-4">
                 {activeCuriosidades.length === 0 ? (
                   <p className="text-neutral-500 text-xs italic">No hay curiosidades para este día.</p>
                 ) : (
                   activeCuriosidades.map(cur => (
-                    <div key={cur.id} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex gap-3">
+                    <div key={cur.id} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex gap-3 group/item">
                       <div className="w-16 h-16 bg-neutral-900 rounded-lg overflow-hidden shrink-0">
                         {cur.img ? <img src={cur.img} alt={cur.title} className="w-full h-full object-cover" /> : '💡'}
                       </div>
                       <div className="flex flex-col justify-center">
                         <p className="text-sm font-bold text-white leading-tight">{cur.title}</p>
                         {cur.teacher_notes && (
-                          <p className="text-[10px] text-yellow-500 font-mono mt-1 border-l-2 border-yellow-500 pl-1">{cur.teacher_notes}</p>
+                          <p className="text-[10px] text-yellow-500 font-mono mt-1 border-l-2 border-yellow-500 pl-1 opacity-0 group-hover/item:opacity-100 transition-opacity">{cur.teacher_notes}</p>
                         )}
                       </div>
                     </div>
@@ -551,7 +552,7 @@ const DailyPlanHub = () => {
                     <span>✍️</span> Oraciones de Práctica
                   </h2>
                 </div>
-                <Link to="/admin-secret-portal-oraciones" className="opacity-0 group-hover:opacity-100 transition-opacity bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-3 py-1.5 rounded border border-teal-700/50 uppercase tracking-widest">
+                <Link to="/admin-secret-portal-oraciones" className="bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-3 py-1.5 rounded border border-teal-700/50 uppercase tracking-widest">
                   ⚙️ Editar
                 </Link>
               </div>
@@ -570,7 +571,7 @@ const DailyPlanHub = () => {
                     <span>📢</span> Anuncios
                   </h2>
                 </div>
-                <Link to="/admin-secret-portal-master?tipo=anuncios" className="opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-3 py-1.5 rounded border border-indigo-700/50 uppercase tracking-widest">
+                <Link to="/admin-secret-portal-master?tipo=anuncios" className="bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-3 py-1.5 rounded border border-indigo-700/50 uppercase tracking-widest">
                   ⚙️ Editar
                 </Link>
               </div>
@@ -587,7 +588,7 @@ const DailyPlanHub = () => {
                 <div className="flex items-center gap-3">
                   <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2"><span>📄</span> Lecturas IB</h2>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <Link to="/admin-lecturas-editor" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">✍️ Editor</Link>
                   <Link to="/admin-lecturas-sequencer" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">⚙️ Sequencer</Link>
                 </div>
@@ -605,7 +606,7 @@ const DailyPlanHub = () => {
                   <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2">📝 Tareas Asignadas</h2>
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeTareas.length}</span>
                 </div>
-                <Link to="/admin-daily-plan-tareas" className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 hover:bg-neutral-700 text-cyan-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
+                <Link to="/admin-daily-plan-tareas" className="bg-neutral-800 hover:bg-neutral-700 text-cyan-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
               </div>
               <div className="space-y-3">
                 {activeTareas.length === 0 ? (
@@ -633,7 +634,7 @@ const DailyPlanHub = () => {
                     <span>🧰</span> Resource Hub Links
                   </h2>
                 </div>
-                <Link to="/admin-resource-hub" className="opacity-0 group-hover:opacity-100 transition-opacity bg-sky-900/40 hover:bg-sky-900/80 text-sky-300 text-[10px] font-bold px-3 py-1.5 rounded border border-sky-700/50 uppercase tracking-widest">
+                <Link to="/admin-resource-hub" className="bg-sky-900/40 hover:bg-sky-900/80 text-sky-300 text-[10px] font-bold px-3 py-1.5 rounded border border-sky-700/50 uppercase tracking-widest">
                   ⚙️ Manager
                 </Link>
               </div>
@@ -692,7 +693,7 @@ const DailyPlanHub = () => {
                     <span>🎮</span> Arcade Diario
                   </h2>
                 </div>
-                <Link to="/admin-secret-portal-senordle" className="opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
+                <Link to="/admin-secret-portal-senordle" className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
                   ⚙️ Señordle
                 </Link>
               </div>

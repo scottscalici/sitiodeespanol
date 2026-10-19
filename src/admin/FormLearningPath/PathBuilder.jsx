@@ -35,8 +35,30 @@ export default function PathBuilder({
   isPracticeHub = false,
   evaluacionOptions = [],
   onOpenPodGenerator,
+  onImportPods,
 }) {
   const podLabel = isPracticeHub ? 'Círculo' : 'Pod';
+  const [podImportOpen, setPodImportOpen] = React.useState(false);
+  const [podImportText, setPodImportText] = React.useState('');
+  const [podImportStatus, setPodImportStatus] = React.useState('');
+
+  const handlePodImport = () => {
+    try {
+      const parsed = JSON.parse(podImportText);
+      const newPods = Array.isArray(parsed) ? parsed : parsed.pods;
+      if (!Array.isArray(newPods) || newPods.length === 0) {
+        setPodImportStatus('❌ El JSON debe ser un arreglo de pods, o un objeto { "pods": [...] }.');
+        return;
+      }
+      onImportPods(newPods);
+      setPodImportText('');
+      setPodImportOpen(false);
+      setPodImportStatus('');
+    } catch (err) {
+      setPodImportStatus('❌ JSON inválido — revisa la consola.');
+      console.error('Error importing pods JSON:', err);
+    }
+  };
 
   const handleEvalLinkChange = (podIndex, diaStr) => {
     const copy = [...pods];
@@ -227,6 +249,15 @@ export default function PathBuilder({
               </button>
             )}
 
+            {onImportPods && (
+              <button
+                onClick={() => setPodImportOpen((v) => !v)}
+                className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all"
+              >
+                📋 Importar Pods (JSON)
+              </button>
+            )}
+
             <button
               onClick={handleSavePathToFirestore}
               disabled={isSaving}
@@ -236,6 +267,38 @@ export default function PathBuilder({
             </button>
           </div>
         </div>
+
+        {podImportOpen && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+              Pega un arreglo de pods (o {'{'}"pods": [...]{'}'}) — se agregan a los pods actuales, sin guardar todavía.
+            </p>
+            <textarea
+              value={podImportText}
+              onChange={(e) => setPodImportText(e.target.value)}
+              rows={6}
+              placeholder='{ "pods": [ { "id": "pod_1", "title": "Comida", "segments": [ { "id": "seg_1", "introduced_concepts": [...] } ] } ] }'
+              className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono"
+            />
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={handlePodImport}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs uppercase tracking-widest"
+              >
+                Importar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPodImportOpen(false); setPodImportText(''); setPodImportStatus(''); }}
+                className="text-xs font-bold text-slate-500 uppercase"
+              >
+                Cancelar
+              </button>
+              {podImportStatus && <p className="text-xs text-rose-600 font-bold">{podImportStatus}</p>}
+            </div>
+          </div>
+        )}
 
       </div>
 

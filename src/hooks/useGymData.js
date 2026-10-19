@@ -109,7 +109,14 @@ const normalizeActivities = (raw) => {
   return activities;
 };
 
-export const useGymData = (userCourse = 's2') => {
+// `userCiclo` is the student's own A/B block-schedule cycle (the trailing
+// letter of their `section`, e.g. "4B" -> "B") — on an A/B schedule the same
+// día number meets on two different real dates, one per cycle, so "what día
+// is active today" has to be computed per-cycle. Without it, a student whose
+// class doesn't meet today would see whichever cycle's class happens to be
+// in session (e.g. a B-day student visiting on an A-day would briefly see
+// today's A-day's día number) rather than their own most recent meeting.
+export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liveDia, setLiveDia] = useState(1);
@@ -264,18 +271,6 @@ export const useGymData = (userCourse = 's2') => {
           .filter((word) => word.length === 5);
         const calendarArray = cal.map || (Array.isArray(cal) ? cal : []);
 
-        const todayStr = new Date().toLocaleDateString('en-CA');
-        const pastEntries = calendarArray.filter(
-          (c) => c.fecha && c.fecha <= todayStr && c.dia != null
-        );
-        const currentDay =
-          pastEntries.length > 0
-            ? parseInt(
-                pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0]
-                  .dia
-              )
-            : 1;
-
         const allActivities = normalizeActivities({
           extras,
           videos,
@@ -287,7 +282,6 @@ export const useGymData = (userCourse = 's2') => {
           atando,
         });
 
-        setLiveDia(currentDay);
         setData({
           tareas,
           cal: calendarArray,
@@ -312,6 +306,29 @@ export const useGymData = (userCourse = 's2') => {
 
     fetchAll();
   }, []);
+
+  // Recomputes "today's día" whenever the calendar data loads or the
+  // student's own cycle becomes known (e.g. userData loads a tick after
+  // this hook first mounts) — kept separate from the fetch effect above so
+  // a cycle becoming available doesn't re-trigger a full data refetch, and
+  // so it stays in sync with the exact same per-cycle filtering Dashboard.jsx
+  // uses for fechaByDia/maxAllowedDay (an entry with no `ciclo` applies to
+  // both; one tagged for the other cycle is skipped).
+  useEffect(() => {
+    const calendarArray = data?.cal;
+    if (!calendarArray || calendarArray.length === 0) return;
+
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const pastEntries = calendarArray.filter(
+      (c) => c.fecha && c.fecha <= todayStr && c.dia != null && (!c.ciclo || c.ciclo === userCiclo)
+    );
+    const currentDay =
+      pastEntries.length > 0
+        ? parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia)
+        : 1;
+
+    setLiveDia(currentDay);
+  }, [data?.cal, userCiclo]);
 
   return { data, loading, liveDia, setLiveDia, course: userCourse };
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks } from '../utils/learningPathProgress';
+import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks, computeGradedPercent, isPastEffectiveDueDate } from '../utils/learningPathProgress';
 import { getPathCardTheme } from '../utils/pathThemes';
 import { useActiveTheme } from '../context/ThemeContext';
 
@@ -9,13 +9,26 @@ import { useActiveTheme } from '../context/ThemeContext';
 // one active at once (e.g. a vocab unit and a verb-tense unit assigned
 // separately), so every one gets its own card and progress bar instead of
 // only ever showing the most recently assigned.
-const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
+//
+// `variant`: 'active' (default) shows every task whose (possibly
+// teacher-extended) due date hasn't passed yet, as the normal full card.
+// 'archived' shows only past-due enforced tasks, as a slimmer, still fully
+// clickable row — opening one for extra practice can only ever raise its
+// locked grade, never lower it (see computeGradedPercent/buildGradedProgressNode).
+// An un-enforced task (no `enforceDueDate`) is always 'active', matching
+// today's behavior exactly.
+const LearningPathTile = ({ liveDia, course, courseTasks = [], fechaByDia = {}, variant = 'active' }) => {
   const { userData } = useAuth();
   const { theme } = useActiveTheme() || {};
   const [progressMetaByPath, setProgressMetaByPath] = useState({});
 
   // getAssignedDominioTasks sorts newest-first; reverse for oldest-on-top.
-  const assignedTasks = [...getAssignedDominioTasks(courseTasks, liveDia)].reverse();
+  const allAssignedTasks = [...getAssignedDominioTasks(courseTasks, liveDia)].reverse();
+  const assignedTasks = allAssignedTasks.filter((task) => {
+    const teacherOverride = userData?.progress?.[task.path_id]?.teacherOverride;
+    const isPastDue = isPastEffectiveDueDate(task, fechaByDia, teacherOverride);
+    return variant === 'archived' ? isPastDue : !isPastDue;
+  });
 
   // The per-unit color rotation (cardTheme below) exists to tell multiple
   // simultaneously-assigned units apart — a seasonal theme only takes over
@@ -37,6 +50,29 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [] }) => {
 
   // Nothing assigned yet for this course today — same pattern as other day-gated dashboard cards.
   if (assignedTasks.length === 0) return null;
+
+  if (variant === 'archived') {
+    return (
+      <div className="space-y-2">
+        {assignedTasks.map((task) => {
+          const meta = progressMetaByPath[task.path_id] || { isFlat: true, pods: [], totalPods: 0 };
+          const { percent: livePercent } = getUnitSummary(userData?.progress, task.path_id, meta);
+          const percent = computeGradedPercent(userData?.progress?.[task.path_id], livePercent, task, fechaByDia);
+
+          return (
+            <Link
+              key={task.path_id}
+              to={`/student-learning-path/${liveDia}?${course ? `course=${course}&` : ''}path=${task.path_id}`}
+              className="flex items-center justify-between gap-3 bg-slate-900/70 border border-slate-800 rounded-lg px-3 py-2 hover:bg-slate-800 transition-colors"
+            >
+              <span className="text-slate-300 text-[11px] font-bold truncate">{task.titulo || task.path_id}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">{percent}% →</span>
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

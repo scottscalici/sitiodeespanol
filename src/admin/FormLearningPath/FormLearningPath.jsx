@@ -8,6 +8,7 @@ import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionC
 import { QUESTION_TYPE_DEFAULTS, PRACTICE_BOSS_BATTLE_MIX, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
+import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
 // mode='learningPath' (default): the graded, sequential Dominio builder,
 // saving to learning_paths. mode='practiceHub': same vault + pod/segment
@@ -125,6 +126,15 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   const handleGeneratedPods = (newPods) => {
     setPods(hasOnlyPlaceholderPod ? newPods : [...pods, ...newPods]);
     setShowPodGenerator(false);
+  };
+
+  // Pasted pods go through the same sanitizer as a loaded path, so a
+  // hand-written/generated JSON doesn't need every optional field spelled
+  // out (badgeAward, gateConfig, etc. default the same way loading does).
+  const handleImportPods = (newPods) => {
+    const sanitized = sanitizePods(newPods);
+    setPods(hasOnlyPlaceholderPod ? sanitized : [...pods, ...sanitized]);
+    setActiveSegmentIdRaw(sanitized[0]?.segments[0]?.id || activeSegmentId);
   };
 
   // Badge catalog (config/gamification.badges) — pods reference these by id
@@ -636,6 +646,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
         isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
         onOpenPodGenerator={() => setShowPodGenerator(true)}
+        onImportPods={handleImportPods}
       />
 
       {showPodGenerator && (

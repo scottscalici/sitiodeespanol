@@ -27,6 +27,8 @@ import GrammarNoteViewer from './student/GrammarNoteViewer';
 import VocabPage from './student/VocabPage';
 import VocabIndexPage from './student/VocabIndexPage';
 import GrammarIndexPage from './student/GrammarIndexPage';
+import GrammarCategoryPage from './student/GrammarCategoryPage';
+import GrammarPrintView from './student/GrammarPrintView';
 import LecturaPage from './student/LecturaPage'; // 👈 NEW STUDENT READING ROUTE
 import GlosarioIdiomaticoPage from './student/GlosarioIdiomaticoPage';
 import ConexionesCulturalesPage from './student/ConexionesCulturalesPage';
@@ -52,6 +54,7 @@ import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
 import LessonPlanFormalPage from './admin/managers/LessonPlanFormalPage';
+import LessonPlanOverviewPage from './admin/managers/LessonPlanOverviewPage';
 import VerbVault from './admin/MasterDashboard/components/VerbVault';
 import VocabVault from './admin/MasterDashboard/components/VocabVault';
 import TareasDashboard from './admin/MasterDashboard/components/TareasDashboard';
@@ -84,6 +87,8 @@ import VideosManager from './admin/managers/VideosManager';
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
 import GramaticaSequencer from './admin/sequencers/GramaticaSequencer';
+import GrammarNotesManager from './admin/managers/GrammarNotesManager';
+import GrammarNotesUploader from './admin/uploaders/GrammarNotesUploader';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
@@ -160,7 +165,7 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {user?.isAnonymous && (
-          <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
+          <div className="print:hidden sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
             <div className="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
               <span className="font-black text-xs sm:text-sm uppercase tracking-wide">
                 👤 Sesión de Invitado — tu progreso no se guardará
@@ -203,6 +208,8 @@ function App() {
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/gramatica" element={<GrammarIndexPage />} />
+            <Route path="/gramatica/imprimir" element={<GrammarPrintView />} />
+            <Route path="/gramatica/categoria/:categoryName" element={<GrammarCategoryPage />} />
             <Route path="/gramatica/:noteId" element={<GrammarNoteViewer />} />
             <Route path="/vocabulario" element={<VocabIndexPage />} />
             <Route path="/vocabulario/:bundleId" element={<VocabPage />} />
@@ -458,6 +465,14 @@ function App() {
               }
             />
             <Route
+              path="/admin-lesson-plan-overview"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <LessonPlanOverviewPage />
+                </AdminRoute>
+              }
+            />
+            <Route
               path="/admin-secret-portal-learning-path"
               element={
                 <AdminRoute user={user} role={role}>
@@ -502,6 +517,22 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <GramaticaSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-grammar-notes-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <GrammarNotesUploader />
                 </AdminRoute>
               }
             />

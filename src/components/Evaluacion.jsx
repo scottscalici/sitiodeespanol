@@ -80,7 +80,13 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-5">
         <h3 className="font-black text-2xl text-white flex items-center gap-2.5">
-          <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0">📋</span>
+          <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
+            {theme?.styles?.imageOverrides?.evaluacion ? (
+              <img src={theme.styles.imageOverrides.evaluacion} alt="" className="w-full h-full object-cover" />
+            ) : (
+              '📋'
+            )}
+          </span>
           Evaluación
         </h3>
         <div className="flex items-center gap-2 shrink-0">

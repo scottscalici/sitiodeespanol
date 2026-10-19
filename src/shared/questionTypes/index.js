@@ -63,6 +63,8 @@ import * as lineBankCloze from './lineBankCloze';
 import * as multipleChoice from './multipleChoice';
 import * as write from './write';
 import * as listen from './listen';
+import * as ordering from './ordering';
+import * as hotspot from './hotspot';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -73,6 +75,8 @@ export const QUESTION_TYPES = {
   [multipleChoice.TYPE_KEY]: multipleChoice,
   [write.TYPE_KEY]: write,
   [listen.TYPE_KEY]: listen,
+  [ordering.TYPE_KEY]: ordering,
+  [hotspot.TYPE_KEY]: hotspot,
 };
 
 export const TYPE_LABELS = Object.fromEntries(
@@ -82,6 +86,21 @@ export const TYPE_LABELS = Object.fromEntries(
 export const getItemCount = (q) => QUESTION_TYPES[q.type]?.getItemCount(q) ?? 1;
 export const finalizeQuestion = (q) => QUESTION_TYPES[q.type]?.finalizeQuestion(q) ?? q;
 export const reconstructQuestion = (q) => QUESTION_TYPES[q.type]?.reconstructQuestion(q) ?? q;
+
+// A one-line plain-text preview of a question, for a printed lesson plan —
+// every question type stores its own intro in `prompt`, but the cloze types
+// often leave that blank and put the actual sentence in `text`/`lines`
+// instead, so this falls back to that (with {{blanks}} shown as blanks)
+// rather than printing an empty line.
+const stripBlankTokens = (s) => (s || '').replace(/\{\{.*?\}\}/g, '____');
+export const getQuestionPreview = (q) => {
+  if (q?.prompt?.trim()) return q.prompt.trim();
+  if (q?.type === 'dropdown_cloze' || q?.type === 'word_bank_cloze') return stripBlankTokens(q.text);
+  if (q?.type === 'line_bank_cloze') return (q.lines || []).map((l) => stripBlankTokens(l.text)).filter(Boolean).join(' / ');
+  if (q?.type === 'matching') return (q.pairs || []).map((p) => p.left?.text).filter(Boolean).join(', ');
+  if (q?.type === 'ordering') return (q.items || []).map((it) => it.text).filter(Boolean).join(' → ');
+  return '';
+};
 
 export { parseBulkRow, parseBulkRowPlain } from './multipleChoice';
 export { parseBulkSections } from './lineBankCloze';

@@ -7,6 +7,7 @@ import {
   fetchUnitProgressMeta,
   getAssignedDominioTasks,
   getUnitSummary,
+  computeGradedPercent,
 } from '../../utils/learningPathProgress';
 import TeacherRecuperacionTab from './components/TeacherRecuperacionTab';
 import BadgeIcon from '../../components/BadgeIcon';
@@ -77,6 +78,7 @@ export default function TeacherGradebook() {
   // score/"Sin Hacer" pill inside the breakdown popup above, to excuse that
   // one assignment for this student only or override its grade.
   const [overrideModal, setOverrideModal] = useState(null);
+  const [pathOverrideModal, setPathOverrideModal] = useState(null); // { student, col, extendDaysInput, waivePenalty }
 
   // Roster filter: 'all' or `${course}|${section}`
   const [rosterFilter, setRosterFilter] = useState('all');
@@ -207,6 +209,8 @@ export default function TeacherGradebook() {
                 path_id: task.path_id,
                 titulo: task.titulo,
                 day_due: task.day_due,
+                enforceDueDate: task.enforceDueDate,
+                latePenaltyPerDay: task.latePenaltyPerDay,
                 courses: new Set(),
               };
             }
@@ -381,11 +385,37 @@ export default function TeacherGradebook() {
   // --- One learning-path percent per unit column, for one student ---
   // Returns null when the unit doesn't apply to this student's course (so
   // the cell can render a blank dash) rather than a misleading 0%.
+  // Past an enforced due date, this is the locked on-time-plus-late-credit
+  // percent (computeGradedPercent), not the raw live percent.
   const getUnitPercentForStudent = (student, col) => {
     if (!col.courses.has(student.course)) return null;
     const meta = unitMeta[col.path_id];
     if (!meta || meta.totalPods === 0) return null;
-    return getUnitSummary(student.progress, col.path_id, meta).percent;
+    const livePercent = getUnitSummary(student.progress, col.path_id, meta).percent;
+    return computeGradedPercent(student.progress?.[col.path_id], livePercent, col, calendarFechaByDia);
+  };
+
+  // Writes (or clears) a per-student, per-learning-path override — a
+  // deadline extension and/or a waived late penalty. Mirrors
+  // applyTeacherOverride's shape/merge pattern, but targets
+  // progress[pathId].teacherOverride directly rather than one of the
+  // warmup/practica/curiosidad progress maps.
+  const applyPathOverride = async (uid, pathId, overridePatch) => {
+    await setDoc(
+      doc(db, 'users', uid),
+      { progress: { [pathId]: { teacherOverride: overridePatch === null ? deleteField() : overridePatch } } },
+      { merge: true }
+    );
+
+    const currentStudent = students.find((s) => s.uid === uid);
+    if (!currentStudent) return;
+    const existingEntry = currentStudent.progress?.[pathId] || {};
+    const newEntry = overridePatch === null
+      ? { ...existingEntry, teacherOverride: undefined }
+      : { ...existingEntry, teacherOverride: overridePatch };
+    setStudents((prev) => prev.map((s) => (
+      s.uid === uid ? { ...s, progress: { ...s.progress, [pathId]: newEntry } } : s
+    )));
   };
 
   // Hoisted out of the gradebook table's render block so the CSV export
@@ -1016,14 +1046,33 @@ const handleResetPassword = async () => {
 
                         {visibleUnitColumns.map((col) => {
                           const unitPercent = getUnitPercentForStudent(student, col);
+                          const pathOverride = student.progress?.[col.path_id]?.teacherOverride;
                           return (
                             <td key={col.path_id} className="p-4">
                               {unitPercent == null ? (
                                 <span className="text-slate-600 font-bold">—</span>
                               ) : (
                                 <div className="w-full max-w-[140px]">
-                                  <div className={`text-xs font-black mb-1 ${getFlagClasses(unitPercent).split(' ')[0]}`}>
-                                    {unitPercent}%
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className={`text-xs font-black ${getFlagClasses(unitPercent).split(' ')[0]}`}>
+                                      {unitPercent}%
+                                    </span>
+                                    {!!pathOverride && <span title="Vencimiento/penalización anulada para este estudiante" className="text-[10px]">🛡️</span>}
+                                    {col.enforceDueDate && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPathOverrideModal({
+                                          student,
+                                          col,
+                                          extendDaysInput: String(pathOverride?.extendDays || ''),
+                                          waivePenalty: !!pathOverride?.waivePenalty,
+                                        })}
+                                        className="text-[10px] text-slate-500 hover:text-white ml-auto"
+                                        title="Extensión / exonerar penalización"
+                                      >
+                                        ⚙️
+                                      </button>
+                                    )}
                                   </div>
                                   <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden">
                                     <div
@@ -1504,6 +1553,72 @@ const handleResetPassword = async () => {
                 Quitar Anulación (usar el trabajo original)
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ⚙️ PATH OVERRIDE MODAL — per-student deadline extension / waived late penalty on one Learning Path */}
+      {pathOverrideModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Excepción de Vencimiento</h3>
+              <button
+                onClick={() => setPathOverrideModal(null)}
+                className="text-slate-400 hover:text-white text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-6">
+              {getStudentDisplayName(pathOverrideModal.student)} — {pathOverrideModal.col.titulo}
+            </p>
+
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Días de Extensión
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={pathOverrideModal.extendDaysInput}
+              onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, extendDaysInput: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-teal-500 mb-4"
+              placeholder="Ej. 2"
+            />
+
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">
+              <input
+                type="checkbox"
+                checked={pathOverrideModal.waivePenalty}
+                onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, waivePenalty: e.target.checked })}
+                className="w-4 h-4"
+              />
+              Exonerar penalización diaria (crédito completo siempre)
+            </label>
+
+            <button
+              onClick={async () => {
+                const extendDays = Number(pathOverrideModal.extendDaysInput) || 0;
+                const patch = (extendDays > 0 || pathOverrideModal.waivePenalty)
+                  ? { ...(extendDays > 0 ? { extendDays } : {}), ...(pathOverrideModal.waivePenalty ? { waivePenalty: true } : {}) }
+                  : null;
+                await applyPathOverride(pathOverrideModal.student.uid, pathOverrideModal.col.path_id, patch);
+                setPathOverrideModal(null);
+              }}
+              className="w-full px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest text-white bg-teal-600 hover:bg-teal-500 transition-colors mb-2"
+            >
+              Guardar
+            </button>
+
+            <button
+              onClick={async () => {
+                await applyPathOverride(pathOverrideModal.student.uid, pathOverrideModal.col.path_id, null);
+                setPathOverrideModal(null);
+              }}
+              className="w-full px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white border border-slate-700 hover:bg-slate-700/50 transition-colors"
+            >
+              Quitar Excepción
+            </button>
           </div>
         </div>
       )}

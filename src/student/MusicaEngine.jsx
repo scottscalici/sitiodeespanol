@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { QUESTION_TYPES } from '../shared/questionTypes';
+import { useAuth } from '../context/AuthContext';
+import { awardPoints } from '../utils/pointsHelper';
 
 const normalize = (str) =>
   (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -15,6 +18,7 @@ const getBlankAnswers = (letras) => {
 const MusicaEngine = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { userData } = useAuth();
 
   const [song, setSong] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +26,18 @@ const MusicaEngine = () => {
 
   // Store student answers
   const [clozeAnswers, setClozeAnswers] = useState({});
-  const [compAnswers, setCompAnswers] = useState({});
+  // Which comprehension questions (by index) the student has already gotten
+  // right — drives the "X/Y completas" counter AND the one-time ranking-
+  // points award below once every question is done. The lyrics cloze above
+  // stays completely separate and ungraded — nothing here touches it.
+  const [completedQuestions, setCompletedQuestions] = useState(() => new Set());
+  // Every gradable sub-item's FIRST-attempt correctness across all
+  // questions, keyed "questionIdx-itemIdx" — same shape as
+  // CuriosidadQuizEngine's firstAttemptRef, just without a "current
+  // question" concept since Música shows every question at once. Tallied
+  // once, when the points award fires, into a flat correct-item count.
+  const firstAttemptRef = useRef({});
+  const [pointsAwarded, setPointsAwarded] = useState(null);
 
   useEffect(() => {
     const fetchSong = async () => {
@@ -46,12 +61,44 @@ const MusicaEngine = () => {
     fetchSong();
   }, [id]);
 
+  // Ranking points for "Preguntas de Comprensión": completion-only (no
+  // gradebook percentage anywhere), 1 point per gradable item answered
+  // correctly on its first attempt, awarded once per song — exactly the
+  // "5 correct = 5 ranking points" model, same awardPoints() every other
+  // activity type uses. Fires the moment every question has been gotten
+  // right; gated on a persisted progress.musica[id].completed flag so
+  // replaying the song (e.g. from the Archived card, or just revisiting)
+  // never re-awards points. The lyrics cloze (handleCheck above) is
+  // entirely separate and untouched by any of this.
+  useEffect(() => {
+    const total = song?.questions?.length || 0;
+    if (total === 0 || completedQuestions.size !== total) return;
+    if (!userData?.uid || userData.role === 'admin') return;
+    if (userData?.progress?.musica?.[id]?.completed) return;
+
+    const correctCount = Object.values(firstAttemptRef.current).filter(Boolean).length;
+
+    const awardAndSave = async () => {
+      try {
+        await setDoc(
+          doc(db, 'users', userData.uid),
+          { progress: { musica: { [id]: { completed: true, correctCount, timestamp: new Date().toISOString() } } } },
+          { merge: true }
+        );
+        if (correctCount > 0) {
+          await awardPoints(userData.uid, correctCount);
+          setPointsAwarded(correctCount);
+        }
+      } catch (err) {
+        console.error('Error awarding Música comprehension points:', err);
+      }
+    };
+    awardAndSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedQuestions.size, song?.questions?.length, userData?.uid]);
+
   const handleClozeChange = (index, value) => {
     setClozeAnswers(prev => ({ ...prev, [index]: value }));
-  };
-
-  const handleCompChange = (index, value) => {
-    setCompAnswers(prev => ({ ...prev, [index]: value }));
   };
 
   const handleCheck = () => {
@@ -239,24 +286,36 @@ const MusicaEngine = () => {
           </div>
         </div>
 
-        {/* COMPREHENSION QUESTIONS — FULL WIDTH */}
-        {song.preguntas && song.preguntas.length > 0 && (
+        {/* COMPREHENSION QUESTIONS — FULL WIDTH, shared question-type engine */}
+        {song.questions && song.questions.length > 0 && (
           <div className="bg-neutral-900/80 border border-neutral-800 p-6 sm:p-8 rounded-2xl shadow-xl space-y-6">
-            <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center gap-2 border-b border-neutral-800 pb-3">
-              <span>🤔</span> Preguntas de Comprensión
+            <h3 className="font-black text-amber-400 uppercase tracking-widest text-xs flex items-center justify-between border-b border-neutral-800 pb-3">
+              <span className="flex items-center gap-2"><span>🤔</span> Preguntas de Comprensión</span>
+              <span className="text-[10px] text-neutral-500 font-mono">{completedQuestions.size}/{song.questions.length} completas</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {song.preguntas.map((p, idx) => (
-                <div key={idx} className="space-y-2">
-                  <p className="font-bold text-sm text-slate-200">{idx + 1}. {p.q}</p>
-                  <textarea
-                    value={compAnswers[idx] || ''}
-                    onChange={(e) => handleCompChange(idx, e.target.value)}
-                    placeholder="Escribe tu respuesta aquí..."
-                    className="w-full p-3 rounded-xl border border-neutral-800 bg-neutral-950 text-white outline-none focus:border-amber-500 resize-none h-24 text-xs font-medium transition-colors"
-                  />
-                </div>
-              ))}
+            {pointsAwarded !== null && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest text-center">
+                🏆 ¡Completaste todas las preguntas! +{pointsAwarded} punto{pointsAwarded === 1 ? '' : 's'} de clasificación
+              </div>
+            )}
+            <div className="space-y-6">
+              {song.questions.map((q, idx) => {
+                const TypeRenderer = QUESTION_TYPES[q.type]?.Renderer;
+                if (!TypeRenderer) return null;
+                return (
+                  <div key={idx} className="space-y-2">
+                    {q.prompt && <p className="font-bold text-sm text-slate-200">{idx + 1}. {q.prompt}</p>}
+                    <TypeRenderer
+                      question={q}
+                      onItemFirstAttempt={(itemIdx, isCorrect) => {
+                        const key = `${idx}-${itemIdx}`;
+                        if (!(key in firstAttemptRef.current)) firstAttemptRef.current[key] = isCorrect;
+                      }}
+                      onAllCorrect={() => setCompletedQuestions((prev) => new Set(prev).add(idx))}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

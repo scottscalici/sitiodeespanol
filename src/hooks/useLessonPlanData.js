@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getCachedCollection, getCachedDoc, getCachedBucketedCollection } from '../utils/firestoreCache';
 
-// Everything a Lesson Plan view (daily working page or the formal printout)
-// needs for one course+day, fetched once per mount and re-filtered on every
-// course/day change — same "fetch once, filter client-side" shape the
-// original LessonPlanPage.jsx used, just shared so the formal view doesn't
-// duplicate ~80 lines of fetch/filter logic. Uses the shared Firestore
-// cache (getCachedCollection/getCachedDoc) so mounting both views in the
+// Fetches the full raw read set a Lesson Plan view needs — every course,
+// every day, all at once — so any number of day views can be computed from
+// it client-side without a second Firestore round trip. Shared by
+// useLessonPlanData (one day) and useLessonPlanRange (a range of days, for
+// the multi-day overview printout). Uses the shared Firestore cache
+// (getCachedCollection/getCachedDoc) so mounting several of these in the
 // same session only pays the read cost once.
-export const useLessonPlanData = (course, selectedDay) => {
+const useRawLessonPlanData = () => {
   const [loading, setLoading] = useState(true);
   const [raw, setRaw] = useState(null);
 
@@ -79,10 +79,15 @@ export const useLessonPlanData = (course, selectedDay) => {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading || !raw) {
-    return { loading: true };
-  }
+  return { loading: loading || !raw, raw };
+};
 
+// Pure function: given the raw read set and one course+day, computes that
+// day's view — every `active*` filter the daily page and the formal
+// printout both need. Factored out of the hook so a multi-day view (the
+// overview printout) can call it once per day in a plain loop instead of
+// calling a hook N times, which the rules of hooks don't allow.
+export const computeLessonPlanDay = (raw, course, selectedDay) => {
   const dateStrings = raw.calendarMap[selectedDay] || [];
   const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Fecha por confirmar';
   const rawDates = raw.rawDatesMap[selectedDay] || [];
@@ -143,4 +148,26 @@ export const useLessonPlanData = (course, selectedDay) => {
     destacado: activeDestacados,
     actividades: { videos: activeVideos, conversaciones: activeConversaciones, musica: activeMusica, cultura: activeCultura, lecturas: activeLecturas },
   };
+};
+
+// Everything a Lesson Plan view (daily working page or the formal printout)
+// needs for one course+day — same public shape this hook always had, now
+// just a thin wrapper over useRawLessonPlanData + computeLessonPlanDay.
+export const useLessonPlanData = (course, selectedDay) => {
+  const { loading, raw } = useRawLessonPlanData();
+  if (loading) return { loading: true };
+  return computeLessonPlanDay(raw, course, selectedDay);
+};
+
+// Every day from startDay to endDay (inclusive) for one course, computed
+// from a single shared fetch — for the multi-day overview printout, so
+// printing a 5-day range doesn't cost 5x the Firestore reads of the daily
+// page (it costs the same one read set the daily page already does).
+export const useLessonPlanRange = (course, startDay, endDay) => {
+  const { loading, raw } = useRawLessonPlanData();
+  if (loading) return { loading: true, days: [] };
+  const [lo, hi] = startDay <= endDay ? [startDay, endDay] : [endDay, startDay];
+  const days = [];
+  for (let d = lo; d <= hi; d++) days.push({ dia: d, ...computeLessonPlanDay(raw, course, d) });
+  return { loading: false, days };
 };
