@@ -32,6 +32,21 @@ const MusicaQuestionsModal = ({ cancion, onClose, onSave }) => {
   const [importText, setImportText] = useState('');
   const [importStatus, setImportStatus] = useState('');
 
+  // Accepts three shapes, since all three are natural ways to paste this:
+  // a bare array of question objects, { questions: [...] } (one song's own
+  // shape), or an array of song-like wrappers each with their own
+  // `questions` array (e.g. [{ title, questions: [...] }]) — flattened
+  // together in that last case.
+  const extractQuestionsArray = (parsed) => {
+    if (Array.isArray(parsed?.questions)) return parsed.questions;
+    if (!Array.isArray(parsed)) return null;
+    if (parsed.every((item) => item && typeof item === 'object' && 'type' in item)) return parsed;
+    if (parsed.length > 0 && parsed.every((item) => item && Array.isArray(item.questions))) {
+      return parsed.flatMap((item) => item.questions);
+    }
+    return null;
+  };
+
   const handleImport = () => {
     let parsed;
     try {
@@ -40,9 +55,9 @@ const MusicaQuestionsModal = ({ cancion, onClose, onSave }) => {
       setImportStatus(`❌ JSON inválido: ${e.message}`);
       return;
     }
-    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.questions) ? parsed.questions : null;
+    const arr = extractQuestionsArray(parsed);
     if (!arr) {
-      setImportStatus('❌ Se espera un arreglo de preguntas, o { "questions": [...] }.');
+      setImportStatus('❌ Se espera un arreglo de preguntas, { "questions": [...] }, o un arreglo de canciones cada una con su propio "questions".');
       return;
     }
     const errors = arr.flatMap((q, i) => validateQuestion(q, i + 1, cancion.titulo || 'Canción'));
