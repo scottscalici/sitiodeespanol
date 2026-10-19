@@ -40,12 +40,16 @@ const withinTarget = (x, y, target) => {
 // for why this is the one place "what counts as correct" lives.
 export const gradeState = (question, state) => [withinTarget(state?.x, state?.y, question.target)];
 
-// Shared click-to-percentage handler, used by both render modes.
+// Shared click-to-percentage handler, used by both render modes. Clamped to
+// the image's own bounds — the Editor's drag uses pointer capture, so the
+// pointer can legitimately end up outside the image (e.g. a drag that
+// overshoots the edge to be sure it covers a full board cell) and would
+// otherwise produce a target outside the normal 0-100 range.
 const posFromEvent = (e, el) => {
   const rect = el.getBoundingClientRect();
   return {
-    x: ((e.clientX - rect.left) / rect.width) * 100,
-    y: ((e.clientY - rect.top) / rect.height) * 100,
+    x: Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
+    y: Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100)),
   };
 };
 
@@ -181,8 +185,19 @@ export const Editor = ({ question: q, onChange }) => {
   // Gate interaction on the image actually being loaded to rule that out.
   const [imgLoaded, setImgLoaded] = useState(false);
   const imgRef = React.useRef(null);
+  // Tracks the image src this gate was last reset for — NOT just "did
+  // q.image change", because that dependency is also "true" on the very
+  // first mount, which races against the <img>'s own onLoad: a small or
+  // already-cached image can finish loading (setImgLoaded(true)) before
+  // this effect's mount-time flush, which would otherwise unconditionally
+  // reset it straight back to false with nothing left to ever undo that —
+  // permanently locking the editor. Only reset on a genuine change away
+  // from an image we'd already seen.
+  const lastResetForImage = React.useRef(q.image);
 
   React.useEffect(() => {
+    if (lastResetForImage.current === q.image) return;
+    lastResetForImage.current = q.image;
     setImgLoaded(false);
   }, [q.image]);
 
@@ -190,23 +205,33 @@ export const Editor = ({ question: q, onChange }) => {
   // onLoad never fires for an already-cached image mounted complete.
   const handleImgRef = (el) => {
     imgRef.current = el;
-    if (el?.complete) setImgLoaded(true);
+    if (el?.complete && el?.naturalWidth > 0) setImgLoaded(true);
   };
 
   const setShape = (shape) => onChange({ target: { ...target, shape } });
 
-  const handleMouseDown = (e) => {
+  // Pointer Events + capture (not plain mouse events) — a plain
+  // onMouseMove/onMouseUp attached to the image's wrapper div stops firing
+  // the instant the cursor leaves that div's bounds, which silently freezes
+  // the drag mid-gesture. That's a very easy thing to trigger by accident:
+  // overshooting the edge slightly to be sure a box fully covers a board
+  // cell near the image's border. Capturing the pointer keeps move/up
+  // events delivered to this same element — via e.currentTarget, exactly as
+  // before — no matter where the cursor actually is, until it's released.
+  const handlePointerDown = (e) => {
     if (target.shape !== 'box' || !imgLoaded) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const pt = posFromEvent(e, e.currentTarget);
     setDrag({ start: pt, current: pt });
   };
-  const handleMouseMove = (e) => {
+  const handlePointerMove = (e) => {
     if (!drag) return;
     setDrag({ start: drag.start, current: posFromEvent(e, e.currentTarget) });
   };
-  const handleMouseUp = (e) => {
+  const handlePointerUp = (e) => {
     if (!drag) return;
     const end = posFromEvent(e, e.currentTarget);
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     let x1 = Math.min(drag.start.x, end.x);
     let x2 = Math.max(drag.start.x, end.x);
     let y1 = Math.min(drag.start.y, end.y);
@@ -218,8 +243,8 @@ export const Editor = ({ question: q, onChange }) => {
       width = Math.max(width, MIN_BOX_SIZE * 3);
       height = Math.max(height, MIN_BOX_SIZE * 3);
     }
-    const x = x1 + (x2 - x1) / 2 || end.x;
-    const y = y1 + (y2 - y1) / 2 || end.y;
+    const x = (x1 + x2) / 2;
+    const y = (y1 + y2) / 2;
     onChange({ target: { ...target, x, y, width, height } });
     setDrag(null);
   };
@@ -282,10 +307,10 @@ export const Editor = ({ question: q, onChange }) => {
             {target.shape === 'box' ? 'Arrastra sobre la imagen para dibujar la caja correcta:' : 'Haz clic en la imagen para marcar el punto correcto:'}
           </p>
           <div
-            className="relative inline-block w-full select-none"
-            onMouseDown={target.shape === 'box' ? handleMouseDown : undefined}
-            onMouseMove={target.shape === 'box' ? handleMouseMove : undefined}
-            onMouseUp={target.shape === 'box' ? handleMouseUp : undefined}
+            className="relative inline-block w-full select-none touch-none"
+            onPointerDown={target.shape === 'box' ? handlePointerDown : undefined}
+            onPointerMove={target.shape === 'box' ? handlePointerMove : undefined}
+            onPointerUp={target.shape === 'box' ? handlePointerUp : undefined}
           >
             <img
               ref={handleImgRef}
