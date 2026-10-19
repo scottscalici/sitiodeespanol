@@ -96,7 +96,7 @@ const TareasSequencer = () => {
 
   const handleTaskChange = (index, field, value) => {
     const updated = [...activeTasks];
-    if (field === 'day_assigned' || field === 'day_due') {
+    if (field === 'day_assigned' || field === 'day_due' || field === 'latePenaltyPerDay') {
       updated[index][field] = Number(value) || 0;
     } else {
       updated[index][field] = value;
@@ -115,7 +115,9 @@ const TareasSequencer = () => {
       titulo: "Nueva tarea",
       notas_opcionales: "",
       path_id: "",
-      url: ""
+      url: "",
+      enforceDueDate: true,
+      latePenaltyPerDay: 10
     };
 
     const updated = [...activeTasks, newTask];
@@ -324,6 +326,37 @@ const TareasSequencer = () => {
                                       </option>
                                     ))}
                                 </select>
+                              </div>
+                            )}
+
+                            {task.tipo === 'Dominio' && (
+                              <div className="md:col-span-12 flex flex-wrap items-center gap-3 bg-neutral-900/50 border border-neutral-800 rounded-lg p-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTaskChange(globalIndex, 'enforceDueDate', !task.enforceDueDate)}
+                                  className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
+                                    task.enforceDueDate
+                                      ? 'bg-rose-500 text-white'
+                                      : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+                                  }`}
+                                  title="Mueve la ruta a Archivadas y bloquea/penaliza la calificación tras la fecha de vencimiento"
+                                >
+                                  {task.enforceDueDate ? '✅ Vencimiento con Penalización' : '⬜ Vencimiento con Penalización'}
+                                </button>
+                                {task.enforceDueDate && (
+                                  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                                    Penalización diaria:
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="50"
+                                      value={task.latePenaltyPerDay ?? 10}
+                                      onChange={(e) => handleTaskChange(globalIndex, 'latePenaltyPerDay', e.target.value)}
+                                      className="w-14 bg-black border border-neutral-700 text-rose-400 text-center font-black rounded-md p-1 text-xs outline-none"
+                                    />
+                                    %/día
+                                  </label>
+                                )}
                               </div>
                             )}
                           </div>

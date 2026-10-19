@@ -99,3 +99,115 @@ export const getCurrentDominioTask = (courseTasks = [], liveDia) => {
   const assigned = getAssignedDominioTasks(courseTasks, liveDia);
   return assigned[0] || null;
 };
+
+// --- Due dates, archival & progressive late grading (opt-in via task.enforceDueDate) ---
+// A legacy/un-enforced task (enforceDueDate falsy — every task that existed
+// before this feature shipped) must behave byte-for-byte as it always has:
+// no archival, no locking, no penalty, live percent forever. Every function
+// below is gated on that flag so adding it to this file never changes
+// anything about a task a teacher hasn't explicitly opted in.
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// 23:59:59 local time on the día's own calendar date — same no-'Z'
+// local-time-string convention Dashboard.jsx's formatDueDate already uses.
+// Returns null when that día isn't in the calendar yet (nothing to enforce).
+export const getDueDateTime = (dayDue, fechaByDia = {}) => {
+  const fecha = fechaByDia[Number(dayDue)];
+  if (!fecha) return null;
+  return new Date(`${fecha}T23:59:59`);
+};
+
+// Shifts a due date forward by a teacher-granted extension, if any.
+export const getEffectiveDueDateTime = (dueDateTime, teacherOverride) => {
+  if (!dueDateTime) return null;
+  const extendDays = Number(teacherOverride?.extendDays) || 0;
+  return extendDays > 0 ? new Date(dueDateTime.getTime() + extendDays * MS_PER_DAY) : dueDateTime;
+};
+
+const dayLateMultiplier = (daysLate, penaltyPerDay, waivePenalty) => {
+  if (waivePenalty) return 1;
+  const rate = Math.max(0, Number(penaltyPerDay) || 0) / 100;
+  return Math.max(0.5, 1 - rate * Math.max(0, daysLate));
+};
+
+// Calendar-day difference, not raw elapsed milliseconds — a write made 20
+// hours after an 11:59 PM deadline is "1 day late" in the way a teacher
+// means it (today's date is the day after the due date), not "0 days late"
+// because a full 24h hasn't elapsed since the exact deadline instant.
+const startOfLocalDay = (date) => new Date(`${date.toLocaleDateString('en-CA')}T00:00:00`);
+const daysLateFor = (effectiveDueDateTime) =>
+  Math.round((startOfLocalDay(new Date(Date.now())).getTime() - startOfLocalDay(effectiveDueDateTime).getTime()) / MS_PER_DAY);
+
+// Read-only display helper — the percent to SHOW (gradebook, archived-tile
+// label), accounting for a locked on-time baseline plus frozen-per-chunk
+// late credit already stored on the student's progress node. Falls back to
+// the plain live percent whenever there's nothing to account for yet (task
+// not enforced, due date hasn't passed, or no on-time snapshot exists
+// because the student hasn't touched the path since the deadline passed).
+export const computeGradedPercent = (progressNode, livePercent, task, fechaByDia = {}) => {
+  if (!task?.enforceDueDate) return livePercent;
+  const snapshot = progressNode?.onTimeSnapshot;
+  if (!snapshot) return livePercent;
+  const lateCreditPercent = progressNode?.lateCreditPercent || 0;
+  return Math.min(100, snapshot.percent + lateCreditPercent);
+};
+
+// Is this task's (possibly extended) deadline in the past, right now?
+export const isPastEffectiveDueDate = (task, fechaByDia, teacherOverride) => {
+  if (!task?.enforceDueDate) return false;
+  const dueDateTime = getDueDateTime(task.day_due, fechaByDia);
+  const effective = getEffectiveDueDateTime(dueDateTime, teacherOverride);
+  return !!effective && Date.now() > effective.getTime();
+};
+
+// Write-time helper — called right before saving a student's new
+// podIndex/segmentIndex. Returns just the progress-node fields this feature
+// owns; the caller merges in path_points etc. For an un-enforced task, or a
+// write that still lands on or before the deadline, returns exactly
+// { podIndex, segmentIndex } — i.e. today's behavior, unchanged.
+export const buildGradedProgressNode = ({
+  existingProgressNode,
+  newPodIndex,
+  newSegmentIndex,
+  meta,
+  task,
+  fechaByDia,
+}) => {
+  const base = { podIndex: newPodIndex, segmentIndex: newSegmentIndex };
+  if (!task?.enforceDueDate) return base;
+
+  const teacherOverride = existingProgressNode?.teacherOverride;
+  const dueDateTime = getDueDateTime(task.day_due, fechaByDia);
+  const effectiveDueDateTime = getEffectiveDueDateTime(dueDateTime, teacherOverride);
+  if (!effectiveDueDateTime || Date.now() <= effectiveDueDateTime.getTime()) return base;
+
+  // Past the deadline — lazily freeze the on-time baseline the first time
+  // this fires, then add this write's own increment at its own frozen rate.
+  const existingSnapshot = existingProgressNode?.onTimeSnapshot;
+  const priorLivePercent = getUnitSummary(
+    { _: { podIndex: existingProgressNode?.podIndex || 0, segmentIndex: existingProgressNode?.segmentIndex || 0 } },
+    '_',
+    meta
+  ).percent;
+  const onTimeSnapshot = existingSnapshot || {
+    percent: priorLivePercent,
+    podIndex: existingProgressNode?.podIndex || 0,
+    segmentIndex: existingProgressNode?.segmentIndex || 0,
+    snapshotAt: new Date().toISOString(),
+  };
+
+  const newLivePercent = getUnitSummary(
+    { _: { podIndex: newPodIndex, segmentIndex: newSegmentIndex } },
+    '_',
+    meta
+  ).percent;
+  const baseline = Math.max(priorLivePercent, onTimeSnapshot.percent);
+  const increment = Math.max(0, newLivePercent - baseline);
+
+  const daysLate = daysLateFor(effectiveDueDateTime);
+  const multiplier = dayLateMultiplier(daysLate, task.latePenaltyPerDay, teacherOverride?.waivePenalty);
+  const lateCreditPercent = (existingProgressNode?.lateCreditPercent || 0) + increment * multiplier;
+
+  return { ...base, onTimeSnapshot, lateCreditPercent };
+};

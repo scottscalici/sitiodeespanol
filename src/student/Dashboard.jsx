@@ -8,6 +8,7 @@ import { getCachedCollection, getCachedQuery, getCachedDoc } from '../utils/fire
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
+import { getAssignedDominioTasks, isPastEffectiveDueDate } from '../utils/learningPathProgress';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { getCanonicalTextbookName } from '../utils/textbookAccess';
 
@@ -779,7 +780,15 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} />
+              <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} fechaByDia={fechaByDia} variant="active" />
+              {getAssignedDominioTasks(safeTareas, liveDia).some(
+                (task) => isPastEffectiveDueDate(task, fechaByDia, userData?.progress?.[task.path_id]?.teacherOverride)
+              ) && (
+                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-4">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">📦 Rutas Archivadas</h3>
+                  <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} fechaByDia={fechaByDia} variant="archived" />
+                </div>
+              )}
               <PracticeHubTile course={course} />
               <LeaderboardCard course={course} />
               <HallOfFameCard course={course} />

@@ -5,7 +5,7 @@ import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
-import { getAssignedDominioTasks } from '../utils/learningPathProgress';
+import { getAssignedDominioTasks, buildGradedProgressNode } from '../utils/learningPathProgress';
 
 // A path is one content type from creation now — no more vocab/verbs/practical
 // branches bundled into a single document, so there's nothing to tab between.
@@ -58,6 +58,7 @@ export default function StudentLearningPath() {
   const [selectedPathId, setSelectedPathId] = useState('');
   const [unitData, setUnitData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fechaByDia, setFechaByDia] = useState({});
   const [activeWorkoutSegment, setActiveWorkoutSegment] = useState(null);
 
   // In-app feedback modal (replaces native alert() popups)
@@ -76,9 +77,17 @@ export default function StudentLearningPath() {
         // same as every other day-gated card computes on its own.
         const parsedTargetDia = parseInt(targetDia, 10);
         let currentDay = parsedTargetDia;
+        // Always fetched (not just when no URL override) — buildGradedProgressNode
+        // needs the día->calendar-date map to resolve a due date regardless of
+        // how this page was reached.
+        const calSnap = await getDoc(doc(db, 'config', 'academic_year_2026_2027'));
+        const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
+        const dateMap = {};
+        calendarArray.forEach((c) => {
+          if (c.dia != null && c.fecha) dateMap[Number(c.dia)] = c.fecha;
+        });
+        setFechaByDia(dateMap);
         if (!currentDay) {
-          const calSnap = await getDoc(doc(db, 'config', 'academic_year_2026_2027'));
-          const calendarArray = calSnap.exists() ? (calSnap.data().map || []) : [];
           const todayStr = new Date().toLocaleDateString('en-CA');
           const pastEntries = calendarArray.filter((c) => c.fecha && c.fecha <= todayStr && c.dia != null);
           currentDay = pastEntries.length > 0
@@ -487,6 +496,7 @@ export default function StudentLearningPath() {
                 let newDaily = totalPointsEarned;
                 let newPathPoints = totalPointsEarned;
                 let existingData = {};
+                let existingPathProgress;
 
                 if (snap.exists()) {
                    const data = snap.data();
@@ -495,13 +505,29 @@ export default function StudentLearningPath() {
                    if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
                    if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
                    newDaily += (data.daily_points || 0);
-                   const existingPathProgress = data.progress?.[selectedPathId];
+                   existingPathProgress = data.progress?.[selectedPathId];
                    newPathPoints += (legacyBranchKey
                      ? existingPathProgress?.[legacyBranchKey]?.path_points
                      : existingPathProgress?.path_points) || 0;
                 }
 
-                const newProgressNode = { path_points: newPathPoints, podIndex: newPodIdx, segmentIndex: newSegIdx };
+                // Due-date/penalty grading only applies to a current flat-shape
+                // path with its Dominio tarea opted in (enforceDueDate) — a
+                // legacy branched path can no longer be newly authored, so it
+                // never gets this treatment, and an un-enforced task's node
+                // comes back byte-identical to the old { podIndex, segmentIndex }.
+                const gradedFields = (!legacyBranchKey && selectedTask)
+                  ? buildGradedProgressNode({
+                      existingProgressNode: existingPathProgress,
+                      newPodIndex: newPodIdx,
+                      newSegmentIndex: newSegIdx,
+                      meta: { isFlat: true, pods: pods.map((p) => ({ segmentCount: p.segments?.length || 0, isBonus: !!p.isBonus })), totalPods: pods.length },
+                      task: selectedTask,
+                      fechaByDia,
+                    })
+                  : { podIndex: newPodIdx, segmentIndex: newSegIdx };
+
+                const newProgressNode = { path_points: newPathPoints, ...gradedFields };
 
                 await setDoc(userRef, {
                   total_points: newTotal,
