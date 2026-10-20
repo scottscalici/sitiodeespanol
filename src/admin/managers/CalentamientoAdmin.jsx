@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import {
@@ -261,6 +261,27 @@ export default function CalentamientoAdmin() {
     setEditingPreviewIndex(null);
   };
 
+  // dia is an explicit, teacher-typed number with no uniqueness constraint —
+  // nothing stops two saved docs from sharing the same course+día, which
+  // then both show to students on that day. This is how a teacher removes
+  // the extra one: load it above, then delete it here.
+  const handleDeletePractice = async () => {
+    if (!savedPractices.some((p) => p.id === calId)) {
+      alert('Primero carga una práctica guardada arriba para poder eliminarla.');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar permanentemente el calentamiento "${calId}"?`)) return;
+    try {
+      await deleteDoc(doc(db, 'calentamientos', calId));
+      invalidateCollectionCache('calentamientos');
+      setSavedPractices((prev) => prev.filter((p) => p.id !== calId));
+      alert('Calentamiento eliminado.');
+    } catch (err) {
+      console.error('Error deleting calentamiento:', err);
+      alert(`Error al eliminar: ${err.message}`);
+    }
+  };
+
   const handleSaveAndLockCalentamiento = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -335,9 +356,17 @@ export default function CalentamientoAdmin() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={handleDeletePractice}
+            className="p-2.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-xl border border-slate-700"
+            title="Eliminar la práctica cargada arriba"
+          >
+            🗑️
+          </button>
         </div>
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
-          Para duplicar una práctica para otro día, cárgala aquí y luego cambia el "Día" y el "ID Documento" abajo antes de guardar.
+          Para duplicar una práctica para otro día, cárgala aquí y luego cambia el "Día" y el "ID Documento" abajo antes de guardar. Para eliminar una duplicada, cárgala y haz clic en 🗑️.
         </p>
       </div>
 
