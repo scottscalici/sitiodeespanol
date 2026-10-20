@@ -97,10 +97,27 @@ const Dashboard = () => {
     return `Día ${diaNum} (${formatted})`;
   };
   const liveDiaFecha = liveDia ? fechaByDia[Number(liveDia)] : null;
+  // On an A/B block schedule the same día number can carry two different
+  // real dates, one per cycle (see fechaByDia above) — e.g. día 16 might be
+  // "16 oct" on cycle A and "20 oct" on cycle B. An account with no section
+  // set (every admin/independent account) defaults to cycle A regardless of
+  // which cycle is ACTUALLY meeting today, so fechaByDia's cycle-filtered
+  // lookup can hand back the wrong cycle's (stale) date for today's own día
+  // — which then resolves to the wrong theme. Checking the full, unfiltered
+  // calendar for ANY entry (either cycle) dated today sidesteps that: if
+  // today's día has one, this is today regardless of which cycle an account
+  // defaults to, so use the already-correct todayTheme instead of
+  // re-deriving a possibly-wrong date through this account's own cycle.
+  const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+  const isViewingToday = useMemo(
+    () => (data?.cal || []).some((c) => Number(c.dia) === Number(liveDia) && c.fecha === todayStr),
+    [data?.cal, liveDia, todayStr]
+  );
   const theme = useMemo(() => {
+    if (isViewingToday) return todayTheme;
     if (!liveDiaFecha || !resolveThemeForDate) return todayTheme;
     return resolveThemeForDate(liveDiaFecha) ?? todayTheme;
-  }, [liveDiaFecha, resolveThemeForDate, todayTheme]);
+  }, [isViewingToday, liveDiaFecha, resolveThemeForDate, todayTheme]);
 
   const [dailySong, setDailySong] = useState(null);
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
