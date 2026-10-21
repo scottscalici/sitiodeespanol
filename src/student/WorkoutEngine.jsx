@@ -931,14 +931,29 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
               ) : (
                 <div className="bg-white p-6 md:p-8 rounded-2xl border-2 border-slate-200 shadow-sm animate-fade-in">
                    <div className="flex flex-wrap items-center justify-center gap-3 text-2xl md:text-3xl font-bold text-slate-800">
-                      {currentQ.correctSyntax.split(' ').map((w, idx) => {
-                          if (w.toLowerCase() === currentQ.infinitive.toLowerCase()) {
-                             return <input key={idx} autoFocus type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} readOnly={isChecked}
-                                 className="w-32 md:w-40 text-center border-b-4 border-blue-500 bg-blue-50 focus:bg-blue-100 text-blue-900 rounded-t-lg outline-none px-2 py-1 mx-1"
-                                 onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} />
-                          }
-                          return <span key={idx}>{w}</span>
-                      })}
+                      {(() => {
+                          // The infinitive can be a multi-word phrase (e.g. "resolver
+                          // dudas"), which never equals any single space-split word, so
+                          // it's matched as a substring of the sentence instead — not
+                          // word-by-word — then split into the text before/after it.
+                          const syntax = currentQ.correctSyntax;
+                          const infinitive = currentQ.infinitive;
+                          const idx = syntax.toLowerCase().indexOf(infinitive.toLowerCase());
+                          const before = idx === -1 ? syntax : syntax.slice(0, idx).trim();
+                          const after = idx === -1 ? '' : syntax.slice(idx + infinitive.length).trim();
+                          const input = (
+                            <input key="input" autoFocus type="text" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} readOnly={isChecked}
+                                className="w-32 md:w-56 text-center border-b-4 border-blue-500 bg-blue-50 focus:bg-blue-100 text-blue-900 rounded-t-lg outline-none px-2 py-1 mx-1"
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !isButtonDisabled) isChecked ? handleNext() : handleCheck(); }} />
+                          );
+                          return (
+                            <>
+                              {before && <span key="before">{before}</span>}
+                              {input}
+                              {after && <span key="after">{after}</span>}
+                            </>
+                          );
+                      })()}
                    </div>
                    <p className="text-xs font-bold text-emerald-600 mt-6 uppercase tracking-widest">Conjuga el verbo: <span className="font-black text-emerald-800">{currentQ.infinitive}</span></p>
                 </div>
