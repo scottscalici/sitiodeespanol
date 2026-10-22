@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -42,6 +42,7 @@ export default function GrammarNoteViewer() {
   const [allPages, setAllPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEnglish, setShowEnglish] = useState(false);
+  const legacyContentRef = useRef(null);
 
   useEffect(() => {
     const fetchNote = async () => {
@@ -66,6 +67,23 @@ export default function GrammarNoteViewer() {
     };
     fetchNote();
   }, [noteId]);
+
+  // dangerouslySetInnerHTML parses <script> tags into inert elements that
+  // never run — standard DOM behavior for anything inserted as innerHTML,
+  // not a React bug. A legacy note with an inline <script> (e.g. a clickable
+  // interactive flowchart) that worked fine as a standalone .html file goes
+  // dead here unless its scripts are re-created and re-inserted, which is
+  // what actually makes the browser execute them.
+  useEffect(() => {
+    const container = legacyContentRef.current;
+    if (!container) return;
+    Array.from(container.querySelectorAll('script')).forEach((oldScript) => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+      newScript.textContent = oldScript.textContent;
+      oldScript.replaceWith(newScript);
+    });
+  }, [noteData?.htmlContent]);
 
   const existingIds = useMemo(() => new Set(allPages.map((p) => p.id)), [allPages]);
   const accentColor = theme?.styles?.cardOverrides?.notaGramatica;
@@ -169,7 +187,7 @@ export default function GrammarNoteViewer() {
                 .grammar-doc td { padding: 12px; border: 1px solid #e2e8f0; color: #334155 !important; font-weight: 500; }
                 .grammar-doc code { background: #f0f9ff; color: #0284c7 !important; font-weight: 800; padding: 3px 6px; border-radius: 4px; }
               `}</style>
-              <div className="grammar-doc prose max-w-none text-slate-700 leading-relaxed space-y-4" dangerouslySetInnerHTML={{ __html: noteData.htmlContent }} />
+              <div ref={legacyContentRef} className="grammar-doc prose max-w-none text-slate-700 leading-relaxed space-y-4" dangerouslySetInnerHTML={{ __html: noteData.htmlContent }} />
             </div>
           )}
         </div>
