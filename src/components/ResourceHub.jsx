@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
@@ -18,11 +17,8 @@ export default function ResourceHub({ course = 's2' }) {
   useEffect(() => {
     const fetchResources = async () => {
       try {
-        const docRef = doc(db, 'config', 'resource_hub');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setResources(docSnap.data().items || []);
-        }
+        const data = await getCachedDoc('config', 'resource_hub');
+        if (data) setResources(data.items || []);
       } catch (err) {
         console.error("Error fetching resources:", err);
       } finally {

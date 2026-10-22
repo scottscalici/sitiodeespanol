@@ -1,5 +1,4 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getCachedDoc } from './firestoreCache';
 
 export const LEARNING_PATH_BRANCHES = ['vocab', 'verbs', 'practical'];
 
@@ -20,9 +19,11 @@ const isFlatPath = (data) => Array.isArray(data?.pods);
 // getUnitSummary below falls back to its original pod-count-based math.
 export const fetchUnitProgressMeta = async (unitId) => {
   if (!unitId) return { isFlat: true, pods: [], totalPods: 0 };
-  const snap = await getDoc(doc(db, 'learning_paths', unitId));
-  if (!snap.exists()) return { isFlat: true, pods: [], totalPods: 0 };
-  const data = snap.data();
+  // Cached per unit id — callers (LearningPathTile, TeacherGradebook) were
+  // each re-reading this doc fresh on every call even though the SAME
+  // handful of units recur across every student and every Dashboard visit.
+  const data = await getCachedDoc('learning_paths', unitId);
+  if (!data) return { isFlat: true, pods: [], totalPods: 0 };
   if (isFlatPath(data)) {
     const pods = data.pods.map((p) => ({ segmentCount: p.segments?.length || 0, isBonus: !!p.isBonus }));
     return { isFlat: true, pods, totalPods: pods.length };
