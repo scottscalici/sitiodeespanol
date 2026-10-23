@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { PAIR_MAP, POOL_MAP } from '../utils/distractorConfig';
 import { checkAnswerLeniently } from '../utils/checkAnswer';
 import { playAudio } from '../utils/playAudio';
-import { getCachedBucketedItem } from '../utils/firestoreCache';
+import { getCachedBucketedItem, getCachedDoc } from '../utils/firestoreCache';
 
 // verbs is a bucketed collection — a verb's own ID deterministically says
 // which bucket document holds it, so a lookup needs no extra read to find
@@ -227,7 +227,19 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       typeQueue = shuffle(typeQueue);
       while (typeQueue.length < totalQs) typeQueue.push('recall');
 
-      // ASYNC UNPACK CURRENT CONCEPTS
+      // ASYNC UNPACK CURRENT CONCEPTS — a Learning Path segment embeds a full
+      // SNAPSHOT of each concept's data (fullData) at the moment it was added
+      // in the path builder, not a live reference. A verb GROUP's members
+      // were already refetched live below (so a VerbEditor correction
+      // reaches an already-built path immediately) — an individual verb and
+      // a plain vocab word were NOT, so an edit made after a path was built
+      // (e.g. adding an alt_answers synonym, or fixing a conjugation) would
+      // silently keep replaying whatever was baked in at save time forever.
+      // Both are now refetched the same way, keyed off of what fullData
+      // actually looks like (a verb has `tenses`, a vocab word has
+      // `palabra`) rather than how the item happened to be tagged when it
+      // was added — a quieter, more reliable signal than isGroup/verbIds,
+      // which only ever marked the GROUP case.
       let concepts = [];
       for (const c of rawConcepts) {
         if (c.isGroup && c.verbIds) {
@@ -235,6 +247,12 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
             const verbData = await getVerbById(vid);
             if (verbData) concepts.push({ id: vid, label: vid, tags: c.tags, fullData: verbData, isVerbObj: true });
           }
+        } else if (c.fullData?.tenses) {
+          const verbData = await getVerbById(c.id);
+          concepts.push(verbData ? { ...c, fullData: verbData } : c);
+        } else if (c.fullData?.palabra) {
+          const freshVocab = await getCachedDoc('vocabulary', c.id);
+          concepts.push(freshVocab ? { ...c, fullData: freshVocab } : c);
         } else {
           concepts.push(c);
         }
