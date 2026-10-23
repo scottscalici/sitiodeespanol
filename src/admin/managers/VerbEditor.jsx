@@ -237,6 +237,16 @@ export default function VerbEditor() {
       // into nested paths. The dot-string form silently wrote to a bogus
       // sibling field next to the real `items` map on every save.
       const bucketId = getBucketId(id);
+      // setDoc's merge:true recursively merges nested objects — a cell the
+      // teacher just blanked (now simply absent from payload, per the
+      // cleanedTenses step above) is NOT the same as telling Firestore to
+      // delete it, so the OLD value silently survived underneath every
+      // save of an already-populated verb, reappearing on the next read.
+      // Deleting this verb's whole entry first, then writing the fresh
+      // payload, guarantees nothing old can survive. The delete is a
+      // harmless no-op (swallowed) the very first time a verb is saved
+      // into a bucket that doesn't have an entry for it yet.
+      await updateDoc(doc(db, 'verbs', bucketId), { [`items.${id}`]: deleteField() }).catch(() => {});
       await setDoc(doc(db, 'verbs', bucketId), { items: { [id]: payload } }, { merge: true });
       invalidateCollectionCache('verbs');
       invalidateDocCache('verbs', bucketId);
