@@ -83,6 +83,16 @@ export default function GrammarNoteViewer() {
       newScript.textContent = oldScript.textContent;
       oldScript.replaceWith(newScript);
     });
+    // Some legacy notes' own scripts scroll the page on load (e.g. an old
+    // standalone page that auto-scrolled to a highlighted row or an input) —
+    // a leftover of being a standalone .html page, where that made sense.
+    // Here it runs AFTER the route-level scroll-to-top reset (this note's
+    // content, and therefore its script, only exists once the async
+    // Firestore fetch resolves — well after that earlier reset already
+    // fired), so it was winning the race and leaving the page scrolled away
+    // from the top. Forcing it back once more, right after the script's own
+    // synchronous execution, makes landing at the top the final word.
+    window.scrollTo(0, 0);
   }, [noteData?.htmlContent]);
 
   const existingIds = useMemo(() => new Set(allPages.map((p) => p.id)), [allPages]);
