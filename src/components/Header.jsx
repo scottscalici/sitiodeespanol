@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 import { getTitleForPoints, getAllEarnedBadges, isBadgeUpgrade, DEFAULT_TITLE_TIERS } from '../utils/gamification';
 import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
@@ -32,11 +32,15 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   useEffect(() => {
     const fetchGamificationData = async () => {
       try {
-        const [configSnap, paths] = await Promise.all([
-          getDoc(doc(db, 'config', 'gamification')),
+        // Cached — Header remounts every time a student navigates back to
+        // the Dashboard, which was re-reading this config doc fresh every
+        // single time instead of reusing the same 5-minute cache the rest
+        // of the app relies on.
+        const [configData, paths] = await Promise.all([
+          getCachedDoc('config', 'gamification'),
           getCachedCollection('learning_paths'),
         ]);
-        if (configSnap.exists()) setGamConfig(configSnap.data());
+        if (configData) setGamConfig(configData);
         setLearningPathsById(Object.fromEntries(paths.map((p) => [p.id, p])));
       } catch (error) {
         console.error('Error loading gamification data:', error);

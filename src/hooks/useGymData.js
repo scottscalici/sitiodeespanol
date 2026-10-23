@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 
 const CONFIG = {
   DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
@@ -135,9 +133,8 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
 
         const fetchCalendar = async () => {
           try {
-            const calRef = doc(db, 'config', 'academic_year_2026_2027');
-            const calSnap = await getDoc(calRef);
-            return calSnap.exists() ? calSnap.data() : { map: [] };
+            const calData = await getCachedDoc('config', 'academic_year_2026_2027');
+            return calData || { map: [] };
           } catch (err) {
             return { map: [] };
           }
@@ -194,18 +191,16 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
 
         const fetchEvalsMaster = async () => {
           try {
-            const evalsRef = doc(db, 'curriculum_tracks', 'evaluaciones_master');
-            const evalsSnap = await getDoc(evalsRef);
-            return evalsSnap.exists() ? evalsSnap.data() : { s2: [], s4: [] };
+            const evalsData = await getCachedDoc('curriculum_tracks', 'evaluaciones_master');
+            return evalsData || { s2: [], s4: [] };
           } catch (err) {
             return { s2: [], s4: [] };
           }
         };
         const fetchTareasMaster = async () => {
           try {
-            const tareasRef = doc(db, 'curriculum_tracks', 'tareas_master');
-            const tareasSnap = await getDoc(tareasRef);
-            return tareasSnap.exists() ? tareasSnap.data() : { s2: [], s4: [] };
+            const tareasData = await getCachedDoc('curriculum_tracks', 'tareas_master');
+            return tareasData || { s2: [], s4: [] };
           } catch (err) {
             return { s2: [], s4: [] };
           }
@@ -213,9 +208,8 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
         // NEW: Fetch Estructura/Gramatica Master Document
         const fetchGramaticaMaster = async () => {
           try {
-            const gramRef = doc(db, 'curriculum_tracks', 'gramatica_master');
-            const gramSnap = await getDoc(gramRef);
-            return gramSnap.exists() ? gramSnap.data() : { s2: [], s4: [] };
+            const gramData = await getCachedDoc('curriculum_tracks', 'gramatica_master');
+            return gramData || { s2: [], s4: [] };
           } catch (err) {
             return { s2: [], s4: [] };
           }

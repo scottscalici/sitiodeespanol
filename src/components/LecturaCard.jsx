@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 
@@ -17,8 +16,8 @@ export default function LecturaCard({ lecturaId }) {
   useEffect(() => {
     if (!lecturaId) return;
     let cancelled = false;
-    getDoc(doc(db, 'lecturas', lecturaId))
-      .then((snap) => { if (!cancelled && snap.exists()) setLectura(snap.data()); })
+    getCachedDoc('lecturas', lecturaId)
+      .then((data) => { if (!cancelled && data) setLectura(data); })
       .catch((err) => console.error('Error loading lectura:', err));
     return () => { cancelled = true; };
   }, [lecturaId]);

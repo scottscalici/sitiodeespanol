@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useGymData } from '../hooks/useGymData';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -152,20 +152,18 @@ const Dashboard = () => {
           getCachedQuery(`${name}:course:${course}`, () =>
             getDocs(query(collection(db, name), where('course', '==', course)))
           );
-        const [calentamientos, allPracticeCards, curiosidadesBundle, platformLogosDoc] = await Promise.all([
+        const [calentamientos, allPracticeCards, platformLogosDoc] = await Promise.all([
           scopedQuery('calentamientos'),
           scopedQuery('practice_cards'),
-          // One doc for every course (unlike the two above) — flattened the
-          // same way TeacherGradebook reads it.
-          getCachedDoc('curiosidades', '_bundle'),
           getCachedDoc('config', 'platform_logos'),
         ]);
         setPracticeCards(allPracticeCards);
         setPlatformLogos(platformLogosDoc || {});
         const todayStr = new Date().toLocaleDateString('en-CA');
 
-        const curiosidadItems = curiosidadesBundle?.items || {};
-        const allCuriosidades = Object.entries(curiosidadItems).map(([id, item]) => ({ id, ...item }));
+        // Reuses useGymData's already-fetched bundle (data.curios) instead of
+        // a second, separately-cached read of the same 'curiosidades' doc.
+        const allCuriosidades = data.curios || [];
 
         const assigned = getAssignedWarmups(calentamientos, fechaByDia, course, todayStr, null);
         const assignedPractice = getAssignedWarmups(allPracticeCards, fechaByDia, course, todayStr, null);
@@ -216,15 +214,12 @@ const Dashboard = () => {
     const fetchVocabSequence = async () => {
       if (!course || !liveDia) return;
       try {
-        const vocabRef = doc(db, 'curriculum_tracks', 'vocab_master');
-        const vocabSnap = await getDoc(vocabRef);
-        if (vocabSnap.exists()) {
-          const masterData = vocabSnap.data();
-          const bundlesForToday = masterData[course]?.[liveDia.toString()] || [];
-          setActiveVocabBundles(bundlesForToday);
-        } else {
-          setActiveVocabBundles([]);
-        }
+        // Cached — was a raw getDoc re-reading this doc on every
+        // liveDia/course change (every click of the day-navigator, and
+        // every time a student navigates back to the Dashboard).
+        const masterData = await getCachedDoc('curriculum_tracks', 'vocab_master');
+        const bundlesForToday = masterData?.[course]?.[liveDia.toString()] || [];
+        setActiveVocabBundles(bundlesForToday);
       } catch (error) {
         console.error('Error fetching vocab sequence:', error);
       }
@@ -240,11 +235,11 @@ const Dashboard = () => {
     let cancelled = false;
     const fetchBundleDetails = async () => {
       try {
+        // Cached per bundle id — the same handful of bundles recur across
+        // many liveDia/course changes and across every student in a course,
+        // so this was re-reading docs that were almost always already known.
         const entries = await Promise.all(
-          activeVocabBundles.map(async (bundleId) => {
-            const snap = await getDoc(doc(db, 'vocab_bundles', bundleId));
-            return [bundleId, snap.exists() ? snap.data() : null];
-          })
+          activeVocabBundles.map(async (bundleId) => [bundleId, await getCachedDoc('vocab_bundles', bundleId)])
         );
         if (!cancelled) setVocabBundleDetails(Object.fromEntries(entries));
       } catch (error) {
@@ -260,17 +255,11 @@ const Dashboard = () => {
     const fetchLecturasSequence = async () => {
       if (!course || !liveDia) return;
       try {
-        const lecturasRef = doc(db, 'curriculum_tracks', 'lecturas_master');
-        const snap = await getDoc(lecturasRef);
-
-        if (snap.exists()) {
-          const masterData = snap.data();
-          const courseData = masterData[course] || {};
-          const readingsForToday = courseData[liveDia.toString()] || [];
-          setActiveLecturas(readingsForToday);
-        } else {
-          setActiveLecturas([]);
-        }
+        // Cached — same fix as fetchVocabSequence above.
+        const masterData = await getCachedDoc('curriculum_tracks', 'lecturas_master');
+        const courseData = masterData?.[course] || {};
+        const readingsForToday = courseData[liveDia.toString()] || [];
+        setActiveLecturas(readingsForToday);
       } catch (error) {
         console.error('Error fetching lecturas sequence:', error);
       }
