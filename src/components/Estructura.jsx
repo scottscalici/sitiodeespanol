@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
@@ -16,7 +14,6 @@ const Estructura = ({ estructura = [], liveDia }) => {
     theme?.styles?.textures?.estructura
   );
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
-  const [linkTitles, setLinkTitles] = useState({});
   const [allPages, setAllPages] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
 
@@ -33,36 +30,24 @@ const Estructura = ({ estructura = [], liveDia }) => {
     fetchAllPages();
   }, []);
 
-  useEffect(() => {
-    const allIds = new Set();
+  // Looked up from the already-fetched allPages above instead of a separate
+  // getDoc per linked note — allPages already holds every grammar page, so
+  // a second per-id Firestore read here was pure redundancy.
+  const pagesById = useMemo(() => new Map(allPages.map((p) => [p.id, p])), [allPages]);
+  const linkTitles = useMemo(() => {
+    const titles = {};
     estructura
       .filter((g) => Number(g.dia) === liveDia)
       .forEach((lesson) => {
         (lesson.enlaces ? lesson.enlaces.split(',') : []).forEach((raw) => {
           const trimmed = raw.trim();
-          if (trimmed) allIds.add(trimmed);
+          if (!trimmed) return;
+          const page = pagesById.get(normalizeGrammarId(trimmed));
+          if (page?.title) titles[trimmed] = page.title;
         });
       });
-
-    if (allIds.size === 0) return;
-
-    const fetchTitles = async () => {
-      const entries = await Promise.all(
-        [...allIds].map(async (raw) => {
-          try {
-            const snap = await getDoc(doc(db, 'grammar_pages', normalizeGrammarId(raw)));
-            return [raw, snap.exists() ? snap.data().title : null];
-          } catch (error) {
-            console.error('Error fetching grammar note title:', error);
-            return [raw, null];
-          }
-        })
-      );
-      setLinkTitles(Object.fromEntries(entries.filter(([, title]) => title)));
-    };
-
-    fetchTitles();
-  }, [estructura, liveDia]);
+    return titles;
+  }, [estructura, liveDia, pagesById]);
 
   if (todaysLessons.length === 0) return null;
 
