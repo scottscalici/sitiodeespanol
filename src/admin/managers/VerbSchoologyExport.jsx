@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getCachedCollection, getCachedBucketedCollection } from '../../utils/firestoreCache';
 import { VERB_TENSES, VERB_SUBJECTS } from '../../utils/verbTenses';
-import { generateVerbQuestions } from '../../utils/verbQuestionGenerator';
+import { generateVerbQuestions, formatSubjectAndTranslation } from '../../utils/verbQuestionGenerator';
 import { buildBlackboardPoolZip, triggerZipDownload } from '../../utils/exportToSchoology';
 
 const TENSE_LABELS = Object.fromEntries(VERB_TENSES.map((t) => [t.id, t.label]));
@@ -23,6 +23,7 @@ export default function VerbSchoologyExport() {
   const [configBlocks, setConfigBlocks] = useState([]);
   const [includeVosotros, setIncludeVosotros] = useState(false);
   const [previewQuestions, setPreviewQuestions] = useState([]);
+  const [editingPreviewIndex, setEditingPreviewIndex] = useState(null);
   const [title, setTitle] = useState('Quiz de Recuperación');
   const [exporting, setExporting] = useState(false);
 
@@ -73,6 +74,45 @@ export default function VerbSchoologyExport() {
 
   const handlePreview = () => {
     setPreviewQuestions(generateVerbQuestions(configBlocks, masterVerbsMap, { includeVosotros }));
+    setEditingPreviewIndex(null);
+  };
+
+  // Same per-question inline edit as Calentamiento Admin's own preview:
+  // swapping the subject or verb on one already-generated question
+  // recomputes its answer and translation from the real verb data, rather
+  // than just changing the label.
+  const handlePreviewEdit = (index, field, newValue) => {
+    const updated = [...previewQuestions];
+    const q = updated[index];
+
+    let newRawSubject = q.rawSubject;
+    let newPalabra = q.palabra;
+
+    if (field === 'sujeto') newRawSubject = newValue;
+    if (field === 'palabra') newPalabra = newValue;
+
+    const verbData = masterVerbsMap[newPalabra];
+    if (!verbData) return;
+
+    const tenseMap = verbData.tenses?.[q.tense] || {};
+    const subjectData = tenseMap[newRawSubject] || {};
+
+    const formAnswer = subjectData.target || '???';
+    const rawEnglish = subjectData.english || verbData.translations?.infinitivo?.english || '';
+
+    const { sp: finalSubject, en: finalEnglish } = formatSubjectAndTranslation(newRawSubject, rawEnglish, q.tense);
+
+    updated[index] = {
+      ...q,
+      palabra: newPalabra,
+      mostrar: newPalabra,
+      rawSubject: newRawSubject,
+      sujeto: finalSubject,
+      traducción: finalEnglish,
+      forma: formAnswer,
+    };
+
+    setPreviewQuestions(updated);
   };
 
   const partCount = Math.ceil(previewQuestions.length / MAX_QUESTIONS_PER_FILE) || 0;
@@ -280,13 +320,62 @@ export default function VerbSchoologyExport() {
                 🔀 Generar otra versión
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-y-auto pr-1">
               {previewQuestions.map((q, i) => (
                 <div key={i} className="p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-xs">
-                  <p className="text-slate-400">
-                    {q.palabra} ({q.sujeto}) - {TENSE_LABELS[q.tense] || q.tense}
-                  </p>
-                  <p className="text-emerald-400 font-bold">{q.forma}</p>
+                  {editingPreviewIndex === i ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between gap-2">
+                        <select
+                          value={q.rawSubject}
+                          onChange={(e) => handlePreviewEdit(i, 'sujeto', e.target.value)}
+                          className="w-1/2 p-1 bg-slate-900 text-sky-400 font-bold rounded outline-none border border-slate-600"
+                        >
+                          <option value="yo">yo</option>
+                          <option value="tú">tú</option>
+                          <option value="él_ella_ud">él / ella / Ud.</option>
+                          <option value="nosotros">nosotros</option>
+                          <option value="vosotros">vosotros</option>
+                          <option value="ellos_ellas_uds">ellos / ellas / Uds.</option>
+                        </select>
+                        <select
+                          value={q.palabra}
+                          onChange={(e) => handlePreviewEdit(i, 'palabra', e.target.value)}
+                          className="w-1/2 p-1 bg-slate-900 text-white font-black uppercase rounded outline-none border border-slate-600"
+                        >
+                          {q.allowedVerbs?.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPreviewIndex(null)}
+                        className="w-full text-center bg-emerald-600/80 hover:bg-emerald-600 text-white font-bold rounded p-1 text-[10px] uppercase tracking-wider"
+                      >
+                        ✔ Hecho
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <p className="text-slate-400">
+                          {q.palabra} ({q.sujeto}) - {TENSE_LABELS[q.tense] || q.tense}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPreviewIndex(i)}
+                          className="text-slate-500 hover:text-sky-400 transition-colors"
+                          title="Editar Sujeto/Verbo"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                      <p className="text-emerald-400 font-bold">{q.forma}</p>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
