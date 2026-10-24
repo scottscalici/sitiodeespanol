@@ -400,6 +400,9 @@ export default function VerbEditor() {
             <Link to="/admin-secret-portal-verb-audit" className="text-emerald-400 hover:text-emerald-300 text-xs font-bold border border-emerald-700/50 px-3 py-1.5 rounded-lg">
               🔍 Auditoría
             </Link>
+            <Link to="/admin-secret-portal-verb-schoology-export" className="text-amber-400 hover:text-amber-300 text-xs font-bold border border-amber-700/50 px-3 py-1.5 rounded-lg">
+              📤 Exportar a Schoology
+            </Link>
             <Link to="/admin-daily-plan-hub" className="text-slate-400 hover:text-white text-xs font-bold border border-slate-700 px-3 py-1.5 rounded-lg">
               ← Hub
             </Link>

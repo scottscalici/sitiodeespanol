@@ -73,6 +73,7 @@ import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
+import VerbSchoologyExport from './admin/managers/VerbSchoologyExport';
 import SilabasAdmin from './admin/managers/SilabasAdmin';
 import CuriosidadesManager from './admin/managers/CuriosidadesManager';
 import ImageCardsManager from './admin/managers/ImageCardsManager';
@@ -623,6 +624,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <VerbAudit />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-verb-schoology-export"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <VerbSchoologyExport />
                 </AdminRoute>
               }
             />
