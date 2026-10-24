@@ -176,7 +176,7 @@ export default function VerbSchoologyExport() {
               {configBlocks.map((block, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-slate-800 rounded-xl border border-slate-700 grid grid-cols-1 sm:grid-cols-5 gap-3 items-center"
+                  className="p-4 bg-slate-800 rounded-xl border border-slate-700 grid grid-cols-1 sm:grid-cols-6 gap-3 items-center"
                 >
                   <div>
                     <p className="text-xs font-black text-white">{block.label}</p>
@@ -205,6 +205,21 @@ export default function VerbSchoologyExport() {
                       onChange={(e) => updateBlockConfig(idx, 'count', Number(e.target.value))}
                       className="w-full p-1.5 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs text-center"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Verbo Específico</label>
+                    <select
+                      value={block.specificVerb}
+                      onChange={(e) => updateBlockConfig(idx, 'specificVerb', e.target.value)}
+                      className="w-full p-1.5 bg-slate-900 border border-slate-700 text-white rounded-lg text-xs"
+                    >
+                      <option value="any">Cualquiera</option>
+                      {block.allowedVerbs.map((vId) => (
+                        <option key={vId} value={masterVerbsMap[vId]?.palabra || vId}>
+                          {masterVerbsMap[vId]?.palabra || vId}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Sujeto</label>
