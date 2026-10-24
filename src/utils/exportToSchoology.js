@@ -126,10 +126,7 @@ export const buildVerbConjugationQuestions = ({ verbs, tenseIds, subjectIds, ten
       subjectIds.forEach((subjectId) => {
         const cell = tenseData[subjectId];
         if (!cell?.target) return;
-        const english = cell.english || verb.translations?.infinitivo?.english || '';
-        const prompt =
-          `Conjuga el verbo (${verb.palabra}) en ${tenseLabels[tenseId] || tenseId} para "${subjectLabels[subjectId] || subjectId}".` +
-          (english ? `\nEnglish: ${english}` : '');
+        const prompt = `${verb.palabra} (${subjectLabels[subjectId] || subjectId}) - ${tenseLabels[tenseId] || tenseId}`;
         questions.push({
           id: `q${questions.length + 1}`,
           prompt,

@@ -9,6 +9,17 @@ const SUBJECT_LABELS = Object.fromEntries(VERB_SUBJECTS.map((s) => [s.id, s.labe
 const DEFAULT_TENSES = new Set(['presente', 'pretérito']);
 const DEFAULT_SUBJECTS = new Set(VERB_SUBJECTS.filter((s) => s.id !== 'vosotros').map((s) => s.id));
 
+// Schoology caps a Test/Quiz (and the newer Assessment object) at 200
+// questions — but importing a Blackboard Pool zip always lands as a
+// Test/Quiz FIRST, even though the actual destination (a Question/Item
+// Bank, which has no such cap — that's the whole point of a bank) only
+// comes after a later "add questions to bank" step. Staying safely under
+// that intermediate limit avoids finding out the hard way whether a bulk
+// XML import enforces it the same as adding questions by hand. Each part
+// below gets imported + "added to bank" separately, accumulating into the
+// SAME bank across multiple rounds.
+const MAX_QUESTIONS_PER_FILE = 150;
+
 export default function VerbSchoologyExport() {
   const [verbs, setVerbs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,13 +92,26 @@ export default function VerbSchoologyExport() {
     [selectedVerbs, selectedTenses, selectedSubjects]
   );
 
+  const partCount = Math.ceil(previewQuestions.length / MAX_QUESTIONS_PER_FILE) || 0;
+
   const handleExport = async () => {
     if (previewQuestions.length === 0) return;
     setExporting(true);
     try {
-      const blob = await buildBlackboardPoolZip({ title, questions: previewQuestions });
-      const safeFilename = (title || 'verb-export').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      triggerZipDownload(blob, `${safeFilename || 'verb-export'}.zip`);
+      const safeFilename = (title || 'verb-export').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'verb-export';
+      const chunks = [];
+      for (let i = 0; i < previewQuestions.length; i += MAX_QUESTIONS_PER_FILE) {
+        chunks.push(previewQuestions.slice(i, i + MAX_QUESTIONS_PER_FILE));
+      }
+      for (let i = 0; i < chunks.length; i++) {
+        const partLabel = chunks.length > 1 ? ` — Parte ${i + 1} de ${chunks.length}` : '';
+        const blob = await buildBlackboardPoolZip({ title: `${title}${partLabel}`, questions: chunks[i] });
+        const filenamePart = chunks.length > 1 ? `-parte-${i + 1}-de-${chunks.length}` : '';
+        triggerZipDownload(blob, `${safeFilename}${filenamePart}.zip`);
+        // A short gap between downloads — triggering several at once in a
+        // tight loop can make the browser silently block all but the first.
+        if (i < chunks.length - 1) await new Promise((resolve) => setTimeout(resolve, 400));
+      }
     } catch (err) {
       console.error('Error building Schoology export:', err);
       alert('Error al generar el archivo. Revisa la consola.');
@@ -238,6 +262,13 @@ export default function VerbSchoologyExport() {
                 <span className="font-black text-white">{previewQuestions.length}</span> pregunta
                 {previewQuestions.length === 1 ? '' : 's'} se generarían
               </p>
+              {partCount > 1 && (
+                <p className="text-xs text-amber-400">
+                  Schoology limita un Test/Quiz (el paso intermedio antes del banco) a 200 preguntas, así que esto se
+                  descargará en <span className="font-black">{partCount} archivos</span> de hasta {MAX_QUESTIONS_PER_FILE}{' '}
+                  cada uno. Importa y "agrega al banco" cada uno por separado, en el mismo banco.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleExport}
