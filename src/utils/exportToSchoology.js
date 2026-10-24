@@ -112,32 +112,6 @@ export const buildBlackboardPoolZip = async ({ title, questions }) => {
   return zip.generateAsync({ type: 'blob' });
 };
 
-// Builds one question per (verb × tense × subject) combination that
-// actually has a saved conjugation — a verb missing a person on purpose
-// (e.g. impersonal "haber," which only ever has él/ella/Ud. filled in)
-// simply contributes no question for that subject, rather than an
-// unanswerable blank.
-export const buildVerbConjugationQuestions = ({ verbs, tenseIds, subjectIds, tenseLabels, subjectLabels }) => {
-  const questions = [];
-  verbs.forEach((verb) => {
-    tenseIds.forEach((tenseId) => {
-      const tenseData = verb.tenses?.[tenseId];
-      if (!tenseData) return;
-      subjectIds.forEach((subjectId) => {
-        const cell = tenseData[subjectId];
-        if (!cell?.target) return;
-        const prompt = `${verb.palabra} (${subjectLabels[subjectId] || subjectId}) - ${tenseLabels[tenseId] || tenseId}`;
-        questions.push({
-          id: `q${questions.length + 1}`,
-          prompt,
-          answers: [cell.target],
-        });
-      });
-    });
-  });
-  return questions;
-};
-
 export const triggerZipDownload = (blob, filename) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
