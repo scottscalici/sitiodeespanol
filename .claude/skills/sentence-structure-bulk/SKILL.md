@@ -88,21 +88,16 @@ at all if it's just modeling the word in context rather than quizzing it.
   differently (different word order, an optional subject pronoun dropped
   or included, etc.) — accepted as correct in addition to the main one.
 
-## The one rule that silently breaks everything if missed
+## Empty middle columns
 
-**A field left empty in the MIDDLE of a line needs TWO spaces between its
-two pipes (`" |  | "`), never one (`" | | "`).** The real parser splits on
-an exact "one space, one pipe, one space" pattern — with only one space
-between two pipes, it can't carve out an empty field at all. It collapses
-into one fewer column than expected and dumps a mangled, pipe-prefixed
-string into the next field instead, silently destroying every column
-after it (this has actually happened with real generated content before
-this rule was added here — it's not a hypothetical).
-
-This matters most for the **capítulo** and **grupo_distractores** columns,
-since they're the ones most often left blank. Before finalizing any
-batch, re-scan every line and check any `" | | "` you wrote should
-actually read `" |  | "`.
+Leaving the **capítulo** or **grupo_distractores** column empty when a
+later column (tags, exclude list, alt answers) is still used is fine —
+write it as `" | | "` or `" |  | "`, either works, since the real parser
+no longer depends on exact spacing to find column breaks. (An earlier
+version of the parser DID require two spaces for this, and a collapsed
+double-space — easy to trigger via a word processor or some clipboard
+tools — used to silently corrupt every column after the empty one. That's
+fixed now, but it's worth knowing in case an older line ever looks wrong.)
 
 ## Important
 
@@ -128,6 +123,5 @@ El tren sale [[pronto]]. | The train leaves soon. |  | Descubre 2, adverbios
 ```
 
 Notice the synonym trio each excludes the other two, on their own line,
-every empty middle field uses two spaces, and the chapter column was
-left blank by choice (since the user didn't ask for a numeric chapter
-id, "Descubre 2" went into tags instead).
+and the chapter column was left blank by choice (since the user didn't
+ask for a numeric chapter id, "Descubre 2" went into tags instead).

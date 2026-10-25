@@ -16,20 +16,37 @@ const SYNTAX_HELP = [
 ].join('\n');
 
 // Bulk-paste format: one sentence per line, columns separated by " | "
-// (a pipe WITH a space on each side) — deliberately distinct from the two
-// in-sentence markup patterns that also use a bare pipe character with no
-// surrounding space ([[verbo|infinitivo]] and the "||" reverse-question
-// marker), so splitting on /\s\|\s/ never mistakes either of those for a
-// column break. Always imports as distractorMode 'none' — the verb-contrast
-// and fixed-pool modes need picking from this app's own verb/pool data, not
-// something an LLM can fill in, so those stay on the one-at-a-time editor.
-//
+// (a pipe, normally with a space on each side for readability) — the two
+// in-sentence markup patterns that also use a bare pipe character
+// ([[verbo|infinitivo]] and the "||" reverse-question marker) are protected
+// below before splitting, so every OTHER pipe in the line is unambiguously
+// a column break, however many (or few) spaces surround it. An earlier
+// version split on an exact /\s\|\s/ (one space on each side) specifically
+// to tell a real column break apart from those two patterns — but that
+// meant an intentionally empty middle column had to be written with
+// exactly two spaces between its pipes, and any step in a copy/paste
+// pipeline that collapsed double spaces to one (common in word processors
+// and some clipboard tools) silently corrupted that field and every
+// column after it. Protecting the two markup patterns up front instead
+// removes the need for any exact-whitespace convention at all — this now
+// matches a plain `line.split('|')` for every real column break.
+const PIPE_PLACEHOLDER = '\u0000SM_PIPE\u0000';
+const DOUBLE_PIPE_PLACEHOLDER = '\u0000SM_DPIPE\u0000';
+
+const protectInlinePipes = (line) => line
+  .replace(/\[\[([^|\]]*)\|([^\]]*)\]\]/g, (_, a, b) => `[[${a}${PIPE_PLACEHOLDER}${b}]]`)
+  .replace(/\|\|/g, DOUBLE_PIPE_PLACEHOLDER);
+
+const restoreInlinePipes = (text) => text
+  .split(PIPE_PLACEHOLDER).join('|')
+  .split(DOUBLE_PIPE_PLACEHOLDER).join('||');
+
 // Columns 5 (distractorGroup), 6 (distractorExclude, comma-separated) and
 // 7+ (one altAnswer per column) are all optional and purely additive — a
 // 4-column line from before these existed still parses exactly as it
 // always did, with all three defaulting to empty.
 const parseBulkSentenceRow = (line) => {
-  const parts = line.split(/\s\|\s/).map((s) => s.trim());
+  const parts = protectInlinePipes(line).split('|').map((s) => restoreInlinePipes(s.trim()));
   const [spanish, english = '', chapterId = '', tagsRaw = '', distractorGroup = '', excludeRaw = '', ...altAnswerParts] = parts;
   if (!spanish) return null;
   return {
