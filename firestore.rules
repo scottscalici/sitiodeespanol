@@ -141,6 +141,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // --- ¡ZAS! GAME (ephemeral multiplayer lobbies) ---
+    // Same posture as impostor_rooms/trivia_rooms above — a student joining
+    // a room writes their own doc under zas_rooms/{code}/players/{uid}, and
+    // during play writes their own round click under
+    // zas_rooms/{code}/rounds/{round}/clicks/{uid} — both of which the
+    // master catch-all below would otherwise reject (admin-only writes).
+    match /zas_rooms/{document=**} {
+      allow read, write: if isLoggedIn();
+    }
+
     // --- LEADERBOARD HISTORY (Hall of Fame weekly/monthly archives) ---
     // Snapshotted client-side by the first student in a course to earn
     // points in a new week/month (see archivePeriodIfNeeded in
