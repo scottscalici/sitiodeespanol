@@ -61,17 +61,47 @@ const FONT_VARIANTS = ['font-sans', 'font-serif', 'font-mono'];
 // board changes every round" (the whole point of the original paper game)
 // carries over here. Positions are percentages, not pixels, so every
 // device renders the identical layout the host computed, regardless of
-// screen size — no per-client randomizer to keep in sync. A margin is kept
-// clear of the edges so a rotated word's bounding box doesn't run off
-// screen on a narrow device.
-export const layoutBoard = (words) => words.map((w) => ({
-  ...w,
-  top: 8 + Math.random() * 78,
-  left: 6 + Math.random() * 74,
-  rotation: Math.round(Math.random() * 50 - 25),
-  fontVariant: FONT_VARIANTS[Math.floor(Math.random() * FONT_VARIANTS.length)],
-  scale: 0.85 + Math.random() * 0.4,
-}));
+// screen size — no per-client randomizer to keep in sync.
+//
+// Each word gets its own cell in a shuffled grid (sized to roughly match
+// the board's landscape aspect ratio) with only a small jitter and a
+// moderate rotation inside that cell, rather than a fully free-floating
+// random position — a free-for-all randomizer packed words on top of each
+// other badly enough that one could fully cover another and make it
+// unclickable. Longer words get less rotation and a smaller scale, since a
+// long word rotated far has a much bigger diagonal footprint and is the
+// most likely to spill out of its own cell into a neighbor's.
+export const layoutBoard = (words) => {
+  const count = words.length;
+  if (count === 0) return [];
+
+  const cols = Math.max(1, Math.ceil(Math.sqrt(count * 1.6)));
+  const rows = Math.max(1, Math.ceil(count / cols));
+  const cellW = 100 / cols;
+  const cellH = 100 / rows;
+
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) cells.push({ r, c });
+  }
+  const assignedCells = shuffle(cells).slice(0, count);
+
+  return words.map((w, i) => {
+    const { r, c } = assignedCells[i];
+    const jitterX = (Math.random() - 0.5) * cellW * 0.3;
+    const jitterY = (Math.random() - 0.5) * cellH * 0.3;
+    const lengthFactor = Math.max(0.4, 1 - Math.max(0, (w.palabra?.length || 0) - 6) * 0.05);
+
+    return {
+      ...w,
+      top: Math.min(95, Math.max(5, r * cellH + cellH / 2 + jitterY)),
+      left: Math.min(93, Math.max(7, c * cellW + cellW / 2 + jitterX)),
+      rotation: Math.round((Math.random() * 30 - 15) * lengthFactor),
+      fontVariant: FONT_VARIANTS[Math.floor(Math.random() * FONT_VARIANTS.length)],
+      scale: (0.85 + Math.random() * 0.3) * lengthFactor,
+    };
+  });
+};
 
 // Tallies one round's clicks (each a {uid, name, groupId, correct, atMs}
 // record from the room's rounds/{round}/clicks subcollection, `atMs`
