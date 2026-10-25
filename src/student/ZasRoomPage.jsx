@@ -331,16 +331,29 @@ const ZasRoomPage = () => {
                   </>
                 )}
 
-                {room.currentTargetId && (
-                  <div className="text-center space-y-3">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Palabra actual (solo tú la ves)</p>
-                    <p className="text-3xl font-black text-amber-400">{room.remainingWords.find((w) => w.id === room.currentTargetId)?.palabra}</p>
-                    <p className="text-sm text-slate-400">{correctClicks.length} respuesta{correctClicks.length === 1 ? '' : 's'} correcta{correctClicks.length === 1 ? '' : 's'} recibida{correctClicks.length === 1 ? '' : 's'}</p>
-                    <button onClick={revealRound} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest py-3 rounded-lg">
-                      Revelar Ronda
-                    </button>
-                  </div>
-                )}
+                {room.currentTargetId && (() => {
+                  const targetWord = room.remainingWords.find((w) => w.id === room.currentTargetId);
+                  return (
+                    <div className="text-center space-y-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Palabra actual (solo tú la ves)</p>
+                      <p className="text-3xl font-black text-amber-400">{targetWord?.palabra}</p>
+                      {(targetWord?.traduccion || targetWord?.hint) && (
+                        <div className="bg-slate-800/60 border border-slate-700 rounded-lg p-3 text-left max-w-md mx-auto space-y-1">
+                          {targetWord.traduccion && (
+                            <p className="text-xs text-slate-400"><span className="font-bold uppercase tracking-widest text-slate-500">Traducción:</span> {targetWord.traduccion}</p>
+                          )}
+                          {targetWord.hint && (
+                            <p className="text-xs text-slate-400">💡 {targetWord.hint}</p>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-sm text-slate-400">{correctClicks.length} respuesta{correctClicks.length === 1 ? '' : 's'} correcta{correctClicks.length === 1 ? '' : 's'} recibida{correctClicks.length === 1 ? '' : 's'}</p>
+                      <button onClick={revealRound} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest py-3 rounded-lg">
+                        Revelar Ronda
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {room.roundResult && (
                   <div className="text-center space-y-3">

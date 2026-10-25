@@ -38,9 +38,15 @@ const getSectionsArray = (metadata) => {
 };
 
 // Builds a ~`count`-word target set for one session's board, drawn from the
-// vocabulary collection and filtered to one textbook + section. Only the
-// Spanish word itself is kept — the teacher supplies the clue live, out
-// loud, so no clue/translation text needs to live on the room doc.
+// vocabulary collection and filtered to one textbook + section. The
+// teacher supplies the actual clue live, out loud — `hint` is only a
+// private on-screen nudge for her, reusing whichever tiered definition the
+// word already has in Vocab Vault rather than writing new clue text from
+// scratch. Preferring nivel2 (a plain-Spanish definition, one notch above
+// the simplest tier) over nivel1 (English-leaning) or nivel3 (the densest,
+// most literal phrasing) — nivel1 risks just handing her the translation,
+// and nivel3 is dictionary-style, which, read as a nudge, often struggles
+// to be an interesting starting point for an ad-libbed description.
 export const buildZasWordSet = (vocabEntries, { textbook, section, count = 20 }) => {
   const filtered = vocabEntries.filter((e) => {
     if (!e.palabra) return false;
@@ -51,7 +57,12 @@ export const buildZasWordSet = (vocabEntries, { textbook, section, count = 20 })
 
   return shuffle(filtered)
     .slice(0, count)
-    .map((e) => ({ id: e.id, palabra: e.palabra }));
+    .map((e) => ({
+      id: e.id,
+      palabra: e.palabra,
+      traduccion: e.traduccion || '',
+      hint: e.definiciones?.nivel2?.[0] || e.definiciones?.nivel1?.[0] || e.definiciones?.nivel3?.[0] || '',
+    }));
 };
 
 const FONT_VARIANTS = ['font-sans', 'font-serif', 'font-mono'];
