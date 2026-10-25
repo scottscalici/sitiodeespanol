@@ -164,18 +164,47 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const grammar = segment.pinned_sentences || [];
       const targetTense = segment.targetTense || 'ALL';
 
+      // A sentence's grammarTags are for topic/organization (filtering in
+      // the Learning Path builder, labeling the question) — using them to
+      // ALSO scope which sentences can be each other's distractors means
+      // every sentence sharing a topic (e.g. a whole vocab-style batch all
+      // tagged the same chapter/unit) becomes fair game as a decoy for
+      // every other one. distractorGroup is a separate, optional field for
+      // narrowing that pool to a more specific category than the display
+      // tags warrant (sibling-pool matching uses ONLY it, ignoring
+      // grammarTags, when a sentence sets it) — but it only changes which
+      // pool is PREFERRED, so it can't guarantee two specific sentences
+      // never face each other (giving each its own unique group just
+      // means neither is preferred, not that either is excluded — they
+      // still fall into the same unprioritized "rest" bucket together).
+      // Falls back to grammarTags for any sentence that never set it, so
+      // older authored sentences keep behaving exactly as before.
+      const getDistractorTags = (item) => (item.distractorGroup ? [item.distractorGroup] : (item.grammarTags || []));
+
+      // For an actual guarantee (e.g. "a menudo" must never be offered as
+      // a distractor for "con frecuencia" or vice versa — true near-
+      // synonyms a student could defend either as correct), distractorExclude
+      // hard-filters the candidate pool by exact answer text BEFORE the
+      // tag-preference logic above ever runs, so exclusion holds no matter
+      // how the tags/groups are set up.
+      const getEligiblePool = (pool, item) => {
+        const excluded = (item.distractorExclude || []).map((v) => v.trim().toLowerCase());
+        return excluded.length === 0 ? pool : pool.filter((s) => !excluded.includes(s.value.trim().toLowerCase()));
+      };
+
       // Every authored grammar sentence's own [[answer]], paired with its
-      // grammarTags — a same-register distractor source (e.g. another
-      // adverbial/idiom phrase like "tal vez" or "sin duda") for a phrase
-      // blank like "a lo mejor", instead of generic single vocab/verb words
-      // ("de", "hacer") that are obviously the wrong part of speech.
+      // distractor-pool tags — a same-register distractor source (e.g.
+      // another adverbial/idiom phrase like "tal vez" or "sin duda") for a
+      // phrase blank like "a lo mejor", instead of generic single
+      // vocab/verb words ("de", "hacer") that are obviously the wrong
+      // part of speech.
       const grammarAnswerPool = grammar
         .map((s) => {
           const twoPart = s.label.match(/\[\[(.*?)\|(.*?)\]\]/);
           const onePart = s.label.match(/\[\[(.*?)\]\]/);
           const rawAnswer = twoPart ? twoPart[1] : onePart ? onePart[1] : null;
           if (!rawAnswer) return null;
-          return { value: rawAnswer.replace(/[.,!?¿¡]/g, '').trim(), tags: s.grammarTags || [] };
+          return { value: rawAnswer.replace(/[.,!?¿¡]/g, '').trim(), tags: getDistractorTags(s) };
         })
         .filter(Boolean);
 
@@ -186,7 +215,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
         .filter((s) => s.label.includes('||'))
         .map((s) => {
           const [, q] = s.label.split('||');
-          return q ? { value: q.trim(), tags: s.grammarTags || [] } : null;
+          return q ? { value: q.trim(), tags: getDistractorTags(s) } : null;
         })
         .filter(Boolean);
 
@@ -408,6 +437,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           const target = grammar[Math.floor(Math.random() * grammar.length)];
           const spaSentence = target.label;
           const engTrans = getEnglishTrans(target) || "⚠️ Agrega la traducción en la base de datos";
+          const targetTags = getDistractorTags(target);
+          const targetAltAnswers = target.altAnswers || [];
 
           const twoPartMatch = spaSentence.match(/\[\[(.*?)\|(.*?)\]\]/);
           const onePartMatch = spaSentence.match(/\[\[(.*?)\]\]/);
@@ -417,8 +448,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
           if (spaSentence.includes('||')) {
               // --- REVERSE ENGINEERING (MC): "STATEMENT || correct question" ---
               const [statement, correctQuestion] = spaSentence.split('||').map((s) => s.trim());
-              const tags = target.grammarTags || [];
-              let distractors = pickFromSiblingPool(reverseQuestionPool, [correctQuestion], tags, 3);
+              let distractors = pickFromSiblingPool(getEligiblePool(reverseQuestionPool, target), [correctQuestion], targetTags, 3);
               if (distractors.length < 3) {
                   const filler = shuffle(GENERIC_QUESTION_FILLERS).filter(
                       (f) => f.toLowerCase() !== correctQuestion.toLowerCase() && !distractors.includes(f)
@@ -458,8 +488,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   const correctWords = cleanDisplay.split(' ');
                   generatedQueue.push({
                       id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans,
-                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]),
-                      correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
+                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, targetTags)]),
+                      correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
                   });
               }
           } else if (onePartMatches.length >= 2 && !isSpeedRound) {
@@ -486,8 +516,8 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   const correctWords = cleanDisplay.split(' ');
                   generatedQueue.push({
                       id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans,
-                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]),
-                      correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
+                      options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, targetTags)]),
+                      correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática', _pointCategory: 'sentence'
                   });
               }
           } else if (twoPartMatch) {
@@ -527,36 +557,35 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
                   // generic vocab words — a phrase blank like "a lo mejor" needs
                   // other adverbial/idiom phrases as distractors, not "de"/"hacer".
                   const smartFallback = (count, exclude) => {
-                      const tags = target.grammarTags || [];
-                      const siblings = pickFromSiblingPool(grammarAnswerPool, exclude, tags, count);
+                      const siblings = pickFromSiblingPool(getEligiblePool(grammarAnswerPool, target), exclude, targetTags, count);
                       if (siblings.length >= count) return siblings.slice(0, count);
                       return [...siblings, ...getWordDistractors(count - siblings.length, [...exclude, ...siblings])];
                   };
                   const options = await buildGrammarOptions(target, answer, smartFallback);
-                  generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'mc', prompt: spaSentence.replace(/\[\[(.*?)\]\]/, '________'), engTrans: engTrans, options: options, correctAnswer: answer, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               } else {
                   // --- SCRAMBLED SENTENCE: rebuild the whole sentence, blank filled in ---
                   let cleanDisplay = spaSentence.replace(onePartMatch[0], answer).replace(/[.,!?¿¡]/g, '').trim();
                   let correctWords = cleanDisplay.split(' ');
-                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, targetTags)]), correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               }
           } else {
               let cleanDisplay = spaSentence.replace(/[.,!?¿¡]/g, '').trim();
               if (isSpeedRound) {
-                  generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Gramática (Velocidad)', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática (Velocidad)', _pointCategory: 'sentence' });
               } else if (requestedType === 'listen') {
                   // Full-sentence dictation: hear it, type it. Reuses the
                   // existing 'listen' UI (audio button + opt-out) unchanged.
-                  generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Dictado', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Dictado', _pointCategory: 'sentence' });
               } else if (requestedType === 'speak') {
                   // Full-sentence dictation: hear it, say it back — text
                   // stays hidden (isDictation) so it's blind listening, not
                   // reading aloud. Reuses the existing 'speak' UI (mic +
                   // opt-out) unchanged.
-                  generatedQueue.push({ id: `q_${i}`, type: 'speak', isDictation: true, prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, topic: target.tags || 'Dictado (Hablar)', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'speak', isDictation: true, prompt: cleanDisplay, engTrans: engTrans, correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Dictado (Hablar)', _pointCategory: 'sentence' });
               } else {
                   let correctWords = cleanDisplay.split(' ');
-                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, target.grammarTags || [])]), correctAnswer: cleanDisplay, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
+                  generatedQueue.push({ id: `q_${i}`, type: 'sentence_builder', prompt: engTrans, engTrans: engTrans, options: shuffle([...correctWords, ...getGrammarWordDistractors(2, correctWords, targetTags)]), correctAnswer: cleanDisplay, altAnswers: targetAltAnswers, topic: target.tags || 'Gramática', _pointCategory: 'sentence' });
               }
           }
         }
@@ -850,7 +879,21 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
 
     if (!userString.trim()) return;
 
-    const { correct, missedArticle, missedAccent } = checkAnswerLeniently(userString, currentQ.correctAnswer, currentQ.isVerb);
+    // A sentence can have more than one valid phrasing (e.g. a word-order
+    // variant a sentence_builder's own fixed tile set still happens to
+    // support, or an equally correct way to say the same thing for a
+    // free-typed/dictation answer) — try the primary correctAnswer first,
+    // and only fall back to altAnswers if it didn't match, so the
+    // feedback shown (missedArticle/missedAccent) still reflects whichever
+    // one actually matched rather than always the primary.
+    let result = checkAnswerLeniently(userString, currentQ.correctAnswer, currentQ.isVerb);
+    if (!result.correct && currentQ.altAnswers?.length > 0) {
+      for (const alt of currentQ.altAnswers) {
+        const altResult = checkAnswerLeniently(userString, alt, currentQ.isVerb);
+        if (altResult.correct) { result = altResult; break; }
+      }
+    }
+    const { correct, missedArticle, missedAccent } = result;
     setIsCorrect(correct); setMissedArticle(missedArticle); setMissedAccent(missedAccent); setIsChecked(true);
 
     if (!correct) {
