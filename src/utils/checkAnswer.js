@@ -61,7 +61,21 @@ const generateAcceptedVariants = (correctStr) => {
 
           variants.add(masc);
           variants.add(fem);
-          expBase.split('/').forEach((w) => variants.add(w.trim()));
+          // Only fall back to a raw split on '/' when none of the
+          // gender-suffix patterns above actually matched anything (masc
+          // and fem both came back unchanged) — that fallback exists for a
+          // full-phrase alternation like "ser un apasionado / una
+          // apasionada de", where the slash separates two complete
+          // alternate phrases, not a tight "o/a" suffix. Running it
+          // unconditionally also fired for an already-correctly-handled
+          // suffix case like "pegajoso/a": masc/fem above already produce
+          // "pegajoso"/"pegajosa" correctly, but the raw split then ALSO
+          // added "pegajoso" (harmless duplicate) and the bare letter "a"
+          // (wrong — accepted literally typing "a" as correct) since
+          // "pegajoso/a".split('/') is ["pegajoso", "a"].
+          if (masc === expBase && fem === expBase) {
+            expBase.split('/').forEach((w) => variants.add(w.trim()));
+          }
         } else {
           variants.add(expBase);
         }
