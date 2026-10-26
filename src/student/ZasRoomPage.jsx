@@ -205,13 +205,18 @@ const ZasRoomPage = () => {
     scoredRoundRef.current = rr.round;
 
     const amount = (amGroupWinner ? GROUP_WIN_POINTS : 0) + (amClassWinner ? CLASS_FASTEST_BONUS : 0);
+    // groupWins is tracked separately from the points `score` — score mixes
+    // in the class-fastest bonus, which would make a student's own head-to-
+    // head tally against their partner read wrong (a class-fastest round
+    // shouldn't count double against a partner who also lost that round
+    // fairly). groupWins is purely "how many rounds did I win within my
+    // own pod," which is the number the partner-vs-partner view needs.
     awardPoints(currentUser.uid, amount)
       .then(() => {
         setPointsFlash({ amount });
-        return updateDoc(doc(db, 'zas_rooms', roomCode, 'players', currentUser.uid), {
-          score: increment(amount),
-          lastScoredRound: rr.round,
-        });
+        const updates = { score: increment(amount), lastScoredRound: rr.round };
+        if (amGroupWinner) updates.groupWins = increment(1);
+        return updateDoc(doc(db, 'zas_rooms', roomCode, 'players', currentUser.uid), updates);
       })
       .catch((err) => console.error('Error awarding Zas points:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,6 +321,27 @@ const ZasRoomPage = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-center">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ronda {room.round} · {room.remainingWords.length} palabras restantes</p>
             </div>
+
+            {/* Kept visible the whole game, not just flashed between rounds —
+                the point of ¡Zas! is the head-to-head against your own
+                partner(s), so that score needs to be the thing a student can
+                check at any moment, not something only glimpsed for a few
+                seconds after each reveal. */}
+            {!isHost && me?.groupId && (
+              <div className="bg-slate-900 border-2 border-amber-600/50 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 text-center mb-2">Tu Grupo</p>
+                <div className="space-y-1">
+                  {[...(groupedPlayers[me.groupId] || [])]
+                    .sort((a, b) => (b.groupWins || 0) - (a.groupWins || 0))
+                    .map((p) => (
+                      <div key={p.id} className={`flex items-center justify-between rounded-lg px-3 py-1.5 ${p.id === currentUser.uid ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-slate-800'}`}>
+                        <span className="font-bold text-sm">{p.name}{p.id === currentUser.uid ? ' (tú)' : ''}</span>
+                        <span className="font-black text-amber-400">{p.groupWins || 0}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {isHost && (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
@@ -443,19 +469,42 @@ const ZasRoomPage = () => {
 
         {/* GAME OVER */}
         {room.gameState === 'gameover' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <h2 className="text-2xl font-black uppercase tracking-tight text-center">¡Juego Terminado!</h2>
-            <div className="space-y-2">
-              {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
-                <div key={p.id} className="flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
-                  <span className="font-bold">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {p.name}</span>
-                  <span className="font-black text-amber-400">{p.score || 0} pts</span>
+          <div className="space-y-4">
+            {/* A student's own pod is the main event — that's the comparison
+                the whole game was actually about. The class leaderboard
+                below is a bonus, not the headline. */}
+            {!isHost && me?.groupId && (
+              <div className="bg-slate-900 border-2 border-amber-600 rounded-2xl p-6 space-y-3">
+                <h2 className="text-2xl font-black uppercase tracking-tight text-center text-amber-400">Tu Grupo</h2>
+                <div className="space-y-2">
+                  {[...(groupedPlayers[me.groupId] || [])]
+                    .sort((a, b) => (b.groupWins || 0) - (a.groupWins || 0))
+                    .map((p, i) => (
+                      <div key={p.id} className={`flex items-center justify-between rounded-lg px-4 py-2 ${p.id === currentUser.uid ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-slate-800 border border-slate-700'}`}>
+                        <span className="font-bold">{i === 0 ? '🏆' : ''} {p.name}{p.id === currentUser.uid ? ' (tú)' : ''}</span>
+                        <span className="font-black text-amber-400">{p.groupWins || 0} ronda{(p.groupWins || 0) === 1 ? '' : 's'}</span>
+                      </div>
+                    ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <h2 className={isHost ? 'text-2xl font-black uppercase tracking-tight text-center' : 'text-xs font-black uppercase tracking-widest text-slate-500 text-center'}>
+                {isHost ? '¡Juego Terminado! (Top 3)' : 'Top 3 de la Clase'}
+              </h2>
+              <div className="space-y-2">
+                {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 3).map((p, i) => (
+                  <div key={p.id} className="flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+                    <span className="font-bold">{['🥇', '🥈', '🥉'][i]} {p.name}</span>
+                    <span className="font-black text-amber-400">{p.score || 0} pts</span>
+                  </div>
+                ))}
+              </div>
+              <Link to="/recreo" className="block text-center w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest py-3 rounded-lg">
+                Volver al Arcade
+              </Link>
             </div>
-            <Link to="/recreo" className="block text-center w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest py-3 rounded-lg">
-              Volver al Arcade
-            </Link>
           </div>
         )}
       </div>
