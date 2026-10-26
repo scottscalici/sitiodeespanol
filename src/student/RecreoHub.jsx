@@ -160,25 +160,24 @@ const RecreoHub = () => {
             </div>
           </Link>
 
-          {/* 8. ¡ZAS! — logo in place, game not built yet; not a Link since
-              there's nowhere to send a click until it exists. */}
-          <div className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 overflow-hidden opacity-60 cursor-not-allowed">
-            <div className="absolute top-4 right-4 z-20 bg-slate-700 text-slate-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-slate-600">
-              Próximamente
+          {/* 8. ¡ZAS! */}
+          <Link to="/juegos/zas" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-amber-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:-translate-y-2 overflow-hidden">
+            <div className="absolute top-4 right-4 z-20 bg-amber-500/20 text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/50">
+              Nuevo
             </div>
             <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
               <img
                 src={imageFor('zas')}
                 alt="¡Zas!"
-                className="w-full h-full object-contain grayscale"
+                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
               />
             </div>
-            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 text-slate-400">¡Zas!</h2>
-            <p className="text-slate-500 text-sm font-medium mb-8">Un nuevo juego está en camino. Vuelve pronto.</p>
-            <div className="text-slate-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
-              MUY PRONTO
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-amber-400 transition-colors">¡Zas!</h2>
+            <p className="text-slate-400 text-sm font-medium mb-8">Encuentra la palabra antes que tu compañero. Compite en vivo con toda la clase.</p>
+            <div className="text-amber-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
-          </div>
+          </Link>
 
         </div>
       </div>

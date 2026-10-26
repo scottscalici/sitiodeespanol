@@ -41,6 +41,8 @@ import ImpostorLobbyPage from './student/ImpostorLobbyPage';
 import ImpostorRoomPage from './student/ImpostorRoomPage';
 import TriviaLobbyPage from './student/TriviaLobbyPage';
 import TriviaRoomPage from './student/TriviaRoomPage';
+import ZasLobbyPage from './student/ZasLobbyPage';
+import ZasRoomPage from './student/ZasRoomPage';
 import SampleSentencesPage from './student/SampleSentencesPage';
 import SilabasPage from './student/SilabasPage';
 import HallOfFamePage from './student/HallOfFamePage';
@@ -196,6 +198,8 @@ function App() {
             <Route path="/juegos/impostor/:roomCode" element={<ImpostorRoomPage />} />
             <Route path="/juegos/rafaga" element={<TriviaLobbyPage />} />
             <Route path="/juegos/rafaga/:roomCode" element={<TriviaRoomPage />} />
+            <Route path="/juegos/zas" element={<ZasLobbyPage />} />
+            <Route path="/juegos/zas/:roomCode" element={<ZasRoomPage />} />
             <Route path="/juegos/silabas" element={<SilabasPage />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
