@@ -83,7 +83,12 @@ const ZasRoomPage = () => {
 
   const correctClicks = clicks.filter((c) => c.correct);
   const myClick = clicks.find((c) => c.id === currentUser?.uid);
-  const alreadyAnsweredCorrectly = myClick?.correct === true;
+  // One swat per round, right or wrong — matches the original paper game
+  // (you only get to mark once) and is what stops a student from just
+  // clicking every word until they land on the right one. A wrong click
+  // still locks the student out for the round; it just scores nothing.
+  const hasAnsweredThisRound = !!myClick;
+  const myAnswerWasCorrect = myClick?.correct === true;
 
   // --- Lobby: grouping ---
   const createGroup = async () => {
@@ -168,7 +173,7 @@ const ZasRoomPage = () => {
 
   // --- Student: answering ---
   const handleWordClick = async (word) => {
-    if (!room?.currentTargetId || alreadyAnsweredCorrectly || !me?.groupId) return;
+    if (!room?.currentTargetId || hasAnsweredThisRound || !me?.groupId) return;
     const correct = word.id === room.currentTargetId;
     try {
       await setDoc(doc(db, 'zas_rooms', roomCode, 'rounds', String(room.round), 'clicks', currentUser.uid), {
@@ -405,16 +410,20 @@ const ZasRoomPage = () => {
 
                 {me?.groupId && room.currentTargetId && (
                   <div className="relative w-full h-[65vh] bg-slate-900 border-2 border-slate-800 rounded-2xl overflow-hidden">
-                    {alreadyAnsweredCorrectly && (
+                    {hasAnsweredThisRound && (
                       <div className="absolute inset-0 bg-slate-950/70 z-10 flex items-center justify-center">
-                        <p className="text-emerald-400 font-black uppercase tracking-widest text-lg">¡Respondiste! Esperando a los demás...</p>
+                        {myAnswerWasCorrect ? (
+                          <p className="text-emerald-400 font-black uppercase tracking-widest text-lg">✔ ¡Correcto! Esperando a los demás...</p>
+                        ) : (
+                          <p className="text-rose-400 font-black uppercase tracking-widest text-lg">✗ Ya usaste tu turno. Esperando a los demás...</p>
+                        )}
                       </div>
                     )}
                     {room.board.map((w) => (
                       <button
                         key={w.id}
                         onClick={() => handleWordClick(w)}
-                        disabled={alreadyAnsweredCorrectly}
+                        disabled={hasAnsweredThisRound}
                         style={{
                           top: `${w.top}%`,
                           left: `${w.left}%`,
