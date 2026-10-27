@@ -171,10 +171,11 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
         <div className="flex items-center gap-4 mt-1">
           <Link
             to="/preguntas-frecuentes"
-            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full border border-white/20 transition-colors"
+            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/60 hover:scale-105 active:scale-95 transition-all"
           >
+            <span className="text-xs">❓</span>
             Preguntas Frecuentes
-            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px]">FAQ</span>
+            <span className="bg-slate-900/15 px-1.5 py-0.5 rounded text-[9px]">FAQ</span>
           </Link>
 
           <span

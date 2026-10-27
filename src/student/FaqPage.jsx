@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 // Grading breakdown data lives here as plain config, not hardcoded into the
 // JSX below — makes it obvious at a glance that the two courses' categories
@@ -53,7 +54,7 @@ const GRADING = {
       {
         name: 'Práctica',
         weight: 20,
-        desc: 'Assignments from the VHL textbook hub.',
+        desc: 'Assignments from Reporteros Cuatro, via the KWL hub.',
       },
       {
         name: 'Español Práctico',
@@ -63,7 +64,7 @@ const GRADING = {
       {
         name: 'Trabajo de Clase',
         weight: 10,
-        desc: 'Classwork — same idea as S2: the warm-ups and other practice activities on this website.',
+        desc: 'Classwork — the warm-ups (calentamientos) and other practice activities on this website, including Curiosidades.',
       },
     ],
   },
@@ -96,6 +97,16 @@ const GradingTable = ({ data }) => (
 );
 
 const FaqPage = () => {
+  const { userData } = useAuth();
+  // Each student only ever sees their own course's grading breakdown — the
+  // two use different categories (and S2's "Práctica" and S4's "Práctica"
+  // aren't even the same source), so showing both every time was just
+  // asking a student to find themselves in the wrong half of the page.
+  // Falls back to showing both only if a course somehow isn't set, rather
+  // than silently showing nobody's.
+  const course = userData?.course;
+  const gradingToShow = course === 's2' ? [GRADING.s2] : course === 's4' ? [GRADING.s4] : [GRADING.s2, GRADING.s4];
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-10 space-y-10">
@@ -120,10 +131,8 @@ const FaqPage = () => {
         <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-black text-slate-900">How is my grade calculated?</h2>
-            <p className="text-slate-500 mt-1">The categories and weights are different for Spanish 2 and Spanish 4/IB.</p>
           </div>
-          <GradingTable data={GRADING.s2} />
-          <GradingTable data={GRADING.s4} />
+          {gradingToShow.map((data) => <GradingTable key={data.label} data={data} />)}
         </div>
 
         {/* SITE TOUR */}
@@ -138,7 +147,7 @@ const FaqPage = () => {
 
           <SiteSection title="Main panel, top to bottom">
             <p><strong>Evaluaciones</strong> — shows today's quiz (if there is one) and the next two coming up. The <strong>Calendario</strong> button shows long-term assessments, and <strong>Recuperaciones</strong> is where you go to make up a quiz (see above).</p>
-            <p><strong>Calentamiento</strong> — your daily warm-up: verb practice on whatever we're covering most recently, plus a vocab review pulling from everything since the course started. The <strong>Promedio</strong> score here feeds into your Trabajo de Clase grade — it's based on accuracy, but you can redo any part of it until you're happy with your score.</p>
+            <p><strong>Calentamiento</strong> — your daily warm-up: verb practice on whatever we're covering most recently, plus a vocab review pulling from everything since the beginning of Spanish 1 — not just this course. The <strong>Promedio</strong> score here feeds into your Trabajo de Clase grade — it's based on accuracy, but you can redo any part of it until you're happy with your score.</p>
             <p><strong>Curiosidad</strong> — a daily cultural fact or bit of trivia about a Spanish-speaking place, person, or custom. Graded on completion only.</p>
             <p><strong>Gramática</strong> — what we're covering that day, split into new material and review, with links to the specific grammar notes plus broader topic pages if you want to look something up that isn't on today's agenda.</p>
             <p><strong>Vocabulario</strong> — the vocab set we're currently working with. The <strong>Índice</strong> button lets you browse other chapters, including past years' notes.</p>
