@@ -17,6 +17,7 @@ import PracticeCardEngine from './student/PracticeCardEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
+import FaqPage from './student/FaqPage';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
 import KPracticePage from './student/KPracticePage';
@@ -191,6 +192,7 @@ function App() {
             <Route path="/juegos/senordle" element={<SenordlePage />} />
             <Route path="/actividad/:type/:id" element={<ActivityPage />} />
             <Route path="/recreo" element={<RecreoHub />} />
+            <Route path="/preguntas-frecuentes" element={<FaqPage />} />
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
