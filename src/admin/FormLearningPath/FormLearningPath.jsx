@@ -484,6 +484,9 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         tags: (g.grammarTags && g.grammarTags[0]) || 'Gramática',
         chapterId: g.chapterId || '',
         grammarTags: g.grammarTags || [],
+        distractorGroup: g.distractorGroup || '',
+        distractorExclude: g.distractorExclude || [],
+        altAnswers: g.altAnswers || [],
         fullData: g
       }));
       setAllGrammarList(mappedGrammar);

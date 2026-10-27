@@ -16,22 +16,47 @@ const SYNTAX_HELP = [
 ].join('\n');
 
 // Bulk-paste format: one sentence per line, columns separated by " | "
-// (a pipe WITH a space on each side) — deliberately distinct from the two
-// in-sentence markup patterns that also use a bare pipe character with no
-// surrounding space ([[verbo|infinitivo]] and the "||" reverse-question
-// marker), so splitting on /\s\|\s/ never mistakes either of those for a
-// column break. Always imports as distractorMode 'none' — the verb-contrast
-// and fixed-pool modes need picking from this app's own verb/pool data, not
-// something an LLM can fill in, so those stay on the one-at-a-time editor.
+// (a pipe, normally with a space on each side for readability) — the two
+// in-sentence markup patterns that also use a bare pipe character
+// ([[verbo|infinitivo]] and the "||" reverse-question marker) are protected
+// below before splitting, so every OTHER pipe in the line is unambiguously
+// a column break, however many (or few) spaces surround it. An earlier
+// version split on an exact /\s\|\s/ (one space on each side) specifically
+// to tell a real column break apart from those two patterns — but that
+// meant an intentionally empty middle column had to be written with
+// exactly two spaces between its pipes, and any step in a copy/paste
+// pipeline that collapsed double spaces to one (common in word processors
+// and some clipboard tools) silently corrupted that field and every
+// column after it. Protecting the two markup patterns up front instead
+// removes the need for any exact-whitespace convention at all — this now
+// matches a plain `line.split('|')` for every real column break.
+const PIPE_PLACEHOLDER = '\u0000SM_PIPE\u0000';
+const DOUBLE_PIPE_PLACEHOLDER = '\u0000SM_DPIPE\u0000';
+
+const protectInlinePipes = (line) => line
+  .replace(/\[\[([^|\]]*)\|([^\]]*)\]\]/g, (_, a, b) => `[[${a}${PIPE_PLACEHOLDER}${b}]]`)
+  .replace(/\|\|/g, DOUBLE_PIPE_PLACEHOLDER);
+
+const restoreInlinePipes = (text) => text
+  .split(PIPE_PLACEHOLDER).join('|')
+  .split(DOUBLE_PIPE_PLACEHOLDER).join('||');
+
+// Columns 5 (distractorGroup), 6 (distractorExclude, comma-separated) and
+// 7+ (one altAnswer per column) are all optional and purely additive — a
+// 4-column line from before these existed still parses exactly as it
+// always did, with all three defaulting to empty.
 const parseBulkSentenceRow = (line) => {
-  const parts = line.split(/\s\|\s/).map((s) => s.trim());
-  const [spanish, english = '', chapterId = '', tagsRaw = ''] = parts;
+  const parts = protectInlinePipes(line).split('|').map((s) => restoreInlinePipes(s.trim()));
+  const [spanish, english = '', chapterId = '', tagsRaw = '', distractorGroup = '', excludeRaw = '', ...altAnswerParts] = parts;
   if (!spanish) return null;
   return {
     spanish,
     english,
     chapterId,
     grammarTags: tagsRaw.split(',').map((t) => t.trim()).filter(Boolean),
+    distractorGroup,
+    distractorExclude: excludeRaw.split(',').map((e) => e.trim()).filter(Boolean),
+    altAnswers: altAnswerParts.map((a) => a.trim()).filter(Boolean),
     distractorMode: 'none',
     pairTag: '',
     poolTag: '',
@@ -47,9 +72,11 @@ const parseBulkSentenceRow = (line) => {
 // before sending it.
 const BULK_LLM_PROMPT = `Genera [NÚMERO] oraciones en español para practicar [TEMA/GRAMÁTICA], nivel [NIVEL], para el Capítulo [CAPÍTULO].
 
-Escribe cada oración en su PROPIA línea, en texto plano (sin numerar, sin viñetas, sin bloque de código, sin encabezados), en este formato EXACTO con cuatro columnas separadas por " | " (un espacio, un pipe, un espacio):
+Escribe cada oración en su PROPIA línea, en texto plano (sin numerar, sin viñetas, sin bloque de código, sin encabezados), en este formato EXACTO con columnas separadas por " | " (un espacio, un pipe, un espacio):
 
-español | inglés | capítulo | etiquetas
+español | inglés | capítulo | etiquetas | grupo_distractores | excluir_distractores | respuesta_alterna_1 | respuesta_alterna_2 ...
+
+Las primeras 4 columnas son obligatorias. Las columnas 5 en adelante son OPCIONALES — si no las necesitas, simplemente termina la línea después de "etiquetas" (no agregues pipes vacíos de más).
 
 Reglas para la columna "español" — marca la respuesta usando EXACTAMENTE una de estas formas:
 - [[respuesta]] → un solo hueco. Ej: Yo [[fui]] a la tienda ayer.
@@ -62,10 +89,13 @@ Reglas para la columna "español" — marca la respuesta usando EXACTAMENTE una 
 Columnas restantes:
 - inglés: traducción completa al inglés (déjala vacía si no aplica, pero no quites la columna).
 - capítulo: el id del capítulo, ej. 8 (puede ir vacío).
-- etiquetas: palabras clave separadas por comas, ej. pretérito, viajes (puede ir vacío).
+- etiquetas: palabras clave separadas por comas, ej. pretérito, viajes (puede ir vacío). Son solo para organizar/filtrar — NO limitan de dónde salen los distractores (ve las dos columnas siguientes).
+- grupo_distractores (opcional): una sola etiqueta más específica que las etiquetas normales, para preferir un grupo más estrecho de oraciones como distractores de esta — NO garantiza que una oración en particular quede excluida (para eso usa excluir_distractores). Si la dejas vacía, se usan las etiquetas normales.
+- excluir_distractores (opcional): respuestas exactas, separadas por comas, que NUNCA deben ofrecerse como opción incorrecta para esta oración — úsala para sinónimos cercanos que un estudiante podría defender como correctos (ej. "a menudo" excluye "con frecuencia, muchas veces"; cada una de esas tres oraciones necesita excluir a las otras dos, por separado, en su propia línea).
+- respuesta_alterna_N (opcional, se pueden agregar varias columnas): otra oración completa igual de correcta que la de la columna "español" pero con una redacción distinta (ej. otro orden de palabras) — se acepta como correcta además de la original.
 
 MUY IMPORTANTE:
-- La única forma de pipe con ESPACIOS a cada lado (" | ") es la que separa las cuatro columnas. En [[forma|infinitivo]] y en || el pipe NO lleva espacios.
+- La única forma de pipe con ESPACIOS a cada lado (" | ") es la que separa columnas. En [[forma|infinitivo]] y en || el pipe NO lleva espacios.
 - No generes oraciones con pares de contraste de verbos (eso se configura aparte, a mano, en la app).
 - No agregues nada más que las líneas de oraciones — ni introducción ni explicación.
 
@@ -73,13 +103,17 @@ Ejemplo de salida:
 Yo [[fui]] a la tienda ayer. | I went to the store yesterday. | 8 | pretérito
 Ella [[comió|comer]] pizza anoche. | She ate pizza last night. | 8 | pretérito, comida
 El hielo está {{caliente}} y el fuego está {{frío}}. |  | 8 | lógico
-Tiene veinte años. || ¿Cuántos años tiene? | He is twenty years old. | 8 | preguntas`;
+Tiene veinte años. || ¿Cuántos años tiene? | He is twenty years old. | 8 | preguntas
+Mi abuelo va al mercado [[a menudo]]. | My grandfather goes to the market often. |  | Adverbios, vocabulario |  | con frecuencia, muchas veces`;
 
 const emptyDraft = () => ({
   spanish: '',
   english: '',
   chapterId: '',
   grammarTags: '',
+  distractorGroup: '',
+  distractorExclude: '',
+  altAnswers: '',
   distractorMode: 'none',
   pairTag: '',
   poolTag: '',
@@ -208,6 +242,9 @@ export default function SentenceManager() {
       english: s.english || '',
       chapterId: s.chapterId || '',
       grammarTags: (s.grammarTags || []).join(', '),
+      distractorGroup: s.distractorGroup || '',
+      distractorExclude: (s.distractorExclude || []).join(', '),
+      altAnswers: (s.altAnswers || []).join('\n'),
       distractorMode: s.distractorMode || 'none',
       pairTag: s.pairTag || '',
       poolTag: s.poolTag || '',
@@ -251,6 +288,9 @@ export default function SentenceManager() {
         english: draft.english.trim(),
         chapterId: draft.chapterId.trim(),
         grammarTags: draft.grammarTags.split(',').map((t) => t.trim()).filter(Boolean),
+        distractorGroup: draft.distractorGroup.trim(),
+        distractorExclude: draft.distractorExclude.split(',').map((e) => e.trim()).filter(Boolean),
+        altAnswers: draft.altAnswers.split('\n').map((a) => a.trim()).filter(Boolean),
         distractorMode: draft.distractorMode,
         pairTag: draft.distractorMode === 'binary_verb' || draft.distractorMode === 'quad_verb' ? draft.pairTag : '',
         poolTag: draft.distractorMode === 'fixed_pool' ? draft.poolTag : '',
@@ -528,6 +568,42 @@ export default function SentenceManager() {
                       className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white outline-none focus:border-cyan-500"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Grupo de Distractores (opcional)</label>
+                    <input
+                      type="text"
+                      value={draft.distractorGroup}
+                      onChange={(e) => updateDraft('distractorGroup', e.target.value)}
+                      placeholder="deja vacío para usar las etiquetas"
+                      className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white outline-none focus:border-cyan-500"
+                    />
+                    <p className="text-[10px] text-slate-500">Prefiere un grupo más estrecho que las etiquetas — no garantiza exclusión (para eso usa el campo de al lado).</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Excluir de Distractores (separado por coma, opcional)</label>
+                    <input
+                      type="text"
+                      value={draft.distractorExclude}
+                      onChange={(e) => updateDraft('distractorExclude', e.target.value)}
+                      placeholder="con frecuencia, muchas veces"
+                      className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white outline-none focus:border-cyan-500"
+                    />
+                    <p className="text-[10px] text-slate-500">Estas respuestas NUNCA se ofrecerán como opción incorrecta para esta oración — para sinónimos cercanos.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Respuestas Alternas (una por línea, opcional)</label>
+                    <textarea
+                      value={draft.altAnswers}
+                      onChange={(e) => updateDraft('altAnswers', e.target.value)}
+                      placeholder={'Otra oración completa igual de correcta...'}
+                      rows={2}
+                      className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white outline-none focus:border-cyan-500 resize-y"
+                    />
                 </div>
 
                 <div className="border-t border-slate-800 pt-4">
