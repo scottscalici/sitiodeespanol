@@ -32,6 +32,12 @@ function choiceOptions(section, q) {
   return /^[A-Z](\s*\/\s*[A-Z])*$/.test(String(q.answer || '').trim().toUpperCase()) ? opts : null;
 }
 
+// Options in letter order. Firestore doesn't keep the order of map keys, so
+// { A, B, C… } can come back shuffled — always sort before showing them.
+function sortedOptions(obj) {
+  return Object.entries(obj || {}).sort(([a], [b]) => a.localeCompare(b));
+}
+
 // "J/D" -> both letters are accepted.
 function acceptedLetters(answer) {
   return String(answer || '').toUpperCase().split('/').map((s) => s.trim()).filter(Boolean);
@@ -242,10 +248,12 @@ export default function LecturaPage() {
                     </p>
                   )}
 
-                  {hasOptions && (
+                  {/* Shared list of options (matching, summaries…). Multiple select
+                      shows its statements as the answer buttons instead. */}
+                  {hasOptions && section.type !== MULTI_SELECT_TYPE && (
                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-2">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Opciones de Referencia:</p>
-                      {Object.entries(section.options).map(([key, val]) => (
+                      {sortedOptions(section.options).map(([key, val]) => (
                         <div key={key} className="flex gap-3 text-sm">
                           <span className="font-black text-cyan-400 w-5">{key}:</span>
                           <span className="text-slate-300"><RichText text={val} /></span>
@@ -272,8 +280,8 @@ export default function LecturaPage() {
                               <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
                               <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
                             </div>
-                            <div className="flex flex-wrap gap-2 pl-6">
-                              {Object.entries(opts).map(([letter, text]) => {
+                            <div className={opts === section.options ? 'flex flex-wrap gap-2 pl-6' : 'flex flex-col items-start gap-2 pl-6'}>
+                              {sortedOptions(opts).map(([letter, text]) => {
                                 const isSelected = selected === letter;
                                 const isTheCorrectOne = submitted && accepted.includes(letter);
                                 return (
@@ -294,7 +302,14 @@ export default function LecturaPage() {
                                         : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-cyan-500'
                                     }`}
                                   >
-                                    <strong>{letter}:</strong> <RichText text={text} />
+                                    {/* Shared options are listed above, so just the letter here. */}
+                                    {opts === section.options ? (
+                                      <strong className="px-1">{letter}</strong>
+                                    ) : (
+                                      <>
+                                        <strong>{letter}:</strong> <RichText text={text} />
+                                      </>
+                                    )}
                                   </button>
                                 );
                               })}
@@ -312,16 +327,21 @@ export default function LecturaPage() {
                       if (section.type === MULTI_SELECT_TYPE && hasOptions) {
                         const given = new Set(studentAnswers[key] || []);
                         const expected = parseLetterSet(q.answer);
+                        // Studio exams repeat the instruction as the prompt
+                        // ("Elige las cuatro frases verdaderas.") — say how many instead.
+                        const norm = (x) => String(x || '').toLowerCase().replace(/[^\p{L}\s]/gu, '').trim();
+                        const repeatsInstructions = norm(section.instructions).startsWith(norm(q.prompt));
+                        const prompt = repeatsInstructions ? `Marca ${expected.size} opciones.` : q.prompt;
                         const isCorrect =
                           submitted && given.size === expected.size && [...expected].every((l) => given.has(l));
                         return (
                           <div key={qIdx} className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
                             <div className="flex items-start gap-3">
                               <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
-                              <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
+                              <p className="text-sm font-bold text-white flex-1"><RichText text={prompt} /></p>
                             </div>
-                            <div className="flex flex-wrap gap-2 pl-6">
-                              {Object.entries(section.options).map(([letter, text]) => {
+                            <div className="flex flex-col items-start gap-2 pl-6">
+                              {sortedOptions(section.options).map(([letter, text]) => {
                                 const isChecked = given.has(letter);
                                 const shouldBeChecked = expected.has(letter);
                                 const cls = submitted
