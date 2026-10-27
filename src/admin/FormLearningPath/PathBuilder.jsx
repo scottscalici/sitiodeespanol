@@ -1,5 +1,6 @@
 import React from 'react';
 import { QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, sumMix } from '../../utils/questionTypes';
+import BadgeIcon from '../../components/BadgeIcon';
 
 export default function PathBuilder({
   contentType,
@@ -41,6 +42,19 @@ export default function PathBuilder({
   const [podImportOpen, setPodImportOpen] = React.useState(false);
   const [podImportText, setPodImportText] = React.useState('');
   const [podImportStatus, setPodImportStatus] = React.useState('');
+
+  // The native <select> used to list every badge as "{icon} {name}" — fine
+  // for an emoji icon, but a badge with an uploaded image icon is a full
+  // URL, so the catalog's options rendered as raw, unreadable URL text as
+  // the badge library grew. A custom searchable dropdown lets us render the
+  // actual BadgeIcon thumbnail (an <img>, which <option> can't show) and
+  // filter a now-large catalog by name instead of scrolling a native list.
+  const [openBadgePicker, setOpenBadgePicker] = React.useState(null);
+  const [badgeSearch, setBadgeSearch] = React.useState('');
+  const closeBadgePicker = () => {
+    setOpenBadgePicker(null);
+    setBadgeSearch('');
+  };
 
   const handlePodImport = () => {
     try {
@@ -357,20 +371,70 @@ export default function PathBuilder({
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
                   🏆 Insignia al completar:
                 </span>
-                <select
-                  value={pod.badgeAward?.badgeId || ''}
-                  onChange={(e) => handleBadgeAwardChange(podIndex, e.target.value)}
-                  className="bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="">-- Ninguna --</option>
-                  {badgeCatalog.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.icon} {b.name}
-                      {b.tiered ? ' (por niveles)' : ''}
-                    </option>
-                  ))}
-                  <option value="__new__">+ Nueva insignia...</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => (openBadgePicker === podIndex ? closeBadgePicker() : setOpenBadgePicker(podIndex))}
+                    className="flex items-center gap-1.5 bg-white border border-amber-300 rounded-lg px-2 py-1 text-xs font-bold text-amber-900 hover:bg-amber-50 transition-colors"
+                  >
+                    {(() => {
+                      const selected = badgeCatalog.find((b) => b.id === pod.badgeAward?.badgeId);
+                      if (!selected) return <span>-- Ninguna --</span>;
+                      return (
+                        <>
+                          <BadgeIcon icon={selected.icon} size="sm" />
+                          <span>{selected.name}{selected.tiered ? ' (por niveles)' : ''}</span>
+                        </>
+                      );
+                    })()}
+                    <span className="text-amber-400">▾</span>
+                  </button>
+
+                  {openBadgePicker === podIndex && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={closeBadgePicker} />
+                      <div className="absolute z-20 top-full left-0 mt-1 w-64 bg-white border border-amber-300 rounded-lg shadow-xl p-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={badgeSearch}
+                          onChange={(e) => setBadgeSearch(e.target.value)}
+                          placeholder="Buscar insignia..."
+                          className="w-full bg-amber-50 border border-amber-200 rounded-md px-2 py-1 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                        <div className="max-h-56 overflow-y-auto space-y-0.5">
+                          <button
+                            type="button"
+                            onClick={() => { handleBadgeAwardChange(podIndex, ''); closeBadgePicker(); }}
+                            className="w-full text-left px-2 py-1 rounded text-xs font-bold text-slate-500 hover:bg-amber-50"
+                          >
+                            -- Ninguna --
+                          </button>
+                          {badgeCatalog
+                            .filter((b) => b.name.toLowerCase().includes(badgeSearch.toLowerCase()))
+                            .map((b) => (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => { handleBadgeAwardChange(podIndex, b.id); closeBadgePicker(); }}
+                                className="w-full flex items-center gap-2 text-left px-2 py-1 rounded text-xs font-bold text-amber-900 hover:bg-amber-50"
+                              >
+                                <BadgeIcon icon={b.icon} size="sm" />
+                                <span className="flex-1 truncate">{b.name}{b.tiered ? ' (por niveles)' : ''}</span>
+                              </button>
+                            ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { handleBadgeAwardChange(podIndex, '__new__'); closeBadgePicker(); }}
+                          className="w-full text-left px-2 py-1.5 mt-1 border-t border-amber-100 pt-2 rounded text-xs font-bold text-indigo-600 hover:bg-amber-50"
+                        >
+                          + Nueva insignia...
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {pod.badgeAward?.badgeId && badgeCatalog.find((b) => b.id === pod.badgeAward.badgeId)?.tiered && (
                   <select
