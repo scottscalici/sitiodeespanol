@@ -99,6 +99,16 @@ double-space — easy to trigger via a word processor or some clipboard
 tools — used to silently corrupt every column after the empty one. That's
 fixed now, but it's worth knowing in case an older line ever looks wrong.)
 
+## Pretérito vs. imperfecto
+
+If the request is for preterite/imperfect practice (or names a specific
+"segment" number from that sequence), read `references/preterito-imperfecto.md`
+first and follow its 19-segment curriculum rather than generating a generic
+mix — it defines exactly which tense-uses each segment drills, the cue
+words that keep each one unambiguous, and the two-pass structure segments
+16-17 need. Don't skip this file for a preterite/imperfect request even if
+the user doesn't mention "segment" by name.
+
 ## Important
 
 - Never generate sentences with verb-contrast pairs (binary/quad verb
