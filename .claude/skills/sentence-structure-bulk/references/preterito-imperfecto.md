@@ -54,7 +54,7 @@ be merged into one segment — only do this if the user asks for a shorter
 set, or if a single segment's sentence count would otherwise be awkwardly
 large. Don't merge by default.
 
-## Each use, with cues and examples
+## Each use, with cues, examples, and its tag label
 
 Keep each use's cues distinct from its sibling uses so a segment's "only
 two new uses" framing actually holds — e.g. use A (completed action) and
@@ -62,49 +62,62 @@ use C (time stamp) are both preterite, but use different cue styles so
 mixing them later (segment 7) is meaningfully mixing two different signals,
 not the same signal twice.
 
-- **A — Completed action (general).** A single finished event, cued
-  without a literal clock/calendar reference (those are reserved for C).
-  Cues: *una vez, de repente, por fin, finalmente,* or a context that's
-  clearly one discrete event. Ex: *De repente, [[sonó|sonar]] la alarma.*
-- **B — Ongoing action (imperfect).** A single action in progress at a
-  specific moment — not habitual (that's D), not a description (that's F).
-  Cues: *en ese momento, a esa hora, en aquel entonces* paired with an
-  action verb. Ex: *En ese momento, los niños [[jugaban|jugar]] en el patio.*
-- **C — Time stamp (preterite).** Explicit calendar/clock-relative cues.
-  Cues: *ayer, anoche, la semana pasada, el año pasado, esta mañana.*
+Each use below has a **tag label** — the human-readable Spanish word for
+that use, used in the `etiquetas` column instead of the bare letter (see
+"Tagging" below).
+
+- **A — Completed action (general).** Tag label: `Completada`. A single
+  finished event, cued without a literal clock/calendar reference (those
+  are reserved for C). Cues: *una vez, de repente, por fin, finalmente,*
+  or a context that's clearly one discrete event.
+  Ex: *De repente, [[sonó|sonar]] la alarma.*
+- **B — Ongoing action (imperfect).** Tag label: `Continua`. A single
+  action in progress at a specific moment — not habitual (that's D), not
+  a description (that's F). Cues: *en ese momento, a esa hora, en aquel
+  entonces* paired with an action verb.
+  Ex: *En ese momento, los niños [[jugaban|jugar]] en el patio.*
+- **C — Time stamp (preterite).** Tag label: `Marca de Tiempo`. Explicit
+  calendar/clock-relative cues. Cues: *ayer, anoche, la semana pasada, el
+  año pasado, esta mañana.*
   Ex: *Anoche [[terminé|terminar]] mi proyecto de ciencias.*
-- **D — Habitual/repeated action (imperfect).** Cues: *todos los veranos,
-  siempre, cada día, generalmente, los sábados.*
+- **D — Habitual/repeated action (imperfect).** Tag label: `Habitual`.
+  Cues: *todos los veranos, siempre, cada día, generalmente, los sábados.*
   Ex: *Todos los veranos, mi familia [[viajaba|viajar]] a la playa.*
-- **E — Stated duration (preterite).** The duration is viewed as a
-  completed whole, so it's preterite despite the time span. Cues: *por
-  tres horas, durante dos años, toda la noche, todo el día.*
+- **E — Stated duration (preterite).** Tag label: `Duración`. The
+  duration is viewed as a completed whole, so it's preterite despite the
+  time span. Cues: *por tres horas, durante dos años, toda la noche, todo
+  el día.*
   Ex: *[[Estudié|Estudiar]] por tres horas anoche.*
-- **F — Description: age, weather, time (imperfect).** Cues: age phrases
-  (*tenía ___ años*), weather (*hacía frío/calor/sol*), clock time (*eran
-  las ___*), or scene conditions (*había mucha gente*).
+- **F — Description: age, weather, time (imperfect).** Tag label:
+  `Descripción`. Cues: age phrases (*tenía ___ años*), weather (*hacía
+  frío/calor/sol*), clock time (*eran las ___*), or scene conditions
+  (*había mucha gente*).
   Ex: *[[Hacía|Hacer]] mucho frío esa noche.*
-- **G — Sequence of events (preterite + preterite).** Two or more
-  preterite verbs chained in order — no imperfect pairing needed, since
-  this is about preterite-with-preterite sequencing. Cues: *primero,
-  luego, después, finalmente* connecting the steps.
+- **G — Sequence of events (preterite + preterite).** Tag label:
+  `Secuencia`. Two or more preterite verbs chained in order — no
+  imperfect pairing needed, since this is about preterite-with-preterite
+  sequencing. Cues: *primero, luego, después, finalmente* connecting the
+  steps.
   Ex: *Primero [[me desperté|despertarse]], luego me duché y salí para
   la escuela.*
-- **H — Background/scene-setting (imperfect, no interruption).** Pure
-  description setting a scene — deliberately with NO interrupting
-  preterite action in the same sentence, to keep this distinct from the
-  interruption pattern (use I) introduced later. Cues: scene-setting
-  phrases like *el cielo estaba, las calles estaban, todo parecía.*
+- **H — Background/scene-setting (imperfect, no interruption).** Tag
+  label: `Trasfondo`. Pure description setting a scene — deliberately
+  with NO interrupting preterite action in the same sentence, to keep
+  this distinct from the interruption pattern (use I) introduced later.
+  Cues: scene-setting phrases like *el cielo estaba, las calles estaban,
+  todo parecía.*
   Ex: *El cielo [[estaba|estar]] gris y las calles estaban vacías.*
 - **I — Interruption pattern (imperfect + preterite in one sentence).**
-  An ongoing imperfect action interrupted by a completed preterite action.
-  Cue: *mientras, cuando* joining the two clauses. This use produces TWO
-  lines per underlying sentence (see "Segments 16 and 17" below).
+  Tag label: `Interrupción`. An ongoing imperfect action interrupted by a
+  completed preterite action. Cue: *mientras, cuando* joining the two
+  clauses. This use produces TWO lines per underlying sentence (see
+  "Segments 16 and 17" below).
   Ex: *Yo dormía cuando sonó el teléfono.*
-- **J — Simultaneous imperfect actions (imperfect + imperfect).** Two
-  actions happening at the same time, both ongoing — no preterite
-  involved. Cue: *mientras* joining two imperfect clauses. Blank either
-  one of the two verbs (vary which one across the set).
+- **J — Simultaneous imperfect actions (imperfect + imperfect).** Tag
+  label: `Simultánea`. Two actions happening at the same time, both
+  ongoing — no preterite involved. Cue: *mientras* joining two imperfect
+  clauses. Blank either one of the two verbs (vary which one across the
+  set).
   Ex: *Mientras yo cocinaba, ella leía un libro.*
 
 ## Segments 16 and 17: one sentence set, two passes
@@ -118,18 +131,31 @@ segment.
 
 Example pair from one underlying sentence:
 ```
-Yo dormía cuando [[sonó|sonar]] el teléfono. | I was sleeping when the phone rang. |  | Pretérito-Imperfecto, Segmento 16, interrupción
-Yo [[dormía|dormir]] cuando sonó el teléfono. | I was sleeping when the phone rang. |  | Pretérito-Imperfecto, Segmento 17, interrupción
+Yo dormía cuando [[sonó|sonar]] el teléfono. | I was sleeping when the phone rang. |  | Pretérito-Imperfecto, Segmento 16, Pretérito, Interrupción
+Yo [[dormía|dormir]] cuando sonó el teléfono. | I was sleeping when the phone rang. |  | Pretérito-Imperfecto, Segmento 17, Imperfecto, Interrupción
 ```
 
 ## Tagging
 
-Use `etiquetas` consistently across every segment: the textbook/course tag
-the user gives (or omit if none), `Pretérito-Imperfecto`, `Segmento N`,
-and the use letter or a short label for it (e.g. `uso A`, `interrupción`,
-`simultáneo`). This lets the teacher filter the Learning Path builder down
-to one segment at a time. `capítulo` follows whatever the user says, or is
-left empty.
+Use `etiquetas` consistently across every segment, in this order:
+
+1. The textbook/course tag the user gives, if any (omit if none).
+2. `Pretérito-Imperfecto` — the curriculum tag, so the teacher can filter
+   to every sentence in the whole sequence at once.
+3. `Segmento N`.
+4. `Pretérito` or `Imperfecto` — whichever tense the BLANKED verb in that
+   specific line actually is. For a mixed segment (e.g. segment 3, 6, 7,
+   11, 15, 18, 19), this varies line by line even within the same segment
+   — tag each line for its own blank, not the segment as a whole. For use
+   I (segments 16-18), the preterite-blanked lines get `Pretérito` and the
+   imperfect-blanked lines get `Imperfecto`, even within one segment.
+5. The use's tag label (e.g. `Completada`, `Continua`, `Marca de Tiempo` —
+   see the full list under "Each use" above). For use J, use `Simultánea`.
+
+This lets the teacher filter the Learning Path builder down to one
+segment, one tense, or one specific sentence type (all "Trasfondo"
+sentences across every segment, for instance). `capítulo` follows
+whatever the user says, or is left empty.
 
 ## Generating a request
 
