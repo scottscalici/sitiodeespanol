@@ -407,8 +407,25 @@ const ZasRoomPage = () => {
             {!isHost && (
               <>
                 {!me?.groupId && (
-                  <div className="bg-rose-950/30 border border-rose-700 rounded-2xl p-6 text-center">
-                    <p className="text-rose-400 font-bold text-sm">No te uniste a un grupo antes de empezar. Pide al profesor que reinicie la sala si quieres jugar.</p>
+                  <div className="bg-slate-900 border-2 border-amber-600/50 rounded-2xl p-6 space-y-3">
+                    <p className="text-amber-400 font-bold text-sm text-center">El juego ya empezó, pero todavía puedes unirte — solo necesitas un grupo. Empezarás a jugar en la próxima ronda.</p>
+                    <button
+                      onClick={createGroup}
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest py-3 rounded-lg"
+                    >
+                      Crear Mi Grupo
+                    </button>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={groupCodeInput}
+                        onChange={(e) => setGroupCodeInput(e.target.value.toUpperCase())}
+                        placeholder="Código de grupo"
+                        className="flex-1 bg-slate-800 border border-slate-700 text-white text-center font-black tracking-widest rounded-lg p-2 uppercase"
+                      />
+                      <button onClick={joinGroup} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 rounded-lg">Unirme</button>
+                    </div>
+                    {groupError && <p className="text-rose-400 text-xs font-bold text-center">{groupError}</p>}
                   </div>
                 )}
 
