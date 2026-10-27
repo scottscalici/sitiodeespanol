@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import FormCultura from './components/FormCultura';
 import FormConversaciones from './components/FormConversaciones';
@@ -191,6 +191,21 @@ export default function MasterDashboard() {
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-')
               .replace(/(^-|-$)/g, '');
+
+            // Exams from The Spanish Gym Studio: line/paragraph numbering (so
+            // "(línea 12)" in a question matches the page), footnotes, and a
+            // photo. The Studio's "Descargar" embeds the photo as image_data;
+            // it goes to Storage like any other lectura image.
+            if (textObj.numbering) convertedData.numbering = textObj.numbering;
+            if (textObj.footnotes?.length) convertedData.footnotes = textObj.footnotes;
+            if (textObj.image) {
+              convertedData.imagen_filename = textObj.image;
+              if (typeof textObj.image_data === 'string' && textObj.image_data.startsWith('data:image/')) {
+                const storageRef = ref(storage, `lectura_images/${docId}-${textObj.image}`);
+                await uploadString(storageRef, textObj.image_data, 'data_url');
+                convertedData.imagen = await getDownloadURL(storageRef);
+              }
+            }
 
             await setDoc(doc(db, "lecturas", docId), convertedData, { merge: true });
           }
