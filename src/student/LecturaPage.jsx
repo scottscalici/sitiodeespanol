@@ -3,10 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import CulturalLecturaExercise from './CulturalLecturaExercise';
+import { RichText, IbPassage } from './ibText';
+import { SECTION_LABELS } from './ibLabels';
 
-// Section types whose answer is a single letter chosen from section.options
-// — exactly gradable, no phrasing-variability problem.
-const CHOICE_TYPES = ['multiple_choice', 'matching'];
+// Section types whose answer is a letter chosen from a list of options —
+// exactly gradable, no phrasing-variability problem. Multiple-choice questions
+// carry their own options (q.options); the other types share section.options.
+const CHOICE_TYPES = ['multiple_choice', 'matching', 'gap_summary', 'fill_in_the_blank'];
 const MULTI_SELECT_TYPE = 'multiple_select';
 const TRUE_FALSE_TYPE = 'true_false_justification';
 
@@ -18,6 +21,31 @@ function parseTrueFalse(answer) {
   const idx = str.indexOf(',');
   if (idx === -1) return { truth: str.toUpperCase(), justification: '' };
   return { truth: str.slice(0, idx).trim().toUpperCase(), justification: str.slice(idx + 1).trim() };
+}
+
+// The options a choice question offers, or null if it isn't a letter question
+// (old fill_in_the_blank sections can hold written answers instead of letters).
+function choiceOptions(section, q) {
+  if (!CHOICE_TYPES.includes(section.type)) return null;
+  const opts = q.options && Object.keys(q.options).length ? q.options : section.options;
+  if (!opts || !Object.keys(opts).length) return null;
+  return /^[A-Z](\s*\/\s*[A-Z])*$/.test(String(q.answer || '').trim().toUpperCase()) ? opts : null;
+}
+
+// "J/D" -> both letters are accepted.
+function acceptedLetters(answer) {
+  return String(answer || '').toUpperCase().split('/').map((s) => s.trim()).filter(Boolean);
+}
+
+// Mark-scheme notes shown under the official answer.
+function MarkNotes({ q }) {
+  if (!q.accept && !q.reject) return null;
+  return (
+    <div className="mt-1 space-y-0.5 text-[11px] text-slate-400">
+      {q.accept && <p>Se acepta: <RichText text={q.accept} /></p>}
+      {q.reject && <p>No se acepta: <RichText text={q.reject} /></p>}
+    </div>
+  );
 }
 
 function parseLetterSet(answer) {
@@ -128,9 +156,9 @@ export default function LecturaPage() {
     const hasOptions = section.options && Object.keys(section.options).length > 0;
     (section.questions || []).forEach((q, qIdx) => {
       const key = `${sIdx}_${qIdx}`;
-      if (CHOICE_TYPES.includes(section.type) && hasOptions) {
+      if (choiceOptions(section, q)) {
         totalGraded++;
-        if ((studentAnswers[key] || '') === (q.answer || '').trim().toUpperCase()) correctGraded++;
+        if (acceptedLetters(q.answer).includes(studentAnswers[key] || '')) correctGraded++;
       } else if (section.type === MULTI_SELECT_TYPE && hasOptions) {
         totalGraded++;
         const expected = parseLetterSet(q.answer);
@@ -177,23 +205,17 @@ export default function LecturaPage() {
           <div
             className={
               layout === 'lado-a-lado'
-                ? 'lg:col-span-5 bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl h-fit lg:sticky lg:top-6 space-y-4 max-h-[80vh] overflow-y-auto'
+                ? `${lectura.numbering === 'lines' ? 'lg:col-span-6' : 'lg:col-span-5'} bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl h-fit lg:sticky lg:top-6 space-y-4 max-h-[80vh] overflow-y-auto`
                 : 'bg-slate-800 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-xl space-y-4'
             }
           >
             <h3 className="text-xs font-black uppercase tracking-widest text-cyan-400 border-b border-slate-700 pb-3">
               Texto de Lectura
             </h3>
-            <div className="space-y-4 font-serif text-slate-300 leading-relaxed text-base">
-              {(lectura.paragraphs || []).map((p, idx) => (
-                <p key={idx} className="indent-6">
-                  {p}
-                </p>
-              ))}
-            </div>
+            <IbPassage lectura={lectura} />
           </div>
 
-          <div className={layout === 'lado-a-lado' ? 'lg:col-span-7 space-y-6' : 'space-y-6'}>
+          <div className={layout === 'lado-a-lado' ? `${lectura.numbering === 'lines' ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-6` : 'space-y-6'}>
             {(lectura.question_sections || []).map((section, sIdx) => {
               const hasOptions = section.options && Object.keys(section.options).length > 0;
               return (
@@ -203,13 +225,20 @@ export default function LecturaPage() {
                       Sección {sIdx + 1}
                     </span>
                     <span className="text-[10px] font-mono bg-slate-900 px-2 py-1 rounded text-slate-400 uppercase">
-                      Tipo: {section.type || 'Standard'}
+                      {SECTION_LABELS[section.type] || section.type || 'Preguntas'}
                     </span>
                   </div>
 
                   {section.instructions && (
                     <p className="text-sm font-bold text-slate-200 bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 leading-relaxed">
-                      {section.instructions}
+                      <RichText text={section.instructions} />
+                    </p>
+                  )}
+
+                  {/* Summary with gaps ("Resumen con espacios") */}
+                  {section.text && (
+                    <p className="text-sm text-slate-200 border-2 border-dashed border-slate-600 p-4 rounded-xl leading-relaxed">
+                      <RichText text={section.text} />
                     </p>
                   )}
 
@@ -219,7 +248,7 @@ export default function LecturaPage() {
                       {Object.entries(section.options).map(([key, val]) => (
                         <div key={key} className="flex gap-3 text-sm">
                           <span className="font-black text-cyan-400 w-5">{key}:</span>
-                          <span className="text-slate-300">{val}</span>
+                          <span className="text-slate-300"><RichText text={val} /></span>
                         </div>
                       ))}
                     </div>
@@ -230,21 +259,23 @@ export default function LecturaPage() {
                       const key = `${sIdx}_${qIdx}`;
                       const qNum = q.number || qIdx + 1;
 
-                      // --- Single-letter choice: multiple_choice / matching ---
-                      if (CHOICE_TYPES.includes(section.type) && hasOptions) {
+                      // --- Single-letter choice: multiple_choice / matching / gap_summary ---
+                      const opts = choiceOptions(section, q);
+                      if (opts) {
                         const selected = studentAnswers[key] || '';
-                        const correctLetter = (q.answer || '').trim().toUpperCase();
-                        const isCorrect = submitted && selected === correctLetter;
+                        const accepted = acceptedLetters(q.answer);
+                        const correctLetter = accepted.join(' / ');
+                        const isCorrect = submitted && accepted.includes(selected);
                         return (
                           <div key={qIdx} className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
                             <div className="flex items-start gap-3">
                               <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
-                              <p className="text-sm font-bold text-white flex-1">{q.prompt}</p>
+                              <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
                             </div>
                             <div className="flex flex-wrap gap-2 pl-6">
-                              {Object.entries(section.options).map(([letter, text]) => {
+                              {Object.entries(opts).map(([letter, text]) => {
                                 const isSelected = selected === letter;
-                                const isTheCorrectOne = submitted && letter === correctLetter;
+                                const isTheCorrectOne = submitted && accepted.includes(letter);
                                 return (
                                   <button
                                     key={letter}
@@ -263,7 +294,7 @@ export default function LecturaPage() {
                                         : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-cyan-500'
                                     }`}
                                   >
-                                    <strong>{letter}:</strong> {text}
+                                    <strong>{letter}:</strong> <RichText text={text} />
                                   </button>
                                 );
                               })}
@@ -287,7 +318,7 @@ export default function LecturaPage() {
                           <div key={qIdx} className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
                             <div className="flex items-start gap-3">
                               <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
-                              <p className="text-sm font-bold text-white flex-1">{q.prompt}</p>
+                              <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
                             </div>
                             <div className="flex flex-wrap gap-2 pl-6">
                               {Object.entries(section.options).map(([letter, text]) => {
@@ -310,7 +341,7 @@ export default function LecturaPage() {
                                     onClick={() => toggleMultiAnswer(key, letter)}
                                     className={`text-xs text-left rounded-lg px-3 py-2 border transition-colors ${cls}`}
                                   >
-                                    <strong>{letter}:</strong> {text}
+                                    <strong>{letter}:</strong> <RichText text={text} />
                                     {isChecked && !submitted ? ' ✓' : ''}
                                   </button>
                                 );
@@ -335,7 +366,7 @@ export default function LecturaPage() {
                           <div key={qIdx} className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
                             <div className="flex items-start gap-3">
                               <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
-                              <p className="text-sm font-bold text-white flex-1">{q.prompt}</p>
+                              <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
                             </div>
                             <div className="flex gap-2 pl-6">
                               {['V', 'F'].map((letter) => (
@@ -374,7 +405,12 @@ export default function LecturaPage() {
                                 >
                                   {isRevealed ? 'Ocultar justificación' : 'Mostrar justificación oficial'}
                                 </button>
-                                {isRevealed && <p className="text-xs text-slate-300 mt-1 italic">"{justification}"</p>}
+                                {isRevealed && (
+                                  <>
+                                    <p className="text-xs text-slate-300 mt-1 italic">"<RichText text={justification} />"</p>
+                                    <MarkNotes q={q} />
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
@@ -390,7 +426,7 @@ export default function LecturaPage() {
                         <div key={qIdx} className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3">
                           <div className="flex items-start gap-3">
                             <span className="font-black text-rose-400 font-mono text-sm">{qNum}.</span>
-                            <p className="text-sm font-bold text-white flex-1">{q.prompt}</p>
+                            <p className="text-sm font-bold text-white flex-1"><RichText text={q.prompt} /></p>
                           </div>
                           {submitted ? (
                             <div className="pl-6">
@@ -401,7 +437,15 @@ export default function LecturaPage() {
                               >
                                 {isRevealed ? 'Ocultar respuesta' : 'Mostrar respuesta oficial'}
                               </button>
-                              {isRevealed && <p className="text-xs text-slate-300 mt-1 italic">"{q.answer}"</p>}
+                              {isRevealed && (
+                                <>
+                                  <p className="text-xs text-slate-300 mt-1 italic">"<RichText text={q.answer} />"</p>
+                                  <MarkNotes q={q} />
+                                  {/\(/.test(String(q.answer)) && (
+                                    <p className="text-[10px] text-slate-500 mt-1">Las palabras entre paréntesis son opcionales; / separa respuestas alternativas.</p>
+                                  )}
+                                </>
+                              )}
                             </div>
                           ) : (
                             <p className="text-xs text-slate-500 italic pl-6">
