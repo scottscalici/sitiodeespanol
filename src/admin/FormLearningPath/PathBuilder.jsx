@@ -623,6 +623,38 @@ export default function PathBuilder({
                         )}
                       </div>
 
+                      {/* Review Mode — how much of this segment draws from
+                          content introduced by EARLIER segments in this pod
+                          instead of its own. Nothing selected = the original
+                          automatic light mix (~20%), unchanged for a segment
+                          nobody has touched since this control shipped. */}
+                      <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+                        <label className="block text-[10px] font-black text-amber-700 uppercase mb-1">🔁 Repaso vs. Nuevo</label>
+                        <div className="flex gap-2">
+                          {[
+                            { value: 'new', label: 'Solo Nuevo' },
+                            { value: 'mixed', label: 'Mixto' },
+                            { value: 'review', label: 'Solo Repaso' },
+                          ].map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => updateSegmentField(podIndex, segIndex, 'reviewMode', opt.value)}
+                              className={`flex-1 text-xs font-bold py-1.5 rounded-lg border transition-colors ${
+                                seg.reviewMode === opt.value
+                                  ? 'bg-amber-500 border-amber-600 text-white'
+                                  : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        {!seg.reviewMode && (
+                          <p className="text-[10px] text-slate-400 italic mt-1">Sin elegir = mezcla automática ligera (como antes). Elige una opción para controlarlo directamente.</p>
+                        )}
+                      </div>
+
                       {contentType === 'verb' && (
                         <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                           <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Verb Tense</label>
