@@ -118,10 +118,15 @@ export default function StudentLearningPath() {
 
   // --- 2. LOAD THE SELECTED UNIT'S DOCUMENT ---
   useEffect(() => {
-    if (!selectedPathId) {
-      setUnitData(null);
-      return;
-    }
+    // Clear both immediately, before the fetch even starts — otherwise the
+    // map kept rendering the PREVIOUS unit's pods (still clickable) for the
+    // moment it takes the new unit's doc to arrive, and any workout left
+    // open from before the switch (shouldn't normally happen, but costs
+    // nothing to guard) would keep showing its old content on top of the
+    // newly-selected unit.
+    setUnitData(null);
+    setActiveWorkoutSegment(null);
+    if (!selectedPathId) return;
     const fetchUnit = async () => {
       try {
         const snap = await getDoc(doc(db, 'learning_paths', selectedPathId));
