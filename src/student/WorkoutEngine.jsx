@@ -32,7 +32,17 @@ const GENERIC_QUESTION_FILLERS = [
   '¿Cuántos años tienes?', '¿Qué tiempo hace hoy?',
 ];
 
-export default function WorkoutEngine({ segment, history = [], podIndex = 0, onClose, onComplete }) {
+// A segment's reviewMode dials how often a question is drawn from everything
+// PRIOR segments in the path introduced ("history") instead of this
+// segment's own new content. Undefined (any segment saved before this field
+// existed) keeps the original hardcoded 20% so already-built paths don't
+// change behavior out from under a teacher who hasn't touched them —
+// picking a mode explicitly is what opts a segment into the new, visible
+// rates below.
+const HISTORY_CHANCE_BY_MODE = { new: 0, mixed: 0.5, review: 1 };
+const LEGACY_HISTORY_CHANCE = 0.2;
+
+export default function WorkoutEngine({ segment, history = [], sentenceHistory = [], podIndex = 0, onClose, onComplete }) {
   const { currentUser } = useAuth();
 
   const [questions, setQuestions] = useState([]);
@@ -169,7 +179,9 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const totalQs = segment.total_questions || 15;
       const rawConcepts = segment.introduced_concepts || [];
       const grammar = segment.pinned_sentences || [];
+      const grammarHistoryPool = sentenceHistory || [];
       const targetTense = segment.targetTense || 'ALL';
+      const historyChance = segment.reviewMode ? (HISTORY_CHANCE_BY_MODE[segment.reviewMode] ?? LEGACY_HISTORY_CHANCE) : LEGACY_HISTORY_CHANCE;
 
       // A sentence's grammarTags are for topic/organization (filtering in
       // the Learning Path builder, labeling the question) — using them to
@@ -205,7 +217,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       // phrase blank like "a lo mejor", instead of generic single
       // vocab/verb words ("de", "hacer") that are obviously the wrong
       // part of speech.
-      const grammarAnswerPool = grammar
+      const grammarAnswerPool = [...grammar, ...grammarHistoryPool]
         .map((s) => {
           const twoPart = s.label.match(/\[\[(.*?)\|(.*?)\]\]/);
           const onePart = s.label.match(/\[\[(.*?)\]\]/);
@@ -218,7 +230,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       // Authored "reverse engineering" pairs (statement || question) — the
       // question halves double as a distractor pool for each other, same
       // shape as grammarAnswerPool above.
-      const reverseQuestionPool = grammar
+      const reverseQuestionPool = [...grammar, ...grammarHistoryPool]
         .filter((s) => s.label.includes('||'))
         .map((s) => {
           const [, q] = s.label.split('||');
@@ -315,7 +327,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
       const validHistoryVerbs = unpackedHistory.filter(c => c.isVerbObj || (c.fullData && c.fullData.tenses));
       const validHistory = [...validHistoryVocab, ...validHistoryVerbs];
 
-      if (concepts.length === 0 && grammar.length === 0 && validHistory.length === 0) {
+      if (concepts.length === 0 && grammar.length === 0 && validHistory.length === 0 && grammarHistoryPool.length === 0) {
         setIsGenerating(false); return;
       }
 
@@ -438,10 +450,21 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
         // --- 2. GRAMÁTICA Y ORACIONES ---
         const forceHistory = concepts.length === 0;
         const requestedType = typeQueue[i] || 'recall';
-        const isGrammarTurn = grammar.length > 0 && (requestedType === 'sentence' || (concepts.length === 0 && validHistory.length === 0));
+        const isGrammarTurn = (grammar.length > 0 || grammarHistoryPool.length > 0) &&
+          (requestedType === 'sentence' || (concepts.length === 0 && validHistory.length === 0));
 
         if (isGrammarTurn) {
-          const target = grammar[Math.floor(Math.random() * grammar.length)];
+          // Same reviewMode dial as the vocab/verb history draw below — pulls
+          // from pinned sentences introduced by EARLIER segments instead of
+          // this segment's own, at the rate the segment's reviewMode sets.
+          // Falls back to whichever pool actually has content, so a segment
+          // with nothing of its own (a pure "Solo repaso" segment) still
+          // works, and a segment with nothing pinned anywhere upstream yet
+          // (e.g. segment 1) just always draws its own.
+          const useGrammarHistory = grammarHistoryPool.length > 0 &&
+            (grammar.length === 0 || Math.random() < historyChance);
+          const grammarSourcePool = useGrammarHistory ? grammarHistoryPool : grammar;
+          const target = grammarSourcePool[Math.floor(Math.random() * grammarSourcePool.length)];
           const spaSentence = target.label;
           const engTrans = getEnglishTrans(target) || "⚠️ Agrega la traducción en la base de datos";
           const targetTags = getDistractorTags(target);
@@ -604,7 +627,7 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
             target = conceptQueue[i];
             if (!target) continue;
           } else {
-            const isHistoryTurn = forceHistory || (validHistory.length > 0 && Math.random() < 0.20);
+            const isHistoryTurn = forceHistory || (validHistory.length > 0 && Math.random() < historyChance);
 
             if (isHistoryTurn && validHistory.length > 0) target = validHistory[Math.floor(Math.random() * validHistory.length)];
             else if (validVerbs.length > 0 && Math.random() < 0.6) target = validVerbs[Math.floor(Math.random() * validVerbs.length)];

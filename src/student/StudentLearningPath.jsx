@@ -430,17 +430,25 @@ export default function StudentLearningPath() {
         <WorkoutEngine
           segment={activeWorkoutSegment}
           podIndex={pods.findIndex((p) => p.segments.some((s) => s.id === activeWorkoutSegment.id))}
-          history={(() => {
-            let hist = [];
+          {...(() => {
+            // Everything every EARLIER segment in this path introduced,
+            // split by kind — concepts (vocab/verbs) as `history`, pinned
+            // sentences as `sentenceHistory`. WorkoutEngine draws from these
+            // instead of the active segment's own content at a rate the
+            // segment's reviewMode sets ("Solo nuevo" never does, "Solo
+            // repaso" always does when there's anything to draw from).
+            let conceptHist = [];
+            let sentenceHist = [];
             let found = false;
             for (const pod of pods) {
               for (const seg of pod.segments) {
                 if (seg.id === activeWorkoutSegment.id) { found = true; break; }
-                if (seg.introduced_concepts) hist = [...hist, ...seg.introduced_concepts];
+                if (seg.introduced_concepts) conceptHist = [...conceptHist, ...seg.introduced_concepts];
+                if (seg.pinned_sentences) sentenceHist = [...sentenceHist, ...seg.pinned_sentences];
               }
               if (found) break;
             }
-            return hist;
+            return { history: conceptHist, sentenceHistory: sentenceHist };
           })()}
           onClose={() => setActiveWorkoutSegment(null)}
           onComplete={async (segId, score, numQs, regularCount = 0, sentenceCount = 0) => {
