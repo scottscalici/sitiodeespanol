@@ -157,6 +157,13 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
     const generateQuestions = async () => {
       if (!segment) return;
       setIsGenerating(true);
+      // Reset leftover state from whatever segment was open before this one —
+      // without this, a segment with nothing to draw from (see the early
+      // return below) left the PREVIOUS segment's questions and position on
+      // screen once isGenerating flipped back to false, since nothing else
+      // ever clears them.
+      setQuestions([]);
+      setCurrentIndex(0);
 
       let generatedQueue = [];
       const totalQs = segment.total_questions || 15;
@@ -923,7 +930,31 @@ export default function WorkoutEngine({ segment, history = [], podIndex = 0, onC
     );
   }
 
-  if (!segment || questions.length === 0) return null;
+  if (!segment) return null;
+
+  // A segment with no concepts/sentences pinned to it generates zero
+  // questions — this used to render nothing at all (the overlay just
+  // vanished), which looked identical to the segment silently failing to
+  // open. Show it plainly instead so a teacher building the path sees
+  // exactly what's missing, and a student isn't left wondering if the app
+  // is broken.
+  if (questions.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="text-5xl">📭</div>
+        <h2 className="text-xl font-black text-slate-700">Este segmento todavía no tiene preguntas</h2>
+        <p className="text-sm text-slate-500 max-w-sm">
+          No hay oraciones ni conceptos asignados a este segmento todavía. Pídele a tu profesor/a que lo complete.
+        </p>
+        <button
+          onClick={onClose}
+          className="mt-2 bg-slate-800 hover:bg-slate-700 text-white font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl transition-colors"
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
   const currentQ = questions[currentIndex];
   const progressPercent = Math.round(((currentIndex) / questions.length) * 100);
 
