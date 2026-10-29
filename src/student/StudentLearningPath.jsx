@@ -18,6 +18,9 @@ import { getAssignedDominioTasks, buildGradedProgressNode } from '../utils/learn
 const CONTENT_TYPES = {
   vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo' },
   verb: { label: 'Verbos', icon: '⚡', theme: 'emerald' },
+  // A pure sentence-structure drill (adverbs, ser vs. estar, pretérito/
+  // imperfecto, etc.) — no introduced_concepts, only pinned sentences.
+  grammar: { label: 'Estructura', icon: '🧩', theme: 'purple' },
 };
 
 // Zigzag path layout constants — a repeating offset pattern (as % from center)
@@ -177,6 +180,7 @@ export default function StudentLearningPath() {
   const themeColors = {
     emerald: { bg: 'bg-emerald-100', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200', line: 'bg-emerald-400' },
     indigo: { bg: 'bg-indigo-100', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200', line: 'bg-indigo-400' },
+    purple: { bg: 'bg-purple-100', active: 'bg-purple-600', ring: 'ring-purple-500', text: 'text-purple-800', border: 'border-purple-200', line: 'bg-purple-400' },
   };
   const theme = themeColors[contentConfig.theme] || themeColors.indigo;
 

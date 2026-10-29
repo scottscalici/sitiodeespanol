@@ -18,6 +18,10 @@ export const PRACTICE_BOSS_BATTLE_MIX = { recall: 7, mc: 5, matching: 2, listen:
 export const QUESTION_TYPE_LABELS = {
   vocab: { recall: 'Escribir', mc: 'Opción Múltiple', matching: 'Emparejar', listen: 'Escuchar', speak: 'Hablar', sentence: 'Oraciones' },
   verb: { recall: 'Conjugar', mc: 'Opción Múltiple', matching: 'Emparejar', listen: 'Escuchar', speak: 'Hablar', sentence: 'Oraciones' },
+  // A pure-grammar segment has no introduced_concepts, so every slot (not
+  // just the 'sentence' quota) draws from pinned_sentences — 'recall' ends
+  // up rendering as a sentence-building exercise, not a plain write/conjugate.
+  grammar: { recall: 'Formar Oración', mc: 'Opción Múltiple', matching: 'Emparejar', listen: 'Dictado', speak: 'Hablar', sentence: 'Oraciones' },
 };
 
 export const QUESTION_TYPE_ORDER = ['recall', 'mc', 'matching', 'listen', 'speak', 'sentence'];
