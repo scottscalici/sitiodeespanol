@@ -292,7 +292,8 @@ export default function KPracticePage() {
             let newPodIdx = activePodIndex;
             let newSegIdx = activeSegmentIndex;
             const currentActiveSeg = pods[activePodIndex]?.segments[activeSegmentIndex];
-            if (score >= MASTERY_THRESHOLD && segId === currentActiveSeg?.id) {
+            const masteryThreshold = currentActiveSeg?.masteryThreshold ?? MASTERY_THRESHOLD;
+            if (score >= masteryThreshold && segId === currentActiveSeg?.id) {
               if (activeSegmentIndex < pods[activePodIndex].segments.length - 1) newSegIdx = activeSegmentIndex + 1;
               else { newPodIdx = activePodIndex + 1; newSegIdx = 0; }
             }
@@ -305,9 +306,9 @@ export default function KPracticePage() {
             saveProgress(nextProgress);
 
             setFeedbackModal(
-              score >= MASTERY_THRESHOLD
+              score >= masteryThreshold
                 ? { tone: 'success', emoji: '🎉', title: '¡Excelente! ¡Aprobaste!', message: `Obtuviste un ${score}%. Multiplicador: ${multiplier}x (+${totalPointsEarned} pts)` }
-                : { tone: 'warning', emoji: '💪', title: '¡Buen esfuerzo!', message: `Obtuviste un ${score}%. Necesitas al menos ${MASTERY_THRESHOLD}% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)` }
+                : { tone: 'warning', emoji: '💪', title: '¡Buen esfuerzo!', message: `Obtuviste un ${score}%. Necesitas al menos ${masteryThreshold}% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)` }
             );
           }}
         />
