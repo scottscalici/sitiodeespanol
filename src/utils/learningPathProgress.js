@@ -147,6 +147,13 @@ const daysLateFor = (effectiveDueDateTime) =>
 // not enforced, due date hasn't passed, or no on-time snapshot exists
 // because the student hasn't touched the path since the deadline passed).
 export const computeGradedPercent = (progressNode, livePercent, task, fechaByDia = {}) => {
+  // A teacher-set flat percent (e.g. a student who did the work on paper, or
+  // missed it for an excused reason) wins over everything else — actual
+  // progress, due-date enforcement, lateness math, all of it. Checked before
+  // the enforceDueDate short-circuit below since manual credit has to work
+  // on a path with no enforced deadline too.
+  const forcedPercent = progressNode?.teacherOverride?.forceCreditPercent;
+  if (forcedPercent != null) return Math.max(0, Math.min(100, Number(forcedPercent) || 0));
   if (!task?.enforceDueDate) return livePercent;
   const snapshot = progressNode?.onTimeSnapshot;
   if (!snapshot) return livePercent;

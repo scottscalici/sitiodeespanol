@@ -1044,22 +1044,25 @@ const handleResetPassword = async () => {
                                     <span className={`text-xs font-black ${getFlagClasses(unitPercent).split(' ')[0]}`}>
                                       {unitPercent}%
                                     </span>
-                                    {!!pathOverride && <span title="Vencimiento/penalización anulada para este estudiante" className="text-[10px]">🛡️</span>}
-                                    {col.enforceDueDate && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPathOverrideModal({
-                                          student,
-                                          col,
-                                          extendDaysInput: String(pathOverride?.extendDays || ''),
-                                          waivePenalty: !!pathOverride?.waivePenalty,
-                                        })}
-                                        className="text-[10px] text-slate-500 hover:text-white ml-auto"
-                                        title="Extensión / exonerar penalización"
-                                      >
-                                        ⚙️
-                                      </button>
+                                    {pathOverride?.forceCreditPercent != null ? (
+                                      <span title={`Crédito manual: ${pathOverride.forceCreditPercent}% (reemplaza el progreso real)`} className="text-[10px]">🎓</span>
+                                    ) : !!pathOverride && (
+                                      <span title="Vencimiento/penalización anulada para este estudiante" className="text-[10px]">🛡️</span>
                                     )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setPathOverrideModal({
+                                        student,
+                                        col,
+                                        extendDaysInput: String(pathOverride?.extendDays || ''),
+                                        waivePenalty: !!pathOverride?.waivePenalty,
+                                        forceCreditPercentInput: pathOverride?.forceCreditPercent != null ? String(pathOverride.forceCreditPercent) : '',
+                                      })}
+                                      className="text-[10px] text-slate-500 hover:text-white ml-auto"
+                                      title="Excepción de vencimiento / crédito manual"
+                                    >
+                                      ⚙️
+                                    </button>
                                   </div>
                                   <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden">
                                     <div
@@ -1544,12 +1547,17 @@ const handleResetPassword = async () => {
         </div>
       )}
 
-      {/* ⚙️ PATH OVERRIDE MODAL — per-student deadline extension / waived late penalty on one Learning Path */}
+      {/* ⚙️ PATH OVERRIDE MODAL — per-student deadline extension, waived late
+          penalty, and/or a flat manual-credit percent on one Learning Path.
+          The manual-credit field works regardless of enforceDueDate (it's
+          for a student who did the work some other way, or is excused —
+          nothing to do with lateness), so only the deadline-specific fields
+          below are hidden for a path that doesn't enforce one. */}
       {pathOverrideModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-start mb-1">
-              <h3 className="text-lg font-black text-white uppercase tracking-wider">Excepción de Vencimiento</h3>
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Excepción / Crédito Manual</h3>
               <button
                 onClick={() => setPathOverrideModal(null)}
                 className="text-slate-400 hover:text-white text-2xl font-bold leading-none"
@@ -1561,33 +1569,59 @@ const handleResetPassword = async () => {
               {getStudentDisplayName(pathOverrideModal.student)} — {pathOverrideModal.col.titulo}
             </p>
 
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-              Días de Extensión
+            <label className="block text-xs font-bold text-amber-400 uppercase tracking-widest mb-2">
+              🎓 Crédito Manual (%)
             </label>
             <input
               type="number"
               min="0"
-              value={pathOverrideModal.extendDaysInput}
-              onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, extendDaysInput: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-teal-500 mb-4"
-              placeholder="Ej. 2"
+              max="100"
+              value={pathOverrideModal.forceCreditPercentInput}
+              onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, forceCreditPercentInput: e.target.value })}
+              className="w-full bg-slate-900 border border-amber-700/50 text-white rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-amber-500 mb-2"
+              placeholder="Ej. 100 — para un estudiante que no lo hizo en el sitio"
             />
+            <p className="text-[10px] text-slate-500 mb-6">
+              Reemplaza el progreso real de este estudiante en esta ruta por el porcentaje que pongas aquí — útil si lo hizo en papel, estuvo ausente, o cualquier otra excepción. Deja el campo vacío para seguir usando su progreso real.
+            </p>
 
-            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">
-              <input
-                type="checkbox"
-                checked={pathOverrideModal.waivePenalty}
-                onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, waivePenalty: e.target.checked })}
-                className="w-4 h-4"
-              />
-              Exonerar penalización diaria (crédito completo siempre)
-            </label>
+            {pathOverrideModal.col.enforceDueDate && (
+              <>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Días de Extensión
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={pathOverrideModal.extendDaysInput}
+                  onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, extendDaysInput: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:border-teal-500 mb-4"
+                  placeholder="Ej. 2"
+                />
+
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">
+                  <input
+                    type="checkbox"
+                    checked={pathOverrideModal.waivePenalty}
+                    onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, waivePenalty: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  Exonerar penalización diaria (crédito completo siempre)
+                </label>
+              </>
+            )}
 
             <button
               onClick={async () => {
                 const extendDays = Number(pathOverrideModal.extendDaysInput) || 0;
-                const patch = (extendDays > 0 || pathOverrideModal.waivePenalty)
-                  ? { ...(extendDays > 0 ? { extendDays } : {}), ...(pathOverrideModal.waivePenalty ? { waivePenalty: true } : {}) }
+                const forceCreditInput = pathOverrideModal.forceCreditPercentInput.trim();
+                const forceCreditPercent = forceCreditInput === '' ? null : Math.max(0, Math.min(100, Number(forceCreditInput) || 0));
+                const patch = (extendDays > 0 || pathOverrideModal.waivePenalty || forceCreditPercent != null)
+                  ? {
+                      ...(extendDays > 0 ? { extendDays } : {}),
+                      ...(pathOverrideModal.waivePenalty ? { waivePenalty: true } : {}),
+                      ...(forceCreditPercent != null ? { forceCreditPercent } : {}),
+                    }
                   : null;
                 await applyPathOverride(pathOverrideModal.student.uid, pathOverrideModal.col.path_id, patch);
                 setPathOverrideModal(null);
