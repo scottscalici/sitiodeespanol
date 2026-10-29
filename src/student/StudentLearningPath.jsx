@@ -23,6 +23,13 @@ const CONTENT_TYPES = {
   grammar: { label: 'Estructura', icon: '🧩', theme: 'purple' },
 };
 
+// The % score needed to pass a segment and advance, when the segment itself
+// doesn't set its own masteryThreshold (see PathBuilder.jsx's "Umbral para
+// Avanzar" field). K-Practice has its own, separately-set default (70, see
+// KPracticePage.jsx) — the two aren't shared on purpose, since they're
+// different programs with different bars.
+const DEFAULT_MASTERY_THRESHOLD = 80;
+
 // Zigzag path layout constants — a repeating offset pattern (as % from center)
 // works for any number of segments without knowing the count ahead of time.
 const PATH_X_PATTERN = [0, -15, 15];
@@ -484,9 +491,11 @@ export default function StudentLearningPath() {
             let newSegIdx = activeSegmentIndex;
 
             const currentActiveSeg = pods[activePodIndex]?.segments[activeSegmentIndex];
+            const masteryThreshold = currentActiveSeg?.masteryThreshold ?? DEFAULT_MASTERY_THRESHOLD;
 
-            // Requires an 80% Mastery Threshold to advance
-            if (score >= 80 && segId === currentActiveSeg?.id) {
+            // Requires the segment's mastery threshold (or the site-wide
+            // default, if this segment never overrode it) to advance.
+            if (score >= masteryThreshold && segId === currentActiveSeg?.id) {
               if (activeSegmentIndex < pods[activePodIndex].segments.length - 1) {
                 newSegIdx = activeSegmentIndex + 1;
               } else {
@@ -571,8 +580,9 @@ export default function StudentLearningPath() {
               }
             }
 
-            // --- 4. FEEDBACK ---
-            if (score >= 80) {
+            // --- 4. FEEDBACK --- (same pass bar as the advance check above,
+            // not the fixed 80/90/100 multiplier scale, which never moves)
+            if (score >= masteryThreshold) {
               setFeedbackModal({
                 tone: 'success',
                 emoji: '🎉',
@@ -584,7 +594,7 @@ export default function StudentLearningPath() {
                 tone: 'warning',
                 emoji: '💪',
                 title: '¡Buen esfuerzo!',
-                message: `Obtuviste un ${score}%. Necesitas al menos 80% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)`,
+                message: `Obtuviste un ${score}%. Necesitas al menos ${masteryThreshold}% para avanzar — ¡puedes intentarlo de nuevo! (+${totalPointsEarned} pts de práctica)`,
               });
             }
           }}

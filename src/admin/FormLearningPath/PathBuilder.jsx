@@ -662,6 +662,24 @@ export default function PathBuilder({
                         )}
                       </div>
 
+                      {/* Mastery Threshold — the % score needed to pass this
+                          segment and advance. Blank uses the site-wide
+                          default (80% for a graded Learning Path, 70% for
+                          K-Practice) — only set this to make ONE segment
+                          easier or harder than the rest of the path. */}
+                      <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+                        <label className="block text-[10px] font-black text-rose-700 uppercase mb-1">🎯 Umbral para Avanzar (%)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={seg.masteryThreshold ?? ''}
+                          onChange={(e) => updateSegmentField(podIndex, segIndex, 'masteryThreshold', e.target.value === '' ? null : Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                          className="w-28 border border-rose-200 rounded-lg p-1.5 text-xs font-bold focus:ring-1 focus:ring-rose-500 outline-none"
+                          placeholder="80 (predeterminado)"
+                        />
+                      </div>
+
                       {contentType === 'verb' && (
                         <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                           <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Verb Tense</label>
