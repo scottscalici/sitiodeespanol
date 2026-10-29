@@ -24,7 +24,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   // practical branches bundled into one document. "practical" is gone
   // entirely; sentences now attach directly to a vocab or verb path's
   // segments via pinned_sentences + the "sentence" slice of questionMix.
-  const [contentType, setContentType] = useState('vocab'); // 'vocab' | 'verb'
+  const [contentType, setContentType] = useState('vocab'); // 'vocab' | 'verb' | 'grammar'
   const [course, setCourse] = useState('s2');
   const [pathId, setPathId] = useState('');
   const [pathTitle, setPathTitle] = useState('');
@@ -246,7 +246,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         const sanitized = sanitizePods(loadedPods);
         setPods(sanitized.length ? sanitized : makeDefaultPods());
         setContentType(loadedContentType);
-        setActiveTab(loadedContentType === 'verb' ? 'verbs' : 'vocab');
+        setActiveTab(loadedContentType === 'verb' ? 'verbs' : loadedContentType === 'grammar' ? 'grammar' : 'vocab');
         setActiveSegmentIdRaw(sanitized[0]?.segments[0]?.id || null);
       }
     } catch (err) { console.error("Error loading path:", err); }
@@ -503,8 +503,11 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
 
   // A vocab path's vault can never show verbs, and vice versa — keeps the
   // "no vocab bleeding into a verb path" rule enforced by the tool itself,
-  // not just convention.
+  // not just convention. A 'grammar' ("Estructura") path has no concepts of
+  // its own at all — only pinned sentences — so it always snaps straight to
+  // the grammar vault tab instead of landing on an irrelevant vocab/verbs one.
   useEffect(() => {
+    if (contentType === 'grammar' && activeTab !== 'grammar') { setActiveTab('grammar'); return; }
     if (contentType === 'verb' && activeTab === 'vocab') setActiveTab('verbs');
     if (contentType === 'vocab' && activeTab === 'verbs') setActiveTab('vocab');
   }, [contentType, activeTab]);

@@ -204,16 +204,23 @@ export default function PathBuilder({
               {/* A path is one content type from the start — no more branches
                   bundling vocab+verbs+practical into one document. Switching
                   this after content exists is allowed but will hide whichever
-                  vault tab no longer matches, so only do it before assigning. */}
+                  vault tab no longer matches, so only do it before assigning.
+                  'grammar' ("Estructura") is for a pure sentence-structure
+                  drill — adverbs, ser vs. estar, pretérito/imperfecto, etc. —
+                  with no introduced_concepts at all, only pinned sentences. */}
               <button
                 type="button"
-                onClick={() => setContentType(contentType === 'vocab' ? 'verb' : 'vocab')}
-                title="Click to switch whether this whole path is vocab-based or verb-based"
+                onClick={() => setContentType(contentType === 'vocab' ? 'verb' : contentType === 'verb' ? 'grammar' : 'vocab')}
+                title="Click to cycle this path's content type: Vocabulario → Verbos → Estructura"
                 className={`px-2.5 py-0.5 text-xs font-black rounded-md uppercase tracking-wider transition-colors cursor-pointer ${
-                  contentType === 'verb' ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800'
+                  contentType === 'verb'
+                    ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                    : contentType === 'grammar'
+                    ? 'bg-purple-100 hover:bg-purple-200 text-purple-800'
+                    : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-800'
                 }`}
               >
-                {contentType === 'verb' ? '⚡ Verbos' : '📖 Vocabulario'} ⇄
+                {contentType === 'verb' ? '⚡ Verbos' : contentType === 'grammar' ? '🧩 Estructura' : '📖 Vocabulario'} ⇄
               </button>
 
               {contentType === 'vocab' && (
@@ -677,23 +684,27 @@ export default function PathBuilder({
                         </div>
                       )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/50 min-h-[110px] flex flex-col justify-between">
-                          <div>
-                            <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1">
-                              <span>📦</span> {contentType === 'verb' ? 'Verbos Introducidos' : 'Vocabulario Introducido'} ({seg.introduced_concepts.length})
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {seg.introduced_concepts.map((concept, cIdx) => (
-                                <span key={cIdx} className="bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-sm flex items-center gap-1.5">
-                                  {concept.label} {concept.isGroup && `(${concept.verbIds?.length || 0})`}
-                                  <button onClick={(e) => { e.stopPropagation(); handleRemoveItem(podIndex, segIndex, 'introduced_concepts', cIdx); }} className="text-blue-400 hover:text-red-500 font-bold ml-1">×</button>
-                                </span>
-                              ))}
-                              {seg.introduced_concepts.length === 0 && <p className="text-blue-400 text-[10px] italic">Click items in vault to assign here</p>}
+                      <div className={`grid grid-cols-1 gap-4 ${contentType === 'grammar' ? '' : 'md:grid-cols-2'}`}>
+                        {/* A pure "Estructura" segment has no concepts of its own —
+                            only pinned sentences — so this box is just clutter there. */}
+                        {contentType !== 'grammar' && (
+                          <div className="border-2 border-dashed border-blue-200 rounded-xl p-4 bg-blue-50/50 min-h-[110px] flex flex-col justify-between">
+                            <div>
+                              <p className="text-blue-900 text-xs font-bold mb-2 flex items-center gap-1">
+                                <span>📦</span> {contentType === 'verb' ? 'Verbos Introducidos' : 'Vocabulario Introducido'} ({seg.introduced_concepts.length})
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {seg.introduced_concepts.map((concept, cIdx) => (
+                                  <span key={cIdx} className="bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-sm flex items-center gap-1.5">
+                                    {concept.label} {concept.isGroup && `(${concept.verbIds?.length || 0})`}
+                                    <button onClick={(e) => { e.stopPropagation(); handleRemoveItem(podIndex, segIndex, 'introduced_concepts', cIdx); }} className="text-blue-400 hover:text-red-500 font-bold ml-1">×</button>
+                                  </span>
+                                ))}
+                                {seg.introduced_concepts.length === 0 && <p className="text-blue-400 text-[10px] italic">Click items in vault to assign here</p>}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
 
                         <div className="border-2 border-dashed border-purple-200 rounded-xl p-4 bg-purple-50/50 min-h-[110px] flex flex-col justify-between">
                           <div>

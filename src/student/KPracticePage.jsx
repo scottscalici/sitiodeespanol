@@ -40,6 +40,7 @@ const saveProgress = (progress) => {
 const CONTENT_TYPES = {
   vocab: { label: 'Vocabulario', icon: '📖', theme: 'indigo' },
   verb: { label: 'Verbos', icon: '⚡', theme: 'emerald' },
+  grammar: { label: 'Estructura', icon: '🧩', theme: 'purple' },
 };
 
 const PATH_X_PATTERN = [0, -15, 15];
@@ -112,6 +113,7 @@ export default function KPracticePage() {
   const themeColors = {
     emerald: { bg: 'bg-emerald-100', active: 'bg-emerald-600', ring: 'ring-emerald-500', text: 'text-emerald-800', border: 'border-emerald-200' },
     indigo: { bg: 'bg-indigo-100', active: 'bg-indigo-600', ring: 'ring-indigo-500', text: 'text-indigo-800', border: 'border-indigo-200' },
+    purple: { bg: 'bg-purple-100', active: 'bg-purple-600', ring: 'ring-purple-500', text: 'text-purple-800', border: 'border-purple-200' },
   };
   const theme = themeColors[contentConfig.theme] || themeColors.indigo;
 
