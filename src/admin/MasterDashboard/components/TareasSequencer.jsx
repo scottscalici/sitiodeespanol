@@ -318,14 +318,36 @@ const TareasSequencer = () => {
                                   className="w-full bg-neutral-900 border border-amber-900/50 focus:border-amber-400 text-amber-300 rounded-lg p-2 text-xs font-bold outline-none"
                                 >
                                   <option value="">-- Selecciona una unidad --</option>
-                                  {learningUnits
-                                    .filter((unit) => unit.course === activeCourse)
-                                    .map((unit) => (
-                                      <option key={unit.id} value={unit.id}>
-                                        {unit.title || unit.id} ({unit.id})
-                                      </option>
-                                    ))}
+                                  <optgroup label={`Esta clase (${activeCourse.toUpperCase()})`}>
+                                    {learningUnits
+                                      .filter((unit) => unit.course === activeCourse)
+                                      .map((unit) => (
+                                        <option key={unit.id} value={unit.id}>
+                                          {unit.title || unit.id} ({unit.id})
+                                        </option>
+                                      ))}
+                                  </optgroup>
+                                  {/* Cross-course units — e.g. assigning S2 content as an S4
+                                      tarea on purpose. Labeled so it's obvious at a glance
+                                      which course a picked unit actually belongs to. */}
+                                  <optgroup label="Otra clase">
+                                    {learningUnits
+                                      .filter((unit) => unit.course && unit.course !== activeCourse)
+                                      .map((unit) => (
+                                        <option key={unit.id} value={unit.id}>
+                                          {unit.title || unit.id} ({unit.id}) — {unit.course.toUpperCase()}
+                                        </option>
+                                      ))}
+                                  </optgroup>
                                 </select>
+                                {task.path_id && (() => {
+                                  const selectedUnit = learningUnits.find((u) => u.id === task.path_id);
+                                  return selectedUnit && selectedUnit.course !== activeCourse ? (
+                                    <p className="text-[10px] text-amber-400 italic mt-1">
+                                      ⚠️ Esta unidad es de {(selectedUnit.course || '').toUpperCase()}, asignada aquí a {activeCourse.toUpperCase()}.
+                                    </p>
+                                  ) : null;
+                                })()}
                               </div>
                             )}
 
