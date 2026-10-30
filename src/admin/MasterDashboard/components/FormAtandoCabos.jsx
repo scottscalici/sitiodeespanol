@@ -28,6 +28,39 @@ const parseCategories = (text) => {
     });
 };
 
+// Calendar-day arithmetic on a plain "YYYY-MM-DD" string (the same shape
+// <input type="date"> and toLocaleDateString('en-CA') both use) — built from
+// y/m/d parts via the LOCAL Date constructor so this never drifts a day from
+// UTC/timezone parsing surprises, since we only ever care about the calendar
+// date, never a real instant in time.
+const addDays = (dateStr, days) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return dt.toLocaleDateString('en-CA');
+};
+
+// Bulk import: one puzzle (4 categories) is assigned to each date starting
+// at `startDate`, walking forward a day at a time and skipping any date
+// already in `occupiedDates` — so pasting over a day that already has a
+// puzzle shifts everything after it forward instead of overwriting. Returns
+// the list actually assigned, each annotated with any dates skipped
+// immediately before it, so the preview can show exactly what happened.
+const assignDatesSkippingOccupied = (startDate, count, occupiedDates) => {
+  const assigned = [];
+  let cursor = startDate;
+  while (assigned.length < count) {
+    const skipped = [];
+    while (occupiedDates.has(cursor)) {
+      skipped.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    assigned.push({ date: cursor, skipped });
+    cursor = addDays(cursor, 1);
+  }
+  return assigned;
+};
+
 export default function FormAtandoCabos() {
   const [course, setCourse] = useState('s2');
   const [date, setDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -66,13 +99,43 @@ export default function FormAtandoCabos() {
   );
   const todayScheduled = scheduleForCourse.some((item) => item.fecha === todayStr());
 
-  const parsedCategories = parseCategories(categoriesText);
+  const parsedCategories = useMemo(() => parseCategories(categoriesText), [categoriesText]);
+
+  // Bulk import: every 4 categories is one puzzle. 4 total = today's single-
+  // puzzle behavior, unchanged. More than 4 (and a multiple of 4) switches
+  // into bulk mode — one puzzle per group, dates assigned starting at the
+  // selected date and walking forward, skipping any date this course
+  // already has a puzzle for.
+  const puzzleGroups = useMemo(() => {
+    const groups = [];
+    for (let i = 0; i < parsedCategories.length; i += 4) {
+      groups.push(parsedCategories.slice(i, i + 4));
+    }
+    return groups;
+  }, [parsedCategories]);
+  const isBulk = puzzleGroups.length > 1;
+  const hasIncompleteGroup = parsedCategories.length % 4 !== 0;
+
+  const occupiedDatesForCourse = useMemo(
+    () => new Set((scheduleItems || []).filter((item) => item.course === course).map((item) => item.fecha)),
+    [scheduleItems, course]
+  );
+
+  const assignedPuzzles = useMemo(() => {
+    if (puzzleGroups.length === 0 || hasIncompleteGroup) return [];
+    const assignments = assignDatesSkippingOccupied(date, puzzleGroups.length, occupiedDatesForCourse);
+    return puzzleGroups.map((categories, i) => ({ categories, ...assignments[i] }));
+  }, [puzzleGroups, hasIncompleteGroup, date, occupiedDatesForCourse]);
 
   const handleSave = async (e) => {
     e.preventDefault();
 
-    if (parsedCategories.length !== 4) {
-      setStatus(`❌ Necesitas exactamente 4 categorías (tienes ${parsedCategories.length}).`);
+    if (parsedCategories.length === 0) {
+      setStatus('❌ Pega al menos 4 categorías (un puzzle completo).');
+      return;
+    }
+    if (hasIncompleteGroup) {
+      setStatus(`❌ El total de líneas debe ser múltiplo de 4 — una categoría por línea, 4 por puzzle (tienes ${parsedCategories.length}).`);
       return;
     }
     const badCategory = parsedCategories.find((c) => c.items.length !== 4);
@@ -81,18 +144,24 @@ export default function FormAtandoCabos() {
       return;
     }
 
-    const docId = `ac-${course}-${date}`;
     setSaving(true);
     setStatus('');
     try {
-      await setDoc(doc(db, 'juego_atandocabos', docId), {
-        id: docId,
-        course,
-        fecha: date,
-        categories: parsedCategories,
-        createdAt: new Date().toISOString(),
-      });
-      setStatus(`✅ ¡Éxito! Puzzle programado para ${course.toUpperCase()} el ${date}.`);
+      for (const puzzle of assignedPuzzles) {
+        const docId = `ac-${course}-${puzzle.date}`;
+        await setDoc(doc(db, 'juego_atandocabos', docId), {
+          id: docId,
+          course,
+          fecha: puzzle.date,
+          categories: puzzle.categories,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setStatus(
+        isBulk
+          ? `✅ ¡Éxito! ${assignedPuzzles.length} puzzles programados para ${course.toUpperCase()} (${assignedPuzzles[0].date} → ${assignedPuzzles[assignedPuzzles.length - 1].date}).`
+          : `✅ ¡Éxito! Puzzle programado para ${course.toUpperCase()} el ${assignedPuzzles[0].date}.`
+      );
       setCategoriesText('');
       await loadSchedule();
     } catch (error) {
@@ -128,7 +197,9 @@ export default function FormAtandoCabos() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha Programada</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+              {isBulk ? 'Fecha de Inicio (Lote)' : 'Fecha Programada'}
+            </label>
             <input
               type="date"
               value={date}
@@ -139,18 +210,22 @@ export default function FormAtandoCabos() {
 
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-              4 Categorías (una por línea: Título: palabra1, palabra2, palabra3, palabra4)
+              Categorías (una por línea: Título: palabra1, palabra2, palabra3, palabra4)
             </label>
+            <p className="text-[10px] text-slate-500 mb-1">
+              4 líneas = un puzzle en la fecha de arriba. Pega más (múltiplo de 4) para importar varios días seguidos —
+              cada 4 líneas es el siguiente puzzle, empezando en esa fecha. Si un día ya tiene puzzle, se salta automáticamente.
+            </p>
             <textarea
               value={categoriesText}
               onChange={(e) => setCategoriesText(e.target.value)}
               placeholder={EXAMPLE}
-              rows={6}
+              rows={isBulk ? 14 : 6}
               className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-fuchsia-500 transition-colors"
             />
           </div>
 
-          {categoriesText.trim() && (
+          {categoriesText.trim() && !isBulk && (
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 space-y-2">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Vista Previa</p>
               {parsedCategories.map((cat, i) => (
@@ -163,16 +238,47 @@ export default function FormAtandoCabos() {
             </div>
           )}
 
+          {categoriesText.trim() && isBulk && (
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Vista Previa — {assignedPuzzles.length} Puzzles
+              </p>
+              {assignedPuzzles.map((puzzle, i) => (
+                <div key={i} className="border-t border-slate-800 first:border-t-0 first:pt-0 pt-3 space-y-1">
+                  {puzzle.skipped.length > 0 && (
+                    <p className="text-[10px] font-bold text-amber-400">
+                      ⏭️ Se {puzzle.skipped.length === 1 ? 'omitió' : 'omitieron'} {puzzle.skipped.join(', ')} — ya {puzzle.skipped.length === 1 ? 'tiene' : 'tienen'} puzzle.
+                    </p>
+                  )}
+                  <p className="text-xs font-black text-fuchsia-400">Puzzle {i + 1} → {puzzle.date}</p>
+                  {puzzle.categories.map((cat, j) => (
+                    <div key={j} className={`text-xs flex flex-wrap gap-2 items-center pl-3 ${cat.items.length === 4 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className="font-bold">{cat.title || '(sin título)'}:</span>
+                      <span>{cat.items.join(', ') || '(sin palabras)'}</span>
+                      <span className="text-slate-500">({cat.items.length}/4)</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {categoriesText.trim() && hasIncompleteGroup && (
+            <p className="text-xs font-bold text-rose-400">
+              ❌ El total de líneas debe ser múltiplo de 4 (tienes {parsedCategories.length}).
+            </p>
+          )}
+
           {status && (
             <p className={`text-xs font-bold text-center ${status.includes('❌') ? 'text-rose-400' : 'text-emerald-400'}`}>{status}</p>
           )}
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || hasIncompleteGroup}
             className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-lg transition-colors shadow-lg"
           >
-            {saving ? 'Guardando...' : 'Guardar Puzzle'}
+            {saving ? 'Guardando...' : isBulk ? `Guardar ${puzzleGroups.length} Puzzles` : 'Guardar Puzzle'}
           </button>
         </form>
 
