@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { COURSE_TITLES, SECTION_STANDARDS, ACTIVITY_STANDARDS, getEvaluacionStandard } from '../../utils/lessonPlanStandards';
 import { TYPE_LABELS, getQuestionPreview } from '../../shared/questionTypes';
+import { renderFormattedText } from '../../utils/formattedText';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
@@ -251,8 +252,8 @@ export default function LessonPlanFormalPage() {
               </div>
               {planData.gramatica.map((g, idx) => (
                 <div key={idx}>
-                  {g.introText && <p><span className="font-bold">Introducir:</span> {g.introText}</p>}
-                  {g.repasoText && <p><span className="font-bold">Repasar:</span> {g.repasoText}</p>}
+                  {g.introText && <p><span className="font-bold">Introducir:</span> {renderFormattedText(g.introText)}</p>}
+                  {g.repasoText && <p><span className="font-bold">Repasar:</span> {renderFormattedText(g.repasoText)}</p>}
                 </div>
               ))}
             </div>

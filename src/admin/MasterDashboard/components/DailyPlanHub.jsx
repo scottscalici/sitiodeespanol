@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase'; 
 import { Link } from 'react-router-dom';
+import { renderFormattedText } from '../../../utils/formattedText';
 
 const DailyPlanHub = () => {
   const [selectedDay, setSelectedDay] = useState(1);
@@ -384,13 +385,13 @@ const DailyPlanHub = () => {
                       {gram.introText && (
                         <div>
                           <span className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Introducir</span>
-                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{gram.introText}</p>
+                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{renderFormattedText(gram.introText)}</p>
                         </div>
                       )}
                       {gram.repasoText && (
                         <div>
                           <span className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Repasar</span>
-                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{gram.repasoText}</p>
+                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{renderFormattedText(gram.repasoText)}</p>
                         </div>
                       )}
                       {(gram.enlaces || gram.recursos) && (
