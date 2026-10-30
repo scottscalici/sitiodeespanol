@@ -130,19 +130,29 @@ const ZasLobbyPage = () => {
         setBusy(false);
         return;
       }
-      if (roomSnap.data().gameState !== 'lobby') {
-        setError('❌ Esa sala ya empezó a jugar.');
+      // Joining mid-game is allowed on purpose — a student who hadn't
+      // joined yet when the host started, or who got disconnected and is
+      // coming back, shouldn't be permanently locked out. Only a truly
+      // finished room is off-limits.
+      if (roomSnap.data().gameState === 'gameover') {
+        setError('❌ Esa sala ya terminó.');
         setBusy(false);
         return;
       }
 
-      await setDoc(doc(db, 'zas_rooms', code, 'players', currentUser.uid), {
-        name: playerName,
-        groupId: null,
-        groupLabel: '',
-        score: 0,
-        joinedAt: Date.now(),
-      }, { merge: true });
+      // A student rejoining after a disconnect already has a player doc —
+      // writing fresh defaults over it would wipe their group and score.
+      // Only a genuinely new player gets the blank starting doc.
+      const existingPlayerSnap = await getDoc(doc(db, 'zas_rooms', code, 'players', currentUser.uid));
+      if (!existingPlayerSnap.exists()) {
+        await setDoc(doc(db, 'zas_rooms', code, 'players', currentUser.uid), {
+          name: playerName,
+          groupId: null,
+          groupLabel: '',
+          score: 0,
+          joinedAt: Date.now(),
+        });
+      }
 
       navigate(`/juegos/zas/${code}`);
     } catch (err) {
