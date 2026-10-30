@@ -193,7 +193,6 @@ const TareasSequencer = () => {
             const dayTasks = activeTasks.filter(t => t.day_assigned === dayNum);
             const dateStrings = calendarMap[dayNum] || [];
             const dateDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Date TBD';
-            const dueCalendarDates = calendarMap[dayNum + 1] ? calendarMap[dayNum + 1].join(' & ') : 'Date TBD';
 
             return (
               <div key={dayNum} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 flex flex-col md:flex-row gap-6 items-center shadow-sm">
@@ -222,6 +221,12 @@ const TareasSequencer = () => {
                   ) : (
                     dayTasks.map((task) => {
                       const globalIndex = activeTasks.findIndex(t => t.id === task.id);
+                      // Each task's own day_due can diverge from the next
+                      // sequential day (that's the whole point of the field
+                      // being editable) — look it up by the task's actual
+                      // value instead of assuming dayNum + 1.
+                      const dueDayNum = Number(task.day_due);
+                      const dueCalendarDates = calendarMap[dueDayNum] ? calendarMap[dueDayNum].join(' & ') : 'Date TBD';
                       return (
                         <div key={task.id} className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-3 relative group">
                           
