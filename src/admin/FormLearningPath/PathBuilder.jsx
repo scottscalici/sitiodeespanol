@@ -680,6 +680,31 @@ export default function PathBuilder({
                         />
                       </div>
 
+                      {/* Speaking-only — forces every question this segment
+                          generates into a production speak exercise: vocab
+                          shows English (say it in Spanish), verbs show the
+                          subject + tense (conjugate it out loud). Grammar
+                          segments have no vocab/verb draw to convert, so the
+                          toggle doesn't apply there. */}
+                      {contentType !== 'grammar' && (
+                        <div className="mb-4" onClick={(e) => e.stopPropagation()}>
+                          <label className="flex items-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!!seg.speakingOnly}
+                              onChange={(e) => updateSegmentField(podIndex, segIndex, 'speakingOnly', e.target.checked)}
+                              className="w-4 h-4 text-purple-600 rounded"
+                            />
+                            <span className="text-purple-700">🎤 Solo Ejercicios de Habla (Producción)</span>
+                          </label>
+                          {seg.speakingOnly && (
+                            <p className="text-[10px] text-purple-600 italic mt-1">
+                              Cada pregunta se vuelve un ejercicio de producción oral: el estudiante ve el inglés (vocabulario) o el sujeto y tiempo verbal (verbos), y tiene que decir la respuesta en español en voz alta. Esto reemplaza la mezcla de tipos de arriba.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       {contentType === 'verb' && (
                         <div className="mb-4" onClick={(e) => e.stopPropagation()}>
                           <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1">Verb Tense</label>

@@ -182,6 +182,14 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
       const grammarHistoryPool = sentenceHistory || [];
       const targetTense = segment.targetTense || 'ALL';
       const historyChance = segment.reviewMode ? (HISTORY_CHANCE_BY_MODE[segment.reviewMode] ?? LEGACY_HISTORY_CHANCE) : LEGACY_HISTORY_CHANCE;
+      // Speaking-only mode: every vocab/verb question in this segment becomes
+      // a production speak exercise (English/subject+tense shown, student
+      // produces the Spanish by voice) instead of whatever questionMix was
+      // set — see the typeQueue override below and the speak_verb/speak
+      // format branches further down. Grammar (pinned_sentences) questions
+      // are untouched by this flag; it only ever changes what a vocab/verb
+      // draw pushes.
+      const speakingOnly = !!segment.speakingOnly;
 
       // A sentence's grammarTags are for topic/organization (filtering in
       // the Learning Path builder, labeling the question) — using them to
@@ -267,13 +275,17 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
       // this existed (segment.modalities instead of questionMix) falls back
       // to plain recall for every slot.
       let typeQueue = [];
-      if (segment.questionMix) {
-        Object.entries(segment.questionMix).forEach(([type, count]) => {
-          for (let n = 0; n < count; n++) typeQueue.push(type);
-        });
+      if (speakingOnly) {
+        typeQueue = new Array(totalQs).fill('speak');
+      } else {
+        if (segment.questionMix) {
+          Object.entries(segment.questionMix).forEach(([type, count]) => {
+            for (let n = 0; n < count; n++) typeQueue.push(type);
+          });
+        }
+        typeQueue = shuffle(typeQueue);
+        while (typeQueue.length < totalQs) typeQueue.push('recall');
       }
-      typeQueue = shuffle(typeQueue);
-      while (typeQueue.length < totalQs) typeQueue.push('recall');
 
       // ASYNC UNPACK CURRENT CONCEPTS — a Learning Path segment embeds a full
       // SNAPSHOT of each concept's data (fullData) at the moment it was added
@@ -717,7 +729,15 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
                 } else if (format === 'listen_verb') {
                      generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Comprensión Auditiva: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                 } else if (format === 'speak_verb') {
-                     generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
+                     if (speakingOnly) {
+                       // Production mode: show subject + infinitive + tense
+                       // (same cue a 'conjugate' question shows), hide the
+                       // conjugated Spanish form — the student has to
+                       // produce it by voice from the cue alone, not read it.
+                       generatedQueue.push({ id: `q_${i}`, type: 'speak', isProduction: true, subject: displaySubjects[randomSubject], engTrans: engTrans, correctAnswer: spaTarget, topic: `Producción: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), _pointCategory: 'regular' });
+                     } else {
+                       generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
+                     }
                 } else {
                      generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 }
@@ -762,7 +782,13 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
           } else if (format === 'listen') {
             generatedQueue.push({ id: `q_${i}`, type: 'listen', prompt: spaWord, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Comprensión Auditiva', _pointCategory: 'regular' });
           } else if (format === 'speak') {
-            generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Pronunciación', _pointCategory: 'regular' });
+            if (speakingOnly) {
+              // Production mode: show the English word, hide the Spanish —
+              // the student has to produce it by voice, not read it aloud.
+              generatedQueue.push({ id: `q_${i}`, type: 'speak', isProduction: true, prompt: engTrans, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Producción', _pointCategory: 'regular' });
+            } else {
+              generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaWord, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Pronunciación', _pointCategory: 'regular' });
+            }
           } else {
             generatedQueue.push({ id: `q_${i}`, type: 'write', prompt: engTrans, engTrans: engTrans, correctAnswer: typedCorrectAnswer, topic: target.tags || 'Escritura', _pointCategory: 'regular' });
           }
@@ -1169,7 +1195,11 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
           {currentQ.type === 'speak' && (
             <>
               <p className="text-slate-500 font-bold mb-2">
-                {currentQ.isDictation ? 'Escucha y repite en voz alta:' : 'Lee en voz alta:'}
+                {currentQ.isDictation
+                  ? 'Escucha y repite en voz alta:'
+                  : currentQ.isProduction
+                    ? (currentQ.isVerb ? 'Conjuga en voz alta:' : 'Dilo en español, en voz alta:')
+                    : 'Lee en voz alta:'}
               </p>
 
               <div className="flex flex-col items-center justify-center mb-8">
@@ -1181,6 +1211,29 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
                     >
                         🔊
                     </button>
+                  ) : currentQ.isProduction && currentQ.isVerb ? (
+                    // Same cue a 'conjugate' question shows (infinitive + tense
+                    // + subject) — no audio button here, since playing the
+                    // conjugated form would hand over the answer this format
+                    // is asking the student to produce from memory.
+                    <div>
+                      <div className="flex flex-wrap items-center justify-center gap-3 mb-1">
+                        <span className="bg-emerald-100 text-emerald-800 font-black px-4 py-2 rounded-xl border border-emerald-300 shadow-sm text-lg">
+                            {currentQ.infinitive}
+                        </span>
+                        <span className="bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs uppercase tracking-widest shadow-sm">
+                            {currentQ.tense}
+                        </span>
+                      </div>
+                      {currentQ.infinitiveEnglish && (
+                        <p className="text-center text-slate-400 text-sm font-medium mb-3">{currentQ.infinitiveEnglish}</p>
+                      )}
+                      <h2 className="text-4xl md:text-5xl font-black text-slate-800 text-center">{currentQ.subject}</h2>
+                    </div>
+                  ) : currentQ.isProduction ? (
+                    // Vocab production: English only, no audio button — same
+                    // reasoning as the verb branch above.
+                    <h2 className="text-4xl md:text-5xl font-black text-slate-800">{currentQ.prompt}</h2>
                   ) : (
                     <div className="flex items-center gap-4">
                         <h2 className="text-4xl md:text-5xl font-black text-slate-800">{currentQ.prompt}</h2>
@@ -1193,7 +1246,7 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
                         </button>
                     </div>
                   )}
-                  {currentQ.engTrans && <p className="text-slate-400 font-medium mt-2">{currentQ.engTrans}</p>}
+                  {!currentQ.isProduction && currentQ.engTrans && <p className="text-slate-400 font-medium mt-2">{currentQ.engTrans}</p>}
               </div>
 
               <div className="flex flex-col items-center justify-center gap-4 w-full">
