@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { renderFormattedText } from '../utils/formattedText';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
@@ -95,8 +96,8 @@ const Estructura = ({ estructura = [], liveDia }) => {
                   <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
                     Introducir
                   </span>
-                  <p className="text-lg text-white leading-relaxed whitespace-pre-wrap">
-                    {lesson.introText}
+                  <p className="text-lg text-white leading-relaxed">
+                    {renderFormattedText(lesson.introText)}
                   </p>
                 </div>
               )}
@@ -106,8 +107,8 @@ const Estructura = ({ estructura = [], liveDia }) => {
                   <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
                     Repasar
                   </span>
-                  <p className="text-lg text-white leading-relaxed whitespace-pre-wrap">
-                    {lesson.repasoText}
+                  <p className="text-lg text-white leading-relaxed">
+                    {renderFormattedText(lesson.repasoText)}
                   </p>
                 </div>
               )}

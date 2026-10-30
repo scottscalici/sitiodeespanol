@@ -25,6 +25,35 @@ const GramaticaSequencer = () => {
 
   const MAX_DAYS = 85;
 
+  // Markdown-lite formatting toolbar for the Introducir/Repasar textareas —
+  // wraps the current selection in a marker pair (see utils/formattedText.jsx
+  // for how these render on the student/admin display side). Refs are keyed
+  // by "dia_field" since there's one textarea per day per column, not a
+  // single shared one.
+  const textareaRefs = React.useRef({});
+  const applyFormat = (dia, field, marker) => {
+    const key = `${dia}_${field}`;
+    const el = textareaRefs.current[key];
+    if (!el) return;
+    const { selectionStart, selectionEnd, value } = el;
+    const selected = value.slice(selectionStart, selectionEnd) || 'texto';
+    const newValue = `${value.slice(0, selectionStart)}${marker}${selected}${marker}${value.slice(selectionEnd)}`;
+    handleInputChange(dia, field, newValue);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(selectionStart + marker.length, selectionStart + marker.length + selected.length);
+    });
+  };
+
+  const FormatToolbar = ({ dia, field }) => (
+    <div className="flex gap-1">
+      <button type="button" onClick={() => applyFormat(dia, field, '**')} title="Negrita" className="w-5 h-5 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-[10px] font-black text-slate-600">B</button>
+      <button type="button" onClick={() => applyFormat(dia, field, '_')} title="Cursiva" className="w-5 h-5 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-[10px] italic font-bold text-slate-600">I</button>
+      <button type="button" onClick={() => applyFormat(dia, field, '~~')} title="Tachado" className="w-5 h-5 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-[10px] line-through font-bold text-slate-600">S</button>
+      <button type="button" onClick={() => applyFormat(dia, field, '__')} title="Subrayado" className="w-5 h-5 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-[10px] underline font-bold text-slate-600">U</button>
+    </div>
+  );
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -209,8 +238,8 @@ const GramaticaSequencer = () => {
         {/* Columns */}
         <div className="grid grid-cols-12 gap-2 p-3 bg-slate-100 border-b border-slate-200 font-black text-[9px] uppercase tracking-widest text-slate-500">
           <div className="col-span-1 text-center">Día / Fecha</div>
-          <div className="col-span-3">Introducir</div>
-          <div className="col-span-3">Repasar</div>
+          <div className="col-span-3" title="Selecciona texto y usa los botones B/I/S/U para darle formato — se ve igual en la página del estudiante.">Introducir</div>
+          <div className="col-span-3" title="Selecciona texto y usa los botones B/I/S/U para darle formato — se ve igual en la página del estudiante.">Repasar</div>
           <div className="col-span-2 text-indigo-600">Enlaces (IDs)</div>
           <div className="col-span-3 text-emerald-600">Recursos (Categorías/IDs)</div>
         </div>
@@ -232,16 +261,20 @@ const GramaticaSequencer = () => {
                   </span>
                 </div>
 
-                <div className="col-span-3">
-                  <textarea 
+                <div className="col-span-3 flex flex-col gap-1">
+                  <FormatToolbar dia={row.dia} field="introText" />
+                  <textarea
+                    ref={(el) => { textareaRefs.current[`${row.dia}_introText`] = el; }}
                     value={row.introText} onChange={(e) => handleInputChange(row.dia, 'introText', e.target.value)}
-                    className="w-full bg-transparent border border-slate-200 focus:border-indigo-500 rounded-md p-1.5 text-xs outline-none min-h-[50px]"
+                    className="w-full bg-transparent border border-slate-200 focus:border-indigo-500 rounded-md p-1.5 text-xs outline-none min-h-[100px]"
                   />
                 </div>
-                <div className="col-span-3">
-                  <textarea 
+                <div className="col-span-3 flex flex-col gap-1">
+                  <FormatToolbar dia={row.dia} field="repasoText" />
+                  <textarea
+                    ref={(el) => { textareaRefs.current[`${row.dia}_repasoText`] = el; }}
                     value={row.repasoText} onChange={(e) => handleInputChange(row.dia, 'repasoText', e.target.value)}
-                    className="w-full bg-transparent border border-slate-200 focus:border-indigo-500 rounded-md p-1.5 text-xs outline-none min-h-[50px]"
+                    className="w-full bg-transparent border border-slate-200 focus:border-indigo-500 rounded-md p-1.5 text-xs outline-none min-h-[100px]"
                   />
                 </div>
 
