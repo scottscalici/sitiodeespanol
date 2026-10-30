@@ -17,6 +17,49 @@ const parseChain = (text) =>
     .map((w) => w.trim().toUpperCase())
     .filter(Boolean);
 
+// Bulk import: a chain has no fixed word count (8-10 is typical, but any
+// length >= 2 is valid), so unlike Atando Cabos's fixed groups-of-4, puzzle
+// boundaries here are marked by a blank line in the pasted text — one block
+// of consecutive non-blank lines is one chain.
+const parseChainBlocks = (text) =>
+  text
+    .split(/\n\s*\n/)
+    .map((block) => parseChain(block))
+    .filter((chain) => chain.length > 0);
+
+// Calendar-day arithmetic on a plain "YYYY-MM-DD" string (the same shape
+// <input type="date"> and toLocaleDateString('en-CA') both use) — built from
+// y/m/d parts via the LOCAL Date constructor so this never drifts a day from
+// UTC/timezone parsing surprises, since we only ever care about the calendar
+// date, never a real instant in time.
+const addDays = (dateStr, days) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return dt.toLocaleDateString('en-CA');
+};
+
+// Bulk import: one chain is assigned to each date starting at `startDate`,
+// walking forward a day at a time and skipping any date already in
+// `occupiedDates` — so pasting over a day that already has a chain shifts
+// everything after it forward instead of overwriting. Returns the list
+// actually assigned, each annotated with any dates skipped immediately
+// before it, so the preview can show exactly what happened.
+const assignDatesSkippingOccupied = (startDate, count, occupiedDates) => {
+  const assigned = [];
+  let cursor = startDate;
+  while (assigned.length < count) {
+    const skipped = [];
+    while (occupiedDates.has(cursor)) {
+      skipped.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    assigned.push({ date: cursor, skipped });
+    cursor = addDays(cursor, 1);
+  }
+  return assigned;
+};
+
 export default function FormEslabones() {
   const [course, setCourse] = useState('s2');
   const [date, setDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -55,28 +98,58 @@ export default function FormEslabones() {
   );
   const todayScheduled = scheduleForCourse.some((item) => item.fecha === todayStr());
 
-  const parsedChain = parseChain(chainText);
+  // Bulk import: every blank-line-separated block in chainText is one chain.
+  // 1 block = today's single-chain behavior, unchanged. More than 1 switches
+  // into bulk mode — one chain per block, dates assigned starting at the
+  // selected date and walking forward, skipping any date this course
+  // already has a chain for.
+  const chainGroups = useMemo(() => parseChainBlocks(chainText), [chainText]);
+  const isBulk = chainGroups.length > 1;
+  const hasInvalidChain = chainGroups.some((chain) => chain.length < 2);
+  const parsedChain = chainGroups[0] || [];
+
+  const occupiedDatesForCourse = useMemo(
+    () => new Set((scheduleItems || []).filter((item) => item.course === course).map((item) => item.fecha)),
+    [scheduleItems, course]
+  );
+
+  const assignedChains = useMemo(() => {
+    if (chainGroups.length === 0 || hasInvalidChain) return [];
+    const assignments = assignDatesSkippingOccupied(date, chainGroups.length, occupiedDatesForCourse);
+    return chainGroups.map((chain, i) => ({ chain, ...assignments[i] }));
+  }, [chainGroups, hasInvalidChain, date, occupiedDatesForCourse]);
 
   const handleSave = async (e) => {
     e.preventDefault();
 
-    if (parsedChain.length < 2) {
+    if (chainGroups.length === 0) {
       setStatus('❌ La cadena necesita al menos 2 palabras.');
       return;
     }
+    if (hasInvalidChain) {
+      const badIndex = chainGroups.findIndex((chain) => chain.length < 2);
+      setStatus(`❌ La cadena ${badIndex + 1} solo tiene ${chainGroups[badIndex].length} palabra(s) — necesita al menos 2.`);
+      return;
+    }
 
-    const docId = `es-${course}-${date}`;
     setSaving(true);
     setStatus('');
     try {
-      await setDoc(doc(db, 'juego_eslabones', docId), {
-        id: docId,
-        course,
-        fecha: date,
-        chain: parsedChain,
-        createdAt: new Date().toISOString(),
-      });
-      setStatus(`✅ ¡Éxito! Cadena programada para ${course.toUpperCase()} el ${date}.`);
+      for (const puzzle of assignedChains) {
+        const docId = `es-${course}-${puzzle.date}`;
+        await setDoc(doc(db, 'juego_eslabones', docId), {
+          id: docId,
+          course,
+          fecha: puzzle.date,
+          chain: puzzle.chain,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setStatus(
+        isBulk
+          ? `✅ ¡Éxito! ${assignedChains.length} cadenas programadas para ${course.toUpperCase()} (${assignedChains[0].date} → ${assignedChains[assignedChains.length - 1].date}).`
+          : `✅ ¡Éxito! Cadena programada para ${course.toUpperCase()} el ${assignedChains[0].date}.`
+      );
       setChainText('');
       await loadSchedule();
     } catch (error) {
@@ -112,7 +185,9 @@ export default function FormEslabones() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha Programada</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+              {isBulk ? 'Fecha de Inicio (Lote)' : 'Fecha Programada'}
+            </label>
             <input
               type="date"
               value={date}
@@ -125,16 +200,20 @@ export default function FormEslabones() {
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
               Cadena de Palabras (una por línea, en orden)
             </label>
+            <p className="text-[10px] text-slate-500 mb-1">
+              Deja una línea en blanco entre cadenas para importar varios días seguidos — cada bloque es la
+              siguiente cadena, empezando en la fecha de arriba. Si un día ya tiene cadena, se salta automáticamente.
+            </p>
             <textarea
               value={chainText}
               onChange={(e) => setChainText(e.target.value)}
               placeholder={EXAMPLE}
-              rows={6}
+              rows={isBulk ? 16 : 6}
               className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 font-mono text-sm uppercase focus:outline-none focus:border-cyan-500 transition-colors"
             />
           </div>
 
-          {chainText.trim() && (
+          {chainText.trim() && !isBulk && (
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-3">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Vista Previa ({parsedChain.length} palabras)</p>
               <div className="flex flex-wrap gap-2">
@@ -147,16 +226,47 @@ export default function FormEslabones() {
             </div>
           )}
 
+          {chainText.trim() && isBulk && (
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Vista Previa — {assignedChains.length} Cadenas
+              </p>
+              {assignedChains.map((puzzle, i) => (
+                <div key={i} className="border-t border-slate-800 first:border-t-0 first:pt-0 pt-3 space-y-2">
+                  {puzzle.skipped.length > 0 && (
+                    <p className="text-[10px] font-bold text-amber-400">
+                      ⏭️ Se {puzzle.skipped.length === 1 ? 'omitió' : 'omitieron'} {puzzle.skipped.join(', ')} — ya {puzzle.skipped.length === 1 ? 'tiene' : 'tienen'} cadena.
+                    </p>
+                  )}
+                  <p className="text-xs font-black text-cyan-400">Cadena {i + 1} → {puzzle.date} ({puzzle.chain.length} palabras)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {puzzle.chain.map((word, j) => (
+                      <span key={j} className="text-xs font-bold text-cyan-400 bg-slate-950 border border-slate-700 px-2 py-1 rounded">
+                        {j + 1}. {word}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {chainText.trim() && hasInvalidChain && (
+            <p className="text-xs font-bold text-rose-400">
+              ❌ Cada cadena necesita al menos 2 palabras — revisa los bloques separados por líneas en blanco.
+            </p>
+          )}
+
           {status && (
             <p className={`text-xs font-bold text-center ${status.includes('❌') ? 'text-rose-400' : 'text-emerald-400'}`}>{status}</p>
           )}
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || hasInvalidChain}
             className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-lg transition-colors shadow-lg"
           >
-            {saving ? 'Guardando...' : 'Guardar Cadena'}
+            {saving ? 'Guardando...' : isBulk ? `Guardar ${chainGroups.length} Cadenas` : 'Guardar Cadena'}
           </button>
         </form>
 
