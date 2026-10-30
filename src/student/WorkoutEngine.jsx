@@ -697,7 +697,22 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
 
                 if (format === 'matching_verb') {
                     let pairs = [];
-                    const subjs = shuffle(availableSubjects).slice(0, 5);
+                    // Imperfecto (and a few irregulars elsewhere) conjugates yo and
+                    // él/ella/Ud. identically — e.g. hablaba/hablaba. Matching tracks
+                    // progress by the Spanish STRING, so two tiles with the same text
+                    // collide: "completing" one silently marks both as matched while
+                    // the other pairing becomes impossible, permanently stalling the
+                    // activity (matchedPairs.length can never reach pairs.length).
+                    // Dedupe by conjugated form before sampling so every tile the
+                    // matching board shows is visually distinguishable.
+                    const seenTargets = new Set();
+                    const uniqueSubjects = availableSubjects.filter((subj) => {
+                        const form = tenseData[subj].target;
+                        if (seenTargets.has(form)) return false;
+                        seenTargets.add(form);
+                        return true;
+                    });
+                    const subjs = shuffle(uniqueSubjects).slice(0, 5);
                     subjs.forEach(subj => {
                         pairs.push({
                             es: tenseData[subj].target,
