@@ -246,6 +246,41 @@ export default function CalentamientoAdmin() {
     setEditingPreviewIndex(null);
   };
 
+  // --- SHUFFLE WITHIN EACH TENSE, KEEPING TENSE BLOCKS TOGETHER ---
+  // Same Fisher-Yates as the full shuffle above, but run separately on each
+  // run of questions that shares a tense (in the order each tense first
+  // appears) instead of across the whole list — so a mixed pretérito +
+  // imperfecto warm-up stays "all pretérito, then all imperfecto" while the
+  // verbs within each tense still shuffle normally (stem-changers etc. end
+  // up mixed in, just never crossing into the other tense's block).
+  const shufflePreviewWithinTense = () => {
+    if (previewQuestions.length <= 1) return;
+    const anchor = previewQuestions[0];
+    const rest = previewQuestions.slice(1);
+
+    const tenseOrder = [];
+    const groups = new Map();
+    rest.forEach((q) => {
+      if (!groups.has(q.tense)) {
+        groups.set(q.tense, []);
+        tenseOrder.push(q.tense);
+      }
+      groups.get(q.tense).push(q);
+    });
+
+    tenseOrder.forEach((tense) => {
+      const group = groups.get(tense);
+      for (let i = group.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [group[i], group[j]] = [group[j], group[i]];
+      }
+    });
+
+    const reordered = tenseOrder.flatMap((tense) => groups.get(tense));
+    setPreviewQuestions([anchor, ...reordered]);
+    setEditingPreviewIndex(null);
+  };
+
   // --- MOVE PREVIEW ITEM (Locking index 0) ---
   const movePreviewIndex = (index, direction) => {
     if (index === 0) return; // Cannot move anchor Q1
@@ -709,13 +744,24 @@ export default function CalentamientoAdmin() {
               <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest">
                 Vista Previa de Preguntas ({previewQuestions.length})
               </h3>
-              <button
-                type="button"
-                onClick={shufflePreviewPreserveFirst}
-                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-lg border border-slate-700"
-              >
-                🔀 Mezclar (Mantener #1 Fijo)
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={shufflePreviewWithinTense}
+                  title="Mezcla los verbos dentro de cada tiempo, pero mantiene los tiempos agrupados (p. ej. todo el pretérito primero, luego todo el imperfecto)"
+                  className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold rounded-lg border border-slate-700"
+                >
+                  🧩 Mezclar Dentro de Tiempos
+                </button>
+                <button
+                  type="button"
+                  onClick={shufflePreviewPreserveFirst}
+                  title="Mezcla todas las preguntas sin importar el tiempo verbal"
+                  className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-lg border border-slate-700"
+                >
+                  🔀 Mezclar Todo (Mantener #1 Fijo)
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-2">
