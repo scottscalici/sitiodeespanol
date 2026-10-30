@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -168,6 +169,14 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
         </div>
 
         <div className="flex items-center gap-4 mt-1">
+          <Link
+            to="/preguntas-frecuentes"
+            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/60 hover:scale-105 active:scale-95 transition-all"
+          >
+            Preguntas Frecuentes
+            <span className="bg-slate-900/15 px-1.5 py-0.5 rounded text-[9px]">FAQ</span>
+          </Link>
+
           <span
             onClick={isAdmin ? onToggleCourse : undefined}
             title={isAdmin ? 'Cambiar de nivel' : ''}

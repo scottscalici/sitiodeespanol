@@ -17,6 +17,7 @@ import PracticeCardEngine from './student/PracticeCardEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
+import FaqPage from './student/FaqPage';
 import SenordlePage from './student/SenordlePage';
 import StudentLearningPath from './student/StudentLearningPath';
 import KPracticePage from './student/KPracticePage';
@@ -55,6 +56,7 @@ import ActivityPage from './components/ActivityPage';
 import MasterDashboard from './admin/MasterDashboard/MasterDashboard';
 import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
+import FaqEditorManager from './admin/managers/FaqEditorManager';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
 import LessonPlanFormalPage from './admin/managers/LessonPlanFormalPage';
 import LessonPlanOverviewPage from './admin/managers/LessonPlanOverviewPage';
@@ -191,6 +193,7 @@ function App() {
             <Route path="/juegos/senordle" element={<SenordlePage />} />
             <Route path="/actividad/:type/:id" element={<ActivityPage />} />
             <Route path="/recreo" element={<RecreoHub />} />
+            <Route path="/preguntas-frecuentes" element={<FaqPage />} />
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />
             <Route path="/juegos/eslabones" element={<EslabonesFinales />} />
@@ -452,6 +455,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <DailyPlanHub />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-faq-editor"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <FaqEditorManager />
                 </AdminRoute>
               }
             />

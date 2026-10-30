@@ -190,6 +190,7 @@ const DailyPlanHub = () => {
               <Link to="/admin-arcade-tiles" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🕹️ Imágenes de El Recreo</Link>
               <Link to="/admin-media-migration" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📤 Migración de Imágenes</Link>
               <Link to="/admin-secret-portal-master?tipo=temas" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎨 Temas</Link>
+              <Link to="/admin-faq-editor" className="bg-neutral-800 hover:bg-neutral-700 text-amber-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">❓ Preguntas Frecuentes</Link>
             </div>
           </div>
 
