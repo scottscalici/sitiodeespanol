@@ -49,7 +49,11 @@ const Estructura = ({ estructura = [], liveDia }) => {
     return titles;
   }, [estructura, liveDia, pagesById]);
 
-  if (todaysLessons.length === 0) return null;
+  // Always render this card — even with nothing assigned for today, a
+  // student should always find grammar notes in the same spot and be able
+  // to reach the index, rather than the whole card vanishing for a day or
+  // two whenever nothing new is introduced.
+  const hasLessonsToday = todaysLessons.length > 0;
 
   return (
     <div
@@ -71,6 +75,12 @@ const Estructura = ({ estructura = [], liveDia }) => {
           Índice
         </Link>
       </div>
+
+      {!hasLessonsToday && (
+        <p className="text-sm text-indigo-100/80 italic">
+          No hay notas nuevas asignadas hoy — usa el índice para repasar cualquier tema ya visto.
+        </p>
+      )}
 
       <div className="space-y-6">
         {todaysLessons.map((lesson, idx) => {

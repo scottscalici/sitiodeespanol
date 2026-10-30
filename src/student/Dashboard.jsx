@@ -633,7 +633,48 @@ const Dashboard = () => {
                 </Link>
               )}
   
-              {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE */}
+              {/* 📖 VOCABULARY CARDS — FLASHCARD-DECK STYLE. Always at least
+                  one card here — when nothing is assigned for today, it
+                  falls back to pointing straight at the index instead of
+                  the whole section disappearing for a day or two. */}
+              {activeVocabBundles.length === 0 && (
+                <div className="relative group">
+                  <Link
+                    to={`/vocabulario${isAdmin ? `?course=${course}` : ''}`}
+                    className="block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                    style={themeGradientStyle('vocabulario')}
+                  >
+                    <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                    <div className="flex items-center gap-5">
+                      <div className="relative w-16 h-16 shrink-0">
+                        <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
+                        <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
+                        <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner overflow-hidden">
+                          {themeImage('vocabulario') ? (
+                            <img src={themeImage('vocabulario')} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl drop-shadow">🧠</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">Explora el Índice</h3>
+                        <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">No hay un capítulo asignado hoy — busca cualquier palabra de cualquier capítulo aquí.</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex justify-end">
+                      <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-emerald-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
+                        Ver Índice <span>→</span>
+                      </span>
+                    </div>
+                  </Link>
+                </div>
+              )}
+
               {activeVocabBundles.map(bundleId => {
                 const bundleDetails = vocabBundleDetails[bundleId];
                 const bundleTitle = bundleDetails
