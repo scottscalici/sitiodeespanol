@@ -1,0 +1,41 @@
+{
+  "id": "calma",
+  "name": "Calma",
+  "start": "",
+  "end": "",
+  "styles": {
+    "header": "bg-gradient-to-r from-[#0f766e] via-[#0e7490] to-[#075985]",
+    "pageBackground": "bg-gradient-to-br from-[#f0f9ff] to-[#e0f2fe]",
+    "accent": "#0e7490",
+    "accentShades": { "light": "#67e8f9", "dark": "#164e63" },
+
+    "fontHeading": "Quicksand",
+    "fonts": { "cardTitle": "Quicksand", "body": "Nunito Sans", "accent": "Caveat" },
+    "fontList": [
+      { "name": "Quicksand", "weights": [500, 700] },
+      { "name": "Caveat", "weights": [500] },
+      { "name": "Nunito Sans", "weights": [400] }
+    ],
+
+    "cardStyles": {
+      "meadow": { "background": "#047857", "text": "#ecfdf5", "heading": "#ffffff", "border": "#065f46" },
+      "sky": { "background": "#0369a1", "text": "#e0f2fe", "heading": "#ffffff", "border": "#075985" }
+    },
+    "cardStyleAssignments": {
+      "calentamiento": "sky",
+      "evaluacion": "meadow"
+    },
+    "cardStyleRotation": ["sky", "meadow"],
+
+    "cardBorderDefault": {
+      "width": 2,
+      "radius": 20,
+      "leftAccent": false,
+      "glow": "0 2px 8px rgba(14,116,144,0.15)"
+    },
+
+    "cornerDecorations": {
+      "default": { "type": "emoji", "value": "🍃", "corner": "top-right", "size": 20, "opacity": 0.35 }
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "id": "halloween",
+  "name": "Halloween",
+  "start": "10-15",
+  "end": "11-02",
+  "hero": {
+    "img": "",
+    "msg": "¡Feliz Halloween! Cuidado con las telarañas en El Recreo...",
+    "active": true
+  },
+  "styles": {
+    "header": "bg-gradient-to-r from-[#1a0033] via-[#ff6b00] to-[#000000]",
+    "pageBackground": "bg-gradient-to-br from-[#0d0014] to-[#1a0033]",
+    "accent": "#ff6b00",
+    "accentShades": { "light": "#ffb366", "dark": "#b34c00" },
+
+    "fontHeading": "Creepster",
+    "fontMono": "Jolly Lodger",
+    "fonts": { "cardTitle": "Jolly Lodger", "body": "Nunito", "accent": "Butcherman" },
+    "fontList": [
+      { "name": "Creepster", "weights": [400] },
+      { "name": "Jolly Lodger", "weights": [400] },
+      { "name": "Butcherman", "weights": [400] },
+      { "name": "Nunito", "weights": [400, 700] }
+    ],
+
+    "textEffects": {
+      "presets": {
+        "flicker": {
+          "keyframes": "0%,19%,21%,23%,25%,54%,56%,100%{opacity:.99;filter:drop-shadow(0 0 8px #fbbf24) drop-shadow(0 0 16px #f59e0b)} 20%,24%,55%{opacity:.8;filter:drop-shadow(0 0 4px #f59e0b)}",
+          "duration": "2.5s"
+        }
+      },
+      "assignments": { "headerTitle": "flicker" }
+    },
+
+    "cardStyles": {
+      "pumpkin": { "background": "#ff6b00", "text": "#2d1200", "heading": "#2d1200", "border": "#b34c00" },
+      "crypt": { "background": "#0d0503", "text": "#e5c9a8", "heading": "#ff6b00", "border": "#3a0000" },
+      "potion": { "background": "#3d1a5c", "text": "#c8f564", "heading": "#c8f564", "border": "#8a4fd6" },
+      "midnight": { "background": "#0f172a", "text": "#93c5fd", "heading": "#60a5fa", "border": "#1e3a8a" }
+    },
+    "cardStyleAssignments": {
+      "calentamiento": "pumpkin",
+      "evaluacion": "crypt",
+      "vocabulario": "potion",
+      "tareas": "midnight"
+    },
+    "cardStyleRotation": ["pumpkin", "crypt", "potion", "midnight"],
+
+    "cardBorderDefault": {
+      "width": 3,
+      "radius": 16,
+      "leftAccent": true,
+      "glow": "0 0 14px rgba(255,107,0,0.45)"
+    },
+
+    "cornerDecorations": {
+      "default": { "type": "emoji", "value": "🦇", "corner": "top-right", "size": 26, "opacity": 0.5 },
+      "perCard": {
+        "evaluacion": { "type": "emoji", "value": "💀", "corner": "top-right", "size": 26, "opacity": 0.5 }
+      }
+    },
+
+    "cardOverlays": {
+      "default": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2080%2080'%3E%3Cg%20fill='none'%20stroke='%23d1d5db'%20stroke-width='1.2'%3E%3Cpath%20d='M0%200%20L80%2080%20M0%2020%20L60%2080%20M0%2040%20L40%2080%20M0%2060%20L20%2080%20M20%200%20L80%2060%20M40%200%20L80%2040%20M60%200%20L80%2020'/%3E%3Cpath%20d='M0%2010%20Q10%2015%208%2025%20M0%2025%20Q15%2030%2012%2042%20M0%2040%20Q18%2045%2015%2058%20M0%2055%20Q20%2058%2020%2070'/%3E%3Cpath%20d='M10%200%20Q15%2010%2025%208%20M25%200%20Q30%2015%2042%2012%20M40%200%20Q45%2018%2058%2015%20M55%200%20Q58%2020%2070%2020'/%3E%3C/g%3E%3C/svg%3E",
+        "anchor": "top-left",
+        "size": "40%",
+        "opacity": 0.25
+      },
+      "perCard": {
+        "tareas": {
+          "url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2080%2080'%3E%3Cg%20fill='none'%20stroke='%23d1d5db'%20stroke-width='1.2'%3E%3Cpath%20d='M0%200%20L80%2080%20M0%2020%20L60%2080%20M0%2040%20L40%2080%20M0%2060%20L20%2080%20M20%200%20L80%2060%20M40%200%20L80%2040%20M60%200%20L80%2020'/%3E%3Cpath%20d='M0%2010%20Q10%2015%208%2025%20M0%2025%20Q15%2030%2012%2042%20M0%2040%20Q18%2045%2015%2058%20M0%2055%20Q20%2058%2020%2070'/%3E%3Cpath%20d='M10%200%20Q15%2010%2025%208%20M25%200%20Q30%2015%2042%2012%20M40%200%20Q45%2018%2058%2015%20M55%200%20Q58%2020%2070%2020'/%3E%3C/g%3E%3C/svg%3E",
+          "anchor": "top-right",
+          "size": "35%",
+          "opacity": 0.22,
+          "flip": true,
+          "tint": "#ff6b00"
+        }
+      }
+    },
+
+    "animatedLayer": {
+      "particles": [
+        { "char": "🦇", "color": "#1a0a05", "count": 6, "speed": 1.4, "sizeRange": [16, 26], "direction": "down" },
+        { "char": "👻", "color": "#f5f5f5", "count": 3, "speed": 0.5, "sizeRange": [26, 42], "direction": "up" }
+      ]
+    }
+  }
+}
