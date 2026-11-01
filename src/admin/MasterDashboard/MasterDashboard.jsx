@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
+import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import FormCultura from './components/FormCultura';
 import FormConversaciones from './components/FormConversaciones';
 import FormAnuncios from './components/FormAnuncios';
@@ -148,6 +149,12 @@ export default function MasterDashboard() {
     try {
       const { isNew, id, ...dataToSave } = actividad;
       await setDoc(doc(db, coleccionActual, id), dataToSave, { merge: true });
+      // Several pages (e.g. ThemeContext.jsx for "temas") read this same
+      // collection through getCachedCollection, which otherwise keeps
+      // serving whatever it last fetched in THIS tab for up to 5 minutes —
+      // an already-open preview tab would show a theme edit as "doing
+      // nothing" until that cache expired or the tab was hard-reloaded.
+      invalidateCollectionCache(coleccionActual);
       alert(`Saved to ${coleccionActual}!`);
       fetchData();
     } catch (error) {
@@ -296,6 +303,7 @@ export default function MasterDashboard() {
             await setDoc(doc(db, "temas", docId), dataToSave, { merge: true });
             count++;
           }
+          invalidateCollectionCache('temas');
           return `${count} temas`;
         }
         // --- DETECTAR FORMATO VIDEOS (daily_tags) ---
