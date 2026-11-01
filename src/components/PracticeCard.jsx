@@ -26,8 +26,12 @@ export default function PracticeCard({ card }) {
       <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner">
-          <span className="text-3xl drop-shadow">✏️</span>
+        <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
+          {theme?.styles?.imageOverrides?.practicaCard ? (
+            <img src={theme.styles.imageOverrides.practicaCard} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-3xl drop-shadow">✏️</span>
+          )}
         </div>
 
         <div className="min-w-0 flex-1">

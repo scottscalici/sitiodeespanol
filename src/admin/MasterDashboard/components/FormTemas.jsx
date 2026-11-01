@@ -1,5 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ImageUploadField from '../../shared/ImageUploadField';
+
+// Fields an imported styles JSON blob is allowed to touch — deliberately
+// excludes every image-URL field (imageOverrides, textures, hero.img, mascot
+// URLs): a screenshot-analysis tool can describe colors/fonts/layout, but it
+// can't invent a real, hosted image, so letting it write those fields would
+// either silently no-op or (worse) save a broken URL.
+const IMPORTABLE_STYLE_KEYS = ['header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides'];
 
 // Every card key the live Dashboard actually reads a theme color for.
 // Deliberately excludes Destacado (it picks its own color from real
@@ -34,7 +41,10 @@ const CARD_KEYS = [
 // Card keys whose Dashboard component actually checks for an image
 // override today (the rest can still be set here — saved for when more
 // cards get wired up — but won't visibly change anything yet).
-const IMAGE_WIRED_KEYS = new Set(['calentamiento', 'conversacion', 'vocabulario', 'tareas', 'evaluacion']);
+const IMAGE_WIRED_KEYS = new Set([
+  'calentamiento', 'conversacion', 'vocabulario', 'tareas', 'evaluacion',
+  'video', 'musica', 'anuncios', 'lectura', 'recursos', 'practicaCard', 'estructura',
+]);
 
 const MASCOT_KEYS = [
   { key: 'sloth', label: 'Perezoso' },
@@ -45,6 +55,9 @@ const MASCOT_KEYS = [
 ];
 
 export default function FormTemas({ actividad, setActividad }) {
+  const [importText, setImportText] = useState('');
+  const [importStatus, setImportStatus] = useState(null); // { ok: bool, msg: string } | null
+
   if (!actividad) return null;
 
   const styles = actividad?.styles || {};
@@ -97,6 +110,41 @@ export default function FormTemas({ actividad, setActividad }) {
   const handleFontHeadingChange = (value) => updateStyles({ fontHeading: value });
   const handleFontMonoChange = (value) => updateStyles({ fontMono: value });
   const handleArchedCardsChange = (checked) => updateStyles({ archedCards: checked });
+  const handleBgTextureChange = (value) => updateStyles({ bgTexture: value });
+
+  // Merges a pasted JSON blob (e.g. the output of an AI screenshot-to-theme
+  // tool) into this theme's styles, keeping only the fields it's safe for
+  // that kind of tool to set — see IMPORTABLE_STYLE_KEYS above. Anything
+  // else in the pasted object is silently ignored rather than rejecting the
+  // whole paste over one stray/unsupported key.
+  const handleImportStyles = () => {
+    if (!importText.trim()) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(importText);
+    } catch {
+      setImportStatus({ ok: false, msg: 'JSON inválido — revisa que esté bien formado.' });
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      setImportStatus({ ok: false, msg: 'Se esperaba un objeto JSON con campos de estilo.' });
+      return;
+    }
+    const patch = {};
+    IMPORTABLE_STYLE_KEYS.forEach((key) => {
+      if (parsed[key] !== undefined) patch[key] = parsed[key];
+    });
+    if (Object.keys(patch).length === 0) {
+      setImportStatus({ ok: false, msg: 'No se encontró ningún campo reconocido en el JSON.' });
+      return;
+    }
+    if (patch.cardOverrides) {
+      patch.cardOverrides = { ...(styles.cardOverrides || {}), ...patch.cardOverrides };
+    }
+    updateStyles(patch);
+    setImportStatus({ ok: true, msg: `Importado: ${Object.keys(patch).join(', ')}` });
+    setImportText('');
+  };
 
   const handleHeroChange = (field, value) => {
     setActividad((prev) => ({ ...prev, hero: { ...(prev.hero || {}), [field]: value } }));
@@ -138,6 +186,37 @@ export default function FormTemas({ actividad, setActividad }) {
                 👁️ Vista Previa
               </a>
             )}
+          </div>
+
+          {/* Paste-box JSON import — the landing spot for an AI theme-importer
+              skill's output (paste a screenshot into Claude, paste the JSON
+              it hands back here). Only touches IMPORTABLE_STYLE_KEYS. */}
+          <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
+            <h3 className="font-bold mb-1 text-sm">Importar Estilos (JSON)</h3>
+            <p className="text-xs text-gray-500 mb-2">
+              Pega aquí el JSON de estilos generado por IA (color, fuentes, encabezado, textura de fondo). No reemplaza imágenes.
+            </p>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder='{"accent": "#6366f1", "fontHeading": "Creepster", ...}'
+              rows={3}
+              className="w-full p-2 border rounded font-mono text-xs bg-white"
+            />
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={handleImportStyles}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded"
+              >
+                Aplicar JSON
+              </button>
+              {importStatus && (
+                <span className={`text-xs ${importStatus.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {importStatus.msg}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-4">
@@ -234,6 +313,20 @@ export default function FormTemas({ actividad, setActividad }) {
               />
               Tarjetas en Arco (El Recreo)
             </label>
+          </div>
+
+          {/* Site-wide background texture — distinct from the per-card
+              `textures` field above: this tiles behind the ENTIRE page
+              (Dashboard, El Recreo), not just one card's gradient. */}
+          <div className="flex flex-col">
+            <label className="text-sm font-semibold mb-1">Textura de Fondo (todo el sitio)</label>
+            <ImageUploadField
+              value={styles?.bgTexture || ''}
+              onChange={handleBgTextureChange}
+              folder="temas"
+              placeholder="Textura de fondo (opcional)"
+              inputClassName="p-2 border rounded text-sm w-full"
+            />
           </div>
 
           {/* Particle Effect */}

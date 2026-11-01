@@ -26,10 +26,18 @@ const RecreoHub = () => {
     : undefined;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden">
+    <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden relative">
+      {/* Site-wide decorative texture — same theme field as Dashboard.jsx's,
+          so a theme's background pattern stays consistent across pages. */}
+      {theme?.styles?.bgTexture && (
+        <div
+          className="fixed inset-0 pointer-events-none z-0"
+          style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
+        />
+      )}
 
       {/* HEADER SECTION */}
-      <div className="w-full max-w-[1400px] mx-auto px-4 py-8">
+      <div className="w-full max-w-[1400px] mx-auto px-4 py-8 relative z-10">
         <Link to="/" className="text-indigo-400 font-bold mb-8 inline-flex items-center gap-2 hover:text-indigo-300 transition-colors group">
           <span className="text-xl leading-none group-hover:-translate-x-1 transition-transform">←</span>
           Volver al Gym

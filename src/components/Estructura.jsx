@@ -65,7 +65,13 @@ const Estructura = ({ estructura = [], liveDia }) => {
 
       <div className="flex justify-between items-center gap-3">
         <h3 className="font-black text-2xl text-white flex items-center gap-3">
-          <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0">📚</span>
+          <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
+            {theme?.styles?.imageOverrides?.estructura ? (
+              <img src={theme.styles.imageOverrides.estructura} alt="" className="w-full h-full object-cover" />
+            ) : (
+              '📚'
+            )}
+          </span>
           Estructura y Gramática
         </h3>
         <Link

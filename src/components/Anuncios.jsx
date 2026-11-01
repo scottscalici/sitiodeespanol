@@ -65,9 +65,11 @@ const Anuncios = ({ anuncios = [], fecha, course }) => {
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
             {/* Image Column — stretches to the card's full height */}
-            <div className="w-28 sm:w-40 shrink-0 bg-white/10">
+            <div className="w-28 sm:w-40 shrink-0 bg-white/10 overflow-hidden">
               {note.thumbnail ? (
                 <img src={note.thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
+              ) : isDefaultType && theme?.styles?.imageOverrides?.anuncios ? (
+                <img src={theme.styles.imageOverrides.anuncios} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-4xl drop-shadow">{icon}</span>

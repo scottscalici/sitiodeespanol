@@ -389,9 +389,19 @@ const Dashboard = () => {
     // of today's, with no prop drilling needed.
     <ThemeContext.Provider value={{ theme, loaded: themeLoaded, resolveThemeForDate }}>
       <ThemeStyleSync theme={theme} />
-      <div className="min-h-screen bg-slate-50/50">
+      <div className="min-h-screen bg-slate-50/50 relative">
+        {/* Site-wide decorative texture (e.g. a subtle cobweb/pattern tile for
+            a Halloween theme) — independent of the per-card textures above,
+            which only ever blend into ONE card's own gradient. Low opacity,
+            tiled, non-interactive, sits behind everything. */}
+        {theme?.styles?.bgTexture && (
+          <div
+            className="fixed inset-0 pointer-events-none z-0"
+            style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
+          />
+        )}
         <ThemeParticles config={theme?.effectConfig} />
-        <div className="w-full max-w-6xl mx-auto space-y-8 pb-24 pt-6 px-4 sm:px-6">
+        <div className="w-full max-w-6xl mx-auto space-y-8 pb-24 pt-6 px-4 sm:px-6 relative z-10">
   
           {/* HEADER */}
           <div className="space-y-4">
@@ -553,8 +563,8 @@ const Dashboard = () => {
                   <div className="flex items-center gap-4">
                     {/* TV Outline Badge */}
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {vid.img ? (
-                        <img src={vid.img} alt={vid.title} className="w-full h-full object-cover" />
+                      {vid.img || themeImage('video') ? (
+                        <img src={vid.img || themeImage('video')} alt={vid.title} className="w-full h-full object-cover" />
                       ) : (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-white drop-shadow">
                           <rect x="3" y="7" width="18" height="13" rx="2" />
@@ -605,8 +615,8 @@ const Dashboard = () => {
                   <div className="flex items-center gap-4">
                     {/* Album Art */}
                     <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden shadow-lg bg-purple-950">
-                      {dailySong.imagen && (
-                        <img src={dailySong.imagen} alt={dailySong.titulo} className="w-full h-full object-cover" />
+                      {(dailySong.imagen || themeImage('musica')) && (
+                        <img src={dailySong.imagen || themeImage('musica')} alt={dailySong.titulo} className="w-full h-full object-cover" />
                       )}
                     </div>
   

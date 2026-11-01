@@ -55,8 +55,12 @@ export default function ResourceHub({ course = 's2' }) {
         <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
         <div className="relative flex items-center gap-4">
-          <div className="w-11 h-11 shrink-0 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner">
-            🧰
+          <div className="w-11 h-11 shrink-0 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner overflow-hidden">
+            {theme?.styles?.imageOverrides?.recursos ? (
+              <img src={theme.styles.imageOverrides.recursos} alt="" className="w-full h-full object-cover" />
+            ) : (
+              '🧰'
+            )}
           </div>
           <div>
             <h3 className="font-black text-sm text-white uppercase tracking-widest">
