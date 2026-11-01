@@ -4,29 +4,11 @@ import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 const CONFIG = {
   DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
   APUNTES: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/apuntes.json',
-  EXTRAS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/extras_diarios.json',
-  PRACTICAS: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/practicas.json',
 };
 
 // 🧹 THE NORMALIZATION ENGINE
 const normalizeActivities = (raw) => {
   let activities = [];
-
-  if (raw.extras?.items) {
-    raw.extras.items.forEach((item) => {
-      activities.push({
-        id: item.id,
-        type: 'extra',
-        title: item.title,
-        url: item.url || item.links?.[0]?.url,
-        img: item.img,
-        tag: item.tag || 'Extra',
-        s2_dias: item.s2_dias || [],
-        s4_dias: item.s4_dias || [],
-        raw: item,
-      });
-    });
-  }
 
   const processCategory = (source, typeName) => {
     if (!source?.items) return;
@@ -64,24 +46,6 @@ const normalizeActivities = (raw) => {
         tag: item.tags?.find((t) => t !== 's2' && t !== 's4') || 'Video',
         s2_dias: item.tags?.includes('s2') ? [item.dia] : [],
         s4_dias: item.tags?.includes('s4') ? [item.dia] : [],
-        raw: item,
-      });
-    });
-  }
-
-  if (raw.practicas?.practicas) {
-    raw.practicas.practicas.forEach((item, idx) => {
-      activities.push({
-        id: `practica-${idx}`,
-        type: 'practica',
-        title: item.title,
-        subtitle: 'Práctica IB',
-        url: null,
-        img: null,
-        icon: item.icon,
-        tag: 'Práctica',
-        s2_dias: item.courses?.includes('s2') ? item.dias || [] : [],
-        s4_dias: item.courses?.includes('s4') ? item.dias || [] : [],
         raw: item,
       });
     });
@@ -221,8 +185,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
           dictText,
           anuncios,
           apuntes,
-          extras,
-          practicas,
           musica,
           lectura,
           conversa,
@@ -241,8 +203,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
 
           fetchFirestoreArray('anuncios'),
           safeFetchJSON(CONFIG.APUNTES),
-          safeFetchJSON(CONFIG.EXTRAS),
-          safeFetchJSON(CONFIG.PRACTICAS),
 
           fetchFirestoreCategory('musica'),
           fetchFirestoreCategory('lectura'),
@@ -266,9 +226,7 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
         const calendarArray = cal.map || (Array.isArray(cal) ? cal : []);
 
         const allActivities = normalizeActivities({
-          extras,
           videos,
-          practicas,
           musica,
           lectura,
           conversa,
