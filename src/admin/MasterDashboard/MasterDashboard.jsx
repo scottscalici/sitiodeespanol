@@ -18,6 +18,23 @@ const VALID_COLLECTIONS = [
   "calendario", "destacado_diario", "temas", "videos", "learning_path",
 ];
 
+// Position of an "MM-DD" start date within the school year rather than the
+// calendar year, so the Temas list reads in the order themes actually occur
+// (Aug 20 first, the following Aug 19 last) instead of alphabetically or by
+// whatever order Firestore happened to return. A theme with no start date
+// (e.g. the dateless "classic" fallback, or a draft not scheduled yet) has
+// no real position in that cycle, so it sorts after every dated theme.
+const schoolYearDayIndex = (md) => {
+  if (typeof md !== 'string') return Infinity;
+  const [m, d] = md.split('-').map(Number);
+  if (!m || !d) return Infinity;
+  const REF_YEAR = 2001; // arbitrary non-leap year — only relative ordering matters
+  const dayMs = Date.UTC(REF_YEAR, m - 1, d);
+  const anchorMs = Date.UTC(REF_YEAR, 7, 20); // August 20
+  const diffDays = Math.round((dayMs - anchorMs) / 86400000);
+  return diffDays < 0 ? diffDays + 365 : diffDays;
+};
+
 export default function MasterDashboard() {
   const [searchParams] = useSearchParams();
   const requestedType = searchParams.get('tipo');
@@ -571,6 +588,11 @@ export default function MasterDashboard() {
               // Only sort by day if we are in destacado_diario
               if (coleccionActual === "destacado_diario") {
                 return (a.dia || 0) - (b.dia || 0);
+              }
+              if (coleccionActual === "temas") {
+                const diff = schoolYearDayIndex(a.start) - schoolYearDayIndex(b.start);
+                if (diff !== 0) return diff;
+                return (a.titulo || a.id || '').localeCompare(b.titulo || b.id || '');
               }
               // Otherwise, leave the original fetch order
               return 0;
