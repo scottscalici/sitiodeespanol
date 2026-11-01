@@ -3,9 +3,12 @@
 A "tema" is a Firestore document (collection `temas`) that can restyle the
 whole student-facing site for a date window — colors, fonts, borders,
 page background, decorative corner icons, a bigger cobweb-style overlay,
-and a floating particle layer. Two fully worked examples live next to this
-file: `docs/themes/halloween.json` and `docs/themes/calma.json` — read
-those alongside this doc, they show every field actually in use at once.
+and a floating particle layer. Three fully worked examples live next to
+this file — `docs/themes/halloween.json`, `docs/themes/calma.json`, and
+`docs/themes/thanksgiving.json` (built from a reference image via the
+theme-importer skill, then hand-finished with a turkey corner decoration
+and a cornucopia overlay) — read them alongside this doc, they show every
+field actually in use at once.
 
 Every field below is optional. A theme that sets nothing beyond `accent`
 and `fontHeading` is just as valid as one using everything — the app

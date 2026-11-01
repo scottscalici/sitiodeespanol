@@ -1,0 +1,30 @@
+{
+  "id": "thanksgiving",
+  "name": "Thanksgiving",
+  "start": "11-15",
+  "end": "11-28",
+  "styles": {
+    "header": "bg-gradient-to-r from-[#3d2817] via-[#8a4a1f] to-[#c96f2b]",
+    "accent": "#e8842c",
+    "fontHeading": "Baloo 2",
+    "fontMono": "Quicksand",
+    "bgTexture": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='%238a4a1f'%3E%3Cg%20transform='translate(12%2014)%20rotate(20)'%3E%3Cpath%20d='M0%20-8%20Q5%20-2%200%208%20Q-5%20-2%200%20-8%20Z'/%3E%3Cline%20x1='0'%20y1='-8'%20x2='0'%20y2='8'%20stroke='%235c3012'%20stroke-width='0.6'/%3E%3C/g%3E%3Cg%20transform='translate(42%2038)%20rotate(-30)'%3E%3Cpath%20d='M0%20-8%20Q5%20-2%200%208%20Q-5%20-2%200%20-8%20Z'/%3E%3Cline%20x1='0'%20y1='-8'%20x2='0'%20y2='8'%20stroke='%235c3012'%20stroke-width='0.6'/%3E%3C/g%3E%3Ccircle%20cx='30'%20cy='50'%20r='2.2'/%3E%3Cpath%20d='M28%2048%20Q30%2045%2032%2048%20Z'/%3E%3C/g%3E%3C/svg%3E",
+    "cardOverrides": {
+      "calentamiento": "#c96f2b",
+      "evaluacion": "#8a4a1f",
+      "vocabulario": "#e8842c",
+      "tareas": "#6b3a1a"
+    },
+    "cornerDecorations": {
+      "default": { "type": "emoji", "value": "🦃", "corner": "top-right", "size": 26, "opacity": 0.5 }
+    },
+    "cardOverlays": {
+      "default": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2090%2090'%3E%3Cg%20fill='%23f5e6c8'%3E%3Cpath%20d='M13.3%2030.2%20L12.2%2036.4%20L12.1%2042.8%20L13.1%2049.0%20L15.1%2055.1%20L18.1%2060.6%20L22.0%2065.7%20L26.6%2070.0%20L32.0%2073.4%20L37.8%2076.0%20L43.9%2077.5%20L50.3%2078.0%20L56.6%2077.4%20L51.4%2047.9%20L50.1%2050.2%20L48.0%2052.2%20L45.3%2053.7%20L42.1%2054.7%20L38.4%2054.9%20L34.5%2054.2%20L30.6%2052.6%20L26.7%2050.0%20L23.3%2046.5%20L20.4%2042.2%20L18.3%2037.0%20L17.2%2031.2%20Z'/%3E%3Ccircle%20cx='60.0'%20cy='58.7'%20r='6.5'/%3E%3Ccircle%20cx='51.0'%20cy='50.7'%20r='5'/%3E%3Ccircle%20cx='69.0'%20cy='53.7'%20r='4.5'/%3E%3Ccircle%20cx='60.0'%20cy='43.7'%20r='4'/%3E%3C/g%3E%3C/svg%3E",
+        "anchor": "bottom-left",
+        "size": "40%",
+        "opacity": 0.25
+      }
+    }
+  }
+}
