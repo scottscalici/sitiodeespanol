@@ -2,18 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 import { renderFormattedText } from '../utils/formattedText';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
 const Estructura = ({ estructura = [], liveDia }) => {
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.estructura,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.estructura
-  );
+  const cardTheme = resolveCardTheme(theme, 'estructura');
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
   const [allPages, setAllPages] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
@@ -59,12 +56,14 @@ const Estructura = ({ estructura = [], liveDia }) => {
   return (
     <div
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-700 to-slate-900 p-6 sm:p-8 shadow-xl space-y-6"
-      style={themeStyle}
+      style={cardTheme.style}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="flex justify-between items-center gap-3">
-        <h3 className="font-black text-2xl text-white flex items-center gap-3">
+        <h3 className="font-black text-2xl text-white flex items-center gap-3" style={{ color: cardTheme.headingColor }}>
           <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
             {theme?.styles?.imageOverrides?.estructura ? (
               <img src={theme.styles.imageOverrides.estructura} alt="" className="w-full h-full object-cover" />

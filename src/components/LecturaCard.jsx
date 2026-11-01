@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 export default function LecturaCard({ lecturaId }) {
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.lectura,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.lectura
-  );
+  const cardTheme = resolveCardTheme(theme, 'lectura');
   const [lectura, setLectura] = useState(null);
 
   useEffect(() => {
@@ -28,8 +25,10 @@ export default function LecturaCard({ lecturaId }) {
     <Link
       to={`/lectura/${lecturaId}`}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-      style={themeStyle}
+      style={cardTheme.style}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="absolute -right-6 -top-6 opacity-20 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 pointer-events-none">
         <span className="text-[100px]">📄</span>
       </div>
@@ -49,7 +48,7 @@ export default function LecturaCard({ lecturaId }) {
               </span>
               <span className="text-[10px] font-mono text-cyan-100">{testId}</span>
             </div>
-            <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+            <h3 className="text-2xl font-black text-white uppercase tracking-tighter" style={{ color: cardTheme.headingColor }}>
               {title || 'Comprensión de Lectura'}
             </h3>
           </div>

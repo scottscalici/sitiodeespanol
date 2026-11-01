@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 // Always-visible entry point to the ungated practice pool — unlike
 // LearningPathTile, this never depends on what's currently assigned, so it
@@ -11,6 +13,11 @@ import { useActiveTheme } from '../context/ThemeContext';
 const PracticeHubTile = ({ course }) => {
   const { theme } = useActiveTheme() || {};
   const themeColor = theme?.styles?.cardOverrides?.practica;
+  // This tile is always a dark surface with a gradient-text heading and a
+  // solid CTA bar, not resolveCardTheme's gradient-fill background, so only
+  // its decoration/overlay layers are used here — the existing themeColor-
+  // driven border/heading/button styling below is untouched.
+  const cardTheme = resolveCardTheme(theme, 'practica');
 
   return (
     <Link
@@ -18,6 +25,8 @@ const PracticeHubTile = ({ course }) => {
       className="group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-teal-500/20 hover:border-teal-500 transition-all duration-300 relative overflow-hidden"
       style={themeColor ? { borderColor: themeColor } : undefined}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
       <div className="relative z-10">

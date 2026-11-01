@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks, computeGradedPercent, isPastEffectiveDueDate } from '../utils/learningPathProgress';
 import { getPathCardTheme } from '../utils/pathThemes';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 // One assigned Dominio unit, oldest at the top — a student can have more than
 // one active at once (e.g. a vocab unit and a verb-tense unit assigned
@@ -34,6 +36,11 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [], fechaByDia = {}, 
   // simultaneously-assigned units apart — a seasonal theme only takes over
   // when there's exactly one active unit, so it never fights that purpose.
   const themeColor = assignedTasks.length === 1 ? theme?.styles?.cardOverrides?.learningPath : null;
+  // Decoration/overlay are a card-type-level flourish, not a unit-identity
+  // color, so unlike themeColor above they aren't gated on exactly one
+  // assigned unit — named `themedDecor` (not `cardTheme`) since that name is
+  // already taken below by the unrelated per-unit color rotation.
+  const themedDecor = resolveCardTheme(theme, 'learningPath');
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +95,8 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [], fechaByDia = {}, 
             className={`group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg ${cardTheme.hoverGlow} ${cardTheme.hoverBorder} transition-all duration-300 relative overflow-hidden`}
             style={themeColor ? { borderColor: themeColor } : undefined}
           >
+            <CardOverlay overlay={themedDecor.overlay} />
+            <CardCornerDecoration decoration={themedDecor.cornerDecoration} />
             <div className="relative z-10">
               <h3
                 className={`font-black text-transparent bg-clip-text bg-gradient-to-r ${cardTheme.title} uppercase tracking-widest text-lg mb-1`}

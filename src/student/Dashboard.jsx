@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getCachedCollection, getCachedQuery, getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getAssignedDominioTasks, isPastEffectiveDueDate } from '../utils/learningPathProgress';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
@@ -27,6 +27,7 @@ import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
+import { CardCornerDecoration, CardOverlay } from '../components/CardDecorations';
 import ImageCards from '../components/ImageCards';
 import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
@@ -381,10 +382,12 @@ const Dashboard = () => {
     (pc) => pc.course === course && Number(pc.dia) === liveDia && !pc.excused
   );
 
-  const themeAccent = theme?.styles?.accent;
-  const themeCardOverrides = theme?.styles?.cardOverrides || {};
-  const themeTextures = theme?.styles?.textures || {};
-  const themeGradientStyle = (key) => getThemedCardStyle(themeCardOverrides[key], themeAccent, themeTextures[key]);
+  // One-stop per-card resolution (background/border/text/heading colors,
+  // corner decoration, overlay) — see resolveCardTheme.js. Keeping this as
+  // a lookup function rather than computing all 6 cards' themes up front
+  // matches how themeImage() below already works, and keeps each card's own
+  // JSX call site self-contained.
+  const cardTheme = (key) => resolveCardTheme(theme, key);
   // Replaces a card's default emoji badge with a themed image while this
   // theme is active (e.g. a pumpkin icon for Calentamiento during a
   // Halloween theme) — null outside any theme's active window, or if this
@@ -466,11 +469,13 @@ const Dashboard = () => {
               <div className="relative group">
                 <Link
                   to={`/calentamiento/${course}/${liveDia}`}
-                  className="block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={themeGradientStyle('calentamiento')}
+                  className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                  style={cardTheme('calentamiento').style}
                 >
+                  <CardOverlay overlay={cardTheme('calentamiento').overlay} />
+                  <CardCornerDecoration decoration={cardTheme('calentamiento').cornerDecoration} />
                   <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                   <div className="flex items-center gap-4">
                     {/* Flame Badge */}
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
@@ -480,11 +485,11 @@ const Dashboard = () => {
                         <span className="text-3xl drop-shadow">🔥</span>
                       )}
                     </div>
-  
+
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-orange-100 mb-1">Rutina del Día · Día {liveDia}</span>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Calentamiento</h3>
-                      <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2">Verbos y vocabulario programado para hoy.</p>
+                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter" style={{ color: cardTheme('calentamiento').headingColor }}>Calentamiento</h3>
+                      <p className="text-orange-50/90 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme('calentamiento').textColor }}>Verbos y vocabulario programado para hoy.</p>
                     </div>
                   </div>
   
@@ -556,10 +561,12 @@ const Dashboard = () => {
                   key={conv.id}
                   to={`/actividad/conversacion/${conv.id}`}
                   className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={themeGradientStyle('conversacion')}
+                  style={cardTheme('conversacion').style}
                 >
+                  <CardOverlay overlay={cardTheme('conversacion').overlay} />
+                  <CardCornerDecoration decoration={cardTheme('conversacion').cornerDecoration} />
                   <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
                       {conv.img || themeImage('conversacion') ? (
@@ -568,12 +575,12 @@ const Dashboard = () => {
                         <span className="text-3xl drop-shadow">🗣️</span>
                       )}
                     </div>
-  
+
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-teal-100 mb-1">Conversación · Día {liveDia}</span>
-                      <h3 className="text-2xl font-black text-white leading-tight tracking-tight truncate">{conv.title}</h3>
+                      <h3 className="text-2xl font-black text-white leading-tight tracking-tight truncate" style={{ color: cardTheme('conversacion').headingColor }}>{conv.title}</h3>
                       {conv.subtitle && (
-                        <p className="text-teal-50/90 text-sm font-medium mt-1 line-clamp-2">{conv.subtitle}</p>
+                        <p className="text-teal-50/90 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme('conversacion').textColor }}>{conv.subtitle}</p>
                       )}
                     </div>
                   </div>
@@ -592,10 +599,12 @@ const Dashboard = () => {
                   key={vid.id}
                   to={`/actividad/video/${vid.id}`}
                   className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-rose-800 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={themeGradientStyle('video')}
+                  style={cardTheme('video').style}
                 >
+                  <CardOverlay overlay={cardTheme('video').overlay} />
+                  <CardCornerDecoration decoration={cardTheme('video').cornerDecoration} />
                   <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-  
+
                   <div className="flex items-center gap-4">
                     {/* TV Outline Badge */}
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
@@ -608,12 +617,12 @@ const Dashboard = () => {
                         </svg>
                       )}
                     </div>
-  
+
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-red-100 mb-1">Video · Día {liveDia}</span>
-                      <h3 className="text-2xl font-black text-white leading-tight tracking-tight truncate">{vid.title}</h3>
+                      <h3 className="text-2xl font-black text-white leading-tight tracking-tight truncate" style={{ color: cardTheme('video').headingColor }}>{vid.title}</h3>
                       {vid.subtitle && (
-                        <p className="text-red-50/90 text-sm font-medium mt-1 line-clamp-2">{vid.subtitle}</p>
+                        <p className="text-red-50/90 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme('video').textColor }}>{vid.subtitle}</p>
                       )}
                     </div>
                   </div>
@@ -639,8 +648,10 @@ const Dashboard = () => {
                 <Link
                   to={`/musica/${dailySong.id}`}
                   className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-purple-800 to-slate-900 p-5 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={themeGradientStyle('musica')}
+                  style={cardTheme('musica').style}
                 >
+                  <CardOverlay overlay={cardTheme('musica').overlay} />
+                  <CardCornerDecoration decoration={cardTheme('musica').cornerDecoration} />
                   {/* Spotify-style icon badge, top right */}
                   <div className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg">
                     <svg viewBox="0 0 24 24" className="w-4 h-4 fill-purple-700">
@@ -659,8 +670,8 @@ const Dashboard = () => {
                     {/* Track Info */}
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-purple-300 mb-1">Música: Día {liveDia}</span>
-                      <h2 className="text-xl font-black text-white truncate">{dailySong.titulo}</h2>
-                      <p className="text-base text-purple-200 truncate">{dailySong.artista}</p>
+                      <h2 className="text-xl font-black text-white truncate" style={{ color: cardTheme('musica').headingColor }}>{dailySong.titulo}</h2>
+                      <p className="text-base text-purple-200 truncate" style={{ color: cardTheme('musica').textColor }}>{dailySong.artista}</p>
                     </div>
                   </div>
   
@@ -687,9 +698,11 @@ const Dashboard = () => {
                 <div className="relative group">
                   <Link
                     to={`/vocabulario${isAdmin ? `?course=${course}` : ''}`}
-                    className="block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                    style={themeGradientStyle('vocabulario')}
+                    className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                    style={cardTheme('vocabulario').style}
                   >
+                    <CardOverlay overlay={cardTheme('vocabulario').overlay} />
+                    <CardCornerDecoration decoration={cardTheme('vocabulario').cornerDecoration} />
                     <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
                     <div className="flex items-center gap-5">
@@ -707,8 +720,8 @@ const Dashboard = () => {
 
                       <div className="min-w-0 flex-1">
                         <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
-                        <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">Explora el Índice</h3>
-                        <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">No hay un capítulo asignado hoy — busca cualquier palabra de cualquier capítulo aquí.</p>
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate" style={{ color: cardTheme('vocabulario').headingColor }}>Explora el Índice</h3>
+                        <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme('vocabulario').textColor }}>No hay un capítulo asignado hoy — busca cualquier palabra de cualquier capítulo aquí.</p>
                       </div>
                     </div>
 
@@ -731,9 +744,11 @@ const Dashboard = () => {
                 <div key={bundleId} className="relative group">
                 <Link
                   to={`/vocabulario/${bundleId}${isAdmin ? `?course=${course}` : ''}`}
-                  className="block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={themeGradientStyle('vocabulario')}
+                  className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
+                  style={cardTheme('vocabulario').style}
                 >
+                  <CardOverlay overlay={cardTheme('vocabulario').overlay} />
+                  <CardCornerDecoration decoration={cardTheme('vocabulario').cornerDecoration} />
                   <div className="absolute -top-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
                   <div className="flex items-center gap-5">
@@ -752,8 +767,8 @@ const Dashboard = () => {
 
                     <div className="min-w-0 flex-1">
                       <span className="block text-xs font-black uppercase tracking-widest text-emerald-200 mb-1">Vocabulario</span>
-                      <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate">{bundleTitle}</h3>
-                      <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2">Aquí puedes ver una lista de palabras y usar tarjetas de estudio.</p>
+                      <h3 className="text-xl font-black text-white uppercase tracking-tighter font-mono truncate" style={{ color: cardTheme('vocabulario').headingColor }}>{bundleTitle}</h3>
+                      <p className="text-emerald-100/80 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme('vocabulario').textColor }}>Aquí puedes ver una lista de palabras y usar tarjetas de estudio.</p>
                     </div>
                   </div>
 
@@ -821,8 +836,10 @@ const Dashboard = () => {
 
               <div
                 className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-800 to-slate-900 p-6 shadow-xl"
-                style={themeGradientStyle('tareas')}
+                style={cardTheme('tareas').style}
               >
+                <CardOverlay overlay={cardTheme('tareas').overlay} />
+                <CardCornerDecoration decoration={cardTheme('tareas').cornerDecoration} />
                 <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
                 <div className="relative flex items-center gap-4 mb-4">
@@ -835,7 +852,7 @@ const Dashboard = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="block text-xs font-black uppercase tracking-widest text-indigo-200 mb-1">Pendientes</span>
-                    <h3 className="text-lg font-black text-white uppercase tracking-tighter">Tareas de Referencia</h3>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tighter" style={{ color: cardTheme('tareas').headingColor }}>Tareas de Referencia</h3>
                   </div>
                 </div>
 

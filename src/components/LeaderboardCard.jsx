@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { getCachedQuery } from '../utils/firestoreCache';
 import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const TABS = [
   { key: 'total', label: 'Todo' },
@@ -18,6 +20,10 @@ const LeaderboardCard = ({ course }) => {
   const { currentUser } = useAuth();
   const { theme } = useActiveTheme() || {};
   const themeColor = theme?.styles?.cardOverrides?.leaderboard;
+  // Dark surface with a gradient-text heading, not resolveCardTheme's
+  // gradient-fill background — only its decoration/overlay layers are used
+  // here, same as the other dark tile cards.
+  const cardTheme = resolveCardTheme(theme, 'leaderboard');
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('total');
@@ -90,9 +96,11 @@ const LeaderboardCard = ({ course }) => {
 
   return (
     <div
-      className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg"
+      className="relative overflow-hidden bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg"
       style={themeColor ? { borderColor: themeColor } : undefined}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <h3
         className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 uppercase tracking-widest text-lg mb-3"
         style={themeColor ? { backgroundImage: `linear-gradient(to right, ${themeColor}, ${theme?.styles?.accent || themeColor})` } : undefined}

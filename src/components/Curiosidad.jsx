@@ -1,10 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const Curiosidad = ({ curiosidades = [] }) => {
   const { theme } = useActiveTheme() || {};
   const themeColor = theme?.styles?.cardOverrides?.curiosidad;
+  // This card is always a light sky-blue surface with just a colored
+  // border/label accent — never the solid gradient fill resolveCardTheme's
+  // `style` builds for other cards — so only its decoration/overlay layers
+  // are used here; the border/label color keeps using the existing flat
+  // `themeColor`, unchanged, to avoid losing that behavior for any theme
+  // that sets cardOverrides.curiosidad but no named cardStyle.
+  const cardTheme = resolveCardTheme(theme, 'curiosidad');
   if (!curiosidades || curiosidades.length === 0) return null;
 
   return (
@@ -16,9 +25,11 @@ const Curiosidad = ({ curiosidades = [] }) => {
         return (
           <article
             key={item.id || idx}
-            className="bg-sky-50/40 rounded-2xl border-2 border-sky-200 p-6 sm:p-8 shadow-sm"
+            className="relative overflow-hidden bg-sky-50/40 rounded-2xl border-2 border-sky-200 p-6 sm:p-8 shadow-sm"
             style={themeColor ? { borderColor: themeColor } : undefined}
           >
+            <CardOverlay overlay={cardTheme.overlay} />
+            <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
             {/* Header */}
             <h3
               className="font-black text-[10px] uppercase text-sky-500 tracking-widest mb-3"

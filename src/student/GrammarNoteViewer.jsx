@@ -4,6 +4,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from '../components/CardDecorations';
 import { BLOCK_TYPES } from '../shared/noteBlocks';
 import RolodexStrip from './RolodexStrip';
 
@@ -97,6 +99,12 @@ export default function GrammarNoteViewer() {
 
   const existingIds = useMemo(() => new Set(allPages.map((p) => p.id)), [allPages]);
   const accentColor = theme?.styles?.cardOverrides?.notaGramatica;
+  // The content card is a plain white surface with just a colored top-border
+  // accent, not resolveCardTheme's solid gradient fill, so only its
+  // decoration/overlay layers are used here — the border keeps using the
+  // existing flat accentColor so a theme with cardOverrides.notaGramatica
+  // but no named cardStyle keeps working exactly as before.
+  const cardTheme = resolveCardTheme(theme, 'notaGramatica');
   const resolvedId = noteId ? noteId.trim().toLowerCase().replace(/\s+/g, '_') : '';
   const isLandingForPrint = noteData?.type === 'landing';
   const topicPrintIds = isLandingForPrint
@@ -162,7 +170,12 @@ export default function GrammarNoteViewer() {
         </div>
 
         {/* CONTENT CARD */}
-        <div className="bg-white border border-slate-200 p-8 md:p-12 rounded-2xl shadow-xl" style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 4 } : undefined}>
+        <div
+          className="relative overflow-hidden bg-white border border-slate-200 p-8 md:p-12 rounded-2xl shadow-xl"
+          style={accentColor ? { borderTopColor: accentColor, borderTopWidth: 4 } : undefined}
+        >
+          <CardOverlay overlay={cardTheme.overlay} />
+          <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
           {!noteData ? (
             <div className="text-center py-16">
               <p className="text-xl font-bold text-rose-500 mb-2">Nota no encontrada</p>

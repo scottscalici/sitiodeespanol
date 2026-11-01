@@ -1,10 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const GamesSidebar = () => {
   const { theme } = useActiveTheme() || {};
   const themeColor = theme?.styles?.cardOverrides?.recreo;
+  // Dark surface with a gradient-text heading, not resolveCardTheme's
+  // gradient-fill background — only its decoration/overlay layers are used
+  // here, same as the other dark tile cards.
+  const cardTheme = resolveCardTheme(theme, 'recreo');
 
   return (
     <div className="space-y-4">
@@ -14,6 +20,8 @@ const GamesSidebar = () => {
         className="group block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:shadow-indigo-500/20 hover:border-indigo-500 transition-all duration-300 relative overflow-hidden"
         style={themeColor ? { borderColor: themeColor } : undefined}
       >
+        <CardOverlay overlay={cardTheme.overlay} />
+        <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
         {/* Subtle background glow */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-fuchsia-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 

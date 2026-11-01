@@ -1,5 +1,7 @@
 import React from 'react';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 // Standard relative-luminance formula for sRGB — cheap enough to run per
 // card, and avoids repeating the "pale background + white text" mistake
@@ -16,6 +18,11 @@ const getContrastTextClass = (hex) => {
 const Destacado = ({ destacado = [] }) => {
   const { theme } = useActiveTheme() || {};
   const themeOverride = theme?.styles?.cardOverrides?.destacado;
+  // Only the decoration/overlay layers come from the generic resolver here —
+  // Destacado's background/border/text colors are its own bespoke
+  // region-or-theme-color system above, not the flat-color convention
+  // resolveCardTheme's `style`/`textColor`/`headingColor` assume.
+  const { cornerDecoration, overlay } = resolveCardTheme(theme, 'destacado');
 
   if (!destacado || destacado.length === 0) return null;
 
@@ -59,11 +66,13 @@ const Destacado = ({ destacado = [] }) => {
         const wordEs = wordObj.word || item.word;
 
         return (
-          <article 
+          <article
             key={item.id || idx}
-            className="bg-white rounded-2xl shadow-sm border-[6px] overflow-hidden" 
+            className="relative bg-white rounded-2xl shadow-sm border-[6px] overflow-hidden"
             style={{ borderColor: borderColor }}
           >
+            <CardOverlay overlay={overlay} />
+            <CardCornerDecoration decoration={cornerDecoration} />
             {/* Main Cover Image */}
             {(item.image_url || item.img || item.imagen) && (
               <div className="w-full h-48 sm:h-64 overflow-hidden bg-slate-100">

@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 export default function ResourceHub({ course = 's2' }) {
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.recursos,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.recursos
-  );
+  const cardTheme = resolveCardTheme(theme, 'recursos');
   const [isOpen, setIsOpen] = useState(false);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +47,10 @@ export default function ResourceHub({ course = 's2' }) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="group relative w-full p-5 flex items-center justify-between overflow-hidden bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 hover:brightness-110 transition-all cursor-pointer text-left shadow-xl"
-        style={themeStyle}
+        style={cardTheme.style}
       >
+        <CardOverlay overlay={cardTheme.overlay} />
+        <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
         <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
         <div className="relative flex items-center gap-4">
@@ -63,10 +62,10 @@ export default function ResourceHub({ course = 's2' }) {
             )}
           </div>
           <div>
-            <h3 className="font-black text-sm text-white uppercase tracking-widest">
+            <h3 className="font-black text-sm text-white uppercase tracking-widest" style={{ color: cardTheme.headingColor }}>
               Panel de Recursos ({courseDisplayName})
             </h3>
-            <p className="text-xs text-violet-200 font-medium">Trip details, support links & course materials</p>
+            <p className="text-xs text-violet-200 font-medium" style={{ color: cardTheme.textColor }}>Trip details, support links & course materials</p>
           </div>
         </div>
         <span className={`relative transform transition-transform duration-300 text-white font-bold ${isOpen ? 'rotate-180' : ''}`}>

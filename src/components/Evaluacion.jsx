@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,11 +17,7 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.evaluacion,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.evaluacion
-  );
+  const cardTheme = resolveCardTheme(theme, 'evaluacion');
 
   // Find today's evaluation
   const todayEval = evals.find((e) => e.dia === liveDia);
@@ -73,13 +70,15 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   return (
     <div
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600 via-pink-700 to-slate-900 p-6 shadow-xl"
-      style={themeStyle}
+      style={cardTheme.style}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* HEADER */}
       <div className="flex justify-between items-center mb-5">
-        <h3 className="font-black text-2xl text-white flex items-center gap-2.5">
+        <h3 className="font-black text-2xl text-white flex items-center gap-2.5" style={{ color: cardTheme.headingColor }}>
           <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
             {theme?.styles?.imageOverrides?.evaluacion ? (
               <img src={theme.styles.imageOverrides.evaluacion} alt="" className="w-full h-full object-cover" />
@@ -111,7 +110,7 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
       <div className="mb-5">
         <span className="block text-xs font-black uppercase tracking-widest text-rose-200 mb-1">Hoy · Día {liveDia}</span>
         {hasEvalToday ? (
-          <p className="text-white text-lg font-bold leading-tight">
+          <p className="text-white text-lg font-bold leading-tight" style={{ color: cardTheme.textColor }}>
             {todayEval.label}
           </p>
         ) : (

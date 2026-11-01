@@ -5,12 +5,19 @@ import { db } from '../firebase';
 import { getCachedCollection, getCachedQuery } from '../utils/firestoreCache';
 import { formatWeekLabel, formatMonthLabel } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 const HallOfFameCard = ({ course }) => {
   const { theme } = useActiveTheme() || {};
   const themeColor = theme?.styles?.cardOverrides?.leaderboard;
+  // Dark surface with a gradient-text heading, not resolveCardTheme's
+  // gradient-fill background — only its decoration/overlay layers are used
+  // here, same as the other dark tile cards. Same `leaderboard` key as
+  // LeaderboardCard.jsx — both represent the same themeable concept.
+  const cardTheme = resolveCardTheme(theme, 'leaderboard');
   const [lastWeek, setLastWeek] = useState(null);
   const [lastMonth, setLastMonth] = useState(null);
   const [allTimeLeader, setAllTimeLeader] = useState(null);
@@ -71,9 +78,11 @@ const HallOfFameCard = ({ course }) => {
   return (
     <Link
       to={`/salon-de-la-fama/${course}`}
-      className="block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:border-amber-500/50 transition-colors"
+      className="relative overflow-hidden block bg-slate-900 border-2 border-slate-800 rounded-2xl p-5 shadow-lg hover:border-amber-500/50 transition-colors"
       style={themeColor ? { borderColor: themeColor } : undefined}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="flex items-center justify-between mb-3">
         <h3
           className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 uppercase tracking-widest text-lg"

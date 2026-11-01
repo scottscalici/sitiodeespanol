@@ -134,8 +134,11 @@ plus several worked examples to adapt rather than start from scratch.
 
 ## Never include
 
-`archedCards`, `imageOverrides`, `textures`, `hero`, `mascots` — the first
-is a deprecated field the teacher chose to stop using, and the rest are all
-image-URL fields the importer deliberately excludes for the reason above.
-Including any of them (even as an empty value) just adds noise to what she
-has to review before pasting.
+`archedCards`, `imageOverrides`, `textures`, `hero`, `mascots`,
+`cornerDecorations`, `cardOverlays` — `archedCards` is a deprecated field
+the teacher chose to stop using, and the rest are all image-URL fields for
+the reason above (`cornerDecorations`/`cardOverlays` can technically hold a
+plain emoji instead of a URL, but still skip them — picking a decoration
+asset is a design choice the teacher makes deliberately, not something to
+guess at from a reference image). Including any of them (even as an empty
+value) just adds noise to what she has to review before pasting.

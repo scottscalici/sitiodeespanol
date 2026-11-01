@@ -1,14 +1,11 @@
 import React from 'react';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 const Anuncios = ({ anuncios = [], fecha, course }) => {
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.anuncios,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.anuncios
-  );
+  const cardTheme = resolveCardTheme(theme, 'anuncios');
   // `fecha` is the student's own cycle-correct date for the día being viewed
   // (Dashboard's fechaByDia already resolves the A/B ciclo ambiguity — the
   // same día number can land on two different actual dates, one per cycle).
@@ -60,8 +57,10 @@ const Anuncios = ({ anuncios = [], fecha, course }) => {
           <div
             key={idx}
             className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradientClass} shadow-xl flex items-stretch`}
-            style={isDefaultType ? themeStyle : undefined}
+            style={isDefaultType ? cardTheme.style : undefined}
           >
+            {isDefaultType && <CardOverlay overlay={cardTheme.overlay} />}
+            {isDefaultType && <CardCornerDecoration decoration={cardTheme.cornerDecoration} />}
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
             {/* Image Column — stretches to the card's full height */}
@@ -79,10 +78,16 @@ const Anuncios = ({ anuncios = [], fecha, course }) => {
 
             <div className="min-w-0 flex-1 p-6 flex flex-col justify-between gap-4">
               <div>
-                <span className={`block text-xs font-black uppercase tracking-widest mb-1 ${pillTextClass}`}>
+                <span
+                  className={`block text-xs font-black uppercase tracking-widest mb-1 ${pillTextClass}`}
+                  style={isDefaultType ? { color: cardTheme.headingColor } : undefined}
+                >
                   {titleText}
                 </span>
-                <p className="text-white font-bold text-base leading-snug">
+                <p
+                  className="text-white font-bold text-base leading-snug"
+                  style={isDefaultType ? { color: cardTheme.textColor } : undefined}
+                >
                   {note.text}
                 </p>
               </div>

@@ -10,6 +10,13 @@ import { parseHeaderGradientStyle } from '../../../utils/parseHeaderGradient';
 const IMPORTABLE_STYLE_KEYS = [
   'header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides',
   'pageBackground', 'accentShades', 'fonts', 'fontList', 'textEffects', 'animatedLayer',
+  'cardStyles', 'cardStyleAssignments', 'cardStyleRotation', 'cardBorderDefault',
+  // cornerDecorations/cardOverlays carry real asset URLs (or a plain emoji,
+  // which needs no hosting) — unlike imageOverrides/textures/hero/mascots,
+  // this box is the ONLY way to set them at all (no dedicated per-field
+  // admin UI exists), so they stay importable here even though an AI
+  // screenshot-analysis tool still shouldn't be the one inventing them.
+  'cornerDecorations', 'cardOverlays',
 ];
 
 // Every card key the live Dashboard actually reads a theme color for.
@@ -154,7 +161,7 @@ export default function FormTemas({ actividad, setActividad }) {
     // Shallow-merge rather than replace for every object-shaped field, so
     // importing a JSON blob that only mentions e.g. `fonts.body` doesn't
     // wipe out `fonts.cardTitle`/`fonts.accent` this theme already had set.
-    ['cardOverrides', 'accentShades', 'fonts'].forEach((key) => {
+    ['cardOverrides', 'accentShades', 'fonts', 'cardStyles', 'cardStyleAssignments'].forEach((key) => {
       if (patch[key]) patch[key] = { ...(styles[key] || {}), ...patch[key] };
     });
     if (patch.textEffects) {
@@ -163,6 +170,16 @@ export default function FormTemas({ actividad, setActividad }) {
         assignments: { ...(styles.textEffects?.assignments || {}), ...(patch.textEffects.assignments || {}) },
       };
     }
+    // cornerDecorations/cardOverlays share the same default/perCard shape —
+    // merge each sub-object separately so adding one new perCard override
+    // doesn't drop every other card's existing override, or the default.
+    ['cornerDecorations', 'cardOverlays'].forEach((key) => {
+      if (!patch[key]) return;
+      patch[key] = {
+        default: patch[key].default ?? styles[key]?.default,
+        perCard: { ...(styles[key]?.perCard || {}), ...(patch[key].perCard || {}) },
+      };
+    });
     updateStyles(patch);
     setImportStatus({ ok: true, msg: `Importado: ${Object.keys(patch).join(', ')}` });
     setImportText('');
@@ -218,8 +235,13 @@ export default function FormTemas({ actividad, setActividad }) {
             <p className="text-xs text-gray-500 mb-2">
               Pega aquí el JSON de estilos generado por IA (color, fuentes, encabezado, textura de fondo). No reemplaza
               imágenes. También es la única forma de configurar <code className="bg-white px-1 rounded">fontList</code> (pesos
-              de fuente) y <code className="bg-white px-1 rounded">textEffects</code> (animaciones con nombre, como un
-              parpadeo de vela) — esos dos campos no tienen controles propios todavía.
+              de fuente), <code className="bg-white px-1 rounded">textEffects</code> (animaciones con nombre, como un
+              parpadeo de vela), <code className="bg-white px-1 rounded">animatedLayer</code> (varias partículas a la
+              vez), <code className="bg-white px-1 rounded">cardStyles</code>/<code className="bg-white px-1 rounded">cardBorderDefault</code> (estilos
+              con nombre y bordes), y <code className="bg-white px-1 rounded">cornerDecorations</code>/<code className="bg-white px-1 rounded">cardOverlays</code> (decoraciones
+              e imágenes grandes tipo telaraña) — ninguno de estos tiene controles propios todavía. Para estos dos
+              últimos, usa solo emojis o URLs de imágenes que tú misma hayas subido — una herramienta de IA no puede
+              inventar una imagen real.
             </p>
             <textarea
               value={importText}

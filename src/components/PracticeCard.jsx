@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
-import { getThemedCardStyle } from '../utils/getThemedCardStyle';
+import { resolveCardTheme } from '../utils/resolveCardTheme';
+import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 
 // A small graded practice (Gustar, prepositional pronouns, etc.) — distinct
 // from the ungated, always-visible Practice Hub tile: this one is assigned
@@ -9,11 +10,7 @@ import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 // "Promedio Calentamientos" average as warm-ups (see warmupBreakdown.js).
 export default function PracticeCard({ card }) {
   const { theme } = useActiveTheme() || {};
-  const themeStyle = getThemedCardStyle(
-    theme?.styles?.cardOverrides?.practicaCard,
-    theme?.styles?.accent,
-    theme?.styles?.textures?.practicaCard
-  );
+  const cardTheme = resolveCardTheme(theme, 'practicaCard');
 
   if (!card) return null;
 
@@ -21,8 +18,10 @@ export default function PracticeCard({ card }) {
     <Link
       to={`/practica/tarjeta/${card.course}/${card.dia}`}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-      style={themeStyle}
+      style={cardTheme.style}
     >
+      <CardOverlay overlay={cardTheme.overlay} />
+      <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
       <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
       <div className="flex items-center gap-4">
@@ -36,8 +35,8 @@ export default function PracticeCard({ card }) {
 
         <div className="min-w-0 flex-1">
           <span className="block text-xs font-black uppercase tracking-widest text-violet-100 mb-1">Práctica · Día {card.dia}</span>
-          <h3 className="text-2xl font-black text-white uppercase tracking-tighter truncate">{card.title}</h3>
-          <p className="text-violet-50/80 text-sm font-medium mt-1 line-clamp-2">{card.questions?.length || 0} preguntas rápidas.</p>
+          <h3 className="text-2xl font-black text-white uppercase tracking-tighter truncate" style={{ color: cardTheme.headingColor }}>{card.title}</h3>
+          <p className="text-violet-50/80 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme.textColor }}>{card.questions?.length || 0} preguntas rápidas.</p>
         </div>
       </div>
 
