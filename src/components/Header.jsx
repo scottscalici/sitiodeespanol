@@ -136,7 +136,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
       <div className="flex justify-between items-center">
       <div className="flex flex-col gap-1">
         <h1
-          className="text-5xl font-black tracking-tight uppercase"
+          className="text-5xl font-black tracking-tight uppercase text-white"
           style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)', fontFamily: headingFont ? 'var(--font-heading)' : undefined }}
         >
           Día {liveDia}
