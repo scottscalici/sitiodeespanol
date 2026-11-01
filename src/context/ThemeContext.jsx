@@ -151,13 +151,20 @@ export function ThemeProvider({ children }) {
   // Lets a descendant resolve the theme active on ANY date, not just today —
   // e.g. a specific lesson day's own calendar date, so browsing an old day
   // shows that day's own era-correct theme instead of whatever's active now.
+  //
+  // A Vista Previa override must win here too, unconditionally — without
+  // this check, navigating the día selector away from "today" (e.g. in
+  // Dashboard.jsx) silently drops the preview and falls back to whatever
+  // theme that OTHER day's real calendar date resolves to, which defeats
+  // the entire point of "see exactly what this forced theme looks like."
   const resolveThemeForDate = useMemo(() => {
     return (dateStr) => {
+      if (previewTheme) return previewTheme;
       const md = toMD(dateStr);
       if (!md || !loaded) return null;
       return resolveActiveTheme(themes, md);
     };
-  }, [themes, loaded]);
+  }, [themes, loaded, previewTheme]);
 
   return (
     <ThemeContext.Provider value={{ theme, loaded, resolveThemeForDate, isPreviewing }}>
