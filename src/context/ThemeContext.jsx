@@ -12,14 +12,37 @@ export function useActiveTheme() {
   return useContext(ThemeContext);
 }
 
+// Both dates matter only relative to each other here (no real year), so any
+// fixed year works as long as it's used consistently for start and end.
+const windowLengthDays = (start, end) => {
+  const parse = (md) => {
+    const [m, d] = md.split('-').map(Number);
+    return Date.UTC(2000, m - 1, d);
+  };
+  return (parse(end) - parse(start)) / 86400000;
+};
+
 // A theme is "active" once its start/end (MM-DD) window contains the target
 // date. Themes without both dates (e.g. "classic", or a one-off not yet
 // scheduled) are never picked by date — "classic" is instead the explicit
 // fallback when nothing else matches, so the app looks exactly as it always
 // has until a dated theme's window opens.
+//
+// More than one theme's window can cover the same date at once — e.g. a
+// specific one-week theme nested inside a month-long seasonal one — and
+// there's no authored priority to break the tie, so the narrower/more
+// specific window wins rather than whichever theme happens to come first
+// in Firestore's return order (which isn't something a teacher controls or
+// can predict, and previously meant changing a new theme's dates could
+// silently have no visible effect if a broader theme already covered the
+// same day).
 const resolveActiveTheme = (themes, targetMD) => {
-  const dated = themes.find((t) => t.start && t.end && targetMD >= t.start && targetMD <= t.end);
-  if (dated) return dated;
+  const candidates = themes.filter((t) => t.start && t.end && targetMD >= t.start && targetMD <= t.end);
+  if (candidates.length > 0) {
+    return candidates.reduce((shortest, t) =>
+      windowLengthDays(t.start, t.end) < windowLengthDays(shortest.start, shortest.end) ? t : shortest
+    );
+  }
   return themes.find((t) => t.id === 'classic') || null;
 };
 
