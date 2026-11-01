@@ -35,16 +35,27 @@ export function ThemeStyleSync({ theme }) {
     const root = document.documentElement;
     const prevAccent = root.style.getPropertyValue('--accent');
     const prevFont = root.style.getPropertyValue('--font-heading');
+    const prevFontMono = root.style.getPropertyValue('--font-mono');
     const accent = theme?.styles?.accent;
     const fontHeading = theme?.styles?.fontHeading;
+    const fontMono = theme?.styles?.fontMono;
     if (accent) root.style.setProperty('--accent', accent);
     if (fontHeading) {
       loadGoogleFont(fontHeading);
       root.style.setProperty('--font-heading', fontHeading.includes(',') ? fontHeading : `'${fontHeading}', sans-serif`);
     }
+    // A second, independent font slot for small all-caps labels (card
+    // badges, stat tags) — the "terminal/monospace micro-copy" look some
+    // themes want sits awkwardly on the same font as big headings, so it's
+    // its own var rather than overloading --font-heading.
+    if (fontMono) {
+      loadGoogleFont(fontMono);
+      root.style.setProperty('--font-mono', fontMono.includes(',') ? fontMono : `'${fontMono}', monospace`);
+    }
     return () => {
       root.style.setProperty('--accent', prevAccent);
       root.style.setProperty('--font-heading', prevFont);
+      root.style.setProperty('--font-mono', prevFontMono);
     };
   }, [theme]);
 

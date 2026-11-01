@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getArcadeTileImages, ARCADE_TILE_FALLBACK_IMAGES } from '../utils/arcadeTiles';
+import { useActiveTheme } from '../context/ThemeContext';
 
 const RecreoHub = () => {
   const [tileImages, setTileImages] = useState({});
+  const { theme } = useActiveTheme();
 
   useEffect(() => {
     getArcadeTileImages()
@@ -12,6 +14,16 @@ const RecreoHub = () => {
   }, []);
 
   const imageFor = (tileId) => tileImages[tileId] || ARCADE_TILE_FALLBACK_IMAGES[tileId];
+
+  // Opt-in per-theme tile treatments (set in FormTemas.jsx's "Tarjetas en
+  // Arco" / "Fuente Mono" fields) — both default to today's look when the
+  // active theme doesn't set them, so no theme means zero visual change.
+  const archedTileStyle = theme?.styles?.archedCards
+    ? { borderRadius: '50% 50% 10px 10px / 45% 45% 6% 6%' }
+    : undefined;
+  const monoLabelStyle = theme?.styles?.fontMono
+    ? { fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }
+    : undefined;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden">
@@ -37,10 +49,10 @@ const RecreoHub = () => {
 
           {/* 1. SEÑORDLE */}
           <Link to="/juegos/senordle" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-emerald-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:-translate-y-2">
-            <div className="absolute top-4 right-4 z-20 bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-emerald-500/20 text-emerald-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-500/50" style={monoLabelStyle}>
               Diario
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
                <img
                  src={imageFor('senordle')}
                  alt="Señordle"
@@ -49,14 +61,14 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-emerald-400 transition-colors">Señordle</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">El clásico rompecabezas de 5 letras. Adivina la palabra secreta de hoy.</p>
-            <div className="text-emerald-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-emerald-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               ADIVINAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 2. ESLABONES */}
           <Link to="/juegos/eslabones" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-cyan-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:-translate-y-2">
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
                <img
                  src={imageFor('eslabones')}
                  alt="Eslabones"
@@ -65,14 +77,14 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-cyan-400 transition-colors">Eslabones</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra la conexión. Crea cadenas de palabras que comparten un eslabón.</p>
-            <div className="text-cyan-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-cyan-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               ENLAZAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 3. ATANDO CABOS */}
           <Link to="/juegos/atandocabos" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-fuchsia-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,70,239,0.3)] hover:-translate-y-2">
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
                <img
                  src={imageFor('atandocabos')}
                  alt="Atando Cabos"
@@ -81,17 +93,17 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-fuchsia-400 transition-colors">Atando Cabos</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Une los conceptos correctos. Un desafío de lógica y vocabulario cruzado.</p>
-            <div className="text-fuchsia-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-fuchsia-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               CONECTAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 4. TICO TALK */}
           <Link to="/recreo/ticotalk" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-rose-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(244,63,94,0.3)] hover:-translate-y-2 overflow-hidden">
-            <div className="absolute top-4 right-4 z-20 bg-rose-500/20 text-rose-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-rose-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-rose-500/20 text-rose-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-rose-500/50" style={monoLabelStyle}>
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
                <img
                  src={imageFor('ticotalk')}
                  alt="Tico Talk"
@@ -100,16 +112,16 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-rose-400 transition-colors">Tico Talk</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Pura Vida. Puros Videos. Tu feed diario de cultura y humor en español.</p>
-            <div className="text-rose-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-rose-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               EXPLORAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
                     {/* 5. IMPOSTOR */}
                     <Link to="/juegos/impostor" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.3)] hover:-translate-y-2 overflow-hidden">
-            <div className="absolute top-4 right-4 z-20 bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-indigo-500/20 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-500/50" style={monoLabelStyle}>
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
               <img src={imageFor('impostor')}
                    alt="Impostor"
                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
@@ -117,17 +129,17 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Impostor</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra al impostor en tu mesa. Juega en grupo, en vivo, en español.</p>
-            <div className="text-indigo-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-indigo-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 6. SÍLABAS */}
           <Link to="/juegos/silabas" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-teal-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(20,184,166,0.3)] hover:-translate-y-2 overflow-hidden">
-            <div className="absolute top-4 right-4 z-20 bg-teal-500/20 text-teal-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-teal-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-teal-500/20 text-teal-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-teal-500/50" style={monoLabelStyle}>
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
                <img
                  src={imageFor('silabas')}
                  alt="Sílabas"
@@ -136,17 +148,17 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-teal-400 transition-colors">Sílabas</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Reconstruye palabras uniendo las sílabas correctas en orden.</p>
-            <div className="text-teal-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-teal-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 7. RÁFAGA */}
           <Link to="/juegos/rafaga" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-orange-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:-translate-y-2 overflow-hidden">
-            <div className="absolute top-4 right-4 z-20 bg-orange-500/20 text-orange-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-orange-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-orange-500/20 text-orange-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-orange-500/50" style={monoLabelStyle}>
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
               <img
                 src={imageFor('rafaga')}
                 alt="Ráfaga"
@@ -155,17 +167,17 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-orange-400 transition-colors">Ráfaga</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Compite con toda la clase en tiempo real. Únete con el código que te dé tu profesor.</p>
-            <div className="text-orange-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-orange-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>
 
           {/* 8. ¡ZAS! */}
           <Link to="/juegos/zas" className="group relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 hover:border-amber-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:-translate-y-2 overflow-hidden">
-            <div className="absolute top-4 right-4 z-20 bg-amber-500/20 text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/50">
+            <div className="absolute top-4 right-4 z-20 bg-amber-500/20 text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-amber-500/50" style={monoLabelStyle}>
               Nuevo
             </div>
-            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl">
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl" style={archedTileStyle}>
               <img
                 src={imageFor('zas')}
                 alt="¡Zas!"
@@ -174,7 +186,7 @@ const RecreoHub = () => {
             </div>
             <h2 className="text-3xl font-black uppercase tracking-tight mb-2 group-hover:text-amber-400 transition-colors">¡Zas!</h2>
             <p className="text-slate-400 text-sm font-medium mb-8">Encuentra la palabra antes que tu compañero. Compite en vivo con toda la clase.</p>
-            <div className="text-amber-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+            <div className="text-amber-500 font-black uppercase text-xs tracking-widest flex items-center gap-2" style={monoLabelStyle}>
               JUGAR <span className="group-hover:translate-x-2 transition-transform">→</span>
             </div>
           </Link>

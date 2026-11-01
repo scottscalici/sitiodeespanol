@@ -95,6 +95,8 @@ export default function FormTemas({ actividad, setActividad }) {
   const handleHeaderChange = (e) => updateStyles({ header: e.target.value });
   const handleAccentChange = (value) => updateStyles({ accent: value });
   const handleFontHeadingChange = (value) => updateStyles({ fontHeading: value });
+  const handleFontMonoChange = (value) => updateStyles({ fontMono: value });
+  const handleArchedCardsChange = (checked) => updateStyles({ archedCards: checked });
 
   const handleHeroChange = (field, value) => {
     setActividad((prev) => ({ ...prev, hero: { ...(prev.hero || {}), [field]: value } }));
@@ -206,6 +208,32 @@ export default function FormTemas({ actividad, setActividad }) {
                 className="p-2 border rounded text-sm"
               />
             </div>
+          </div>
+
+          {/* Fuente Mono + Tarjetas en Arco — a smaller, more surgical pair
+              of theme knobs than the ones above: a second font slot for
+              small all-caps labels (card badges, stat tags) instead of
+              reusing the heading font, and an arched-top tile shape so far
+              only wired into El Recreo. */}
+          <div className="flex gap-4 items-end">
+            <div className="flex flex-col flex-1">
+              <label className="text-sm font-semibold mb-1">Fuente Mono / Etiquetas (Google Fonts)</label>
+              <input
+                type="text"
+                value={styles?.fontMono || ''}
+                onChange={(e) => handleFontMonoChange(e.target.value)}
+                placeholder="JetBrains Mono"
+                className="p-2 border rounded text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm font-semibold pb-2">
+              <input
+                type="checkbox"
+                checked={!!styles?.archedCards}
+                onChange={(e) => handleArchedCardsChange(e.target.checked)}
+              />
+              Tarjetas en Arco (El Recreo)
+            </label>
           </div>
 
           {/* Particle Effect */}
