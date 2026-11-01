@@ -65,6 +65,24 @@ name. Pick a direction (`to-r`, `to-br`, `to-t`, …) that matches the
 image's actual gradient direction, or default to `to-r` if the source is a
 flat color or the direction isn't legible.
 
+**Critical constraint: the header always renders fixed white text on top**
+(`text-white`, `text-white/60`, hardcoded in `Header.jsx` — not themeable,
+not something this JSON can change). So every stop in this gradient needs
+to be dark/saturated enough for white text to stay legible on it, no
+matter what the reference image's own palette looks like. For a vivid or
+already-dark image this falls out naturally. For a pale, minimal, or
+mostly-white reference image (a clean gallery site, a light mood board),
+do NOT copy its literal background color — that produces white-on-white.
+Instead, pull the header color from whatever in the image is actually dark
+or saturated (its ink/text color, a logo mark, a single bold accent), even
+if that color is a small detail rather than the dominant one. A plain
+black-on-white design, for instance, should still get a dark (often
+near-black) header, using its own ink as the fill — that keeps the
+design's spirit without breaking legibility. If you genuinely can't find
+anything dark enough in the image to build a gradient from, fall back to a
+deep neutral (e.g. `from-[#111111] via-[#1a1a1a] to-[#000000]`) rather
+than defaulting to the image's pale background.
+
 **`accent`** — one hex color: the single most representative brand/accent
 color in the image, the one you'd point to if someone asked "what color is
 this theme." This drives button highlights, active states, and borders
