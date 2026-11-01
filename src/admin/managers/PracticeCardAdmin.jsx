@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion, parseBulkRowPlain, parseBulkSections } from '../../shared/questionTypes';
@@ -114,6 +114,28 @@ export default function PracticeCardAdmin() {
     setSectionBulkStatus(`Se importaron ${newQuestions.length} sección(es).`);
   };
 
+  // dia is an explicit, teacher-typed number with no uniqueness constraint —
+  // nothing stops an old/stale card from sharing the same course+día as a
+  // newer one, so it keeps showing up to students alongside (or instead of)
+  // the intended one. This is how a teacher removes it: load it above, then
+  // delete it here.
+  const handleDeleteCard = async () => {
+    if (!savedCards.some((c) => c.id === cardId)) {
+      alert('Primero carga una tarjeta guardada arriba para poder eliminarla.');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar permanentemente la tarjeta de práctica "${cardId}"?`)) return;
+    try {
+      await deleteDoc(doc(db, 'practice_cards', cardId));
+      invalidateCollectionCache('practice_cards');
+      setSavedCards((prev) => prev.filter((c) => c.id !== cardId));
+      alert('Tarjeta de práctica eliminada.');
+    } catch (err) {
+      console.error('Error deleting practice card:', err);
+      alert(`Error al eliminar: ${err.message}`);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -164,9 +186,18 @@ export default function PracticeCardAdmin() {
               <option key={c.id} value={c.id}>{c.course?.toUpperCase()} Día {c.dia}: {c.title}</option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={handleDeleteCard}
+            className="p-2.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-xl border border-slate-700"
+            title="Eliminar la tarjeta cargada arriba"
+          >
+            🗑️
+          </button>
         </div>
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
-          Para duplicar para otro día, cárgala y cambia el "Día" y el "ID Documento" antes de guardar.
+          Para duplicar para otro día, cárgala y cambia el "Día" y el "ID Documento" antes de guardar. Para eliminar
+          una tarjeta antigua, cárgala y haz clic en 🗑️.
         </p>
       </div>
 
