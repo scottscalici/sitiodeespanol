@@ -113,7 +113,14 @@ color-coded categories).
 Valid keys: `calentamiento`, `evaluacion`, `anuncios`, `lectura`,
 `conversacion`, `video`, `musica`, `vocabulario`, `tareas`, `countdown`,
 `recursos`, `practicaCard`, `curiosidad`, `estructura`, `notaGramatica`,
-`practica`, `learningPath`, `recreo`, `leaderboard`.
+`practica`, `learningPath`, `recreo`, `leaderboard`, `destacado`.
+
+`destacado` is a special case worth being deliberate about: by default it
+picks its own color from the featured item's region (a real signal, not
+just decoration), so only include it when the teacher's request implies
+she wants visual consistency across every card more than she wants that
+region color preserved. When in doubt, leave it out — it's easy for her to
+add afterward, harder to notice it was silently overridden.
 
 **`bgTexture`** (optional) — a decorative pattern tiled behind the entire
 site at a faint ~6% opacity (the app applies that fade itself, so build the
