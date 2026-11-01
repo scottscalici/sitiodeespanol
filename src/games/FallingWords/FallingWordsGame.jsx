@@ -56,31 +56,11 @@ export default function FallingWordsGame() {
   const playAreaRef = useRef(null);
   const hasCorrectOnScreenRef = useRef(false);
   const nextIdRef = useRef(1);
+  const tickRef = useRef(null);
 
   useEffect(() => {
     basketXRef.current = basketXPct;
   }, [basketXPct]);
-
-  const resetGame = useCallback(() => {
-    const firstTarget = pickTarget(null);
-    setScore(0);
-    setLives(STARTING_LIVES);
-    setBasketXPct(50);
-    setFallingWords([]);
-    setTarget(firstTarget);
-    setGameOver(false);
-    basketXRef.current = 50;
-    fallSpeedRef.current = BASE_FALL_SPEED;
-    streakRef.current = 0;
-    targetRef.current = firstTarget;
-    livesRef.current = STARTING_LIVES;
-    gameOverRef.current = false;
-    wordsRef.current = [];
-    lastTsRef.current = null;
-    spawnAccumulatorRef.current = 0;
-    hasCorrectOnScreenRef.current = false;
-    setStarted(true);
-  }, []);
 
   const spawnWord = useCallback(() => {
     const spawnDecoy = hasCorrectOnScreenRef.current || Math.random() < DECOY_CHANCE;
@@ -125,10 +105,20 @@ export default function FallingWordsGame() {
   }, []);
 
   // --- GAME LOOP ---
-  useEffect(() => {
-    if (!started) return undefined;
-
-    const tick = (ts) => {
+  // `tick` is a stable callback (not a plain useEffect closure) so resetGame
+  // can kick it off directly every time it's called — including on replay.
+  // It used to live inside a useEffect keyed on `started`, which only
+  // (re)started the loop the FIRST time `started` flipped false -> true.
+  // Once the loop hit `if (gameOverRef.current) return`, it stopped calling
+  // requestAnimationFrame(tick) and never resumed: `started` was already
+  // true from the first playthrough, so clicking "Jugar de Nuevo" (which
+  // sets it to true again, a no-op as far as React's dependency diffing is
+  // concerned) never made that effect re-run, and nothing ever called
+  // spawnWord() again. Tying the loop's start directly to the resetGame
+  // action — not to a boolean's change-detection — fixes it for every
+  // replay, not just the first game.
+  const tick = useCallback(
+    (ts) => {
       if (gameOverRef.current) return;
       if (lastTsRef.current == null) lastTsRef.current = ts;
       const dtSec = (ts - lastTsRef.current) / 1000;
@@ -166,14 +156,48 @@ export default function FallingWordsGame() {
       setFallingWords(survivors);
       if (caught) handleCatch(caught);
 
-      rafRef.current = requestAnimationFrame(tick);
-    };
+      rafRef.current = requestAnimationFrame((nextTs) => tickRef.current(nextTs));
+    },
+    [spawnWord, handleCatch]
+  );
 
+  // Keeps tickRef pointed at the latest `tick` closure, so the recursive
+  // requestAnimationFrame call above never has to reference `tick` before
+  // it's declared (which the linter correctly flags as fragile) while still
+  // always running the current version.
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
+
+  const resetGame = useCallback(() => {
+    const firstTarget = pickTarget(null);
+    setScore(0);
+    setLives(STARTING_LIVES);
+    setBasketXPct(50);
+    setFallingWords([]);
+    setTarget(firstTarget);
+    setGameOver(false);
+    basketXRef.current = 50;
+    fallSpeedRef.current = BASE_FALL_SPEED;
+    streakRef.current = 0;
+    targetRef.current = firstTarget;
+    livesRef.current = STARTING_LIVES;
+    gameOverRef.current = false;
+    wordsRef.current = [];
+    lastTsRef.current = null;
+    spawnAccumulatorRef.current = 0;
+    hasCorrectOnScreenRef.current = false;
+    setStarted(true);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
+  }, [tick]);
+
+  // Loop cleanup on unmount only — starting it is resetGame's job now.
+  useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [started, spawnWord, handleCatch]);
+  }, []);
 
   // --- CONTROLS: arrow keys ---
   useEffect(() => {
