@@ -9,7 +9,7 @@ import { parseHeaderGradientStyle } from '../../../utils/parseHeaderGradient';
 // either silently no-op or (worse) save a broken URL.
 const IMPORTABLE_STYLE_KEYS = [
   'header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides',
-  'pageBackground', 'accentShades', 'fonts', 'fontList', 'textEffects',
+  'pageBackground', 'accentShades', 'fonts', 'fontList', 'textEffects', 'animatedLayer',
 ];
 
 // Every card key the live Dashboard actually reads a theme color for.
@@ -468,9 +468,18 @@ export default function FormTemas({ actividad, setActividad }) {
             </div>
           </div>
 
-          {/* Particle Effect */}
+          {/* Particle Effect — a single species (one emoji/color/speed) via
+              these controls. A theme that wants several at once (bats AND
+              ghosts, say) sets `styles.animatedLayer.particles` — an array of
+              these same fields plus an optional `sizeRange` — via the
+              paste-box above instead; this section's effectConfig still
+              works as the simple single-species fallback either way. */}
           <div className="bg-gray-50 p-3 rounded border">
             <h3 className="font-bold mb-2 text-sm">Efecto de Partículas</h3>
+            <p className="text-[11px] text-gray-400 -mt-1 mb-2">
+              Un solo tipo de partícula. Para varios a la vez (murciélagos Y fantasmas), usa el JSON de arriba con
+              <code className="bg-white px-1 rounded mx-1">styles.animatedLayer.particles</code> (una lista).
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Emoji / Carácter</label>

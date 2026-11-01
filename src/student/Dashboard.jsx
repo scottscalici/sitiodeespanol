@@ -119,6 +119,15 @@ const Dashboard = () => {
     if (!liveDiaFecha || !resolveThemeForDate) return todayTheme;
     return resolveThemeForDate(liveDiaFecha) ?? todayTheme;
   }, [isViewingToday, liveDiaFecha, resolveThemeForDate, todayTheme]);
+  // New multi-species `animatedLayer.particles` wins when a theme sets it;
+  // otherwise falls back to the older single-species `effectConfig` so a
+  // theme authored before this existed keeps floating exactly what it did.
+  // Memoized so ThemeParticles' effect (which seeds particle positions) only
+  // re-runs when the theme itself changes, not on every unrelated re-render.
+  const particleSpecies = useMemo(() => {
+    if (theme?.styles?.animatedLayer?.particles?.length) return theme.styles.animatedLayer.particles;
+    return theme?.effectConfig?.count ? [theme.effectConfig] : [];
+  }, [theme]);
 
   const [dailySong, setDailySong] = useState(null);
   const [activeVocabBundles, setActiveVocabBundles] = useState([]);
@@ -427,7 +436,7 @@ const Dashboard = () => {
             style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
           />
         )}
-        <ThemeParticles config={theme?.effectConfig} />
+        <ThemeParticles particles={particleSpecies} />
         <div className="w-full max-w-6xl mx-auto space-y-8 pb-24 pt-6 px-4 sm:px-6 relative z-10">
   
           {/* HEADER */}
