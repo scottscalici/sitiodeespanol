@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ImageUploadField from '../../shared/ImageUploadField';
+import { parseHeaderGradientStyle } from '../../../utils/parseHeaderGradient';
 
 // Fields an imported styles JSON blob is allowed to touch — deliberately
 // excludes every image-URL field (imageOverrides, textures, hero.img, mascot
@@ -445,7 +446,12 @@ export default function FormTemas({ actividad, setActividad }) {
         <div className="w-full xl:w-1/2 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden flex flex-col bg-white">
 
           {/* Header & Hero Image Display */}
-          <div className={`w-full p-8 text-center text-white flex flex-col items-center justify-center min-h-[160px] ${styles?.header || 'bg-gray-800'}`}>
+          <div
+            className={`w-full p-8 text-center text-white flex flex-col items-center justify-center min-h-[160px] ${
+              parseHeaderGradientStyle(styles?.header) ? '' : styles?.header || 'bg-gray-800'
+            }`}
+            style={parseHeaderGradientStyle(styles?.header) || undefined}
+          >
             {hero.img && (
               <img
                 src={hero.img}

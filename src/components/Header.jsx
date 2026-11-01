@@ -11,11 +11,13 @@ import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
 import { useActiveTheme } from '../context/ThemeContext';
+import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
   const { userData, currentUser } = useAuth();
   const { theme } = useActiveTheme() || {};
   const headerGradientClass = theme?.styles?.header || 'bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c]';
+  const headerGradientStyle = parseHeaderGradientStyle(headerGradientClass);
   const headingFont = theme?.styles?.fontHeading;
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
@@ -127,7 +129,10 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   }
 
   return (
-    <header className={`${headerGradientClass} rounded-xl p-8 text-white shadow-lg flex flex-col gap-6`}>
+    <header
+      className={`${headerGradientStyle ? '' : headerGradientClass} rounded-xl p-8 text-white shadow-lg flex flex-col gap-6`}
+      style={headerGradientStyle || undefined}
+    >
       <div className="flex justify-between items-center">
       <div className="flex flex-col gap-1">
         <h1
