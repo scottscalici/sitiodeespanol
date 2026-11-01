@@ -1,12 +1,30 @@
 import React from 'react';
+import { useActiveTheme } from '../context/ThemeContext';
+
+// Standard relative-luminance formula for sRGB — cheap enough to run per
+// card, and avoids repeating the "pale background + white text" mistake
+// a flat theme color could otherwise cause (a teacher picking any hex
+// shouldn't also have to separately guess which text color reads on it).
+const getContrastTextClass = (hex) => {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.6 ? 'text-slate-900' : 'text-white';
+};
 
 const Destacado = ({ destacado = [] }) => {
+  const { theme } = useActiveTheme() || {};
+  const themeOverride = theme?.styles?.cardOverrides?.destacado;
+
   if (!destacado || destacado.length === 0) return null;
 
   return (
     <div className="space-y-8">
       {destacado.map((item, idx) => {
-        // Auto-color logic based on location
+        // Auto-color logic based on location — this is the default look,
+        // used whenever the active theme doesn't explicitly set its own
+        // Destacado color below.
         let pillColor = "#64748b"; // Default slate
         let textColor = "text-white";
         const loc = (item.location || item.tag || "").toUpperCase();
@@ -20,6 +38,15 @@ const Destacado = ({ destacado = [] }) => {
         } else if (loc.includes("ESPAÑA")) {
           pillColor = "#eab308"; // Yellow
           textColor = "text-slate-900"; // Dark text for yellow bg
+        }
+
+        // A theme opting in to its own Destacado color takes over
+        // completely (border + pill), on top of whatever the region would
+        // have picked — a teacher who sets this is choosing the page
+        // theme's look over the per-region signal on purpose.
+        if (themeOverride) {
+          pillColor = themeOverride;
+          textColor = getContrastTextClass(themeOverride);
         }
 
         // A lighter version of the pill color for the border

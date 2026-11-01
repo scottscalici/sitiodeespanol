@@ -10,13 +10,16 @@ import { parseHeaderGradientStyle } from '../../../utils/parseHeaderGradient';
 const IMPORTABLE_STYLE_KEYS = ['header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides'];
 
 // Every card key the live Dashboard actually reads a theme color for.
-// Deliberately excludes Destacado (it picks its own color from real
-// information — region — so a flat theme color would erase that signal)
-// and any legacy key from the old vanilla-JS site (pruebas, senordle,
-// extras, sidebarEvalList, cultura) that nothing in this React app consumes
-// yet. Anuncios is included, but only ever applies to a routine/default
-// announcement — a 'warning' or 'trip' one keeps its own fixed semantic
-// color (red/emerald) regardless of this setting.
+// Destacado normally picks its own color from real information (the
+// featured item's region) — checking its box here opts that one card out
+// of the region signal in favor of matching the page theme instead, which
+// is left off by default so the region color keeps meaning something
+// unless a teacher deliberately overrides it. Excludes any legacy key from
+// the old vanilla-JS site (pruebas, senordle, extras, sidebarEvalList,
+// cultura) that nothing in this React app consumes yet. Anuncios is
+// included, but only ever applies to a routine/default announcement — a
+// 'warning' or 'trip' one keeps its own fixed semantic color (red/emerald)
+// regardless of this setting.
 const CARD_KEYS = [
   { key: 'calentamiento', label: 'Calentamiento', texture: true },
   { key: 'evaluacion', label: 'Evaluación', texture: true },
@@ -30,6 +33,7 @@ const CARD_KEYS = [
   { key: 'countdown', label: 'Cuenta Regresiva', texture: true },
   { key: 'recursos', label: 'Panel de Recursos', texture: true },
   { key: 'practicaCard', label: 'Práctica (Gustar, etc.)', texture: true },
+  { key: 'destacado', label: 'Destacado Diario (anula el color por región)' },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
   { key: 'notaGramatica', label: 'Nota de Gramática' },
