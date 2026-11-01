@@ -3,7 +3,6 @@ import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 
 const CONFIG = {
   DICTIONARY: 'https://raw.githubusercontent.com/bayu01/Wordle-ES/master/palabras_de_cinco_letras.txt',
-  APUNTES: 'https://raw.githubusercontent.com/scottscalici/imagenes/main/planes/apuntes.json',
 };
 
 // 🧹 THE NORMALIZATION ENGINE
@@ -86,10 +85,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const safeFetchJSON = (url) =>
-          fetch(url)
-            .then((r) => (r.ok ? r.json() : {}))
-            .catch(() => ({}));
         const safeFetchText = (url) =>
           fetch(url)
             .then((r) => (r.ok ? r.text() : ''))
@@ -184,7 +179,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
           cal,
           dictText,
           anuncios,
-          apuntes,
           musica,
           lectura,
           conversa,
@@ -202,7 +196,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
           safeFetchText(CONFIG.DICTIONARY),
 
           fetchFirestoreArray('anuncios'),
-          safeFetchJSON(CONFIG.APUNTES),
 
           fetchFirestoreCategory('musica'),
           fetchFirestoreCategory('lectura'),
@@ -243,7 +236,6 @@ export const useGymData = (userCourse = 's2', userCiclo = 'A') => {
           curios,
           estructura: gramaticaMaster, // <--- Passing the structure data to dashboard
           destacado,
-          apuntes,
           atando,
           activities: allActivities,
           imageCards,
