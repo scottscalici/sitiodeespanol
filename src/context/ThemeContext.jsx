@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { getCachedCollection } from '../utils/firestoreCache';
 import { loadGoogleFont } from '../utils/loadGoogleFont';
+import { syncTextEffectPresets } from '../utils/textEffects';
 
 // Exported so a day/lesson page (see Dashboard.jsx) can nest its own
 // <ThemeContext.Provider> with a historical theme, and every descendant
@@ -49,6 +50,27 @@ const resolveActiveTheme = (themes, targetMD) => {
 // "YYYY-MM-DD" -> "MM-DD", matching how theme start/end are authored.
 const toMD = (dateStr) => (typeof dateStr === 'string' ? dateStr.slice(5) : null);
 
+// A theme's optional `fontList` declares the weights a given family actually
+// needs (e.g. a display font used only at 900) — without this every font
+// loads at a generic 400;700, which may not even include the weight a bold
+// display font was chosen for in the first place.
+const weightsFor = (fontList, familyName) => {
+  const clean = familyName?.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+  const entry = fontList?.find((f) => f.name === clean);
+  return entry?.weights?.length ? entry.weights : [400, 700];
+};
+
+// Each [cssVar, fallbackStack, legacyField, fontsField] — `fonts.*` is the
+// current way to set a slot, the legacy flat field (fontHeading/fontMono)
+// still works on its own for an older theme that never adopted `fonts`.
+const FONT_SLOTS = [
+  ['--font-heading', 'sans-serif', 'fontHeading', 'heading'],
+  ['--font-mono', 'monospace', 'fontMono', null],
+  ['--font-card-title', 'sans-serif', null, 'cardTitle'],
+  ['--font-body', 'sans-serif', null, 'body'],
+  ['--font-accent', 'sans-serif', null, 'accent'],
+];
+
 // Applies a theme's CSS custom properties to the document root, restoring
 // whatever was there before on cleanup. This lets a nested, day-specific
 // ThemeContext.Provider borrow the global styling slots while it's mounted
@@ -56,29 +78,37 @@ const toMD = (dateStr) => (typeof dateStr === 'string' ? dateStr.slice(5) : null
 export function ThemeStyleSync({ theme }) {
   useEffect(() => {
     const root = document.documentElement;
-    const prevAccent = root.style.getPropertyValue('--accent');
-    const prevFont = root.style.getPropertyValue('--font-heading');
-    const prevFontMono = root.style.getPropertyValue('--font-mono');
     const accent = theme?.styles?.accent;
-    const fontHeading = theme?.styles?.fontHeading;
-    const fontMono = theme?.styles?.fontMono;
+    const accentShades = theme?.styles?.accentShades;
+    const fontList = theme?.styles?.fontList;
+
+    const prevAccent = root.style.getPropertyValue('--accent');
     if (accent) root.style.setProperty('--accent', accent);
-    if (fontHeading) {
-      loadGoogleFont(fontHeading);
-      root.style.setProperty('--font-heading', fontHeading.includes(',') ? fontHeading : `'${fontHeading}', sans-serif`);
-    }
-    // A second, independent font slot for small all-caps labels (card
-    // badges, stat tags) — the "terminal/monospace micro-copy" look some
-    // themes want sits awkwardly on the same font as big headings, so it's
-    // its own var rather than overloading --font-heading.
-    if (fontMono) {
-      loadGoogleFont(fontMono);
-      root.style.setProperty('--font-mono', fontMono.includes(',') ? fontMono : `'${fontMono}', monospace`);
-    }
+
+    // Optional — a theme with only `accent` (the common case) just doesn't
+    // get these two extra vars, and anything reading them falls back to the
+    // plain --accent value on its own.
+    const prevAccentLight = root.style.getPropertyValue('--accent-light');
+    const prevAccentDark = root.style.getPropertyValue('--accent-dark');
+    if (accentShades?.light) root.style.setProperty('--accent-light', accentShades.light);
+    if (accentShades?.dark) root.style.setProperty('--accent-dark', accentShades.dark);
+
+    const prevValues = FONT_SLOTS.map(([cssVar]) => root.style.getPropertyValue(cssVar));
+    FONT_SLOTS.forEach(([cssVar, fallbackStack, legacyField, fontsField]) => {
+      const family = (fontsField && theme?.styles?.fonts?.[fontsField]) || (legacyField && theme?.styles?.[legacyField]);
+      if (!family) return;
+      loadGoogleFont(family, weightsFor(fontList, family));
+      root.style.setProperty(cssVar, family.includes(',') ? family : `'${family}', ${fallbackStack}`);
+    });
+
+    const cleanupTextEffects = syncTextEffectPresets(theme?.styles?.textEffects?.presets);
+
     return () => {
       root.style.setProperty('--accent', prevAccent);
-      root.style.setProperty('--font-heading', prevFont);
-      root.style.setProperty('--font-mono', prevFontMono);
+      root.style.setProperty('--accent-light', prevAccentLight);
+      root.style.setProperty('--accent-dark', prevAccentDark);
+      FONT_SLOTS.forEach(([cssVar], i) => root.style.setProperty(cssVar, prevValues[i]));
+      cleanupTextEffects();
     };
   }, [theme]);
 

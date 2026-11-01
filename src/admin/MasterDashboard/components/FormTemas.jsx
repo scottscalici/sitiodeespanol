@@ -7,7 +7,10 @@ import { parseHeaderGradientStyle } from '../../../utils/parseHeaderGradient';
 // URLs): a screenshot-analysis tool can describe colors/fonts/layout, but it
 // can't invent a real, hosted image, so letting it write those fields would
 // either silently no-op or (worse) save a broken URL.
-const IMPORTABLE_STYLE_KEYS = ['header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides'];
+const IMPORTABLE_STYLE_KEYS = [
+  'header', 'accent', 'fontHeading', 'fontMono', 'archedCards', 'bgTexture', 'cardOverrides',
+  'pageBackground', 'accentShades', 'fonts', 'fontList', 'textEffects',
+];
 
 // Every card key the live Dashboard actually reads a theme color for.
 // Destacado normally picks its own color from real information (the
@@ -116,6 +119,11 @@ export default function FormTemas({ actividad, setActividad }) {
   const handleFontMonoChange = (value) => updateStyles({ fontMono: value });
   const handleArchedCardsChange = (checked) => updateStyles({ archedCards: checked });
   const handleBgTextureChange = (value) => updateStyles({ bgTexture: value });
+  const handlePageBackgroundChange = (e) => updateStyles({ pageBackground: e.target.value });
+  const handleAccentShadeChange = (key, value) => updateStyles({ accentShades: { ...(styles.accentShades || {}), [key]: value } });
+  const handleFontSlotChange = (key, value) => updateStyles({ fonts: { ...(styles.fonts || {}), [key]: value } });
+  const handlePageBgImageField = (field, value) =>
+    updateStyles({ pageBackgroundImage: { ...(styles.pageBackgroundImage || {}), [field]: value } });
 
   // Merges a pasted JSON blob (e.g. the output of an AI screenshot-to-theme
   // tool) into this theme's styles, keeping only the fields it's safe for
@@ -143,8 +151,17 @@ export default function FormTemas({ actividad, setActividad }) {
       setImportStatus({ ok: false, msg: 'No se encontró ningún campo reconocido en el JSON.' });
       return;
     }
-    if (patch.cardOverrides) {
-      patch.cardOverrides = { ...(styles.cardOverrides || {}), ...patch.cardOverrides };
+    // Shallow-merge rather than replace for every object-shaped field, so
+    // importing a JSON blob that only mentions e.g. `fonts.body` doesn't
+    // wipe out `fonts.cardTitle`/`fonts.accent` this theme already had set.
+    ['cardOverrides', 'accentShades', 'fonts'].forEach((key) => {
+      if (patch[key]) patch[key] = { ...(styles[key] || {}), ...patch[key] };
+    });
+    if (patch.textEffects) {
+      patch.textEffects = {
+        presets: { ...(styles.textEffects?.presets || {}), ...(patch.textEffects.presets || {}) },
+        assignments: { ...(styles.textEffects?.assignments || {}), ...(patch.textEffects.assignments || {}) },
+      };
     }
     updateStyles(patch);
     setImportStatus({ ok: true, msg: `Importado: ${Object.keys(patch).join(', ')}` });
@@ -199,7 +216,10 @@ export default function FormTemas({ actividad, setActividad }) {
           <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
             <h3 className="font-bold mb-1 text-sm">Importar Estilos (JSON)</h3>
             <p className="text-xs text-gray-500 mb-2">
-              Pega aquí el JSON de estilos generado por IA (color, fuentes, encabezado, textura de fondo). No reemplaza imágenes.
+              Pega aquí el JSON de estilos generado por IA (color, fuentes, encabezado, textura de fondo). No reemplaza
+              imágenes. También es la única forma de configurar <code className="bg-white px-1 rounded">fontList</code> (pesos
+              de fuente) y <code className="bg-white px-1 rounded">textEffects</code> (animaciones con nombre, como un
+              parpadeo de vela) — esos dos campos no tienen controles propios todavía.
             </p>
             <textarea
               value={importText}
@@ -271,6 +291,55 @@ export default function FormTemas({ actividad, setActividad }) {
             />
           </div>
 
+          {/* Fondo de Página — same Tailwind-gradient-class format as Header,
+              applied to the whole page instead of just the header bar. */}
+          <div className="flex flex-col">
+            <label className="font-bold mb-1">Fondo de Página (Tailwind)</label>
+            <input
+              type="text"
+              value={styles?.pageBackground || ''}
+              onChange={handlePageBackgroundChange}
+              className="p-2 border rounded font-mono text-sm bg-gray-50"
+              placeholder="bg-gradient-to-br from-[#1a0a05] to-[#0d0503]"
+            />
+          </div>
+
+          <div className="bg-gray-50 p-3 rounded border">
+            <h3 className="font-bold mb-2 text-sm">Imagen de Fondo (toda la página, opcional)</h3>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold">Imagen</label>
+              <ImageUploadField
+                value={styles?.pageBackgroundImage?.url || ''}
+                onChange={(url) => handlePageBgImageField('url', url)}
+                folder="temas"
+                inputClassName="p-1 border rounded text-sm w-full"
+              />
+              <div className="flex gap-3 items-end mt-1">
+                <div className="flex flex-col">
+                  <label className="text-xs font-semibold mb-1">Color del Overlay</label>
+                  <input
+                    type="color"
+                    value={styles?.pageBackgroundImage?.overlayColor || '#000000'}
+                    onChange={(e) => handlePageBgImageField('overlayColor', e.target.value)}
+                    className="w-10 h-10 cursor-pointer rounded border-0 p-0 bg-transparent"
+                  />
+                </div>
+                <div className="flex flex-col flex-1">
+                  <label className="text-xs font-semibold mb-1">Opacidad del Overlay (0–1, para que el texto siga siendo legible)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={styles?.pageBackgroundImage?.overlayOpacity ?? 0.5}
+                    onChange={(e) => handlePageBgImageField('overlayOpacity', parseFloat(e.target.value))}
+                    className="p-1.5 border rounded text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Accent + Heading Font */}
           <div className="flex gap-4 items-end">
             <div className="flex flex-col">
@@ -332,6 +401,71 @@ export default function FormTemas({ actividad, setActividad }) {
               placeholder="Textura de fondo (opcional)"
               inputClassName="p-2 border rounded text-sm w-full"
             />
+          </div>
+
+          {/* Tonos de Acento — two optional shades alongside the single
+              Color de Acento above, for themes that want a lighter/darker
+              variant available (e.g. several oranges in a Halloween theme)
+              without replacing the one flat accent most things still use. */}
+          <div className="flex gap-4 items-end">
+            <div className="flex flex-col">
+              <label className="text-sm font-semibold mb-1">Acento Claro (opcional)</label>
+              <input
+                type="color"
+                value={styles?.accentShades?.light || styles?.accent || '#6366f1'}
+                onChange={(e) => handleAccentShadeChange('light', e.target.value)}
+                className="w-10 h-10 cursor-pointer rounded border-0 p-0 bg-transparent"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-semibold mb-1">Acento Oscuro (opcional)</label>
+              <input
+                type="color"
+                value={styles?.accentShades?.dark || styles?.accent || '#6366f1'}
+                onChange={(e) => handleAccentShadeChange('dark', e.target.value)}
+                className="w-10 h-10 cursor-pointer rounded border-0 p-0 bg-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Fuentes adicionales — tres ranuras más allá del Encabezado y
+              Mono de arriba: título de tarjeta, texto normal, y una fuente
+              decorativa para efectos. Cada una es opcional; una tarjeta o
+              texto que no la use no cambia. */}
+          <div className="bg-gray-50 p-3 rounded border">
+            <h3 className="font-bold mb-2 text-sm">Fuentes Adicionales (Google Fonts, todas opcionales)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold mb-1">Título de Tarjeta</label>
+                <input
+                  type="text"
+                  value={styles?.fonts?.cardTitle || ''}
+                  onChange={(e) => handleFontSlotChange('cardTitle', e.target.value)}
+                  placeholder="Jolly Lodger"
+                  className="p-2 border rounded text-sm"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold mb-1">Texto Normal</label>
+                <input
+                  type="text"
+                  value={styles?.fonts?.body || ''}
+                  onChange={(e) => handleFontSlotChange('body', e.target.value)}
+                  placeholder="Nunito"
+                  className="p-2 border rounded text-sm"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold mb-1">Acento / Efectos</label>
+                <input
+                  type="text"
+                  value={styles?.fonts?.accent || ''}
+                  onChange={(e) => handleFontSlotChange('accent', e.target.value)}
+                  placeholder="Butcherman"
+                  className="p-2 border rounded text-sm"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Particle Effect */}

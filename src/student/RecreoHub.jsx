@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getArcadeTileImages, ARCADE_TILE_FALLBACK_IMAGES } from '../utils/arcadeTiles';
 import { useActiveTheme } from '../context/ThemeContext';
+import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 
 const RecreoHub = () => {
   const [tileImages, setTileImages] = useState({});
   const { theme } = useActiveTheme();
+  const pageBgClass = theme?.styles?.pageBackground || 'bg-slate-900';
+  const pageBgStyle = parseHeaderGradientStyle(pageBgClass);
 
   useEffect(() => {
     getArcadeTileImages()
@@ -26,12 +29,36 @@ const RecreoHub = () => {
     : undefined;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden relative">
+    <div
+      className={`min-h-screen text-white font-sans overflow-hidden relative ${pageBgStyle ? '' : pageBgClass}`}
+      style={pageBgStyle || undefined}
+    >
+      {/* Optional full-page photo background, with a dark overlay so text
+          stays readable over it — independent of bgTexture below, which is
+          a faint tiled pattern, not a photo. */}
+      {theme?.styles?.pageBackgroundImage?.url && (
+        <div
+          className="fixed inset-0 z-0"
+          style={{
+            backgroundImage: `url('${theme.styles.pageBackgroundImage.url}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundColor: theme.styles.pageBackgroundImage.overlayColor || '#000000',
+              opacity: theme.styles.pageBackgroundImage.overlayOpacity ?? 0.5,
+            }}
+          />
+        </div>
+      )}
       {/* Site-wide decorative texture — same theme field as Dashboard.jsx's,
           so a theme's background pattern stays consistent across pages. */}
       {theme?.styles?.bgTexture && (
         <div
-          className="fixed inset-0 pointer-events-none z-0"
+          className="fixed inset-0 pointer-events-none z-[1]"
           style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
         />
       )}

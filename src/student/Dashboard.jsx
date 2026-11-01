@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getCachedCollection, getCachedQuery, getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeContext';
+import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { getThemedCardStyle } from '../utils/getThemedCardStyle';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
 import { getAssignedDominioTasks, isPastEffectiveDueDate } from '../utils/learningPathProgress';
@@ -380,6 +381,8 @@ const Dashboard = () => {
   // Halloween theme) — null outside any theme's active window, or if this
   // theme just doesn't set one for that card, so the emoji fallback shows.
   const themeImage = (key) => theme?.styles?.imageOverrides?.[key];
+  const pageBgClass = theme?.styles?.pageBackground || 'bg-slate-50/50';
+  const pageBgStyle = parseHeaderGradientStyle(pageBgClass);
 
   return (
     // A nested provider so every card below (Header, Countdown, Curiosidad,
@@ -389,14 +392,38 @@ const Dashboard = () => {
     // of today's, with no prop drilling needed.
     <ThemeContext.Provider value={{ theme, loaded: themeLoaded, resolveThemeForDate }}>
       <ThemeStyleSync theme={theme} />
-      <div className="min-h-screen bg-slate-50/50 relative">
+      <div
+        className={`min-h-screen relative ${pageBgStyle ? '' : pageBgClass}`}
+        style={pageBgStyle || undefined}
+      >
+        {/* Optional full-page photo background, with a dark overlay so text
+            stays readable over it — independent of bgTexture below, which is
+            a faint tiled pattern, not a photo. */}
+        {theme?.styles?.pageBackgroundImage?.url && (
+          <div
+            className="fixed inset-0 z-0"
+            style={{
+              backgroundImage: `url('${theme.styles.pageBackgroundImage.url}')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundColor: theme.styles.pageBackgroundImage.overlayColor || '#000000',
+                opacity: theme.styles.pageBackgroundImage.overlayOpacity ?? 0.5,
+              }}
+            />
+          </div>
+        )}
         {/* Site-wide decorative texture (e.g. a subtle cobweb/pattern tile for
             a Halloween theme) — independent of the per-card textures above,
             which only ever blend into ONE card's own gradient. Low opacity,
             tiled, non-interactive, sits behind everything. */}
         {theme?.styles?.bgTexture && (
           <div
-            className="fixed inset-0 pointer-events-none z-0"
+            className="fixed inset-0 pointer-events-none z-[1]"
             style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
           />
         )}

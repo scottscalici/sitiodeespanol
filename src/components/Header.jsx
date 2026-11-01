@@ -12,6 +12,7 @@ import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
 import { useActiveTheme } from '../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
+import { getTextEffectStyle } from '../utils/textEffects';
 
 const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
   const { userData, currentUser } = useAuth();
@@ -19,6 +20,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   const headerGradientClass = theme?.styles?.header || 'bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c]';
   const headerGradientStyle = parseHeaderGradientStyle(headerGradientClass);
   const headingFont = theme?.styles?.fontHeading;
+  const titleEffectStyle = getTextEffectStyle(theme, 'headerTitle');
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
@@ -137,7 +139,11 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
       <div className="flex flex-col gap-1">
         <h1
           className="text-5xl font-black tracking-tight uppercase text-white"
-          style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)', fontFamily: headingFont ? 'var(--font-heading)' : undefined }}
+          style={{
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+            fontFamily: headingFont ? 'var(--font-heading)' : undefined,
+            ...titleEffectStyle,
+          }}
         >
           Día {liveDia}
         </h1>
