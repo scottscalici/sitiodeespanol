@@ -40,7 +40,7 @@ const RecreoHub = () => {
         <div
           className="fixed inset-0 z-0"
           style={{
-            backgroundImage: `url('${theme.styles.pageBackgroundImage.url}')`,
+            backgroundImage: `url("${theme.styles.pageBackgroundImage.url}")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
@@ -59,7 +59,7 @@ const RecreoHub = () => {
       {theme?.styles?.bgTexture && (
         <div
           className="fixed inset-0 pointer-events-none z-[1]"
-          style={{ backgroundImage: `url('${theme.styles.bgTexture}')`, backgroundRepeat: 'repeat', opacity: 0.06 }}
+          style={{ backgroundImage: `url("${theme.styles.bgTexture}")`, backgroundRepeat: 'repeat', opacity: 0.06 }}
         />
       )}
 
