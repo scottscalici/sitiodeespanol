@@ -119,13 +119,6 @@ animation (see `calma.json`). The older single-species `effectConfig`
 (still editable via the simple admin controls, not the JSON box) keeps
 working as the fallback when a theme doesn't set `animatedLayer`.
 
-## What's in the original spec but not built yet
-
-The brainstorm this system was built from also asked for a `extras` slot
-— a divider style, badge/pill colors, a hover-zoom effect, and a heading
-emoji. None of that is implemented yet; including those fields in a
-theme's JSON today does nothing. Worth a follow-up pass if you want them.
-
 ## Using the theme-importer skill
 
 There's a Claude Skill (`theme-importer`) that takes a screenshot or
