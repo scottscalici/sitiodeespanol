@@ -44,6 +44,7 @@ export default function MasterDashboard() {
   const [listaActividades, setListaActividades] = useState([]);
   const [actividad, setActividad] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [exportAllJson, setExportAllJson] = useState('');
 
   const fetchData = async () => {
     if (coleccionActual === "calendario" || coleccionActual === "learning_path") {
@@ -148,6 +149,25 @@ export default function MasterDashboard() {
       });
     } else {
       setActividad(base);
+    }
+  };
+
+  // Every saved theme at once, in the same order the sidebar list shows
+  // them — useful for handing the whole set to someone (or something) else
+  // for context in one paste, rather than one theme's export box at a time.
+  const handleExportAllTemas = async () => {
+    const sorted = [...listaActividades].sort((a, b) => {
+      const diff = schoolYearDayIndex(a.start) - schoolYearDayIndex(b.start);
+      if (diff !== 0) return diff;
+      return (a.titulo || a.id || '').localeCompare(b.titulo || b.id || '');
+    });
+    const json = JSON.stringify(sorted, null, 2);
+    setExportAllJson(json);
+    try {
+      await navigator.clipboard.writeText(json);
+    } catch {
+      // Clipboard access can be blocked — the textarea below still holds
+      // the JSON for a manual select/copy.
     }
   };
 
@@ -541,7 +561,7 @@ export default function MasterDashboard() {
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif' }}>
       <div style={{ width: '30%', borderRight: '1px solid #ccc', padding: '1rem', overflowY: 'auto', backgroundColor: '#f9f9f9' }}>
         <h3>Collection:</h3>
-        <select value={coleccionActual} onChange={(e) => {setColeccionActual(e.target.value); setActividad(null);}} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>
+        <select value={coleccionActual} onChange={(e) => {setColeccionActual(e.target.value); setActividad(null); setExportAllJson('');}} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>
           <option value="conversaciones">Conversaciones</option>
           <option value="culture">Cultura</option>
           <option value="lectura">Lectura</option>
@@ -559,6 +579,27 @@ export default function MasterDashboard() {
             <button onClick={handleCreateNew} style={{ width: '100%', padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '20px' }}>
               + Create New
             </button>
+            {coleccionActual === "temas" && (
+              <div style={{ marginBottom: '20px' }}>
+                <button onClick={handleExportAllTemas} style={{ width: '100%', padding: '10px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                  📤 Exportar Todos los Temas (JSON)
+                </button>
+                {exportAllJson && (
+                  <>
+                    <p style={{ fontSize: '10px', color: '#666', margin: '6px 0 4px' }}>
+                      Copiado al portapapeles ({listaActividades.length} temas) — si no funcionó, selecciona el texto de abajo manualmente.
+                    </p>
+                    <textarea
+                      readOnly
+                      value={exportAllJson}
+                      rows={6}
+                      onFocus={(e) => e.target.select()}
+                      style={{ width: '100%', fontFamily: 'monospace', fontSize: '10px' }}
+                    />
+                  </>
+                )}
+              </div>
+            )}
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#eee', borderRadius: '4px' }}>
               <h4>Upload JSON</h4>
               <input type="file" accept=".json" multiple onChange={handleJSONUpload} />

@@ -72,6 +72,7 @@ const MASCOT_KEYS = [
 export default function FormTemas({ actividad, setActividad }) {
   const [importText, setImportText] = useState('');
   const [importStatus, setImportStatus] = useState(null); // { ok: bool, msg: string } | null
+  const [exportCopied, setExportCopied] = useState(false);
 
   if (!actividad) return null;
 
@@ -185,6 +186,33 @@ export default function FormTemas({ actividad, setActividad }) {
     setImportText('');
   };
 
+  // The full theme doc exactly as it's saved — the mirror image of the
+  // import box above. Useful for handing a theme to someone (or something)
+  // else for context: a chat, a backup, another teacher borrowing the look.
+  const exportJson = JSON.stringify(
+    {
+      id: actividad.id,
+      name: actividad.name || actividad.titulo || '',
+      start: actividad.start || '',
+      end: actividad.end || '',
+      styles: actividad.styles || {},
+    },
+    null,
+    2
+  );
+
+  const handleCopyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exportJson);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch {
+      // Clipboard access can be blocked (permissions, non-HTTPS, etc.) —
+      // the textarea below still holds the JSON for a manual select/copy.
+      setExportCopied(false);
+    }
+  };
+
   const handleHeroChange = (field, value) => {
     setActividad((prev) => ({ ...prev, hero: { ...(prev.hero || {}), [field]: value } }));
   };
@@ -264,6 +292,32 @@ export default function FormTemas({ actividad, setActividad }) {
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Mirror of the import box above — the full theme (name, dates,
+              styles) exactly as saved, ready to copy and share for context
+              (e.g. pasting it to Claude when asking for theme changes). */}
+          <div className="bg-emerald-50 p-3 rounded border border-emerald-200">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-bold text-sm">Exportar Tema (JSON)</h3>
+              <button
+                type="button"
+                onClick={handleCopyExport}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded shrink-0"
+              >
+                {exportCopied ? '¡Copiado!' : '📋 Copiar JSON'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">
+              Este tema completo tal como está guardado. Si el botón de copiar no funciona en tu navegador, selecciona el texto de abajo manualmente (clic adentro lo selecciona todo).
+            </p>
+            <textarea
+              readOnly
+              value={exportJson}
+              rows={6}
+              onFocus={(e) => e.target.select()}
+              className="w-full p-2 border rounded font-mono text-xs bg-white"
+            />
           </div>
 
           <div className="flex gap-4">
