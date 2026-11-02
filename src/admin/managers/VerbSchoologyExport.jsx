@@ -121,9 +121,16 @@ export default function VerbSchoologyExport() {
     if (previewQuestions.length === 0) return;
     setExporting(true);
     try {
+      // Schoology's Fill in the Blank question type ties each blank to a
+      // literal underscore run typed into the question text itself — the
+      // <ANSWER> values are stored separately and don't create a blank on
+      // their own. Without one, an item imports and sits in the bank fine,
+      // but an assessment built from it has nothing to render an input
+      // box where, which is exactly the "no blanks in the final quiz"
+      // symptom this replaces.
       const questions = previewQuestions.map((q, i) => ({
         id: `q${i + 1}`,
-        prompt: `${q.palabra} (${q.sujeto}) - ${TENSE_LABELS[q.tense] || q.tense}`,
+        prompt: `${q.sujeto} _____ (${q.palabra}) - ${TENSE_LABELS[q.tense] || q.tense}`,
         answers: [q.forma],
       }));
 
