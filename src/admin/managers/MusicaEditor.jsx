@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import ImageUploadField from '../shared/ImageUploadField';
 import MusicaQuestionsModal from './MusicaQuestionsModal';
 
@@ -100,6 +101,19 @@ const MusicaEditor = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Writes straight to Firestore instead of only updating local `song`
+  // state — the modal's "Guardar Preguntas" button reads as a complete
+  // save, but used to just patch this page's in-memory state, relying on a
+  // separate top-level "Guardar Canción" click to actually reach Firestore.
+  // Easy to miss (same bug Curiosidades had — see CuriosidadesManager's
+  // handleSaveQuestions), and navigating back to the Manager afterward
+  // silently lost everything with no warning.
+  const handleSaveQuestions = async (questions) => {
+    setSong((prev) => ({ ...prev, questions }));
+    await updateDoc(doc(db, 'musica', id), { questions });
+    invalidateCollectionCache('musica');
   };
 
   // --- LIVE PREVIEW GENERATOR ---
@@ -296,7 +310,7 @@ const MusicaEditor = () => {
         <MusicaQuestionsModal
           cancion={song}
           onClose={() => setQuestionsModalOpen(false)}
-          onSave={async (questions) => setSong((prev) => ({ ...prev, questions }))}
+          onSave={handleSaveQuestions}
         />
       )}
     </div>

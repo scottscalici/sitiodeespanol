@@ -94,10 +94,10 @@ const MusicaQuestionsModal = ({ cancion, onClose, onSave }) => {
     });
   };
 
-  // Saves into the parent editor's own local state (see MusicaEditor's
-  // onSave) rather than straight to Firestore — Música's editor already
-  // saves every field together with one "Guardar Canción" button, unlike
-  // Curiosidades' grid-row pattern.
+  // Hands off to MusicaEditor's onSave, which writes `questions` straight
+  // to Firestore (and updates its own local `song` state) — this button
+  // is a real, complete save on its own, not contingent on a later
+  // top-level "Guardar Canción" click.
   const handleSave = async () => {
     setSaving(true);
     setError('');
