@@ -762,10 +762,10 @@ const Dashboard = () => {
                       <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
                       <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
                       <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner overflow-hidden">
-                        {themeImage('vocabulario') ? (
+                        {isImageUrl(themeImage('vocabulario')) ? (
                           <img src={themeImage('vocabulario')} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-2xl drop-shadow">🧠</span>
+                          <span className="text-2xl drop-shadow">{themeImage('vocabulario') || '🧠'}</span>
                         )}
                       </div>
                     </div>
