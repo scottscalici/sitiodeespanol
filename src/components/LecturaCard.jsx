@@ -4,6 +4,7 @@ import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import { isImageUrl } from '../utils/isImageUrl';
 
 export default function LecturaCard({ lecturaId }) {
   const { theme } = useActiveTheme() || {};
@@ -35,10 +36,10 @@ export default function LecturaCard({ lecturaId }) {
       <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner backdrop-blur-sm overflow-hidden">
-            {theme?.styles?.imageOverrides?.lectura ? (
+            {isImageUrl(theme?.styles?.imageOverrides?.lectura) ? (
               <img src={theme.styles.imageOverrides.lectura} alt="" className="w-full h-full object-cover" />
             ) : (
-              '📖'
+              theme?.styles?.imageOverrides?.lectura || '📖'
             )}
           </div>
           <div>

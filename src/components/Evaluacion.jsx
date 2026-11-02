@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import { isImageUrl } from '../utils/isImageUrl';
 
 const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,10 +81,10 @@ const Evaluacion = ({ evals = [], liveDia, course, cal = [] }) => {
       <div className="flex justify-between items-center mb-5">
         <h3 className="font-black text-2xl text-white flex items-center gap-2.5" style={{ color: cardTheme.headingColor }}>
           <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
-            {theme?.styles?.imageOverrides?.evaluacion ? (
+            {isImageUrl(theme?.styles?.imageOverrides?.evaluacion) ? (
               <img src={theme.styles.imageOverrides.evaluacion} alt="" className="w-full h-full object-cover" />
             ) : (
-              '📋'
+              theme?.styles?.imageOverrides?.evaluacion || '📋'
             )}
           </span>
           Evaluación

@@ -2,6 +2,7 @@ import React from 'react';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import { isImageUrl } from '../utils/isImageUrl';
 
 const Anuncios = ({ anuncios = [], fecha, course }) => {
   const { theme } = useActiveTheme() || {};
@@ -67,11 +68,11 @@ const Anuncios = ({ anuncios = [], fecha, course }) => {
             <div className="w-28 sm:w-40 shrink-0 bg-white/10 overflow-hidden">
               {note.thumbnail ? (
                 <img src={note.thumbnail} alt="thumbnail" className="w-full h-full object-cover" />
-              ) : isDefaultType && theme?.styles?.imageOverrides?.anuncios ? (
+              ) : isDefaultType && isImageUrl(theme?.styles?.imageOverrides?.anuncios) ? (
                 <img src={theme.styles.imageOverrides.anuncios} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl drop-shadow">{icon}</span>
+                  <span className="text-4xl drop-shadow">{(isDefaultType && theme?.styles?.imageOverrides?.anuncios) || icon}</span>
                 </div>
               )}
             </div>

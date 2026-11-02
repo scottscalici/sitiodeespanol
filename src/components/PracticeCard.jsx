@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import { isImageUrl } from '../utils/isImageUrl';
 
 // A small graded practice (Gustar, prepositional pronouns, etc.) — distinct
 // from the ungated, always-visible Practice Hub tile: this one is assigned
@@ -26,10 +27,10 @@ export default function PracticeCard({ card }) {
 
       <div className="flex items-center gap-4">
         <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-          {theme?.styles?.imageOverrides?.practicaCard ? (
+          {isImageUrl(theme?.styles?.imageOverrides?.practicaCard) ? (
             <img src={theme.styles.imageOverrides.practicaCard} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-3xl drop-shadow">✏️</span>
+            <span className="text-3xl drop-shadow">{theme?.styles?.imageOverrides?.practicaCard || '✏️'}</span>
           )}
         </div>
 

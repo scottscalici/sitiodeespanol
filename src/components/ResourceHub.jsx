@@ -3,6 +3,7 @@ import { getCachedDoc } from '../utils/firestoreCache';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import { isImageUrl } from '../utils/isImageUrl';
 
 export default function ResourceHub({ course = 's2' }) {
   const { theme } = useActiveTheme() || {};
@@ -55,10 +56,10 @@ export default function ResourceHub({ course = 's2' }) {
 
         <div className="relative flex items-center gap-4">
           <div className="w-11 h-11 shrink-0 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner overflow-hidden">
-            {theme?.styles?.imageOverrides?.recursos ? (
+            {isImageUrl(theme?.styles?.imageOverrides?.recursos) ? (
               <img src={theme.styles.imageOverrides.recursos} alt="" className="w-full h-full object-cover" />
             ) : (
-              '🧰'
+              theme?.styles?.imageOverrides?.recursos || '🧰'
             )}
           </div>
           <div>

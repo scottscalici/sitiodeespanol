@@ -12,6 +12,7 @@ import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weig
 import { getAssignedDominioTasks, isPastEffectiveDueDate } from '../utils/learningPathProgress';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { getCanonicalTextbookName } from '../utils/textbookAccess';
+import { isImageUrl } from '../utils/isImageUrl';
 
 // Components
 import Header from '../components/Header';
@@ -479,10 +480,10 @@ const Dashboard = () => {
                   <div className="flex items-center gap-4">
                     {/* Flame Badge */}
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {themeImage('calentamiento') ? (
+                      {isImageUrl(themeImage('calentamiento')) ? (
                         <img src={themeImage('calentamiento')} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-3xl drop-shadow">🔥</span>
+                        <span className="text-3xl drop-shadow">{themeImage('calentamiento') || '🔥'}</span>
                       )}
                     </div>
 
@@ -569,10 +570,10 @@ const Dashboard = () => {
 
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {conv.img || themeImage('conversacion') ? (
+                      {conv.img || isImageUrl(themeImage('conversacion')) ? (
                         <img src={conv.img || themeImage('conversacion')} alt={conv.title} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-3xl drop-shadow">🗣️</span>
+                        <span className="text-3xl drop-shadow">{themeImage('conversacion') || '🗣️'}</span>
                       )}
                     </div>
 
@@ -608,8 +609,10 @@ const Dashboard = () => {
                   <div className="flex items-center gap-4">
                     {/* TV Outline Badge */}
                     <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                      {vid.img || themeImage('video') ? (
+                      {vid.img || isImageUrl(themeImage('video')) ? (
                         <img src={vid.img || themeImage('video')} alt={vid.title} className="w-full h-full object-cover" />
+                      ) : themeImage('video') ? (
+                        <span className="text-3xl drop-shadow">{themeImage('video')}</span>
                       ) : (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-white drop-shadow">
                           <rect x="3" y="7" width="18" height="13" rx="2" />
@@ -662,9 +665,11 @@ const Dashboard = () => {
                   <div className="flex items-center gap-4">
                     {/* Album Art */}
                     <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden shadow-lg bg-purple-950">
-                      {(dailySong.imagen || themeImage('musica')) && (
+                      {dailySong.imagen || isImageUrl(themeImage('musica')) ? (
                         <img src={dailySong.imagen || themeImage('musica')} alt={dailySong.titulo} className="w-full h-full object-cover" />
-                      )}
+                      ) : themeImage('musica') ? (
+                        <div className="w-full h-full flex items-center justify-center text-4xl drop-shadow">{themeImage('musica')}</div>
+                      ) : null}
                     </div>
   
                     {/* Track Info */}
@@ -710,10 +715,10 @@ const Dashboard = () => {
                         <div className="absolute inset-0 rotate-6 rounded-xl bg-white/10"></div>
                         <div className="absolute inset-0 -rotate-3 rounded-xl bg-white/15"></div>
                         <div className="relative inset-0 rounded-xl bg-white/25 backdrop-blur-sm flex items-center justify-center h-full shadow-inner overflow-hidden">
-                          {themeImage('vocabulario') ? (
+                          {isImageUrl(themeImage('vocabulario')) ? (
                             <img src={themeImage('vocabulario')} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-2xl drop-shadow">🧠</span>
+                            <span className="text-2xl drop-shadow">{themeImage('vocabulario') || '🧠'}</span>
                           )}
                         </div>
                       </div>
@@ -844,10 +849,10 @@ const Dashboard = () => {
 
                 <div className="relative flex items-center gap-4 mb-4">
                   <div className="w-16 h-16 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center shadow-inner overflow-hidden">
-                    {themeImage('tareas') ? (
+                    {isImageUrl(themeImage('tareas')) ? (
                       <img src={themeImage('tareas')} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-3xl drop-shadow">📝</span>
+                      <span className="text-3xl drop-shadow">{themeImage('tareas') || '📝'}</span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">

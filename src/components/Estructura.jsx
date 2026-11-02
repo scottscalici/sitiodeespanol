@@ -5,6 +5,7 @@ import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 import { renderFormattedText } from '../utils/formattedText';
+import { isImageUrl } from '../utils/isImageUrl';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
@@ -65,10 +66,10 @@ const Estructura = ({ estructura = [], liveDia }) => {
       <div className="flex justify-between items-center gap-3">
         <h3 className="font-black text-2xl text-white flex items-center gap-3" style={{ color: cardTheme.headingColor }}>
           <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
-            {theme?.styles?.imageOverrides?.estructura ? (
+            {isImageUrl(theme?.styles?.imageOverrides?.estructura) ? (
               <img src={theme.styles.imageOverrides.estructura} alt="" className="w-full h-full object-cover" />
             ) : (
-              '📚'
+              theme?.styles?.imageOverrides?.estructura || '📚'
             )}
           </span>
           Estructura y Gramática
