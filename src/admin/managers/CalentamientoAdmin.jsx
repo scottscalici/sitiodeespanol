@@ -53,7 +53,16 @@ export default function CalentamientoAdmin() {
           getCachedBucketedCollection('verbs'),
         ]);
         setVerbGroups(groups);
-        setSavedPractices([...cals].sort((a, b) => a.dia - b.dia));
+        // Bank items (dia: null) sort first — `a.dia - b.dia` alone goes
+        // unstable (NaN) the moment either side is null/undefined.
+        setSavedPractices(
+          [...cals].sort((a, b) => {
+            if (a.dia == null && b.dia == null) return 0;
+            if (a.dia == null) return -1;
+            if (b.dia == null) return 1;
+            return a.dia - b.dia;
+          })
+        );
 
         const verbsMap = {};
         verbsArray.forEach((v) => {
@@ -76,7 +85,9 @@ export default function CalentamientoAdmin() {
     if (p) {
       setCalId(p.id);
       setTitle(p.title || '');
-      setDia(p.dia || 1);
+      // p.dia || 1 would silently turn a bank item (dia: null) into "día 1"
+      // the moment you reopen it — ?? keeps it genuinely blank instead.
+      setDia(p.dia ?? '');
       setCourse(p.course || 's2');
       setConfigBlocks(p.configBlocks || []);
       setPreviewQuestions(p.bakedQuestions || []);
@@ -333,13 +344,20 @@ export default function CalentamientoAdmin() {
       // We don't need to save the massive 'allowedVerbs' array inside the final payload
       const cleanQuestions = previewQuestions.map(({ allowedVerbs, ...rest }) => rest);
 
+      // A blank "Día" saves this as a bank item — dia: null (not 0, which
+      // would collide with a real día) — getAssignedWarmups already treats
+      // dia == null as "not due yet" and quietly skips it, so a bank item
+      // never shows to students or counts toward grading until a teacher
+      // comes back, loads it, fills in a real día, and re-saves.
+      const diaValue = dia === '' || dia === null || dia === undefined ? null : Number(dia);
+
       const docRef = doc(db, 'calentamientos', calId);
       await setDoc(
         docRef,
         {
           id: calId,
           title,
-          dia: Number(dia),
+          dia: diaValue,
           course,
           configBlocks,
           includeVosotros,
@@ -385,11 +403,24 @@ export default function CalentamientoAdmin() {
             className="flex-1 p-2 rounded-xl bg-slate-800 text-sky-400 font-bold border border-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
           >
             <option value="">-- Seleccionar Práctica Anterior --</option>
-            {savedPractices.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.course?.toUpperCase()} Día {p.dia}: {p.title}
-              </option>
-            ))}
+            {savedPractices.some((p) => p.dia == null) && (
+              <optgroup label="📦 Banco (sin día asignado)">
+                {savedPractices.filter((p) => p.dia == null).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.course?.toUpperCase()}: {p.title}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {savedPractices.some((p) => p.dia != null) && (
+              <optgroup label="Asignados">
+                {savedPractices.filter((p) => p.dia != null).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.course?.toUpperCase()} Día {p.dia}: {p.title}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <button
             type="button"
@@ -459,9 +490,13 @@ export default function CalentamientoAdmin() {
                 type="number"
                 value={dia}
                 onChange={(e) => setDia(e.target.value)}
+                placeholder="Banco"
                 className="w-1/2 p-2.5 border rounded-xl font-bold text-center"
               />
             </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Deja "Día" en blanco para guardarlo en el 📦 Banco — queda listo pero no se le asigna a ningún estudiante todavía.
+            </p>
           </div>
         </div>
 
