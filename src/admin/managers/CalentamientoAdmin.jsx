@@ -38,6 +38,8 @@ export default function CalentamientoAdmin() {
 
   const [saving, setSaving] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(true);
+  const [exportCopied, setExportCopied] = useState(false);
+  const [exportAllJson, setExportAllJson] = useState('');
 
   const availableTenses = VERB_TENSES;
 
@@ -391,6 +393,45 @@ export default function CalentamientoAdmin() {
   // Calculate live block verb count
   const totalVerbsCount = configBlocks.reduce((sum, block) => sum + (Number(block.count) || 0), 0);
 
+  // The form's current state exactly as it would be saved — lets a teacher
+  // (or anything she hands this to, e.g. a chat) see precisely what a real
+  // calentamiento doc looks like without needing direct Firestore access.
+  const exportJson = JSON.stringify(
+    {
+      id: calId,
+      title,
+      dia: dia === '' || dia === null || dia === undefined ? null : Number(dia),
+      course,
+      configBlocks,
+      includeVosotros,
+      excused,
+      bakedQuestions: previewQuestions.map(({ allowedVerbs, ...rest }) => rest),
+    },
+    null,
+    2
+  );
+
+  const handleCopyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exportJson);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch {
+      setExportCopied(false);
+    }
+  };
+
+  const handleExportAll = async () => {
+    const json = JSON.stringify(savedPractices, null, 2);
+    setExportAllJson(json);
+    try {
+      await navigator.clipboard.writeText(json);
+    } catch {
+      // Clipboard access can be blocked — the textarea below still holds
+      // the JSON for a manual select/copy.
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6 font-sans pb-20">
       
@@ -434,6 +475,53 @@ export default function CalentamientoAdmin() {
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
           Para duplicar una práctica para otro día, cárgala aquí y luego cambia el "Día" y el "ID Documento" abajo antes de guardar. Para eliminar una duplicada, cárgala y haz clic en 🗑️.
         </p>
+      </div>
+
+      {/* EXPORT JSON — mirrors the Temas export box: lets a teacher copy a
+          real saved doc's exact shape out, e.g. to hand to Claude as a
+          format reference before building a bulk importer. */}
+      <div className="bg-emerald-50 p-4 rounded-2xl mb-6 border border-emerald-200 space-y-3">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <h3 className="font-black text-sm text-emerald-800">Exportar JSON</h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCopyExport}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+            >
+              {exportCopied ? '¡Copiado!' : '📋 Copiar Este Calentamiento'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportAll}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+            >
+              📤 Exportar Todos ({savedPractices.length})
+            </button>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] text-emerald-700/70 mb-1">El calentamiento cargado/en edición arriba, tal como se guardaría.</p>
+          <textarea
+            readOnly
+            value={exportJson}
+            rows={4}
+            onFocus={(e) => e.target.select()}
+            className="w-full p-2 border border-emerald-200 rounded-lg font-mono text-[10px] bg-white"
+          />
+        </div>
+        {exportAllJson && (
+          <div>
+            <p className="text-[10px] text-emerald-700/70 mb-1">Todos los calentamientos guardados — si el botón de copiar no funcionó, selecciona el texto manualmente.</p>
+            <textarea
+              readOnly
+              value={exportAllJson}
+              rows={6}
+              onFocus={(e) => e.target.select()}
+              className="w-full p-2 border border-emerald-200 rounded-lg font-mono text-[10px] bg-white"
+            />
+          </div>
+        )}
       </div>
 
       <div className="mb-6 border-b border-slate-200 pb-4">

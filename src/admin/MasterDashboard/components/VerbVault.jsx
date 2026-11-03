@@ -69,6 +69,38 @@ const VerbVault = () => {
     fetchData();
   }, []);
 
+  // --- EXPORT JSON (verbGroups in full, verbs as a lightweight index) ---
+  // A verb's full record (up to 19 tenses x 6 subjects each) is too large to
+  // usefully paste into a chat — this index (id/palabra, tags, and which
+  // tenses actually have data) is what's needed to check "does this verb
+  // already exist / does it already have imperfecto data" without dumping
+  // the whole conjugation table for every verb in the library.
+  const [groupsExportCopied, setGroupsExportCopied] = useState(false);
+  const [verbsIndexCopied, setVerbsIndexCopied] = useState(false);
+
+  const groupsExportJson = useMemo(() => JSON.stringify(groups, null, 2), [groups]);
+  const verbsIndexJson = useMemo(
+    () =>
+      JSON.stringify(
+        fullLibrary
+          .map((v) => ({ id: v.id, palabra: v.palabra, tags: v.tags || [], tenses: Object.keys(v.tenses || {}) }))
+          .sort((a, b) => a.palabra.localeCompare(b.palabra)),
+        null,
+        2
+      ),
+    [fullLibrary]
+  );
+
+  const copyToClipboard = async (text, setCopied) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   // --- HELPER: Sorted & Categorized Groups ---
   const sortedGroups = [...groups].sort((a, b) => {
     const nameA = a.name || "";
@@ -297,6 +329,37 @@ const VerbVault = () => {
           <button onClick={() => setActiveTab('bake')} style={activeTab === 'bake' ? s.tabActive : s.tab}>Baking Station</button>
         </div>
       </header>
+
+      {/* --- EXPORT JSON --- */}
+      <div className="bg-emerald-50 p-4 rounded-2xl mb-4 border border-emerald-200 space-y-3">
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <h3 className="font-black text-sm text-emerald-800">Exportar JSON</h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => copyToClipboard(groupsExportJson, setGroupsExportCopied)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+            >
+              {groupsExportCopied ? '¡Copiado!' : `📤 Exportar Grupos (${groups.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(verbsIndexJson, setVerbsIndexCopied)}
+              className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+            >
+              {verbsIndexCopied ? '¡Copiado!' : `📤 Exportar Índice de Verbos (${fullLibrary.length})`}
+            </button>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] text-emerald-700/70 mb-1">Grupos de verbos (verbGroups) — nombre, verbos, tiempos etiquetados.</p>
+          <textarea readOnly value={groupsExportJson} rows={4} onFocus={(e) => e.target.select()} className="w-full p-2 border border-emerald-200 rounded-lg font-mono text-[10px] bg-white" />
+        </div>
+        <div>
+          <p className="text-[10px] text-emerald-700/70 mb-1">Índice de verbos — id, etiquetas, y qué tiempos ya tienen datos (sin las conjugaciones completas, para que quepa al pegarlo).</p>
+          <textarea readOnly value={verbsIndexJson} rows={4} onFocus={(e) => e.target.select()} className="w-full p-2 border border-emerald-200 rounded-lg font-mono text-[10px] bg-white" />
+        </div>
+      </div>
 
       {/* --- CURATE TAB --- */}
       {activeTab === 'curate' && (
