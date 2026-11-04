@@ -24,6 +24,14 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   const titleEffectStyle = getTextEffectStyle(theme, 'headerTitle');
   const faqColor = theme?.styles?.cardOverrides?.faq;
   const faqBorderColor = faqColor ? darkenHex(faqColor, 0.35) : null;
+  // Built by hand (not a --tw-ring-color/--tw-shadow-color override) so the
+  // ring and the shadow-lg glow land in one single inline boxShadow — mixing
+  // an inline boxShadow with Tailwind's own ring/shadow CSS vars on the same
+  // element would just have the inline one clobber the composed property
+  // those utilities rely on, dropping whichever layer wasn't rebuilt here.
+  const faqGlowStyle = faqColor
+    ? { backgroundColor: faqColor, boxShadow: `0 10px 15px -3px ${faqColor}4d, 0 4px 6px -4px ${faqColor}4d, 0 0 0 2px ${faqBorderColor}` }
+    : undefined;
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
@@ -186,7 +194,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           <Link
             to="/preguntas-frecuentes"
             className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/60 hover:scale-105 active:scale-95 transition-all"
-            style={faqColor ? { backgroundColor: faqColor, '--tw-ring-color': faqBorderColor } : undefined}
+            style={faqGlowStyle}
           >
             Preguntas Frecuentes
             <span className="bg-slate-900/15 px-1.5 py-0.5 rounded text-[9px]">FAQ</span>
