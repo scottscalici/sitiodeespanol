@@ -23,7 +23,8 @@ const MusicaEditor = () => {
     youtube_url: '',
     spotify_url: '',
     letras: '',
-    questions: [] // Shared question-type engine — see src/shared/questionTypes
+    questions: [], // Shared question-type engine — see src/shared/questionTypes
+    notas: '' // Teacher-only notes (origin, cultural references, etc.) — never shown to students
   });
 
   useEffect(() => {
@@ -42,7 +43,8 @@ const MusicaEditor = () => {
             youtube_url: data.youtube_url || '',
             spotify_url: data.spotify_url || '',
             letras: data.letras || '',
-            questions: data.questions || []
+            questions: data.questions || [],
+            notas: data.notas || ''
           });
         }
       } catch (error) {
@@ -268,6 +270,21 @@ const MusicaEditor = () => {
                   🧩 Editar Preguntas
                 </button>
               </div>
+            </div>
+
+            {/* Teacher-only notes — never shown to students, just a personal reference */}
+            <div className="bg-violet-50 p-5 rounded-2xl border border-violet-200 space-y-2">
+              <h2 className="text-xs font-black text-violet-600 uppercase tracking-widest">Notas del Profesor</h2>
+              <p className="text-[10px] text-violet-700/60">
+                Solo para ti — nunca se muestra a los estudiantes. Origen del artista, referencias culturales, cosas que notar en la canción, etc.
+              </p>
+              <textarea
+                value={song.notas}
+                onChange={(e) => handleInputChange('notas', e.target.value)}
+                rows="6"
+                className="w-full p-3 rounded-lg border border-violet-300 font-sans text-xs leading-relaxed text-slate-700 outline-none focus:ring-2 focus:ring-violet-400 resize-y"
+                placeholder="Ej: El artista es de Puebla, México. Nota el uso de 'órale' como muletilla regional. Hace referencia a..."
+              />
             </div>
 
           </div>
