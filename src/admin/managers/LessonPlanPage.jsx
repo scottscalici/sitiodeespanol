@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -31,6 +31,17 @@ export default function LessonPlanPage() {
   const [course, setCourse] = useState('s2');
   const [selectedDay, setSelectedDay] = useState(1);
   const planData = useLessonPlanData(course, selectedDay);
+
+  // Snaps the day picker to today's actual día once the calendar loads,
+  // same as the Daily Plan Hub — but only the first time, so it doesn't
+  // fight a day the teacher has since navigated to manually.
+  const hasInitializedDay = useRef(false);
+  useEffect(() => {
+    if (!hasInitializedDay.current && planData.todayDia) {
+      setSelectedDay(planData.todayDia);
+      hasInitializedDay.current = true;
+    }
+  }, [planData.todayDia]);
 
   const [durations, setDurations] = useState(DEFAULT_DURATIONS);
   const [notes, setNotes] = useState(emptyNotes());

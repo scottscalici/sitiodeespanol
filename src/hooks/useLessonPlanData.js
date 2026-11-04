@@ -150,13 +150,33 @@ export const computeLessonPlanDay = (raw, course, selectedDay) => {
   };
 };
 
+// Resolves "today" to a día number from the calendar's raw per-día fecha
+// lists (rawDatesMap: dayNum -> [fecha, ...], one entry per ciclo) — same
+// "most recent calendar entry on/before today" rule useGymData uses for the
+// student Dashboard's liveDia. Not cycle-filtered: a día can carry two
+// dates, one per ciclo, and either landing on/before today should count for
+// an admin view covering both. Returns null (never 1) while nothing has
+// happened yet, so a caller can tell "no calendar data" apart from "today
+// really is day 1" and leave its own default alone in the former case.
+const resolveTodayDia = (rawDatesMap) => {
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  let best = null;
+  Object.entries(rawDatesMap).forEach(([dayNum, fechas]) => {
+    fechas.forEach((fecha) => {
+      if (fecha && fecha <= todayStr && (!best || fecha > best.fecha)) best = { dia: Number(dayNum), fecha };
+    });
+  });
+  return best ? best.dia : null;
+};
+
 // Everything a Lesson Plan view (daily working page or the formal printout)
 // needs for one course+day — same public shape this hook always had, now
-// just a thin wrapper over useRawLessonPlanData + computeLessonPlanDay.
+// just a thin wrapper over useRawLessonPlanData + computeLessonPlanDay, plus
+// `todayDia` so a page can default its day picker to today instead of Día 1.
 export const useLessonPlanData = (course, selectedDay) => {
   const { loading, raw } = useRawLessonPlanData();
   if (loading) return { loading: true };
-  return computeLessonPlanDay(raw, course, selectedDay);
+  return { ...computeLessonPlanDay(raw, course, selectedDay), todayDia: resolveTodayDia(raw.rawDatesMap) };
 };
 
 // Every day from startDay to endDay (inclusive) for one course, computed
