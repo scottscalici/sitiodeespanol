@@ -55,6 +55,7 @@ import ActivityPage from './components/ActivityPage';
 // 🛠️ ADMIN MANAGERS & HUBS
 import MasterDashboard from './admin/MasterDashboard/MasterDashboard';
 import TeacherGradebook from './admin/MasterDashboard/TeacherGradebook';
+import MonthlyLeadersReport from './admin/managers/MonthlyLeadersReport';
 import DailyPlanHub from './admin/MasterDashboard/components/DailyPlanHub';
 import FaqEditorManager from './admin/managers/FaqEditorManager';
 import LessonPlanPage from './admin/managers/LessonPlanPage';
@@ -520,6 +521,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <TeacherGradebook />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-monthly-leaders"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <MonthlyLeadersReport />
                 </AdminRoute>
               }
             />

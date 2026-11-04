@@ -195,6 +195,7 @@ const DailyPlanHub = () => {
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               <Link to="/admin-secret-portal-grades" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📊 Gradebook</Link>
+              <Link to="/admin-monthly-leaders" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📈 Líderes por Clase</Link>
               <Link to="/admin-secret-portal-master" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🗄️ Master Dashboard</Link>
               <Link to="/admin-lesson-plan" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📋 Plan de Lección</Link>
               <Link to="/admin-question-pool" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🧠 Reserva de Preguntas</Link>
