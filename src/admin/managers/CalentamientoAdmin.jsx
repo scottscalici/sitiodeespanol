@@ -203,6 +203,24 @@ export default function CalentamientoAdmin() {
   // below — kept under this name so that call site didn't need to change.
   const formatSubjectAndTranslation = formatSubjectAndTranslationShared;
 
+  // A question built from configBlocks carries its own `allowedVerbs`, which
+  // is what the swap-verb dropdown below normally lists. A loaded/imported
+  // question (no configBlocks involved — e.g. anything from the bulk
+  // uploader, or hand-authored JSON) has none, so that dropdown used to
+  // render with nothing to pick. This falls back to every verb across every
+  // saved verbGroup tagged for the question's own tense — the same
+  // group-based way a teacher already thinks about "what else fits here."
+  // A verb picked this way still needs real tenses[q.tense] data in
+  // Firestore to produce a real answer — handlePreviewEdit already falls
+  // back to '???' when it doesn't, same as it always has for any verb swap.
+  const verbOptionsForTense = (tense) => {
+    const ids = new Set();
+    verbGroups.forEach((g) => {
+      if (g.tenses?.includes(tense)) (g.verbIds || []).forEach((v) => ids.add(v));
+    });
+    return [...ids].sort();
+  };
+
   const handlePreview = () => {
     const generated = generateVerbQuestions(configBlocks, masterVerbsMap, { includeVosotros });
     setPreviewQuestions(generated);
@@ -949,7 +967,7 @@ export default function CalentamientoAdmin() {
                           onChange={(e) => handlePreviewEdit(i, 'palabra', e.target.value)}
                           className="w-1/2 p-1 bg-slate-800 text-white font-black uppercase rounded outline-none border border-slate-600"
                         >
-                          {q.allowedVerbs?.map(v => <option key={v} value={v}>{v}</option>)}
+                          {(q.allowedVerbs?.length ? q.allowedVerbs : verbOptionsForTense(q.tense)).map(v => <option key={v} value={v}>{v}</option>)}
                         </select>
                       </div>
                       <button 
