@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -471,6 +472,12 @@ export default function CalentamientoAdmin() {
           >
             🗑️
           </button>
+          <Link
+            to="/admin-secret-portal-calentamiento-upload"
+            className="shrink-0 text-xs font-bold text-sky-400 hover:text-sky-300 border border-slate-700 px-3 py-2.5 rounded-xl whitespace-nowrap"
+          >
+            📤 Importar en Lote
+          </Link>
         </div>
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
           Para duplicar una práctica para otro día, cárgala aquí y luego cambia el "Día" y el "ID Documento" abajo antes de guardar. Para eliminar una duplicada, cárgala y haz clic en 🗑️.

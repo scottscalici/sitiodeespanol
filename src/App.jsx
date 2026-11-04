@@ -74,6 +74,7 @@ import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
+import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
@@ -615,6 +616,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <CalentamientoAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-calentamiento-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <CalentamientoUploader />
                 </AdminRoute>
               }
             />
