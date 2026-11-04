@@ -55,6 +55,17 @@ const DailyPlanHub = () => {
                 mapping[dayNum].push(`${formattedDate}${item.ciclo ? ` (${item.ciclo})` : ''}`);
               }
             });
+
+            // Same "most recent past calendar entry" resolution useGymData
+            // uses for the student Dashboard's liveDia — not cycle-filtered
+            // here since a día can carry two dates (one per ciclo) and
+            // either one landing on/before today should count.
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            const pastEntries = configData.map.filter((item) => item.fecha && item.fecha <= todayStr && item.dia != null);
+            if (pastEntries.length > 0) {
+              const todayDia = parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia, 10);
+              if (!Number.isNaN(todayDia)) setSelectedDay(todayDia);
+            }
           }
           setCalendarMap(mapping);
         }
