@@ -24,7 +24,7 @@ export const gradeState = (question, state) => [checkAnswerLeniently(state?.valu
 // contract.
 export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
 
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const [value, setValue] = useState(() => initialState?.value || '');
   const [checked, setChecked] = useState(() => initialState?.checked || false);
   const [isCorrect, setIsCorrect] = useState(() => initialState?.isCorrect || false);
@@ -59,7 +59,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div className="space-y-4">
       <PromptImage src={question.promptImage} />
-      <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>}
       <input
         type="text"
         value={value}
@@ -97,7 +97,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
 // Plain, always-editable text input — no Comprobar step, since nothing is
 // graded until the whole card is submitted. Colored live from then on.
-const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange, hidePrompt }) => {
   const [value, setValue] = useState(() => initialState?.value || '');
 
   useEffect(() => {
@@ -111,7 +111,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   return (
     <div className="space-y-4">
       <PromptImage src={question.promptImage} />
-      <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>}
       <input
         type="text"
         value={value}

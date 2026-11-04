@@ -462,6 +462,7 @@ export default function CuriosidadQuizEngine() {
             <TypeRenderer
               key={currentQuestion}
               question={question}
+              hidePrompt
               onItemFirstAttempt={handleItemFirstAttempt}
               onAllCorrect={handleAllCorrect}
             />

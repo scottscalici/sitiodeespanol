@@ -88,7 +88,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // One click = one attempt. A miss is marked wrong immediately and reveals
 // the correct spot on the board (matches write/listen's reveal-on-miss),
 // then locks — no retry, consistent with every other single-shot type here.
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const [click, setClick] = useState(() => (initialState?.x != null ? { x: initialState.x, y: initialState.y } : null));
   const [done, setDone] = useState(() => initialState?.done || false);
   const attemptedRef = React.useRef(false);
@@ -120,7 +120,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>}
       <div className="relative inline-block w-full">
         <img
           src={question.image}
@@ -138,7 +138,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
 // Freely re-clickable until the whole card is submitted, like every other
 // deferred renderer — no lock, colored live once `submitted` is true.
-const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange, hidePrompt }) => {
   const [click, setClick] = useState(() => (initialState?.x != null ? { x: initialState.x, y: initialState.y } : null));
 
   React.useEffect(() => {
@@ -152,7 +152,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>}
       <div className="relative inline-block w-full">
         <img src={question.image} alt="" onClick={handleClick} className="w-full rounded-lg border border-slate-200 cursor-crosshair" />
         {click && (

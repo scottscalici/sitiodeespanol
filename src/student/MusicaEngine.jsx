@@ -307,6 +307,7 @@ const MusicaEngine = () => {
                     {q.prompt && <p className="font-bold text-sm text-slate-200">{idx + 1}. {q.prompt}</p>}
                     <TypeRenderer
                       question={q}
+                      hidePrompt
                       onItemFirstAttempt={(itemIdx, isCorrect) => {
                         const key = `${idx}-${itemIdx}`;
                         if (!(key in firstAttemptRef.current)) firstAttemptRef.current[key] = isCorrect;
