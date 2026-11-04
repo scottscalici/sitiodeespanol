@@ -189,5 +189,5 @@ export const useLessonPlanRange = (course, startDay, endDay) => {
   const [lo, hi] = startDay <= endDay ? [startDay, endDay] : [endDay, startDay];
   const days = [];
   for (let d = lo; d <= hi; d++) days.push({ dia: d, ...computeLessonPlanDay(raw, course, d) });
-  return { loading: false, days };
+  return { loading: false, days, todayDia: resolveTodayDia(raw.rawDatesMap) };
 };

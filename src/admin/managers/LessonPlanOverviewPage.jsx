@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -18,7 +18,21 @@ export default function LessonPlanOverviewPage() {
   const [course, setCourse] = useState('s2');
   const [startDay, setStartDay] = useState(1);
   const [endDay, setEndDay] = useState(5);
-  const { loading, days } = useLessonPlanRange(course, startDay, endDay);
+  const { loading, days, todayDia } = useLessonPlanRange(course, startDay, endDay);
+
+  // Snaps the range to start on today's actual día once the calendar loads
+  // — same fix as the Daily Plan Hub and Plan de Lección — keeping the same
+  // 5-day span width, and only the first time, so it doesn't fight a range
+  // the teacher has since set manually.
+  const hasInitializedRange = useRef(false);
+  useEffect(() => {
+    if (!hasInitializedRange.current && todayDia) {
+      setEndDay(todayDia + (endDay - startDay));
+      setStartDay(todayDia);
+      hasInitializedRange.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayDia]);
 
   const [notes, setNotes] = useState({});
   const [notesSaving, setNotesSaving] = useState(false);
