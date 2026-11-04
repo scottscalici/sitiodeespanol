@@ -51,6 +51,7 @@ const CARD_KEYS = [
   { key: 'learningPath', label: 'Ruta de Aprendizaje' },
   { key: 'recreo', label: 'El Recreo' },
   { key: 'leaderboard', label: 'Tabla de Líderes' },
+  { key: 'faq', label: 'Preguntas Frecuentes (pill del encabezado)' },
 ];
 
 // Card keys whose Dashboard component actually checks for an image

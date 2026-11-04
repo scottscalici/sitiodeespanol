@@ -21,6 +21,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
   const headerGradientStyle = parseHeaderGradientStyle(headerGradientClass);
   const headingFont = theme?.styles?.fontHeading;
   const titleEffectStyle = getTextEffectStyle(theme, 'headerTitle');
+  const faqColor = theme?.styles?.cardOverrides?.faq;
   const totalPoints = userData?.total_points || 0;
   const weeklyPoints = userData?.weekly_points || 0;
   const monthlyPoints = userData?.monthly_points || 0;
@@ -183,6 +184,7 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           <Link
             to="/preguntas-frecuentes"
             className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/60 hover:scale-105 active:scale-95 transition-all"
+            style={faqColor ? { backgroundColor: faqColor } : undefined}
           >
             Preguntas Frecuentes
             <span className="bg-slate-900/15 px-1.5 py-0.5 rounded text-[9px]">FAQ</span>
