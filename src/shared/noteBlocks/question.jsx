@@ -16,7 +16,11 @@ export const Renderer = ({ block }) => {
   return (
     <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
       <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1.5">🧠 Practica rápida</p>
-      <TypeRenderer question={q} onItemFirstAttempt={() => {}} onAllCorrect={() => {}} />
+      {/* A note can embed several of these on one page (write/listen are the
+          only types that autoFocus their input) — each would try to steal
+          focus on mount, and the browser auto-scrolls to whichever one wins,
+          landing the page well past its own top instead of at it. */}
+      <TypeRenderer question={q} onItemFirstAttempt={() => {}} onAllCorrect={() => {}} noAutoFocus />
     </div>
   );
 };

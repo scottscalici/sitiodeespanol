@@ -20,7 +20,7 @@ export const gradeState = (question, state) => [checkAnswerLeniently(state?.valu
 // contract.
 export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRenderer {...props} /> : <RetryRenderer {...props} />);
 
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, noAutoFocus }) => {
   const [value, setValue] = useState(() => initialState?.value || '');
   const [checked, setChecked] = useState(() => initialState?.checked || false);
   const [isCorrect, setIsCorrect] = useState(() => initialState?.isCorrect || false);
@@ -72,7 +72,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
         placeholder="Escribe lo que escuchaste..."
-        autoFocus
+        autoFocus={!noAutoFocus}
         className={`w-full border rounded-lg p-3 text-base ${
           checked ? (isCorrect ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-rose-400 bg-rose-50 text-rose-800') : 'border-slate-300 bg-white text-slate-900'
         }`}
@@ -102,7 +102,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
 // Plain, always-editable text input — no Comprobar step, since nothing is
 // graded until the whole card is submitted. Colored live from then on.
-const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) => {
+const DeferredRenderer = ({ question, submitted, initialState, onStateChange, noAutoFocus }) => {
   const [value, setValue] = useState(() => initialState?.value || '');
 
   useEffect(() => {
@@ -131,7 +131,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Escribe lo que escuchaste..."
-        autoFocus
+        autoFocus={!noAutoFocus}
         className={`w-full border rounded-lg p-3 text-base ${
           isCorrect === true
             ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
