@@ -387,7 +387,7 @@ const GrammarNotesManager = () => {
         <GrammarSequenceModal
           course={sequenceModalCourse}
           items={sequences[sequenceModalCourse]}
-          allNotes={items}
+          categories={categoryNames}
           onClose={() => setSequenceModalCourse(null)}
           onSave={(rows) => handleSaveSequence(sequenceModalCourse, rows)}
         />

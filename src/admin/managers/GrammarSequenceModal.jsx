@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 
 // Same ordered, hand-curated pick-and-reorder pattern as
 // GrammarLandingSubtopicsModal, just scoped to a whole course's default
-// teaching order (config/grammar_sequences.{course}) instead of one landing
-// note's own subtopics. Also lets an id reference a note that doesn't exist
-// yet — GrammarIndexPage shows it as "próximamente", same as a subtopic.
-const GrammarSequenceModal = ({ course, items, allNotes, onClose, onSave }) => {
+// teaching order (config/grammar_sequences.{course}) — picking CATEGORIES,
+// not individual notes, so a sequence entry leads wherever that category's
+// tile already leads on the alphabetical index (its landing note, or the
+// plain fallback category page), the same shortcut a teacher already uses
+// to group a bunch of notes under one roof.
+const GrammarSequenceModal = ({ course, items, categories, onClose, onSave }) => {
   const [rows, setRows] = useState(() => items || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,9 +50,9 @@ const GrammarSequenceModal = ({ course, items, allNotes, onClose, onSave }) => {
 
         <div className="p-5 space-y-3">
           <p className="text-xs text-slate-500">
-            Este orden es lo que {course.toUpperCase()} ve por defecto en el índice en vez de la vista alfabética. Un ID que
-            todavía no existe se muestra como "próximamente". Deja vacía la secuencia de un curso para que siga usando el
-            índice alfabético como antes.
+            Este orden es lo que {course.toUpperCase()} ve por defecto en el índice en vez de la vista alfabética — cada fila
+            es una categoría completa, igual que una ficha del índice alfabético. Deja vacía la secuencia de un curso para
+            que siga usando el índice alfabético como antes.
           </p>
           {rows.map((r, idx) => (
             <div key={idx} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2">
@@ -65,11 +67,11 @@ const GrammarSequenceModal = ({ course, items, allNotes, onClose, onSave }) => {
               <span className="w-6 text-center text-xs font-black text-slate-400 shrink-0">{idx + 1}.</span>
               <input
                 type="text"
-                list="grammar-sequence-note-ids"
+                list="grammar-sequence-categories"
                 value={r.id || ''}
                 onChange={(e) => update(idx, { id: e.target.value })}
-                placeholder="ID de la nota (p. ej. imperfecto:usos)"
-                className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs font-mono"
+                placeholder="Categoría (p. ej. Pretérito)"
+                className="flex-1 border border-slate-300 rounded-md p-1.5 text-xs"
               />
               <input
                 type="text"
@@ -83,13 +85,13 @@ const GrammarSequenceModal = ({ course, items, allNotes, onClose, onSave }) => {
               </button>
             </div>
           ))}
-          <datalist id="grammar-sequence-note-ids">
-            {allNotes.map((n) => (
-              <option key={n.id} value={n.id}>{n.title || n.id}</option>
+          <datalist id="grammar-sequence-categories">
+            {categories.map((name) => (
+              <option key={name} value={name} />
             ))}
           </datalist>
           <button onClick={add} className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
-            + Agregar nota a la secuencia
+            + Agregar categoría a la secuencia
           </button>
         </div>
 

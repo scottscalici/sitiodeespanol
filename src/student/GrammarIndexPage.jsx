@@ -74,21 +74,6 @@ export default function GrammarIndexPage() {
     }
   }, [loading, mySequence]);
 
-  const pagesById = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages]);
-
-  const sequenceRows = useMemo(
-    () => mySequence.map((entry) => {
-      const page = pagesById.get(entry.id);
-      return {
-        id: entry.id,
-        title: page?.title || entry.label || entry.id,
-        category: page?.category || 'General',
-        exists: !!page,
-      };
-    }),
-    [mySequence, pagesById]
-  );
-
   const categories = useMemo(() => {
     const map = {};
     pages.forEach((p) => {
@@ -99,6 +84,25 @@ export default function GrammarIndexPage() {
     });
     return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
   }, [pages]);
+
+  const categoriesByName = useMemo(() => new Map(categories.map((c) => [c.name, c])), [categories]);
+
+  // The sequence is categories, not individual notes — a category's bar
+  // leads wherever its tile already leads on the alphabetical index (its
+  // landing note's Rolodex, or the plain fallback category page), so a
+  // category with zero notes yet is still a safe, clickable "coming soon"
+  // rather than a broken link.
+  const sequenceRows = useMemo(
+    () => mySequence.map((entry) => {
+      const cat = categoriesByName.get(entry.id);
+      return {
+        name: entry.id,
+        title: entry.label || entry.id,
+        href: cat?.landing ? `/gramatica/${encodeURIComponent(cat.landing.id)}` : `/gramatica/categoria/${encodeURIComponent(entry.id)}`,
+      };
+    }),
+    [mySequence, categoriesByName]
+  );
 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -181,25 +185,16 @@ export default function GrammarIndexPage() {
             <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">No se encontraron notas.</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {sequenceRows.map((row) =>
-                row.exists ? (
-                  <Link
-                    key={row.id}
-                    to={`/gramatica/${encodeURIComponent(row.id)}`}
-                    className="rounded-xl shadow-sm px-5 py-4 flex items-center hover:-translate-y-0.5 hover:shadow-md transition-all"
-                    style={{ backgroundColor: resolveCategoryColor(row.category, categoryColors) }}
-                  >
-                    <p className="flex-1 font-black text-white uppercase tracking-tight truncate">{row.title}</p>
-                  </Link>
-                ) : (
-                  <div key={row.id} className="rounded-xl px-5 py-4 flex items-center gap-3 bg-slate-100 border border-dashed border-slate-300">
-                    <p className="flex-1 font-bold text-slate-400 italic truncate">{row.title}</p>
-                    <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-200 px-2 py-1 rounded-full">
-                      Próximamente
-                    </span>
-                  </div>
-                )
-              )}
+              {sequenceRows.map((row) => (
+                <Link
+                  key={row.name}
+                  to={row.href}
+                  className="rounded-xl shadow-sm px-5 py-4 flex items-center hover:-translate-y-0.5 hover:shadow-md transition-all"
+                  style={{ backgroundColor: resolveCategoryColor(row.name, categoryColors) }}
+                >
+                  <p className="flex-1 font-black text-white uppercase tracking-tight truncate">{row.title}</p>
+                </Link>
+              ))}
             </div>
           )
         ) : categories.length === 0 ? (
