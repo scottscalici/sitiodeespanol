@@ -177,7 +177,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   };
 
   return (
-    <ClozeChrome img={question.img} completed={completedCount} total={blankCount}>
+    <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} light>
       {renderClozeText(question.text, selections, correct, wrong, handleSelect, optionsForBlank, { lockOnCorrect: false })}
     </ClozeChrome>
   );

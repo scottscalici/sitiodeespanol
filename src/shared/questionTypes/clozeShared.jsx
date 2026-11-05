@@ -124,17 +124,63 @@ export const renderClozeTextInputs = (text, values, correctArr, wrongIndicator, 
   return nodes;
 };
 
-// Shared visual chrome both cloze types use: an "N de M completados"
-// sub-progress line (once there's more than one blank), then the optional
-// image, then the passage itself.
-export const ClozeChrome = ({ img, children, completed, total }) => (
+// Shared visual chrome every cloze type uses: an optional prompt line, an
+// "N de M completados" sub-progress line (once there's more than one
+// blank), then the optional image, then the passage itself.
+//
+// `light` (default false, the original look) switches the passage/prompt
+// text from light-on-dark to dark-on-light. It's not a cosmetic toggle —
+// these colors were hardcoded for Curiosidad's dark quiz background, the
+// only place a cloze type was ever used until Practice Cards' bulk
+// importer made the other three cloze types reachable there too. Practice
+// Cards' own page has a light background, so the original text-slate-200
+// rendered as barely-visible light gray on near-white. A caller passes `light` iff
+// it's rendering on a light page — currently that's exactly the
+// `mode === 'deferred'` (Practice Cards) branch of every cloze type's own
+// Renderer, never the `retry` (Curiosidad) one.
+//
+// `prompt` is only ever rendered here in the `light` case: Curiosidad's
+// own engine already renders every question's prompt itself before
+// handing off to a type's Renderer (plain `{question.prompt}`, correctly
+// colored for its dark background) — rendering it again here would just
+// duplicate it. Practice Cards' engine never renders a question's prompt
+// at all (unlike write/multiple_choice/etc., which self-render their own),
+// so a cloze type showing it here is the only place it was ever going to
+// appear there.
+//
+// `verbBank` (text_cloze only — a plain reference list of infinitives, NOT
+// a clickable word bank like word_bank_cloze's) renders right under the
+// prompt, same position a paper worksheet's own word-bank box would sit in.
+export const ClozeChrome = ({ img, children, completed, total, prompt, verbBank, light = false }) => (
   <div>
+    {light && prompt && (
+      <p className="text-sm font-bold text-slate-700 mb-4 text-center">{prompt}</p>
+    )}
+    {verbBank?.length > 0 && (
+      <div className="mb-6 text-center">
+        <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${light ? 'text-slate-400' : 'text-slate-500'}`}>
+          Banco de verbos
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {verbBank.map((v, i) => (
+            <span
+              key={i}
+              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                light ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-slate-800 text-slate-300 border border-slate-700'
+              }`}
+            >
+              {v}
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
     {total > 1 && (
       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
         {completed} de {total} completados
       </p>
     )}
     {img && <img src={img} alt="" className="w-full max-h-64 object-contain bg-slate-950 rounded-lg mb-6" />}
-    <p className="text-base text-slate-200 leading-loose text-center">{children}</p>
+    <p className={`text-base leading-loose text-center ${light ? 'text-slate-800' : 'text-slate-200'}`}>{children}</p>
   </div>
 );

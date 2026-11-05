@@ -111,9 +111,18 @@ one-sentence `write` questions out of context, and not as a clickable word
 bank even if the paper worksheet printed one (typing is the default; a
 word bank on paper was just a hint for the student, not something students
 should be able to click through digitally). Mark each answer inline with
-double curly braces in `rawText`:
+double curly braces in `rawText`. If the worksheet's own word bank lists
+infinitives (the usual case for a verb-conjugation paragraph), include
+them as `verbBankText` — a plain, non-clickable reference list shown above
+the paragraph, newline-separated, one infinitive per line (not the
+conjugated answers):
 ```json
-{ "type": "text_cloze", "prompt": "Completa el párrafo con el pretérito o el imperfecto", "rawText": "Ayer yo {{fui}} al mercado y {{compré}} fruta." }
+{
+  "type": "text_cloze",
+  "prompt": "Completa el párrafo con el pretérito o el imperfecto",
+  "rawText": "Ayer yo {{fui}} al mercado y {{compré}} fruta.",
+  "verbBankText": "ir\ncomprar"
+}
 ```
 Add `"requireAccents": true` only if the worksheet is specifically testing
 accent placement.

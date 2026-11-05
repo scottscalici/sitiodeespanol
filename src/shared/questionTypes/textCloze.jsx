@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
 import { renderClozeTextInputs, ClozeChrome } from './clozeShared';
-import { parseAnswerTokens } from './text';
+import { parseAnswerTokens, parseLines } from './text';
 import { checkAnswerLeniently } from '../../utils/checkAnswer';
 
 // Like word_bank_cloze, but every blank is free-typed instead of picked from
@@ -13,26 +13,32 @@ import { checkAnswerLeniently } from '../../utils/checkAnswer';
 export const TYPE_KEY = 'text_cloze';
 export const TYPE_LABEL = 'Cloze de Texto Libre';
 
-export const emptyQuestion = () => ({ type: 'text_cloze', prompt: '', img: '', rawText: '', requireAccents: false });
+export const emptyQuestion = () => ({ type: 'text_cloze', prompt: '', img: '', rawText: '', verbBankText: '', requireAccents: false });
 export const getItemCount = (q) => q.answers.length;
 
 // Converts the raw, freely-typed {{answer}}-tagged passage into the final
 // blank-tokenized `text` + ordered `answers` the Renderer reads — same
 // save-time conversion word_bank_cloze does, minus the word-bank step.
+// `verbBankText` (optional, one infinitive per line) becomes `verbBank` —
+// a plain reference list shown above the passage, NOT a clickable bank of
+// answers like word_bank_cloze's: free typing means there's no "spend a
+// word once" mechanic to support, just a hint of which verbs to use.
 export const finalizeQuestion = (q) => {
-  const { rawText, ...rest } = q;
+  const { rawText, verbBankText, ...rest } = q;
   const { text, answers } = parseAnswerTokens(rawText);
-  return { ...rest, text, answers };
+  return { ...rest, text, answers, verbBank: parseLines(verbBankText) };
 };
 
 // Reopening an already-saved question only has the final blank-tokenized
-// shape — reconstructs the {{word}}-tagged passage for editing.
+// shape — reconstructs the {{word}}-tagged passage and verb bank text for
+// editing.
 export const reconstructQuestion = (q) => {
   if (q.rawText !== undefined) return q;
   const answers = q.answers || [];
   let i = 0;
   const rawText = (q.text || '').replace(/\{\{blank\}\}/g, () => `{{${answers[i++] ?? ''}}}`);
-  return { ...q, rawText };
+  const verbBankText = (q.verbBank || []).join('\n');
+  return { ...q, rawText, verbBankText };
 };
 
 // Pure, given a {values} snapshot — see dropdownCloze.jsx's gradeState for
@@ -104,7 +110,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
   return (
     <div>
-      <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
+      <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount} verbBank={question.verbBank}>
         {renderClozeTextInputs(question.text, values, correct, wrongAttempted, handleChange)}
       </ClozeChrome>
       {!allCorrect && (
@@ -143,7 +149,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   const completedCount = submitted ? correct.filter((c) => c === true).length : values.filter(Boolean).length;
 
   return (
-    <ClozeChrome img={question.img} completed={completedCount} total={blankCount}>
+    <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} verbBank={question.verbBank} light>
       {renderClozeTextInputs(question.text, values, correct, wrong, handleChange, { lockOnCorrect: false })}
     </ClozeChrome>
   );
@@ -188,6 +194,20 @@ export const Editor = ({ question: q, onChange }) => {
           {preview.answers.length} espacio{preview.answers.length === 1 ? '' : 's'} en blanco: {preview.answers.join(', ')}
         </p>
       )}
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          Banco de verbos (opcional, un infinitivo por línea — solo de referencia, el estudiante igual escribe la
+          respuesta conjugada)
+        </label>
+        <textarea
+          value={q.verbBankText || ''}
+          onChange={(e) => onChange({ verbBankText: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
+          placeholder={'hablar\ncomer\nvivir'}
+        />
+      </div>
 
       <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600 mt-3">
         <input

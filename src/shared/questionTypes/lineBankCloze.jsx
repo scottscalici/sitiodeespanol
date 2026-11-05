@@ -266,6 +266,15 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 
   return (
     <div>
+      {/* Each row below carries its own dark background regardless of the
+          page behind it, so — unlike ClozeChrome's shared passage text —
+          nothing here needed a light/dark contrast fix. The prompt itself
+          sits OUTSIDE those rows though, on Practice Cards' light page
+          background, which (like every other cloze type) never renders a
+          question's prompt itself — see clozeShared.jsx's ClozeChrome. */}
+      {question.prompt && (
+        <p className="text-sm font-bold text-slate-700 mb-4 text-center">{question.prompt}</p>
+      )}
       {blankCount > 1 && (
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
           {completedCount} de {blankCount} completados
