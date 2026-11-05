@@ -526,7 +526,7 @@ const Dashboard = () => {
               <ImageCards cards={activeImageCards} />
   
               {/* 🏗️ ESTRUCTURA — its own "Índice" button lives in the card's header */}
-              <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} />
+              <Estructura estructura={data?.estructura?.[course] || []} liveDia={liveDia} course={course} />
 
               {/* ✍️ ORACIONES DE PRÁCTICA/EJEMPLO — WIDGET STYLE */}
               {sentenceSetTitle != null && (

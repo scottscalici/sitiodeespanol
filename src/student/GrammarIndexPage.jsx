@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 import { useAuth } from '../context/AuthContext';
 import { resolveCategoryColor } from '../utils/grammarCategoryColors';
@@ -24,7 +24,13 @@ import { resolveCategoryColor } from '../utils/grammarCategoryColors';
 
 export default function GrammarIndexPage() {
   const { userData } = useAuth() || {};
-  const course = userData?.course;
+  const [searchParams] = useSearchParams();
+  // An admin's course-preview toggle (see Dashboard/Header) never changes
+  // their own stored profile field — it's local UI state — so Estructura's
+  // Índice link carries the currently-previewed course here as a query
+  // param (same pattern as the theme system's ?previewThemeId=). A real
+  // student never sets this, so they always fall back to their own profile.
+  const course = searchParams.get('course') || userData?.course;
 
   const [pages, setPages] = useState([]);
   const [categoryColors, setCategoryColors] = useState({});

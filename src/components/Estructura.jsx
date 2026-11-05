@@ -9,7 +9,7 @@ import { isImageUrl } from '../utils/isImageUrl';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
 
-const Estructura = ({ estructura = [], liveDia }) => {
+const Estructura = ({ estructura = [], liveDia, course }) => {
   const { theme } = useActiveTheme() || {};
   const cardTheme = resolveCardTheme(theme, 'estructura');
   const todaysLessons = estructura.filter((g) => Number(g.dia) === liveDia);
@@ -75,7 +75,7 @@ const Estructura = ({ estructura = [], liveDia }) => {
           Estructura y Gramática
         </h3>
         <Link
-          to="/gramatica"
+          to={`/gramatica${course ? `?course=${course}` : ''}`}
           className="shrink-0 text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
           title="Buscar cualquier tema de gramática"
         >
