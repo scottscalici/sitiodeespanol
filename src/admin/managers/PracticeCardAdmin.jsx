@@ -182,10 +182,10 @@ export default function PracticeCardAdmin() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 font-sans pb-20">
-      <div className="bg-slate-900 p-4 rounded-2xl mb-6 shadow-sm border border-slate-700 flex justify-between items-center">
-        <div className="flex items-center gap-3 w-full max-w-lg">
-          <span className="text-white font-bold text-sm tracking-wider uppercase">Cargar Práctica:</span>
-          <select onChange={(e) => loadCard(e.target.value)} className="flex-1 p-2 rounded-xl bg-slate-800 text-sky-400 font-bold border border-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <div className="bg-slate-900 p-4 rounded-2xl mb-6 shadow-sm border border-slate-700 flex flex-wrap justify-between items-center gap-3">
+        <div className="flex items-center gap-3 w-full max-w-lg min-w-0">
+          <span className="text-white font-bold text-sm tracking-wider uppercase shrink-0">Cargar Práctica:</span>
+          <select onChange={(e) => loadCard(e.target.value)} className="flex-1 min-w-0 p-2 rounded-xl bg-slate-800 text-sky-400 font-bold border border-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
             <option value="">-- Seleccionar Tarjeta Anterior --</option>
             <optgroup label="📦 Banco (sin día asignado)">
               {savedCards.filter((c) => c.dia == null).map((c) => (
@@ -213,7 +213,7 @@ export default function PracticeCardAdmin() {
             📤 Importar en Lote
           </Link>
         </div>
-        <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
+        <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs shrink-0">
           Para duplicar para otro día, cárgala y cambia el "Día" y el "ID Documento" antes de guardar. Para eliminar
           una tarjeta antigua, cárgala y haz clic en 🗑️.
         </p>
