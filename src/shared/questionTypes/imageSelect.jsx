@@ -33,7 +33,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // Single-correct-answer questions resolve the instant you click one option;
 // multi-correct ones let you toggle several, then confirm. Either way, one
 // gradable item (itemIdx 0), first-attempt-only, lock on correct.
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const isMultiSelect = (question.correctIndices || []).length > 1;
   const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx || []);
   const [done, setDone] = useState(() => initialState?.done || false);
@@ -85,6 +85,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
 
   return (
     <div>
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>}
       {isMultiSelect && (
         <p className="text-xs text-slate-400 text-center mb-4">(elige {question.correctIndices.length})</p>
       )}
@@ -152,6 +153,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
 
   return (
     <div>
+      <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>
       {isMultiSelect && (
         <p className="text-xs text-slate-400 text-center mb-4">(elige {question.correctIndices.length})</p>
       )}

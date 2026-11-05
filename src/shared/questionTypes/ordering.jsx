@@ -168,7 +168,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // red/green and lets them keep adjusting and re-checking (same
 // retry-until-correct spirit as matching), rather than the one-shot
 // grade-and-move-on behavior write/listen use.
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const n = (question.items || []).length;
   const [order, setOrder] = useState(() => initialState?.order || shuffledOrder(n));
   const [done, setDone] = useState(() => initialState?.done || false);
@@ -210,6 +210,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>}
       <OrderList
         items={question.items}
         order={order}
@@ -247,6 +248,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>
       <OrderList items={question.items} order={order} setOrder={setOrder} locked={false} rowState={(pos) => (submitted ? positionsCorrect[pos] : null)} />
     </div>
   );

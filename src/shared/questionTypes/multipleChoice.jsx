@@ -13,6 +13,7 @@ export const emptyQuestion = () => ({
   options: ['', ''],
   optionImages: ['', ''],
   answer: '',
+  explanation: '',
 });
 
 export const getItemCount = () => 1;
@@ -65,7 +66,7 @@ const OptionContent = ({ text, image }) => (
 // Resolves the instant you click an option — one gradable item, first-
 // attempt-only, lock on correct. Options render as a responsive grid: 2 or 4
 // side-by-side pairs (4 wraps into a 2x2 block), 3 all in one row.
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const [selectedIdx, setSelectedIdx] = useState(() => initialState?.selectedIdx ?? null);
   const [done, setDone] = useState(() => initialState?.done || false);
   const [wrongFlash, setWrongFlash] = useState(false);
@@ -105,6 +106,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>}
       <div className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {question.options.map((opt, oIdx) => {
           const isSelected = selectedIdx === oIdx;
@@ -130,6 +132,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
           );
         })}
       </div>
+      {done && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -150,6 +157,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>
       <div className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {question.options.map((opt, oIdx) => {
           const isSelected = selectedIdx === oIdx;
@@ -174,6 +182,11 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
           );
         })}
       </div>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -246,7 +259,7 @@ export const Editor = ({ question: q, onChange, showCategory, instanceId }) => {
       </div>
 
       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-        Marca con el círculo cuál opción es la correcta (2 a 4 opciones).
+        Marca con el círculo cuál opción es la correcta (2 a 5 opciones).
       </p>
       <div className="space-y-2">
         {q.options.map((opt, oIdx) => (
@@ -285,7 +298,7 @@ export const Editor = ({ question: q, onChange, showCategory, instanceId }) => {
           </div>
         ))}
       </div>
-      {q.options.length < 4 && (
+      {q.options.length < 5 && (
         <button onClick={addOption} className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
           + Agregar opción
         </button>
@@ -293,6 +306,19 @@ export const Editor = ({ question: q, onChange, showCategory, instanceId }) => {
       {!q.answer && (
         <p className="text-[10px] text-amber-600 font-bold mt-1">Marca con el círculo cuál opción es la correcta.</p>
       )}
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          Explicación (opcional — se muestra como retroalimentación después de responder, sea correcto o no)
+        </label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
+          placeholder="Por qué es correcta (o incorrecta) esta respuesta..."
+        />
+      </div>
     </>
   );
 };

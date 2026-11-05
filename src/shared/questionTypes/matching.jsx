@@ -92,7 +92,7 @@ export const Renderer = (props) => (props.mode === 'deferred' ? <DeferredRendere
 // the caller changes its `key` (e.g. on navigating to a different question).
 // Calls onItemFirstAttempt(pairIdx, isCorrect) once per pair's first attempt,
 // and onAllCorrect() once every pair has been matched.
-const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange }) => {
+const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialState, onStateChange, hidePrompt }) => {
   const pairs = question.pairs.map(normalizePair);
   const [matchedPairIdx, setMatchedPairIdx] = useState(() => initialState?.matchedPairIdx || []);
   const [selectedLeftIdx, setSelectedLeftIdx] = useState(null);
@@ -140,6 +140,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      {!hidePrompt && <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>}
       {question.pairs.length > 1 && (
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
           {matchedPairIdx.length} de {question.pairs.length} emparejados
@@ -223,6 +224,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>
       {pairCount > 1 && (
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-6">
           {completedCount} de {pairCount} {submitted ? 'correctos' : 'emparejados'}

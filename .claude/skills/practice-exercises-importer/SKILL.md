@@ -78,7 +78,9 @@ student but doesn't mark it wrong).
 ```json
 { "type": "multiple_choice", "prompt": "¿Qué significa 'madrugar'?", "options": ["despertarse temprano", "trabajar de noche", "llegar tarde", "dormir la siesta"], "answer": "despertarse temprano" }
 ```
-`answer` must be one of the exact strings in `options` (2-4 options total).
+`answer` must be one of the exact strings in `options` (2-5 options total, so a
+textbook's A-E format fits). Add `"explanation"` (optional) for feedback text
+shown after the student answers, right or wrong.
 
 ### `matching` — two columns meant to be paired up
 ```json
