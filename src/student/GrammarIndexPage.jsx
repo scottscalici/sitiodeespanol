@@ -180,24 +180,21 @@ export default function GrammarIndexPage() {
           sequenceRows.length === 0 ? (
             <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">No se encontraron notas.</div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y divide-slate-100">
-              {sequenceRows.map((row, idx) =>
+            <div className="flex flex-col gap-2">
+              {sequenceRows.map((row) =>
                 row.exists ? (
                   <Link
                     key={row.id}
                     to={`/gramatica/${encodeURIComponent(row.id)}`}
-                    className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors"
+                    className="rounded-xl shadow-sm px-5 py-4 flex items-center hover:-translate-y-0.5 hover:shadow-md transition-all"
+                    style={{ backgroundColor: resolveCategoryColor(row.category, categoryColors) }}
                   >
-                    <span className="shrink-0 w-7 text-center text-sm font-black text-slate-400">{idx + 1}.</span>
-                    <span className="shrink-0 w-3 h-3 rounded-full" style={{ backgroundColor: resolveCategoryColor(row.category, categoryColors) }} />
-                    <p className="flex-1 font-black text-slate-800 truncate">{row.title}</p>
+                    <p className="flex-1 font-black text-white uppercase tracking-tight truncate">{row.title}</p>
                   </Link>
                 ) : (
-                  <div key={row.id} className="flex items-center gap-4 px-5 py-3 opacity-50">
-                    <span className="shrink-0 w-7 text-center text-sm font-black text-slate-400">{idx + 1}.</span>
-                    <span className="shrink-0 w-3 h-3 rounded-full bg-slate-300" />
+                  <div key={row.id} className="rounded-xl px-5 py-4 flex items-center gap-3 bg-slate-100 border border-dashed border-slate-300">
                     <p className="flex-1 font-bold text-slate-400 italic truncate">{row.title}</p>
-                    <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-200 px-2 py-1 rounded-full">
                       Próximamente
                     </span>
                   </div>
