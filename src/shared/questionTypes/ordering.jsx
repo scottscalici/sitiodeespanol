@@ -275,6 +275,17 @@ export const Editor = ({ question: q, onChange }) => {
   return (
     <>
       <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Pregunta</label>
+        <input
+          type="text"
+          value={q.prompt}
+          onChange={(e) => onChange({ prompt: e.target.value })}
+          placeholder="Pregunta (inglés o instrucción)"
+          className="w-full border border-slate-300 rounded-md p-2 text-sm"
+        />
+      </div>
+
+      <div className="mb-3">
         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Imagen de la pregunta (opcional)</label>
         <div className="flex items-center gap-2">
           {q.promptImage && <img src={q.promptImage} alt="" className="w-12 h-12 object-cover rounded-md border border-slate-200 shrink-0" />}

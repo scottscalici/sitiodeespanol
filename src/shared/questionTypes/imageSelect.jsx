@@ -208,6 +208,17 @@ export const Editor = ({ question: q, onChange }) => {
 
   return (
     <>
+      <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Pregunta</label>
+        <input
+          type="text"
+          value={q.prompt}
+          onChange={(e) => onChange({ prompt: e.target.value })}
+          placeholder="Pregunta (inglés o instrucción)"
+          className="w-full border border-slate-300 rounded-md p-2 text-sm"
+        />
+      </div>
+
       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
         Marca la casilla de cada opción correcta — marcar más de una la convierte en una pregunta de "elige{' '}
         {(q.correctIndices || []).length || 'N'}".
