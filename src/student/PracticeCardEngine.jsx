@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firesto
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
-import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
+import { QUESTION_TYPES, getItemCount, getQuestionPreview } from '../shared/questionTypes';
 import { normalizeLegacyPracticeQuestion } from '../utils/legacyPracticeQuestion';
 
 // A small, focused graded practice (e.g. Gustar, prepositional pronouns).
@@ -50,6 +50,11 @@ export default function PracticeCardEngine({ onClose }) {
   const [pointsAwarded, setPointsAwarded] = useState(0);
   const [grade, setGrade] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  // One entry per question (not per gradable item) from the last Enviar —
+  // true only if every item in that question was correct — so the results
+  // screen can show a per-question ✅/❌ breakdown without re-deriving it
+  // from questionStatesRef (which keeps changing as the student edits).
+  const [perQuestionCorrect, setPerQuestionCorrect] = useState([]);
 
   const saveTimeoutRef = useRef(null);
 
@@ -180,6 +185,7 @@ export default function PracticeCardEngine({ onClose }) {
 
     setCorrectCount(newCorrectCount);
     setGrade(newGrade);
+    setPerQuestionCorrect(perQuestionResults.map((items) => items.length > 0 && items.every(Boolean)));
     setSubmitted(true);
     setShowResults(true);
     setSaveState('saving');
@@ -240,18 +246,42 @@ export default function PracticeCardEngine({ onClose }) {
 
   if (showResults) {
     return (
-      <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <span className="text-5xl">{grade >= 70 ? '🎉' : '💪'}</span>
-        <h1 className="text-2xl font-black text-slate-800">{cardData.title}</h1>
-        <p className="text-4xl font-black text-emerald-600">{grade}%</p>
-        <p className="text-slate-500 font-bold">{correctCount}/{totalItems} correctas</p>
-        {pointsAwarded > 0 && (
-          <p className="text-amber-600 font-black uppercase tracking-widest text-sm">+{pointsAwarded} puntos</p>
-        )}
-        {saveState === 'error' && (
-          <p className="text-rose-500 text-xs font-bold">Hubo un error al guardar. Intenta de nuevo.</p>
-        )}
-        <div className="flex items-center justify-center gap-3 mt-2">
+      <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans">
+        <div className="flex-none p-6 text-center">
+          <span className="text-5xl">{grade >= 70 ? '🎉' : '💪'}</span>
+          <h1 className="text-2xl font-black text-slate-800 mt-2">{cardData.title}</h1>
+          <p className="text-4xl font-black text-emerald-600">{grade}%</p>
+          <p className="text-slate-500 font-bold">{correctCount}/{totalItems} correctas</p>
+          {pointsAwarded > 0 && (
+            <p className="text-amber-600 font-black uppercase tracking-widest text-sm">+{pointsAwarded} puntos</p>
+          )}
+          {saveState === 'error' && (
+            <p className="text-rose-500 text-xs font-bold">Hubo un error al guardar. Intenta de nuevo.</p>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 md:px-6">
+          <div className="max-w-2xl mx-auto w-full space-y-2 pb-4">
+            {questions.map((question, idx) => {
+              const isCorrect = perQuestionCorrect[idx];
+              return (
+                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 text-left">
+                  <div className="flex items-start gap-2">
+                    <span className="shrink-0 mt-0.5">{isCorrect ? '✅' : '❌'}</span>
+                    <p className="text-sm font-bold text-slate-700">{getQuestionPreview(question) || `Pregunta ${idx + 1}`}</p>
+                  </div>
+                  {question.explanation && (
+                    <p className="mt-2 ml-6 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                      {question.explanation}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex-none flex items-center justify-center gap-3 p-4 md:p-6 border-t border-slate-200 bg-white">
           <button
             onClick={() => setShowResults(false)}
             className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs transition-all"
