@@ -10,6 +10,13 @@ export const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 export const PromptImage = ({ src }) =>
   src ? <img src={src} alt="" className="w-full max-h-64 object-contain bg-slate-950 rounded-xl mb-4" /> : null;
 
+// Same idea as PromptImage, for a question's own audio clip (e.g. "listen
+// and identify the genre") — a plain native player, no autoplay (a student
+// should choose when to hear it, and autoplay would also fire again on
+// every re-render of a type that re-renders on each keystroke).
+export const PromptAudio = ({ src }) =>
+  src ? <audio src={src} controls className="w-full mb-4" /> : null;
+
 // Shared by word_bank_cloze and line_bank_cloze: "Lo" and "lo" are the same
 // underlying word, differing only because Spanish capitalizes whichever
 // one happens to start a sentence — not a grammar distinction either type

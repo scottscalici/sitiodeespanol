@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ImageUploadField from '../../admin/shared/ImageUploadField';
-import { shuffle, PromptImage } from './clozeShared';
+import AudioUploadField from '../../admin/shared/AudioUploadField';
+import { shuffle, PromptImage, PromptAudio } from './clozeShared';
 
 export const TYPE_KEY = 'multiple_choice';
 export const TYPE_LABEL = 'Opción Múltiple';
@@ -9,6 +10,7 @@ export const emptyQuestion = () => ({
   type: 'multiple_choice',
   prompt: '',
   promptImage: '',
+  promptAudio: '',
   category: '',
   options: ['', ''],
   optionImages: ['', ''],
@@ -106,6 +108,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      <PromptAudio src={question.promptAudio} />
       {!hidePrompt && <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>}
       <div className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {question.options.map((opt, oIdx) => {
@@ -157,6 +160,7 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   return (
     <div>
       <PromptImage src={question.promptImage} />
+      <PromptAudio src={question.promptAudio} />
       <h2 className="text-lg font-bold text-slate-800 mb-4">{question.prompt}</h2>
       <div className={`grid gap-3 ${question.options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {question.options.map((opt, oIdx) => {
@@ -269,8 +273,20 @@ export const Editor = ({ question: q, onChange, showCategory, instanceId }) => {
         </div>
       </div>
 
+      <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">
+          Audio de la pregunta (opcional — p. ej. un clip para identificar)
+        </label>
+        <AudioUploadField
+          value={q.promptAudio || ''}
+          onChange={(url) => onChange({ promptAudio: url })}
+          folder="curiosidades"
+          inputClassName="w-full border border-slate-300 rounded-md p-1.5 text-[10px] font-mono"
+        />
+      </div>
+
       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-        Marca con el círculo cuál opción es la correcta (2 a 5 opciones).
+        Marca con el círculo cuál opción es la correcta (2 a 8 opciones).
       </p>
       <div className="space-y-2">
         {q.options.map((opt, oIdx) => (
@@ -309,7 +325,7 @@ export const Editor = ({ question: q, onChange, showCategory, instanceId }) => {
           </div>
         ))}
       </div>
-      {q.options.length < 5 && (
+      {q.options.length < 8 && (
         <button onClick={addOption} className="mt-2 text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">
           + Agregar opción
         </button>

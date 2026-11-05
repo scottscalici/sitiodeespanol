@@ -9,14 +9,17 @@ service firebase.storage {
     }
 
     // Everything here is content shown on the public site (curiosidades
-    // images, etc.), so anyone can read. Only an admin account can write —
-    // same role check as firestore.rules — and only images up to 10MB,
-    // matching the client-side cap in src/utils/imageUpload.js.
+    // images/audio, etc.), so anyone can read. Only an admin account can
+    // write — same role check as firestore.rules — and only images up to
+    // 10MB or audio up to 25MB, matching the client-side caps in
+    // src/utils/imageUpload.js (MAX_IMAGE_BYTES / MAX_AUDIO_BYTES).
     match /{allPaths=**} {
       allow read: if true;
       allow write: if isAdmin()
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && (
+                     (request.resource.contentType.matches('image/.*') && request.resource.size < 10 * 1024 * 1024) ||
+                     (request.resource.contentType.matches('audio/.*') && request.resource.size < 25 * 1024 * 1024)
+                   );
     }
   }
 }

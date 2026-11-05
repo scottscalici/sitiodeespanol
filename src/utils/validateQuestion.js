@@ -55,6 +55,19 @@ export const collectQuestionImageRefs = (q) => {
   return refs;
 };
 
+// Same idea as collectQuestionImageRefs, for a local audio filename — so
+// far only multiple_choice's promptAudio, but kept as its own walk (rather
+// than merged into the image one) since a future type's audio field won't
+// necessarily live at the same key as its image field.
+export const collectQuestionAudioRefs = (q) => {
+  const refs = [];
+  if (!q || typeof q !== 'object') return refs;
+  if (q.type === 'multiple_choice' && q.promptAudio !== undefined) {
+    refs.push({ obj: q, key: 'promptAudio' });
+  }
+  return refs;
+};
+
 export const validateQuestion = (q, qNum, ownerLabel) => {
   const tag = `${ownerLabel}, pregunta ${qNum}`;
   const errs = [];
@@ -64,8 +77,8 @@ export const validateQuestion = (q, qNum, ownerLabel) => {
   switch (q.type) {
     case 'multiple_choice': {
       if (!isNonEmptyString(q.prompt)) errs.push(`${tag}: falta "prompt".`);
-      if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4) {
-        errs.push(`${tag}: "options" debe ser un arreglo de 2 a 4 textos.`);
+      if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 8) {
+        errs.push(`${tag}: "options" debe ser un arreglo de 2 a 8 textos.`);
       } else if (q.options.some((o) => !isNonEmptyString(o))) {
         errs.push(`${tag}: cada elemento de "options" debe ser un texto no vacío.`);
       } else if (!q.options.includes(q.answer)) {

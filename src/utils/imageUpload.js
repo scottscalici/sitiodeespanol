@@ -69,3 +69,62 @@ export const listAdminImages = async (folder = 'misc') => {
   );
   return items.sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated));
 };
+
+// Audio's own size cap — clips (a song snippet, a listening-test track) run
+// much larger than any UI image, so this is deliberately separate from
+// MAX_IMAGE_BYTES rather than reusing it. Keep in sync with storage.rules.
+export const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25MB
+
+// Same shape as uploadAdminImage, for an admin-picked audio file.
+export const uploadAdminAudio = async (file, folder = 'misc') => {
+  if (!file.type.startsWith('audio/')) {
+    throw new Error('El archivo debe ser de audio.');
+  }
+  if (file.size > MAX_AUDIO_BYTES) {
+    throw new Error('El audio es demasiado grande (máximo 25MB).');
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file);
+  return getDownloadURL(fileRef);
+};
+
+// Same shape as importImageFromUrl — fetches audio bytes from an arbitrary
+// URL (e.g. a raw.githubusercontent.com link into the imagenes repo) and
+// re-uploads to Firebase Storage, so a bulk importer can reference a
+// filename/URL without the admin ever downloading-then-re-picking the file.
+export const importAudioFromUrl = async (sourceUrl, folder = 'misc', filename = 'audio.mp3') => {
+  const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar el audio (${response.status}).`);
+  }
+  const blob = await response.blob();
+  if (!blob.type.startsWith('audio/') && blob.type !== 'application/octet-stream') {
+    throw new Error('El archivo descargado no es de audio.');
+  }
+  if (blob.size > MAX_AUDIO_BYTES) {
+    throw new Error('El audio es demasiado grande (máximo 25MB).');
+  }
+
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, blob);
+  return getDownloadURL(fileRef);
+};
+
+// Lists every audio file already uploaded to a folder, newest first — same
+// reuse convenience listAdminImages gives for images.
+export const listAdminAudio = async (folder = 'misc') => {
+  const folderRef = ref(storage, folder);
+  const result = await listAll(folderRef);
+  const items = await Promise.all(
+    result.items.map(async (itemRef) => {
+      const [url, metadata] = await Promise.all([getDownloadURL(itemRef), getMetadata(itemRef)]);
+      return { url, name: itemRef.name, timeCreated: metadata.timeCreated };
+    })
+  );
+  return items.sort((a, b) => new Date(b.timeCreated) - new Date(a.timeCreated));
+};

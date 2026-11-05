@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase'; // Adjust relative path to your firebase.js if needed
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
-import { uploadAdminImage } from '../../utils/imageUpload';
+import { uploadAdminImage, uploadAdminAudio, importImageFromUrl, importAudioFromUrl } from '../../utils/imageUpload';
 import { finalizeQuestion } from '../../shared/questionTypes';
-import { isNonEmptyString, validateQuestion, collectQuestionImageRefs } from '../../utils/validateQuestion';
+import { isNonEmptyString, validateQuestion, collectQuestionImageRefs, collectQuestionAudioRefs } from '../../utils/validateQuestion';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -39,6 +39,26 @@ const ensureUniqueId = (candidate, existingIds) => {
 
 const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
 
+// A raw.githubusercontent.com link (e.g. into the teacher's own `imagenes`
+// asset repo) is treated as a SOURCE to fetch and re-host, not an already-
+// final URL — these links are known to break on some networks' content
+// filters (see MediaMigrationManager's own comment on the same issue), so
+// everything the app stores long-term goes through Firebase Storage instead.
+const isGithubRawUrl = (v) => typeof v === 'string' && /^https:\/\/raw\.githubusercontent\.com\//i.test(v);
+
+// Only a local filename or a raw-GitHub source URL needs resolving (upload
+// or fetch+reupload) — any other already-hosted URL (Firebase Storage, an
+// old Schoology link, etc.) is left exactly as given, same as before.
+const needsResolution = (value) => isNonEmptyString(value) && (!isUrl(value) || isGithubRawUrl(value));
+
+const basenameFromUrl = (url, fallback) => {
+  try {
+    return decodeURIComponent(new URL(url).pathname.split('/').pop()) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const validateItem = (item, idx) => {
   const label = `Curiosidad ${idx + 1}${item?.title ? ` ("${item.title}")` : ''}`;
   if (!item || typeof item !== 'object') return [`${label}: no es un objeto válido.`];
@@ -64,19 +84,51 @@ const collectImageRefs = (item) => {
   return refs;
 };
 
-const validateImageRefs = (items, fileMap) => {
+// Same idea, for a local audio filename or a raw-GitHub audio source —
+// currently just `item.audio` (an intro/narration clip for the curiosidad
+// itself) and each question's `promptAudio`.
+const collectAudioRefs = (item) => {
+  const refs = [];
+  if (item.audio !== undefined) refs.push({ obj: item, key: 'audio' });
+  (item.questions || []).forEach((q) => refs.push(...collectQuestionAudioRefs(q)));
+  return refs;
+};
+
+// A local filename (not a URL at all) must be in the picked-files list; a
+// raw-GitHub URL doesn't need one, since it's fetched directly instead.
+const validateMediaRefs = (items, fileMap, collectRefs, label) => {
   const errs = [];
   items.forEach((item, idx) => {
     if (!item || typeof item !== 'object') return;
-    const label = `Curiosidad ${idx + 1}${item.title ? ` ("${item.title}")` : ''}`;
-    collectImageRefs(item).forEach(({ obj, key }) => {
+    const itemLabel = `Curiosidad ${idx + 1}${item.title ? ` ("${item.title}")` : ''}`;
+    collectRefs(item).forEach(({ obj, key }) => {
       const value = obj[key];
-      if (isNonEmptyString(value) && !isUrl(value) && !fileMap.has(value)) {
-        errs.push(`${label}: la imagen "${value}" no fue proporcionada en los archivos seleccionados.`);
+      if (needsResolution(value) && !isGithubRawUrl(value) && !fileMap.has(value)) {
+        errs.push(`${itemLabel}: ${label} "${value}" no fue proporcionado en los archivos seleccionados.`);
       }
     });
   });
   return errs;
+};
+
+// Resolves every ref's value to a final Storage URL in place — a local
+// filename goes through uploadFn (matched against fileMap), a raw-GitHub
+// source URL goes through importFn (fetched and re-hosted); anything else
+// is already final and untouched. One pass across every item's refs so the
+// same source file/URL referenced from several places only uploads once.
+const resolveMediaRefs = async (items, collectRefs, fileMap, folder, uploadFn, importFn, fallbackName) => {
+  const allRefs = items.flatMap((item) => collectRefs(item));
+  const urlMap = new Map();
+  const neededValues = new Set(allRefs.map(({ obj, key }) => obj[key]).filter(needsResolution));
+  for (const value of neededValues) {
+    const url = isGithubRawUrl(value)
+      ? await importFn(value, folder, basenameFromUrl(value, fallbackName))
+      : await uploadFn(fileMap.get(value), folder);
+    urlMap.set(value, url);
+  }
+  allRefs.forEach(({ obj, key }) => {
+    if (needsResolution(obj[key])) obj[key] = urlMap.get(obj[key]);
+  });
 };
 
 const CuriosidadesUploader = () => {
@@ -107,13 +159,14 @@ const CuriosidadesUploader = () => {
       return;
     }
 
-    // Validate EVERYTHING — shape first, then image references — before
-    // touching Storage or Firestore at all, so a mistake anywhere in the
-    // batch is reported up front instead of leaving a partial import.
+    // Validate EVERYTHING — shape first, then image/audio references —
+    // before touching Storage or Firestore at all, so a mistake anywhere in
+    // the batch is reported up front instead of leaving a partial import.
     const shapeErrors = parsedData.flatMap((item, idx) => validateItem(item, idx));
     const fileMap = new Map(pickedFiles.map((f) => [f.name, f]));
-    const imageErrors = validateImageRefs(parsedData, fileMap);
-    const allErrors = [...shapeErrors, ...imageErrors];
+    const imageErrors = validateMediaRefs(parsedData, fileMap, collectImageRefs, 'la imagen');
+    const audioErrors = validateMediaRefs(parsedData, fileMap, collectAudioRefs, 'el audio');
+    const allErrors = [...shapeErrors, ...imageErrors, ...audioErrors];
     if (allErrors.length > 0) {
       setErrors(allErrors);
       return;
@@ -122,24 +175,10 @@ const CuriosidadesUploader = () => {
     setLoading(true);
     try {
       setStatus('Subiendo imágenes...');
-      const neededFilenames = new Set();
-      parsedData.forEach((item) => {
-        collectImageRefs(item).forEach(({ obj, key }) => {
-          const value = obj[key];
-          if (isNonEmptyString(value) && !isUrl(value)) neededFilenames.add(value);
-        });
-      });
-      const urlMap = new Map();
-      for (const filename of neededFilenames) {
-        const url = await uploadAdminImage(fileMap.get(filename), 'curiosidades');
-        urlMap.set(filename, url);
-      }
-      parsedData.forEach((item) => {
-        collectImageRefs(item).forEach(({ obj, key }) => {
-          const value = obj[key];
-          if (isNonEmptyString(value) && !isUrl(value)) obj[key] = urlMap.get(value);
-        });
-      });
+      await resolveMediaRefs(parsedData, collectImageRefs, fileMap, 'curiosidades', uploadAdminImage, importImageFromUrl, 'imagen.png');
+
+      setStatus('Subiendo audio...');
+      await resolveMediaRefs(parsedData, collectAudioRefs, fileMap, 'curiosidades', uploadAdminAudio, importAudioFromUrl, 'audio.mp3');
 
       setStatus('Preparando IDs...');
       // Same bundle-vs-legacy detection as CuriosidadesManager, plus
@@ -175,6 +214,7 @@ const CuriosidadesUploader = () => {
           id: finalId,
           title: item.title || '',
           img: item.img || '',
+          audio: item.audio || '',
           student_note: item.student_note || '',
           teacher_notes: item.teacher_notes || '',
           s2_dia: item.s2_dia != null ? Number(item.s2_dia) : null,
@@ -232,10 +272,13 @@ const CuriosidadesUploader = () => {
           </Link>
         </div>
         <p className="text-slate-500 font-medium mb-6">
-          Pega tu arreglo JSON completo abajo. Si alguna curiosidad o pregunta hace referencia a una imagen local (p. ej.{' '}
-          <code className="bg-slate-100 px-1 rounded">"img": "fallas.jpg"</code>), selecciona esos archivos abajo también — se
-          suben automáticamente y sus URLs se insertan antes de guardar. No necesitas incluir "id": si lo omites, se genera uno
-          a partir del título.
+          Pega tu arreglo JSON completo abajo. Si alguna curiosidad o pregunta hace referencia a una imagen o audio local
+          (p. ej. <code className="bg-slate-100 px-1 rounded">"img": "fallas.jpg"</code> o{' '}
+          <code className="bg-slate-100 px-1 rounded">"promptAudio": "clip.mp3"</code>), selecciona esos archivos abajo también.
+          También puedes usar directamente un enlace <code className="bg-slate-100 px-1 rounded">raw.githubusercontent.com</code>{' '}
+          (p. ej. a tu repo de imágenes) en vez de un nombre de archivo — se descarga y se vuelve a subir a Firebase
+          automáticamente, sin necesidad de seleccionarlo abajo. En cualquier caso, las URLs finales se insertan antes de
+          guardar. No necesitas incluir "id": si lo omites, se genera uno a partir del título.
         </p>
 
         <textarea
@@ -248,12 +291,12 @@ const CuriosidadesUploader = () => {
 
         <div className="mb-6">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
-            Imágenes locales referenciadas en el JSON (opcional)
+            Imágenes o audio locales referenciados en el JSON (opcional — no hace falta si usas enlaces raw.githubusercontent.com)
           </label>
           <input
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,audio/*"
             onChange={(e) => setPickedFiles(Array.from(e.target.files || []))}
             className="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:text-[10px] file:font-black file:uppercase file:tracking-widest hover:file:bg-slate-600"
           />
