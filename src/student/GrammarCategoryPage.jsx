@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
+import { resolveCategoryColor } from '../utils/grammarCategoryColors';
 import RolodexStrip from './RolodexStrip';
 
 // Fallback category hub for a category that has no `type: 'landing'` note
@@ -11,13 +12,19 @@ import RolodexStrip from './RolodexStrip';
 export default function GrammarCategoryPage() {
   const { categoryName } = useParams();
   const [pages, setPages] = useState([]);
+  const [categoryColors, setCategoryColors] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        setPages(await getCachedCollection('grammar_pages'));
+        const [pagesData, colorsDoc] = await Promise.all([
+          getCachedCollection('grammar_pages'),
+          getCachedDoc('config', 'grammar_categories'),
+        ]);
+        setPages(pagesData);
+        setCategoryColors(colorsDoc || {});
       } catch (err) {
         console.error('Error loading category:', err);
       }
@@ -59,7 +66,12 @@ export default function GrammarCategoryPage() {
         </div>
 
         <div className="bg-white border border-slate-200 p-8 md:p-12 rounded-2xl shadow-xl">
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-6 pb-4 border-b border-slate-200">{label}</h1>
+          <h1
+            className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-6 pb-4 border-b-4"
+            style={{ borderColor: resolveCategoryColor(label, categoryColors) }}
+          >
+            {label}
+          </h1>
           <RolodexStrip cards={cards} />
         </div>
       </div>

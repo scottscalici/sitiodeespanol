@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { invalidateCollectionCache } from '../../utils/firestoreCache';
+import { invalidateCollectionCache, invalidateDocCache } from '../../utils/firestoreCache';
 import GrammarNoteBlocksModal from './GrammarNoteBlocksModal';
 import GrammarLandingSubtopicsModal from './GrammarLandingSubtopicsModal';
+import GrammarCategoryColorsModal from './GrammarCategoryColorsModal';
+import GrammarSequenceModal from './GrammarSequenceModal';
 
 // grammar_pages is a flat, one-document-per-note collection (no _bundle
 // pattern) — see GrammarIndexPage/GrammarNoteViewer, the collection's only
@@ -30,6 +32,29 @@ const GrammarNotesManager = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [blocksModalItem, setBlocksModalItem] = useState(null);
   const [subtopicsModalItem, setSubtopicsModalItem] = useState(null);
+  const [categoryColors, setCategoryColors] = useState({});
+  const [colorsModalOpen, setColorsModalOpen] = useState(false);
+  const [sequences, setSequences] = useState({ s2: [], s4: [] });
+  const [sequenceModalCourse, setSequenceModalCourse] = useState(null); // null | 's2' | 's4'
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const [colorsSnap, sequencesSnap] = await Promise.all([
+          getDoc(doc(db, 'config', 'grammar_categories')),
+          getDoc(doc(db, 'config', 'grammar_sequences')),
+        ]);
+        if (colorsSnap.exists()) setCategoryColors(colorsSnap.data());
+        if (sequencesSnap.exists()) {
+          const data = sequencesSnap.data();
+          setSequences({ s2: data.s2 || [], s4: data.s4 || [] });
+        }
+      } catch (err) {
+        console.error('Error fetching grammar config:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -120,6 +145,24 @@ const GrammarNotesManager = () => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, subtopics, isNew: false, isLegacy: false } : it)));
   };
 
+  const categoryNames = useMemo(
+    () => [...new Set(items.map((it) => it.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
+
+  const handleSaveCategoryColors = async (colors) => {
+    await setDoc(doc(db, 'config', 'grammar_categories'), colors);
+    invalidateDocCache('config', 'grammar_categories');
+    setCategoryColors(colors);
+  };
+
+  const handleSaveSequence = async (course, rows) => {
+    const next = { ...sequences, [course]: rows };
+    await setDoc(doc(db, 'config', 'grammar_sequences'), next);
+    invalidateDocCache('config', 'grammar_sequences');
+    setSequences(next);
+  };
+
   const handleSaveAll = async () => {
     const newWithoutId = items.find((it) => it.isNew && !it.id.trim());
     if (newWithoutId) {
@@ -160,6 +203,27 @@ const GrammarNotesManager = () => {
             >
               📤 Subir JSON
             </Link>
+            <button
+              type="button"
+              onClick={() => setColorsModalOpen(true)}
+              className="bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              🎨 Colores
+            </button>
+            <button
+              type="button"
+              onClick={() => setSequenceModalCourse('s2')}
+              className="bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              🧭 Secuencia S2
+            </button>
+            <button
+              type="button"
+              onClick={() => setSequenceModalCourse('s4')}
+              className="bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              🧭 Secuencia S4
+            </button>
             <Link
               to="/admin-daily-plan-gramatica"
               className="bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 px-5 py-3 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
@@ -309,6 +373,23 @@ const GrammarNotesManager = () => {
           note={items[subtopicsModalItem]}
           onClose={() => setSubtopicsModalItem(null)}
           onSave={(subtopics) => handleSaveSubtopics(subtopicsModalItem, subtopics)}
+        />
+      )}
+      {colorsModalOpen && (
+        <GrammarCategoryColorsModal
+          categories={categoryNames}
+          initialColors={categoryColors}
+          onClose={() => setColorsModalOpen(false)}
+          onSave={handleSaveCategoryColors}
+        />
+      )}
+      {sequenceModalCourse && (
+        <GrammarSequenceModal
+          course={sequenceModalCourse}
+          items={sequences[sequenceModalCourse]}
+          allNotes={items}
+          onClose={() => setSequenceModalCourse(null)}
+          onSave={(rows) => handleSaveSequence(sequenceModalCourse, rows)}
         />
       )}
     </div>

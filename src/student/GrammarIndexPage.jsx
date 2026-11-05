@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getCachedCollection } from '../utils/firestoreCache';
+import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
+import { useAuth } from '../context/AuthContext';
+import { resolveCategoryColor } from '../utils/grammarCategoryColors';
 
 // A category-gallery front door to every authored grammar_pages note — the
 // grammar counterpart to VocabIndexPage, but cards instead of a flat list:
@@ -9,31 +11,46 @@ import { getCachedCollection } from '../utils/firestoreCache';
 // GrammarNoteViewer; otherwise GrammarCategoryPage's plain Rolodex
 // fallback). Typing in the search box temporarily swaps the gallery for a
 // flat title-match list, so a known note is still one search away.
-// Plain solid colors, not gradients — a gradient card rendered invisible
-// (white-on-white) for at least one real browser, likely because Tailwind
-// v4's gradient CSS relies on newer oklab color-interpolation that doesn't
-// paint everywhere; a solid background-color has no such dependency.
-const CARD_COLORS = [
-  'bg-indigo-600',
-  'bg-emerald-600',
-  'bg-amber-600',
-  'bg-rose-600',
-  'bg-sky-600',
-  'bg-violet-600',
-  'bg-teal-600',
-  'bg-orange-600',
-];
+//
+// A course with its own curated sequence (config/grammar_sequences, edited
+// from GrammarNotesManager) lands on that ordered list by default instead
+// of this alphabetical gallery — see viewMode below. Tile/tag color is
+// plain solid backgroundColor, not a gradient class — a gradient card
+// rendered invisible (white-on-white) for at least one real browser, likely
+// because Tailwind v4's gradient CSS relies on newer oklab
+// color-interpolation that doesn't paint everywhere; a solid color has no
+// such dependency, and it's also what lets a custom hex (resolveCategoryColor)
+// apply the same way as the old fixed classes did.
 
 export default function GrammarIndexPage() {
+  const { userData } = useAuth() || {};
+  const course = userData?.course;
+
   const [pages, setPages] = useState([]);
+  const [categoryColors, setCategoryColors] = useState({});
+  const [sequences, setSequences] = useState({ s2: [], s4: [] });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // null until the data below decides it for us — 'sequence' if this
+  // course has a curated order set up, else the alphabetical gallery, same
+  // as every course saw before sequences existed. A manual toggle after
+  // that is never overridden again (this effect's guard only fires once).
+  const [viewMode, setViewMode] = useState(null);
+  const hasSetDefaultView = useRef(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        setPages(await getCachedCollection('grammar_pages'));
+        const [pagesData, colorsDoc, sequencesDoc] = await Promise.all([
+          getCachedCollection('grammar_pages'),
+          getCachedDoc('config', 'grammar_categories'),
+          getCachedDoc('config', 'grammar_sequences'),
+        ]);
+        setPages(pagesData);
+        setCategoryColors(colorsDoc || {});
+        setSequences({ s2: sequencesDoc?.s2 || [], s4: sequencesDoc?.s4 || [] });
       } catch (err) {
         console.error('Error loading grammar index:', err);
       }
@@ -41,6 +58,30 @@ export default function GrammarIndexPage() {
     };
     load();
   }, []);
+
+  const mySequence = useMemo(() => sequences[course] || [], [sequences, course]);
+
+  useEffect(() => {
+    if (!loading && !hasSetDefaultView.current) {
+      setViewMode(mySequence.length > 0 ? 'sequence' : 'alphabetical');
+      hasSetDefaultView.current = true;
+    }
+  }, [loading, mySequence]);
+
+  const pagesById = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages]);
+
+  const sequenceRows = useMemo(
+    () => mySequence.map((entry) => {
+      const page = pagesById.get(entry.id);
+      return {
+        id: entry.id,
+        title: page?.title || entry.label || entry.id,
+        category: page?.category || 'General',
+        exists: !!page,
+      };
+    }),
+    [mySequence, pagesById]
+  );
 
   const categories = useMemo(() => {
     const map = {};
@@ -76,12 +117,27 @@ export default function GrammarIndexPage() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <p className="text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">Referencia</p>
-            <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">📚 Índice de Gramática</h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">{categories.length} categorías</p>
+            <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
+              {viewMode === 'sequence' ? '🧭 Guía de Gramática' : '📚 Índice de Gramática'}
+            </h1>
+            <p className="text-sm font-medium text-slate-500 mt-1">
+              {viewMode === 'sequence' ? `${sequenceRows.length} temas en orden` : `${categories.length} categorías`}
+            </p>
           </div>
-          <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
-            Volver al Inicio ↗
-          </Link>
+          <div className="flex items-center gap-3">
+            {mySequence.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setViewMode((v) => (v === 'sequence' ? 'alphabetical' : 'sequence'))}
+                className="text-indigo-600 hover:text-indigo-800 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 px-5 py-2.5 rounded-xl transition-colors"
+              >
+                {viewMode === 'sequence' ? '📚 Índice Completo (Apuntes Variados)' : '🧭 Ver Mi Guía'}
+              </button>
+            )}
+            <Link to="/" className="text-slate-500 hover:text-slate-800 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-5 py-2.5 rounded-xl transition-colors">
+              Volver al Inicio ↗
+            </Link>
+          </div>
         </header>
 
         <input
@@ -104,22 +160,55 @@ export default function GrammarIndexPage() {
                   className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-50 transition-colors"
                 >
                   <p className="font-black text-slate-800 truncate">{page.title || page.id}</p>
-                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
+                  <span
+                    className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-white px-3 py-1.5 rounded-full"
+                    style={{ backgroundColor: resolveCategoryColor(page.category || 'General', categoryColors) }}
+                  >
                     {page.category || 'General'}
                   </span>
                 </Link>
               ))}
             </div>
           )
+        ) : viewMode === 'sequence' ? (
+          sequenceRows.length === 0 ? (
+            <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">No se encontraron notas.</div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y divide-slate-100">
+              {sequenceRows.map((row, idx) =>
+                row.exists ? (
+                  <Link
+                    key={row.id}
+                    to={`/gramatica/${encodeURIComponent(row.id)}`}
+                    className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="shrink-0 w-7 text-center text-sm font-black text-slate-400">{idx + 1}.</span>
+                    <span className="shrink-0 w-3 h-3 rounded-full" style={{ backgroundColor: resolveCategoryColor(row.category, categoryColors) }} />
+                    <p className="flex-1 font-black text-slate-800 truncate">{row.title}</p>
+                  </Link>
+                ) : (
+                  <div key={row.id} className="flex items-center gap-4 px-5 py-3 opacity-50">
+                    <span className="shrink-0 w-7 text-center text-sm font-black text-slate-400">{idx + 1}.</span>
+                    <span className="shrink-0 w-3 h-3 rounded-full bg-slate-300" />
+                    <p className="flex-1 font-bold text-slate-400 italic truncate">{row.title}</p>
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
+                      Próximamente
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+          )
         ) : categories.length === 0 ? (
           <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">No se encontraron notas.</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {categories.map((cat, i) => (
+            {categories.map((cat) => (
               <Link
                 key={cat.name}
                 to={cat.landing ? `/gramatica/${encodeURIComponent(cat.landing.id)}` : `/gramatica/categoria/${encodeURIComponent(cat.name)}`}
-                className={`${CARD_COLORS[i % CARD_COLORS.length]} rounded-2xl shadow-sm p-5 flex flex-col justify-between h-32 text-white hover:-translate-y-1 hover:shadow-lg transition-all`}
+                className="rounded-2xl shadow-sm p-5 flex flex-col justify-between h-32 text-white hover:-translate-y-1 hover:shadow-lg transition-all"
+                style={{ backgroundColor: resolveCategoryColor(cat.name, categoryColors) }}
               >
                 <span className="font-black uppercase tracking-tight text-lg leading-tight">{cat.name}</span>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">
