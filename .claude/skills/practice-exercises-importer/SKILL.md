@@ -62,7 +62,7 @@ A plain JSON array, each entry one practice card:
 
 ## Question types — pick the one that matches what's actually on the page
 
-Every question needs a `"type"` field. These eight are good candidates for
+Every question needs a `"type"` field. These nine are good candidates for
 extraction from a worksheet:
 
 ### `write` — one blank, free-typed answer
@@ -103,9 +103,27 @@ student):
 { "type": "ordering", "prompt": "Pon las oraciones en orden cronológico", "items": [{ "text": "Me desperté." }, { "text": "Me duché." }, { "text": "Desayuné." }] }
 ```
 
-### `word_bank_cloze` — one passage, several blanks, one shared word bank
-Mark each answer inline with double curly braces in `rawText` — don't
-pre-compute a separate blanked version:
+### `text_cloze` — DEFAULT for a paragraph with several blanks, free-typed
+A worksheet asking the student to conjugate/fill in a flowing passage
+(the most common "Práctica" worksheet shape) renders as ONE continuous
+paragraph with a free-text input per blank — not as several disjointed
+one-sentence `write` questions out of context, and not as a clickable word
+bank even if the paper worksheet printed one (typing is the default; a
+word bank on paper was just a hint for the student, not something students
+should be able to click through digitally). Mark each answer inline with
+double curly braces in `rawText`:
+```json
+{ "type": "text_cloze", "prompt": "Completa el párrafo con el pretérito o el imperfecto", "rawText": "Ayer yo {{fui}} al mercado y {{compré}} fruta." }
+```
+Add `"requireAccents": true` only if the worksheet is specifically testing
+accent placement.
+
+### `word_bank_cloze` — one passage, several blanks, clickable shared word bank
+Same passage-with-blanks shape as text_cloze, but the student picks from a
+word bank instead of typing — use this ONLY when explicitly asked for a
+word-bank/selection style instead of free typing. Mark each answer inline
+with double curly braces in `rawText` — don't pre-compute a separate
+blanked version:
 ```json
 { "type": "word_bank_cloze", "prompt": "Completa el párrafo", "rawText": "Ayer yo {{fui}} al mercado y {{compré}} fruta.", "distractorsText": "fue\ncompró" }
 ```

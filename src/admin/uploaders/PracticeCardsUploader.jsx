@@ -70,6 +70,15 @@ const QUESTION_VALIDATORS = {
     }
     return errs;
   },
+  // Same raw rawText shape as word_bank_cloze, minus the word bank — every
+  // blank is free-typed instead of picked.
+  text_cloze: (q) => {
+    const errs = [];
+    if (!isNonEmptyString(q.rawText) || !/\{\{.+?\}\}/.test(q.rawText)) {
+      errs.push('"rawText" debe contener al menos una respuesta marcada como {{así}}.');
+    }
+    return errs;
+  },
   line_bank_cloze: (q) => {
     const errs = [];
     if (!Array.isArray(q.lines) || q.lines.length === 0) errs.push('"lines" debe ser un arreglo no vacío.');

@@ -60,6 +60,7 @@ import * as imageSelect from './imageSelect';
 import * as dropdownCloze from './dropdownCloze';
 import * as wordBankCloze from './wordBankCloze';
 import * as lineBankCloze from './lineBankCloze';
+import * as textCloze from './textCloze';
 import * as multipleChoice from './multipleChoice';
 import * as write from './write';
 import * as listen from './listen';
@@ -72,6 +73,7 @@ export const QUESTION_TYPES = {
   [dropdownCloze.TYPE_KEY]: dropdownCloze,
   [wordBankCloze.TYPE_KEY]: wordBankCloze,
   [lineBankCloze.TYPE_KEY]: lineBankCloze,
+  [textCloze.TYPE_KEY]: textCloze,
   [multipleChoice.TYPE_KEY]: multipleChoice,
   [write.TYPE_KEY]: write,
   [listen.TYPE_KEY]: listen,
@@ -95,7 +97,7 @@ export const reconstructQuestion = (q) => QUESTION_TYPES[q.type]?.reconstructQue
 const stripBlankTokens = (s) => (s || '').replace(/\{\{.*?\}\}/g, '____');
 export const getQuestionPreview = (q) => {
   if (q?.prompt?.trim()) return q.prompt.trim();
-  if (q?.type === 'dropdown_cloze' || q?.type === 'word_bank_cloze') return stripBlankTokens(q.text);
+  if (q?.type === 'dropdown_cloze' || q?.type === 'word_bank_cloze' || q?.type === 'text_cloze') return stripBlankTokens(q.text);
   if (q?.type === 'line_bank_cloze') return (q.lines || []).map((l) => stripBlankTokens(l.text)).filter(Boolean).join(' / ');
   if (q?.type === 'matching') return (q.pairs || []).map((p) => p.left?.text).filter(Boolean).join(', ');
   if (q?.type === 'ordering') return (q.items || []).map((it) => it.text).filter(Boolean).join(' → ');

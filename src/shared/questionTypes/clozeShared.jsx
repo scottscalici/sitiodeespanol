@@ -84,6 +84,46 @@ export const renderClozeText = (text, selections, correctArr, wrongIndicator, on
   return nodes;
 };
 
+// Same interleaving idea as renderClozeText, but one free-text <input> per
+// blank instead of a <select> — for text_cloze, where there's no bank of
+// options to pick from, just whatever the student types. `correctArr`/
+// `wrongIndicator` are per-blank boolean[]s, same shape/meaning as
+// renderClozeText's (green once correct, red once checked-and-wrong,
+// persisting until re-submitted/changed — a free-typed answer has no
+// natural "instant" moment to grade at the way a click does).
+// `lockOnCorrect` (default true, matching every other retry-mode cloze
+// type) disables a blank once it's correct; Practice Cards' deferred mode
+// passes false, same reasoning as renderClozeText.
+export const renderClozeTextInputs = (text, values, correctArr, wrongIndicator, onChange, { lockOnCorrect = true } = {}) => {
+  const parts = (text || '').split('{{blank}}');
+  const nodes = [];
+  parts.forEach((part, i) => {
+    if (part) nodes.push(<span key={`t-${i}`}>{part}</span>);
+    if (i < parts.length - 1) {
+      const isCorrect = correctArr[i];
+      const isWrong = !!wrongIndicator[i];
+      nodes.push(
+        <input
+          key={`b-${i}`}
+          type="text"
+          value={values[i] || ''}
+          onChange={(e) => onChange(i, e.target.value)}
+          disabled={lockOnCorrect && isCorrect}
+          size={Math.max(4, (values[i] || '').length + 2)}
+          className={`mx-1 border-b-2 bg-slate-900 font-bold rounded px-2 py-1 text-sm align-middle outline-none ${
+            isCorrect
+              ? 'border-emerald-500 text-emerald-400'
+              : isWrong
+              ? 'border-rose-500 text-rose-300'
+              : 'border-slate-500 text-sky-300 focus:border-sky-400'
+          }`}
+        />
+      );
+    }
+  });
+  return nodes;
+};
+
 // Shared visual chrome both cloze types use: an "N de M completados"
 // sub-progress line (once there's more than one blank), then the optional
 // image, then the passage itself.
