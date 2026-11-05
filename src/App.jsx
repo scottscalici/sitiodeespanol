@@ -77,6 +77,7 @@ import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
+import PracticeCardsUploader from './admin/uploaders/PracticeCardsUploader';
 import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
 import VerbSchoologyExport from './admin/managers/VerbSchoologyExport';
@@ -641,6 +642,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PracticeCardAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-practice-cards-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PracticeCardsUploader />
                 </AdminRoute>
               }
             />

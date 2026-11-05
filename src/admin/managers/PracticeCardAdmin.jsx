@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
@@ -45,7 +46,7 @@ export default function PracticeCardAdmin() {
     if (c) {
       setCardId(c.id);
       setTitle(c.title || '');
-      setDia(c.dia || 1);
+      setDia(c.dia ?? '');
       setCourse(c.course || 's2');
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
@@ -146,13 +147,17 @@ export default function PracticeCardAdmin() {
         return;
       }
       const cleanQuestions = questions.map(finalizeQuestion);
+      // Blank/cleared "Día" saves as a 📦 Banco item (dia: null) — invisible
+      // to students (every query/filter compares dia by number) until it's
+      // given a real día, same bank pattern Calentamientos already has.
+      const diaValue = dia === '' || dia === null || dia === undefined ? null : Number(dia);
 
       await setDoc(
         doc(db, 'practice_cards', cardId),
         {
           id: cardId,
           title,
-          dia: Number(dia),
+          dia: diaValue,
           course,
           gradeWeight: Number(gradeWeight) || 1,
           excused,
@@ -182,9 +187,16 @@ export default function PracticeCardAdmin() {
           <span className="text-white font-bold text-sm tracking-wider uppercase">Cargar Práctica:</span>
           <select onChange={(e) => loadCard(e.target.value)} className="flex-1 p-2 rounded-xl bg-slate-800 text-sky-400 font-bold border border-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
             <option value="">-- Seleccionar Tarjeta Anterior --</option>
-            {savedCards.map((c) => (
-              <option key={c.id} value={c.id}>{c.course?.toUpperCase()} Día {c.dia}: {c.title}</option>
-            ))}
+            <optgroup label="📦 Banco (sin día asignado)">
+              {savedCards.filter((c) => c.dia == null).map((c) => (
+                <option key={c.id} value={c.id}>{c.course?.toUpperCase()}: {c.title}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Asignadas">
+              {savedCards.filter((c) => c.dia != null).map((c) => (
+                <option key={c.id} value={c.id}>{c.course?.toUpperCase()} Día {c.dia}: {c.title}</option>
+              ))}
+            </optgroup>
           </select>
           <button
             type="button"
@@ -194,6 +206,12 @@ export default function PracticeCardAdmin() {
           >
             🗑️
           </button>
+          <Link
+            to="/admin-practice-cards-upload"
+            className="shrink-0 text-indigo-300 hover:text-indigo-200 text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 whitespace-nowrap"
+          >
+            📤 Importar en Lote
+          </Link>
         </div>
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs">
           Para duplicar para otro día, cárgala y cambia el "Día" y el "ID Documento" antes de guardar. Para eliminar
@@ -220,6 +238,7 @@ export default function PracticeCardAdmin() {
           </div>
           <div>
             <label className="block text-xs font-black text-slate-500 uppercase mb-1">Curso / Día</label>
+            <p className="text-[10px] text-slate-400 mb-1">Deja "Día" en blanco para guardarla en el 📦 Banco (sin asignar).</p>
             <div className="flex gap-2">
               <select value={course} onChange={(e) => setCourse(e.target.value)} className="w-1/2 p-2.5 border rounded-xl font-bold uppercase bg-slate-50">
                 <option value="s2">S2</option>
