@@ -17,7 +17,7 @@ export const BLANK_TOKEN = '{{blank}}';
 // fail, since there'd be nothing visible to even point at.
 const countBlanksInText = (text) => (text || '').split(BLANK_TOKEN).length - 1;
 
-export const emptyQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [] });
+export const emptyQuestion = () => ({ type: 'dropdown_cloze', prompt: '', img: '', text: '', blanks: [], explanation: '' });
 export const getItemCount = (q) => countBlanksInText(q.text);
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
@@ -107,6 +107,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
         {renderClozeText(question.text, selections, correct, wrongAttempted, handleSelect, (blankIdx) => question.blanks[blankIdx]?.options || [])}
       </ClozeChrome>
+      {allCorrect && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
       {!allCorrect && (
         <div className="mt-6 text-center">
           <button
@@ -145,17 +150,24 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   const completedCount = submitted ? correct.filter((c) => c === true).length : selections.filter(Boolean).length;
 
   return (
-    <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} light>
-      {renderClozeText(
-        question.text,
-        selections,
-        correct,
-        wrong,
-        handleSelect,
-        (blankIdx) => question.blanks[blankIdx]?.options || [],
-        { lockOnCorrect: false }
+    <>
+      <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} light>
+        {renderClozeText(
+          question.text,
+          selections,
+          correct,
+          wrong,
+          handleSelect,
+          (blankIdx) => question.blanks[blankIdx]?.options || [],
+          { lockOnCorrect: false }
+        )}
+      </ClozeChrome>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
       )}
-    </ClozeChrome>
+    </>
   );
 };
 
@@ -299,6 +311,16 @@ export const Editor = ({ question: q, onChange, instanceId }) => {
           ))}
         </div>
       )}
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
+        />
+      </div>
     </>
   );
 };

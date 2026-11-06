@@ -13,7 +13,7 @@ import { checkAnswerLeniently } from '../../utils/checkAnswer';
 export const TYPE_KEY = 'text_cloze';
 export const TYPE_LABEL = 'Cloze de Texto Libre';
 
-export const emptyQuestion = () => ({ type: 'text_cloze', prompt: '', img: '', rawText: '', verbBankText: '', requireAccents: false });
+export const emptyQuestion = () => ({ type: 'text_cloze', prompt: '', img: '', rawText: '', verbBankText: '', requireAccents: false, explanation: '' });
 export const getItemCount = (q) => q.answers.length;
 
 // Converts the raw, freely-typed {{answer}}-tagged passage into the final
@@ -113,6 +113,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount} verbBank={question.verbBank}>
         {renderClozeTextInputs(question.text, values, correct, wrongAttempted, handleChange)}
       </ClozeChrome>
+      {allCorrect && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
       {!allCorrect && (
         <div className="mt-6 text-center">
           <button
@@ -149,9 +154,16 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   const completedCount = submitted ? correct.filter((c) => c === true).length : values.filter(Boolean).length;
 
   return (
-    <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} verbBank={question.verbBank} light>
-      {renderClozeTextInputs(question.text, values, correct, wrong, handleChange, { lockOnCorrect: false })}
-    </ClozeChrome>
+    <>
+      <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} verbBank={question.verbBank} light>
+        {renderClozeTextInputs(question.text, values, correct, wrong, handleChange, { lockOnCorrect: false })}
+      </ClozeChrome>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
+    </>
   );
 };
 
@@ -217,6 +229,16 @@ export const Editor = ({ question: q, onChange }) => {
         />
         Requerir acentos correctos (si no, solo se avisa)
       </label>
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
+        />
+      </div>
     </>
   );
 };

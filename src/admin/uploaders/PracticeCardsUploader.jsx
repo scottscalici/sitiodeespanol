@@ -18,6 +18,21 @@ const cardLabel = (item, idx) => `Tarjeta ${idx + 1}${item?.title ? ` ("${item.t
 
 const COURSE_IDS = new Set(['s2', 's4']);
 
+// Accepts a single course string ("s2"/"s4", unchanged from before), the
+// shorthand "both", or an explicit array like ["s2","s4"] — lets one card
+// cover both classes without pasting the whole JSON twice under two ids.
+// A plain single-string course keeps writing to exactly its given id, same
+// as always; "both"/an array instead writes one doc PER course, each id
+// suffixed `_${course}` so the two never collide and can still be
+// scheduled independently per class afterward (in the Sequencer, each is
+// just its own ordinary card).
+const resolveCourses = (course) => {
+  if (course === 'both') return ['s2', 's4'];
+  if (Array.isArray(course)) return course;
+  return isNonEmptyString(course) ? [course] : [];
+};
+const coursesNeedIdSuffix = (course) => course === 'both' || Array.isArray(course);
+
 // Deliberately lighter than a full per-field schema check for every type —
 // just enough to catch an obviously malformed question (wrong shape, a
 // typo'd type key) before it's written. image_select and hotspot both now
@@ -137,7 +152,10 @@ const validateCard = (item, idx) => {
   const errors = [];
   if (!isNonEmptyString(item.id)) errors.push(`${label}: falta "id" (requerido — este importador nunca genera ids automáticamente).`);
   if (!isNonEmptyString(item.title)) errors.push(`${label}: falta "title".`);
-  if (!isNonEmptyString(item.course) || !COURSE_IDS.has(item.course)) errors.push(`${label}: "course" debe ser "s2" o "s4".`);
+  const courses = resolveCourses(item.course);
+  if (courses.length === 0 || new Set(courses).size !== courses.length || courses.some((c) => !COURSE_IDS.has(c))) {
+    errors.push(`${label}: "course" debe ser "s2", "s4", "both", o un arreglo como ["s2","s4"].`);
+  }
   if (item.dia !== null && item.dia !== undefined && typeof item.dia !== 'number') {
     errors.push(`${label}: "dia" debe ser un número, o null/omitido para guardarla en el 📦 Banco sin asignar.`);
   }
@@ -203,6 +221,16 @@ const PracticeCardsUploader = () => {
       setStatus('Subiendo audio...');
       await resolveMediaRefs(parsedData, collectCardAudioRefs, fileMap, 'practice_cards', uploadAdminAudio, importAudioFromUrl, 'audio.mp3');
 
+      // One card can resolve to MULTIPLE Firestore writes — "both"/an array
+      // course expands into one doc per course, id suffixed `_${course}` so
+      // the two never collide (see resolveCourses above); a plain single
+      // string course still writes exactly to its own given id, unchanged.
+      const writes = parsedData.flatMap((item) => {
+        const courses = resolveCourses(item.course);
+        const suffix = coursesNeedIdSuffix(item.course);
+        return courses.map((course) => ({ item, course, outputId: suffix ? `${item.id}_${course}` : item.id }));
+      });
+
       setStatus('Revisando ids existentes...');
       const snap = await getDocs(collection(db, 'practice_cards'));
       const existingIds = new Set(snap.docs.map((d) => d.id));
@@ -212,14 +240,14 @@ const PracticeCardsUploader = () => {
       // normal and already supported, so there's no day-collision check.
       const idErrors = [];
       const seenIds = new Map();
-      parsedData.forEach((item, idx) => {
-        if (seenIds.has(item.id)) {
-          idErrors.push(`"${item.id}" aparece más de una vez en este lote (tarjetas ${seenIds.get(item.id) + 1} y ${idx + 1}).`);
+      writes.forEach(({ outputId }, idx) => {
+        if (seenIds.has(outputId)) {
+          idErrors.push(`"${outputId}" aparece más de una vez en este lote (tarjetas ${seenIds.get(outputId) + 1} y ${idx + 1}).`);
         } else {
-          seenIds.set(item.id, idx);
+          seenIds.set(outputId, idx);
         }
-        if (existingIds.has(item.id)) {
-          idErrors.push(`"${item.id}" ya existe en Firestore — este importador no sobrescribe tarjetas existentes (edítala en el Creador si quieres cambiarla).`);
+        if (existingIds.has(outputId)) {
+          idErrors.push(`"${outputId}" ya existe en Firestore — este importador no sobrescribe tarjetas existentes (edítala en el Creador si quieres cambiarla).`);
         }
       });
 
@@ -229,11 +257,11 @@ const PracticeCardsUploader = () => {
       }
 
       setStatus('Subiendo a Firestore...');
-      for (const item of parsedData) {
+      for (const { item, course, outputId } of writes) {
         const payload = {
-          id: item.id,
+          id: outputId,
           title: item.title,
-          course: item.course,
+          course,
           dia: item.dia ?? null,
           gradeWeight: Number(item.gradeWeight) || 1,
           excused: !!item.excused,
@@ -244,12 +272,13 @@ const PracticeCardsUploader = () => {
           questions: item.questions.map(finalizeQuestion),
           createdAt: new Date().toISOString(),
         };
-        await setDoc(doc(db, 'practice_cards', item.id), payload);
+        await setDoc(doc(db, 'practice_cards', outputId), payload);
       }
       invalidateCollectionCache('practice_cards');
 
       setStatus(
-        `✅ ¡Éxito! Se subieron ${parsedData.length} tarjeta(s) a Firestore.` +
+        `✅ ¡Éxito! Se subieron ${writes.length} tarjeta(s) a Firestore` +
+        (writes.length !== parsedData.length ? ` (${parsedData.length} en el JSON, expandidas por curso).` : '.') +
         (anyNeedsCoordinates ? ' ⚠️ Una o más preguntas "hotspot" necesitan que coloques las coordenadas del punto en el Creador.' : '')
       );
       setJsonInput('');
@@ -275,9 +304,16 @@ const PracticeCardsUploader = () => {
         <p className="text-slate-500 font-medium mb-6">
           Pega tu arreglo JSON completo abajo. Cada tarjeta necesita su propio <code className="bg-slate-100 px-1 rounded">"id"</code> explícito
           — este importador nunca sobrescribe una tarjeta existente ni genera ids automáticamente. Deja <code className="bg-slate-100 px-1 rounded">"dia"</code>{' '}
-          en null/omitido para guardarla en el 📦 Banco sin asignar. Tipos de pregunta soportados: {Object.keys(QUESTION_TYPES).join(', ')}.
+          en null/omitido para guardarla en el 📦 Banco sin asignar. <code className="bg-slate-100 px-1 rounded">"course"</code> puede ser{' '}
+          <code className="bg-slate-100 px-1 rounded">"s2"</code>, <code className="bg-slate-100 px-1 rounded">"s4"</code>,{' '}
+          <code className="bg-slate-100 px-1 rounded">"both"</code>, o un arreglo como <code className="bg-slate-100 px-1 rounded">["s2","s4"]</code> — eso
+          crea una tarjeta independiente por curso (ids <code className="bg-slate-100 px-1 rounded">tu_id_s2</code> /{' '}
+          <code className="bg-slate-100 px-1 rounded">tu_id_s4</code>), cada una programable por separado en el Secuenciador. Tipos de pregunta
+          soportados: {Object.keys(QUESTION_TYPES).join(', ')}.
           Si una pregunta referencia una imagen o audio local (p. ej. <code className="bg-slate-100 px-1 rounded">"promptImage": "pic1.png"</code>),
-          selecciónalo abajo o usa un enlace <code className="bg-slate-100 px-1 rounded">raw.githubusercontent.com</code> directamente en el JSON.
+          selecciónalo abajo (ya sea el archivo original o uno ya recortado) o usa un enlace{' '}
+          <code className="bg-slate-100 px-1 rounded">raw.githubusercontent.com</code> directamente en el JSON — la herramienta de recorte de abajo es
+          opcional, solo necesaria si quieres extraer una parte de una foto más grande.
           La pregunta de tipo <code className="bg-slate-100 px-1 rounded">hotspot</code> igual necesita que coloques las coordenadas del punto a mano en el Creador después.
         </p>
 

@@ -6,7 +6,7 @@ import { parseLines, parseAnswerTokens } from './text';
 export const TYPE_KEY = 'word_bank_cloze';
 export const TYPE_LABEL = 'Cloze con Banco de Palabras';
 
-export const emptyQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', rawText: '', distractorsText: '' });
+export const emptyQuestion = () => ({ type: 'word_bank_cloze', prompt: '', img: '', rawText: '', distractorsText: '', explanation: '' });
 export const getItemCount = (q) => q.answers.length;
 
 // Converts the raw, freely-typed editing fields into the final shape the
@@ -132,6 +132,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
       <ClozeChrome img={question.img} completed={correct.filter(Boolean).length} total={blankCount}>
         {renderClozeText(question.text, selections, correct, wrongAttempted, handleSelect, optionsForBlank)}
       </ClozeChrome>
+      {allCorrect && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
       {!allCorrect && (
         <div className="mt-6 text-center">
           <button
@@ -177,9 +182,16 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
   };
 
   return (
-    <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} light>
-      {renderClozeText(question.text, selections, correct, wrong, handleSelect, optionsForBlank, { lockOnCorrect: false })}
-    </ClozeChrome>
+    <>
+      <ClozeChrome img={question.img} completed={completedCount} total={blankCount} prompt={question.prompt} light>
+        {renderClozeText(question.text, selections, correct, wrong, handleSelect, optionsForBlank, { lockOnCorrect: false })}
+      </ClozeChrome>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
+    </>
   );
 };
 
@@ -233,6 +245,16 @@ export const Editor = ({ question: q, onChange }) => {
           rows={2}
           className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono mt-1"
           placeholder={'sol\nnube'}
+        />
+      </div>
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
         />
       </div>
     </>

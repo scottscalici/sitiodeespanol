@@ -29,6 +29,7 @@ export const emptyQuestion = () => ({
   promptImage: '',
   pairs: [{ left: { text: '', image: '' }, right: { text: '', image: '' } }],
   distractorsText: '',
+  explanation: '',
 });
 
 export const getItemCount = (q) => q.pairs.length;
@@ -188,6 +189,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
           })}
         </div>
       </div>
+      {matchedPairIdx.length === question.pairs.length && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -290,6 +296,11 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
           })}
         </div>
       </div>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -402,6 +413,16 @@ export const Editor = ({ question: q, onChange }) => {
           rows={2}
           className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
           placeholder="Respuestas incorrectas extra que aparecerán en el banco de opciones"
+        />
+      </div>
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
         />
       </div>
     </>

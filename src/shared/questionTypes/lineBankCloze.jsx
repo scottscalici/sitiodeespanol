@@ -19,7 +19,7 @@ import { parseLines, parseAnswerTokens } from './text';
 export const TYPE_KEY = 'line_bank_cloze';
 export const TYPE_LABEL = 'Líneas con Banco de Palabras';
 
-export const emptyQuestion = () => ({ type: 'line_bank_cloze', prompt: '', lines: [{ img: '', rawText: '' }], distractorsText: '', allowRepeats: false });
+export const emptyQuestion = () => ({ type: 'line_bank_cloze', prompt: '', lines: [{ img: '', rawText: '' }], distractorsText: '', allowRepeats: false, explanation: '' });
 export const getItemCount = (q) => q.answers.length;
 
 // Converts each row's raw {{word}}-tagged text into its blank-tokenized
@@ -88,6 +88,7 @@ export const parseBulkSections = (text) => {
     lines: s.rawLines.map((rawText) => ({ img: '', rawText })),
     distractorsText: '',
     allowRepeats: false,
+    explanation: '',
   }));
 };
 
@@ -222,6 +223,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
           );
         })}
       </div>
+      {allCorrect && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
       {!allCorrect && (
         <div className="mt-6 text-center">
           <button
@@ -305,6 +311,11 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange }) 
           );
         })}
       </div>
+      {submitted && question.explanation && (
+        <p className="mt-4 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -462,6 +473,16 @@ export const Editor = ({ question: q, onChange }) => {
           correctamente, como en Cloze con Banco de Palabras.
         </span>
       </label>
+
+      <div className="mt-3">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+        <textarea
+          value={q.explanation || ''}
+          onChange={(e) => onChange({ explanation: e.target.value })}
+          rows={2}
+          className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
+        />
+      </div>
     </>
   );
 };

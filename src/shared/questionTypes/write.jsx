@@ -11,7 +11,7 @@ import { PromptImage } from './clozeShared';
 export const TYPE_KEY = 'write';
 export const TYPE_LABEL = 'Escribir';
 
-export const emptyQuestion = () => ({ type: 'write', prompt: '', promptImage: '', answer: '', requireAccents: false });
+export const emptyQuestion = () => ({ type: 'write', prompt: '', promptImage: '', answer: '', requireAccents: false, explanation: '' });
 export const getItemCount = () => 1;
 export const finalizeQuestion = (q) => q;
 export const reconstructQuestion = (q) => q;
@@ -91,6 +91,11 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
           Comprobar
         </button>
       )}
+      {checked && question.explanation && (
+        <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -136,6 +141,11 @@ const DeferredRenderer = ({ question, submitted, initialState, onStateChange, hi
           ⚠️ Cuidado con los acentos{isCorrect ? ' — tu respuesta fue aceptada, pero revisa el acento.' : `: la respuesta correcta es "${question.answer}".`}
         </p>
       )}
+      {submitted && question.explanation && (
+        <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+          {question.explanation}
+        </p>
+      )}
     </div>
   );
 };
@@ -176,5 +186,14 @@ export const Editor = ({ question: q, onChange }) => (
       />
       Requerir acentos correctos (si no, solo se avisa)
     </label>
+    <div>
+      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explicación (opcional, se muestra después de responder)</label>
+      <textarea
+        value={q.explanation || ''}
+        onChange={(e) => onChange({ explanation: e.target.value })}
+        rows={2}
+        className="w-full border border-slate-300 rounded-lg p-2 text-xs mt-1"
+      />
+    </div>
   </div>
 );
