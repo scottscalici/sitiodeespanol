@@ -71,6 +71,7 @@ import FormAtandoCabos from './admin/MasterDashboard/components/FormAtandoCabos'
 import FormEslabones from './admin/MasterDashboard/components/FormEslabones';
 import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorPage'; // 👈 NEW ADMIN EDITOR
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
+import ReadingCardsSequencer from './admin/MasterDashboard/components/ReadingCardsSequencer';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
@@ -301,6 +302,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <LecturasSequencer />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-reading-cards-sequencer"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ReadingCardsSequencer />
                 </AdminRoute>
               }
             />
