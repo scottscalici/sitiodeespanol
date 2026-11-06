@@ -223,6 +223,7 @@ function App() {
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/lectura/tarjeta/:readingId" element={<ReadingCardEngine />} />
+            <Route path="/lectura/tarjeta/:courseId/:targetDia" element={<ReadingCardEngine />} />
             <Route path="/gramatica" element={<GrammarIndexPage />} />
             <Route path="/gramatica/imprimir" element={<GrammarPrintView />} />
             <Route path="/gramatica/categoria/:categoryName" element={<GrammarCategoryPage />} />

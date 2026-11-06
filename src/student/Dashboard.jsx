@@ -36,6 +36,7 @@ import Anuncios from '../components/Anuncios';
 import LeaderboardCard from '../components/LeaderboardCard';
 import HallOfFameCard from '../components/HallOfFameCard';
 import PracticeCard from '../components/PracticeCard';
+import ReadingCard from '../components/ReadingCard';
 
 const PLATFORM_TAREA_INFO = {
   VHL: {
@@ -141,6 +142,7 @@ const Dashboard = () => {
   const [warmupBreakdown, setWarmupBreakdown] = useState([]);
   const [showWarmupModal, setShowWarmupModal] = useState(false);
   const [practiceCards, setPracticeCards] = useState([]);
+  const [readingCards, setReadingCards] = useState([]);
   const [platformLogos, setPlatformLogos] = useState({});
   const warmupAverage = weightedAverageFromBreakdown(warmupBreakdown);
 
@@ -164,12 +166,19 @@ const Dashboard = () => {
           getCachedQuery(`${name}:course:${course}`, () =>
             getDocs(query(collection(db, name), where('course', '==', course)))
           );
-        const [calentamientos, allPracticeCards, platformLogosDoc] = await Promise.all([
+        const [calentamientos, allPracticeCards, allReadingCards, platformLogosDoc] = await Promise.all([
           scopedQuery('calentamientos'),
           scopedQuery('practice_cards'),
+          scopedQuery('reading_cards'),
           getCachedDoc('config', 'platform_logos'),
         ]);
         setPracticeCards(allPracticeCards);
+        // Not yet folded into the warmup/classwork average below — reading
+        // cards are shown to students the same way practice cards are, but
+        // whether their grade should count toward the same running average
+        // is a separate decision (ties into the still-unbuilt teacher-
+        // grading queue for open_ended responses).
+        setReadingCards(allReadingCards);
         setPlatformLogos(platformLogosDoc || {});
         const todayStr = new Date().toLocaleDateString('en-CA');
 
@@ -383,6 +392,10 @@ const Dashboard = () => {
     (pc) => pc.course === course && Number(pc.dia) === liveDia && !pc.excused
   );
 
+  const activeReadingCards = readingCards.filter(
+    (rc) => rc.course === course && Number(rc.dia) === liveDia && !rc.excused
+  );
+
   // One-stop per-card resolution (background/border/text/heading colors,
   // corner decoration, overlay) — see resolveCardTheme.js. Keeping this as
   // a lookup function rather than computing all 6 cards' themes up front
@@ -517,6 +530,11 @@ const Dashboard = () => {
               {/* ✏️ PRÁCTICA — SMALL GRADED ACTIVITIES (GUSTAR, ETC.) */}
               {activePracticeCards.map((card) => (
                 <PracticeCard key={card.id} card={card} />
+              ))}
+
+              {/* 📖 LECTURA — comprehension readings assigned for today */}
+              {activeReadingCards.map((card) => (
+                <ReadingCard key={card.id} card={card} />
               ))}
 
               {/* 💡 CURIOSIDAD */}

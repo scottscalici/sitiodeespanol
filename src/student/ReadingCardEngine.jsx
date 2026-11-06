@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
@@ -17,7 +17,11 @@ import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
 // those separately (a later addition) rather than folding them into this
 // card's own score.
 export default function ReadingCardEngine() {
-  const { readingId } = useParams();
+  // Two route shapes resolve here: /lectura/tarjeta/:readingId (direct, by
+  // doc id) and /lectura/tarjeta/:courseId/:targetDia (by course+día, same
+  // pattern PracticeCardEngine uses so a Dashboard tile for "today's
+  // reading" can link the same way "today's practice card" already does).
+  const { readingId, courseId, targetDia } = useParams();
   const { userData } = useAuth();
   const navigate = useNavigate();
 
@@ -38,16 +42,26 @@ export default function ReadingCardEngine() {
   const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!readingId) return;
+    if (!readingId && !(courseId && targetDia)) return;
     const fetchCard = async () => {
       try {
-        const snap = await getDoc(doc(db, 'reading_cards', readingId));
-        if (snap.exists()) {
-          const data = { id: snap.id, ...snap.data() };
-          setCardData(data);
+        let data = null;
+        if (readingId) {
+          const snap = await getDoc(doc(db, 'reading_cards', readingId));
+          if (snap.exists()) data = { id: snap.id, ...snap.data() };
+        } else {
+          const formattedCourse = String(courseId).toLowerCase();
+          const targetDiaNum = Number(targetDia);
+          const snap = await getDocs(
+            query(collection(db, 'reading_cards'), where('dia', '==', targetDiaNum), where('course', '==', formattedCourse))
+          );
+          if (!snap.empty) data = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        }
 
+        if (data) {
+          setCardData(data);
           if (userData?.role !== 'admin') {
-            const inProgress = userData?.progress?.readingCards?.[readingId]?.inProgress;
+            const inProgress = userData?.progress?.readingCards?.[data.id]?.inProgress;
             if (inProgress) {
               questionStatesRef.current = { ...(inProgress.questionStates || {}) };
               setSubmitted(!!inProgress.submitted);
@@ -65,7 +79,7 @@ export default function ReadingCardEngine() {
     };
     fetchCard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readingId]);
+  }, [readingId, courseId, targetDia]);
 
   const questions = cardData?.questions || [];
   const totalItems = questions.reduce((sum, q) => sum + getItemCount(q), 0);

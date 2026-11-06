@@ -29,6 +29,7 @@ const DailyPlanHub = () => {
   const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
   const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
   const [allPracticeCards, setAllPracticeCards] = useState([]); // Small graded practice (Gustar, etc.)
+  const [allReadingCards, setAllReadingCards] = useState([]); // Comprehension readings (passage + questions)
   const [allImageCards, setAllImageCards] = useState([]); // One-off photo shares
 
   const MAX_DAYS = 80;
@@ -72,7 +73,7 @@ const DailyPlanHub = () => {
 
         // Fetch Sequences & Collections
         const [
-          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap, imageCardsSnap
+          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap, readingCardsSnap, imageCardsSnap
         ] = await Promise.all([
           getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
           getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
@@ -86,6 +87,7 @@ const DailyPlanHub = () => {
           getDocs(collection(db, 'dailyVocabWarmups')),
           getDocs(collection(db, 'conversaciones')),
           getDocs(collection(db, 'practice_cards')),
+          getDocs(collection(db, 'reading_cards')),
           getDocs(collection(db, 'image_cards'))
         ]);
 
@@ -114,6 +116,7 @@ const DailyPlanHub = () => {
         setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllConversaciones(convSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAllPracticeCards(practiceCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setAllReadingCards(readingCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         // Single-bundle-doc collection (see ImageCardsManager) — unwrap its
         // items map back into a flat array instead of treating the bundle
@@ -146,6 +149,7 @@ const DailyPlanHub = () => {
   const activeCalentamientosVerbs = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
   const activeCalentamientosVocab = allVocabWarmups.filter(v => v.course === activeCourse && Number(v.dia) === selectedDay);
   const activePracticeCards = allPracticeCards.filter(p => p.course === activeCourse && Number(p.dia) === selectedDay);
+  const activeReadingCards = allReadingCards.filter(r => r.course === activeCourse && Number(r.dia) === selectedDay);
 
   const activeCuriosidades = allCuriosidades.filter(c => {
     if (activeCourse === 's2') return c.s2_dia === selectedDay;
@@ -373,6 +377,35 @@ const DailyPlanHub = () => {
                         <h3 className="font-bold text-white text-md">{card.title}</h3>
                         <span className="text-xs font-mono text-neutral-500">
                           {card.questions?.length || 0} Preguntas &middot; {card.points || 1}pt &middot; Peso {card.gradeWeight || 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
+              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2">📖 Lectura</h2>
+                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeReadingCards.length}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Link to="/admin-reading-cards-upload" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Importar</Link>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {activeReadingCards.length === 0 ? (
+                  <p className="text-neutral-500 text-sm italic">Sin lectura asignada para hoy.</p>
+                ) : (
+                  <div className="bg-neutral-950 p-4 rounded-xl border border-cyan-900/30 flex flex-col gap-4">
+                    {activeReadingCards.map(card => (
+                      <div key={card.id} className="flex justify-between items-center">
+                        <h3 className="font-bold text-white text-md">{card.title}</h3>
+                        <span className="text-xs font-mono text-neutral-500">
+                          {card.questions?.length || 0} Preguntas &middot; Peso {card.gradeWeight || 1}
                         </span>
                       </div>
                     ))}
