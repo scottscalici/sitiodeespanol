@@ -41,14 +41,38 @@ const restoreInlinePipes = (text) => text
   .split(PIPE_PLACEHOLDER).join('|')
   .split(DOUBLE_PIPE_PLACEHOLDER).join('||');
 
-// Columns 5 (distractorGroup), 6 (distractorExclude, comma-separated) and
-// 7+ (one altAnswer per column) are all optional and purely additive — a
-// 4-column line from before these existed still parses exactly as it
-// always did, with all three defaulting to empty.
+// Columns 5 (distractorGroup), 6 (distractorExclude, comma-separated), 7
+// (contrasteVerbo, see below) and 8+ (one altAnswer per column) are all
+// optional and purely additive — a line from before any of these existed
+// still parses exactly as it always did, with everything defaulting to
+// empty/none.
+//
+// Column 7 wires up the SAME verb-contrast distractor engine the hand
+// editor's "Modo de Distractores" fields set (distractorMode/pairTag/
+// targetLemma/targetTense/targetSubject) — without it, a bulk-imported
+// sentence can only ever get 'none' (generic random) distractors, and
+// binary/quad verb-contrast had to be configured one sentence at a time by
+// hand afterward. Compact colon-separated syntax so it costs one column
+// instead of four: lema:tiempo:sujeto:par_contraste — e.g.
+// "tener:pretérito:nosotros:preterito_imperfecto". `lema` must be the
+// verb's Verb Vault document id (its infinitive spelling, e.g. "tener");
+// `par_contraste` must be one of PAIR_MAP's keys (see distractorConfig.js)
+// — a malformed or incomplete value (not exactly 4 non-empty parts) is
+// silently left as distractorMode 'none' rather than rejecting the whole
+// line, same tolerance as every other optional column here.
+const parseContrasteVerbo = (raw) => {
+  if (!raw) return null;
+  const parts = raw.split(':').map((p) => p.trim());
+  if (parts.length !== 4 || parts.some((p) => !p)) return null;
+  const [targetLemma, targetTense, targetSubject, pairTag] = parts;
+  return { targetLemma, targetTense, targetSubject, pairTag };
+};
+
 const parseBulkSentenceRow = (line) => {
   const parts = protectInlinePipes(line).split('|').map((s) => restoreInlinePipes(s.trim()));
-  const [spanish, english = '', chapterId = '', tagsRaw = '', distractorGroup = '', excludeRaw = '', ...altAnswerParts] = parts;
+  const [spanish, english = '', chapterId = '', tagsRaw = '', distractorGroup = '', excludeRaw = '', contrasteRaw = '', ...altAnswerParts] = parts;
   if (!spanish) return null;
+  const contraste = parseContrasteVerbo(contrasteRaw);
   return {
     spanish,
     english,
@@ -57,12 +81,12 @@ const parseBulkSentenceRow = (line) => {
     distractorGroup,
     distractorExclude: excludeRaw.split(',').map((e) => e.trim()).filter(Boolean),
     altAnswers: altAnswerParts.map((a) => a.trim()).filter(Boolean),
-    distractorMode: 'none',
-    pairTag: '',
+    distractorMode: contraste ? 'binary_verb' : 'none',
+    pairTag: contraste?.pairTag || '',
     poolTag: '',
-    targetLemma: '',
-    targetTense: '',
-    targetSubject: '',
+    targetLemma: contraste?.targetLemma || '',
+    targetTense: contraste?.targetTense || '',
+    targetSubject: contraste?.targetSubject || '',
   };
 };
 
@@ -74,7 +98,7 @@ const BULK_LLM_PROMPT = `Genera [NÚMERO] oraciones en español para practicar [
 
 Escribe cada oración en su PROPIA línea, en texto plano (sin numerar, sin viñetas, sin bloque de código, sin encabezados), en este formato EXACTO con columnas separadas por " | " (un espacio, un pipe, un espacio):
 
-español | inglés | capítulo | etiquetas | grupo_distractores | excluir_distractores | respuesta_alterna_1 | respuesta_alterna_2 ...
+español | inglés | capítulo | etiquetas | grupo_distractores | excluir_distractores | contraste_verbo | respuesta_alterna_1 | respuesta_alterna_2 ...
 
 Las primeras 4 columnas son obligatorias. Las columnas 5 en adelante son OPCIONALES — si no las necesitas, simplemente termina la línea después de "etiquetas" (no agregues pipes vacíos de más).
 
@@ -92,11 +116,11 @@ Columnas restantes:
 - etiquetas: palabras clave separadas por comas, ej. pretérito, viajes (puede ir vacío). Son solo para organizar/filtrar — NO limitan de dónde salen los distractores (ve las dos columnas siguientes).
 - grupo_distractores (opcional): una sola etiqueta más específica que las etiquetas normales, para preferir un grupo más estrecho de oraciones como distractores de esta — NO garantiza que una oración en particular quede excluida (para eso usa excluir_distractores). Si la dejas vacía, se usan las etiquetas normales.
 - excluir_distractores (opcional): respuestas exactas, separadas por comas, que NUNCA deben ofrecerse como opción incorrecta para esta oración — úsala para sinónimos cercanos que un estudiante podría defender como correctos (ej. "a menudo" excluye "con frecuencia, muchas veces"; cada una de esas tres oraciones necesita excluir a las otras dos, por separado, en su propia línea).
+- contraste_verbo (opcional): SOLO para una oración con [[forma|infinitivo]] donde además quieras que la opción múltiple ofrezca, como distractor, la forma del MISMO verbo en el tiempo contrario (ej. pretérito vs. imperfecto) — no afecta las oraciones [[respuesta]] normales, que ya sacan sus distractores de "grupo_distractores"/"excluir_distractores". Formato compacto, cuatro valores separados por ":" y SIN espacios: lema:tiempo:sujeto:par_contraste. "lema" es el infinitivo EXACTO tal como está guardado en el Verbatario (Verb Vault); "tiempo" y "sujeto" son el tiempo/sujeto de la forma que ya pusiste en el [[...]] de esa línea; "par_contraste" es uno de estos ids fijos: preterito_imperfecto, subjuntivo_presente_indicativo, subjuntivo_presente_futuro, pluscuamperfecto_subj_ra_indicativo, perfecto_subj_indicativo. Ejemplo: tener:pretérito:nosotros:preterito_imperfecto. Déjala vacía si no aplica.
 - respuesta_alterna_N (opcional, se pueden agregar varias columnas): otra oración completa igual de correcta que la de la columna "español" pero con una redacción distinta (ej. otro orden de palabras) — se acepta como correcta además de la original.
 
 MUY IMPORTANTE:
 - La única forma de pipe con ESPACIOS a cada lado (" | ") es la que separa columnas. En [[forma|infinitivo]] y en || el pipe NO lleva espacios.
-- No generes oraciones con pares de contraste de verbos (eso se configura aparte, a mano, en la app).
 - No agregues nada más que las líneas de oraciones — ni introducción ni explicación.
 
 Ejemplo de salida:
@@ -104,7 +128,8 @@ Yo [[fui]] a la tienda ayer. | I went to the store yesterday. | 8 | pretérito
 Ella [[comió|comer]] pizza anoche. | She ate pizza last night. | 8 | pretérito, comida
 El hielo está {{caliente}} y el fuego está {{frío}}. |  | 8 | lógico
 Tiene veinte años. || ¿Cuántos años tiene? | He is twenty years old. | 8 | preguntas
-Mi abuelo va al mercado [[a menudo]]. | My grandfather goes to the market often. |  | Adverbios, vocabulario |  | con frecuencia, muchas veces`;
+Mi abuelo va al mercado [[a menudo]]. | My grandfather goes to the market often. |  | Adverbios, vocabulario |  | con frecuencia, muchas veces
+Nosotros [[teníamos|tener]] 15 años cuando pasó eso. | We were 15 years old when that happened. | 8 | Pretérito-Imperfecto |  |  | tener:imperfecto:nosotros:preterito_imperfecto`;
 
 const emptyDraft = () => ({
   spanish: '',

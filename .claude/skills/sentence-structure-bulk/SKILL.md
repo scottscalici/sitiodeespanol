@@ -30,7 +30,7 @@ block, no headers). Each line has columns separated by `" | "` — exactly
 one space, one pipe, one space:
 
 ```
-español | inglés | capítulo | etiquetas | grupo_distractores | excluir_distractores | respuesta_alterna_1 | respuesta_alterna_2 ...
+español | inglés | capítulo | etiquetas | grupo_distractores | excluir_distractores | contraste_verbo | respuesta_alterna_1 | respuesta_alterna_2 ...
 ```
 
 The first 4 columns are required. Columns 5 onward are optional — if a
@@ -83,6 +83,23 @@ at all if it's just modeling the word in context rather than quizzing it.
   veces", each of those three sentences needs its OWN line excluding the
   other two, since without it the app may pit true synonyms against each
   other as if only one were right.
+- **contraste_verbo** (optional): wires a `[[forma|infinitivo]]` sentence
+  into the app's binary-verb-contrast engine, so when it's drawn as
+  multiple choice the wrong answer offered is the SAME verb conjugated in
+  the OTHER tense of a fixed pair (e.g. the imperfect form, when the
+  correct answer is preterite) — the hardest possible distractor, and the
+  one that actually tests discernment rather than recognition. Format:
+  `lema:tiempo:sujeto:par_contraste`, colon-separated, no spaces — e.g.
+  `tener:imperfecto:nosotros:preterito_imperfecto`. `lema` must be the
+  EXACT infinitive spelling as it's saved in the site's Verb Vault (its
+  document id) — if unsure of the exact spelling, leave this column empty
+  rather than guess; `tiempo`/`sujeto` must match the tense/subject of the
+  form already in the `[[...]]` blank on that same line; `par_contraste`
+  must be one of: `preterito_imperfecto`, `subjuntivo_presente_indicativo`,
+  `subjuntivo_presente_futuro`, `pluscuamperfecto_subj_ra_indicativo`,
+  `perfecto_subj_indicativo`. Only set this when the user explicitly asks
+  for multiple-choice tense-contrast/discernment practice — see
+  "Important" below for when to leave it off.
 - **respuesta_alterna_N** (optional, one full sentence per column, can
   repeat): another complete sentence that's equally correct but phrased
   differently (different word order, an optional subject pronoun dropped
@@ -111,9 +128,16 @@ the user doesn't mention "segment" by name.
 
 ## Important
 
-- Never generate sentences with verb-contrast pairs (binary/quad verb
-  distractor modes) — those need to be configured by hand in the app
-  against its own verb data, not authored as plain text.
+- Leave `contraste_verbo` empty by default, even for pretérito/imperfecto
+  requests — a plain `[[forma|infinitivo]]` sentence with its own cue
+  phrase already forces discernment on its own (that cue IS the test, same
+  as a teacher's own printed exam), and setting it wrong (a misspelled
+  lemma, a tense/subject that doesn't match the blank) silently breaks
+  that sentence's multiple-choice draw rather than erroring loudly. Only
+  fill it in when the user explicitly asks for multiple-choice tense-
+  contrast practice, and still only for a lemma you're confident is
+  spelled exactly as saved in their Verb Vault (ask if unsure, rather than
+  guessing a conjugation-chart spelling that might not match).
 - Output nothing but the sentence lines. No intro, no explanation, no
   summary — the user is going to select-all and paste this directly into
   a textarea.

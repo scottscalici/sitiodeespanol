@@ -13,8 +13,21 @@ Every sentence in every segment uses `[[forma_conjugada|infinitivo]]`
 or any other marker — the drill is always "produce the correct conjugated
 form," and that marker is the only one that renders as a typed-recall
 exercise rather than multiple choice (a conjugation blank never becomes
-multiple choice in the app, so `grupo_distractores`/`excluir_distractores`
-are irrelevant here — leave them off entirely).
+multiple choice in the app on its own, so `grupo_distractores`/
+`excluir_distractores` are irrelevant here — leave them off entirely).
+`contraste_verbo` is a separate, independent opt-in (see the main
+SKILL.md) that turns a line into multiple choice with the other-tense form
+as the distractor — leave it off by default per that file's guidance; it
+doesn't change anything else about how a segment's sentences are written.
+
+A tagged batch from this curriculum doubles as a ready-made reassessment
+question bank: the admin's "Configurar Reevaluaciones" tool can draw
+typed-recall questions straight from any `etiquetas` tag here (via its
+"Oraciones de discernimiento" block) for a recuperación/reevaluación retake
+— no extra authoring needed, since it reads the exact same
+`[[forma|infinitivo]]` + cue-phrase sentences this curriculum already
+produces. This is exactly what makes a cue-word batch reusable for both a
+Learning Path practice circle AND a reassessment off the same content.
 
 ## The one rule every sentence must follow
 

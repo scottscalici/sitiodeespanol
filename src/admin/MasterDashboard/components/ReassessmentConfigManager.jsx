@@ -5,6 +5,7 @@ import { db } from '../../../firebase';
 import { getCachedCollection, getCachedBucketedCollection } from '../../../utils/firestoreCache';
 import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../../../utils/evaluaciones';
 import { generateVerbQuestions } from '../../../utils/verbQuestionGenerator';
+import { generateSentenceRecallQuestions } from '../../../utils/reassessmentSentenceGenerator';
 import { VERB_TENSES } from '../../../utils/verbTenses';
 
 // Phase A of Reassessments: define, per gate-enabled Practice Hub circle
@@ -20,10 +21,12 @@ export default function ReassessmentConfigManager() {
   const [circles, setCircles] = useState([]);
   const [verbGroups, setVerbGroups] = useState([]);
   const [masterVerbsMap, setMasterVerbsMap] = useState({});
+  const [sentenceBank, setSentenceBank] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedCircleId, setSelectedCircleId] = useState('');
   const [groupRows, setGroupRows] = useState([]); // { groupId, tense, count }
+  const [sentenceRows, setSentenceRows] = useState([]); // { tag, count } — discernment questions drawn from tagged Sentence Bank [[forma|infinitivo]] entries
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -33,13 +36,15 @@ export default function ReassessmentConfigManager() {
     const load = async () => {
       setLoading(true);
       try {
-        const [podDocs, groups, verbsArray, s2Options, s4Options] = await Promise.all([
+        const [podDocs, groups, verbsArray, s2Options, s4Options, sentences] = await Promise.all([
           getCachedCollection('practice_pods'),
           getCachedCollection('verbGroups'),
           getCachedBucketedCollection('verbs'),
           fetchEvaluacionOptions('s2'),
           fetchEvaluacionOptions('s4'),
+          getCachedCollection('sentence_bank'),
         ]);
+        setSentenceBank(sentences);
         const evalOptionsByCourse = { s2: s2Options, s4: s4Options };
 
         const allCircles = [];
@@ -84,6 +89,7 @@ export default function ReassessmentConfigManager() {
     setStatus('');
     if (!circleId) {
       setGroupRows([]);
+      setSentenceRows([]);
       return;
     }
     try {
@@ -91,9 +97,11 @@ export default function ReassessmentConfigManager() {
       if (snap.exists()) {
         const data = snap.data();
         setGroupRows(data.groups || []);
+        setSentenceRows(data.sentenceBlocks || []);
         setTimeLimitMinutes(Math.round((data.timeLimitSeconds || 900) / 60));
       } else {
         setGroupRows([]);
+        setSentenceRows([]);
         setTimeLimitMinutes(15);
       }
     } catch (err) {
@@ -105,8 +113,23 @@ export default function ReassessmentConfigManager() {
   const updateGroupRow = (idx, patch) => setGroupRows(groupRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const removeGroupRow = (idx) => setGroupRows(groupRows.filter((_, i) => i !== idx));
 
+  // Only tags that actually have at least one [[forma|infinitivo]] sentence
+  // are offered — a tag used only for [[respuesta]]/other sentence shapes
+  // would silently draw zero questions (generateSentenceRecallQuestions
+  // skips anything without that marker), so there's no point listing it here.
+  const availableSentenceTags = [...new Set(
+    sentenceBank.filter((s) => /\[\[(.*?)\|(.*?)\]\]/.test(s.spanish || '')).flatMap((s) => s.grammarTags || [])
+  )].sort();
+
+  const addSentenceRow = () => setSentenceRows([...sentenceRows, { tag: '', count: 3 }]);
+  const updateSentenceRow = (idx, patch) => setSentenceRows(sentenceRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const removeSentenceRow = (idx) => setSentenceRows(sentenceRows.filter((_, i) => i !== idx));
+
   const validRows = groupRows.filter((r) => r.groupId);
-  const totalQuestions = validRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
+  const validSentenceRows = sentenceRows.filter((r) => r.tag);
+  const totalQuestions =
+    validRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0) +
+    validSentenceRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
 
   const blocksFromRows = () =>
     validRows.map((r) => {
@@ -121,9 +144,13 @@ export default function ReassessmentConfigManager() {
       };
     });
 
+  const sentenceBlocksFromRows = () =>
+    validSentenceRows.map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
+
   const handlePreview = () => {
-    const generated = generateVerbQuestions(blocksFromRows(), masterVerbsMap, { withoutReplacement: true });
-    setPreviewQuestions(generated);
+    const verbQuestions = generateVerbQuestions(blocksFromRows(), masterVerbsMap, { withoutReplacement: true });
+    const sentenceQuestions = generateSentenceRecallQuestions(sentenceBlocksFromRows(), sentenceBank, { withoutReplacement: true });
+    setPreviewQuestions([...verbQuestions, ...sentenceQuestions]);
   };
 
   const handleSave = async () => {
@@ -136,6 +163,7 @@ export default function ReassessmentConfigManager() {
         course: selectedCircle.course,
         evalLabel: selectedCircle.evalLabel,
         groups: validRows,
+        sentenceBlocks: validSentenceRows,
         timeLimitSeconds: Math.max(60, Number(timeLimitMinutes) || 15) * 60,
         updatedAt: new Date().toISOString(),
       });
@@ -262,6 +290,58 @@ export default function ReassessmentConfigManager() {
             </div>
           )}
 
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <h3 className="font-bold text-white text-sm">Oraciones de discernimiento (Sentence Bank)</h3>
+            <button
+              type="button"
+              onClick={addSentenceRow}
+              className="text-[10px] font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg"
+            >
+              + Agregar etiqueta
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 italic -mt-2">
+            Para gramática donde lo que se evalúa es ELEGIR el tiempo correcto (ej. pretérito vs. imperfecto) a partir de
+            una pista en la oración — saca al azar oraciones [[forma|infinitivo]] etiquetadas con esta etiqueta.
+          </p>
+
+          {sentenceRows.length > 0 && (
+            <div className="space-y-2">
+              {sentenceRows.map((row, idx) => (
+                <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-3">
+                  <select
+                    value={row.tag}
+                    onChange={(e) => updateSentenceRow(idx, { tag: e.target.value })}
+                    className="flex-1 min-w-[160px] bg-slate-800 border border-slate-700 rounded-md p-2 text-xs"
+                  >
+                    <option value="">Elige una etiqueta...</option>
+                    {availableSentenceTags.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    value={row.count}
+                    onChange={(e) => updateSentenceRow(idx, { count: e.target.value })}
+                    className="w-20 bg-slate-800 border border-slate-700 rounded-md p-2 text-center text-sm font-bold"
+                  />
+                  <button type="button" onClick={() => removeSentenceRow(idx)} className="text-rose-400 hover:text-rose-300 text-xs font-black px-2">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {availableSentenceTags.length === 0 && (
+            <p className="text-xs text-slate-600 italic">
+              Ninguna oración en Sentence Bank tiene todavía el formato [[forma|infinitivo]] con una etiqueta — agrega
+              algunas desde el Sentence Manager para poder usarlas aquí.
+            </p>
+          )}
+
           <div className="flex items-center gap-4 pt-2 border-t border-slate-800">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Límite de tiempo (min)</label>
             <input
@@ -278,7 +358,7 @@ export default function ReassessmentConfigManager() {
             <button
               type="button"
               onClick={handlePreview}
-              disabled={validRows.length === 0}
+              disabled={validRows.length === 0 && validSentenceRows.length === 0}
               className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-black uppercase tracking-widest rounded-lg disabled:opacity-50"
             >
               🎲 Vista previa (nuevo sorteo)
@@ -286,7 +366,7 @@ export default function ReassessmentConfigManager() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || validRows.length === 0}
+              disabled={saving || (validRows.length === 0 && validSentenceRows.length === 0)}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg disabled:opacity-50"
             >
               {saving ? '...' : 'Guardar configuración'}
@@ -303,17 +383,26 @@ export default function ReassessmentConfigManager() {
           </h3>
           {previewQuestions.length < totalQuestions && (
             <p className="text-amber-400 text-xs font-bold mb-3">
-              ⚠️ Algunos grupos no tienen suficientes verbos con datos para este tiempo verbal — agrega más verbos al grupo o baja el conteo.
+              ⚠️ Algunos grupos/etiquetas no tienen suficientes verbos u oraciones con datos para esto — agrega más al
+              grupo/etiqueta o baja el conteo.
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {previewQuestions.map((q, i) => (
-              <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
-                <span className="text-slate-400">{q.sujeto}</span> <span className="font-bold text-white">{q.palabra}</span>
-                <span className="text-slate-500"> ({q.tense})</span>
-                <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
-              </div>
-            ))}
+            {previewQuestions.map((q, i) =>
+              q.type === 'sentence_recall' ? (
+                <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
+                  <span className="text-white">{q.subject}</span>
+                  <span className="text-slate-500"> ({q.infinitive})</span>
+                  <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
+                </div>
+              ) : (
+                <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
+                  <span className="text-slate-400">{q.sujeto}</span> <span className="font-bold text-white">{q.palabra}</span>
+                  <span className="text-slate-500"> ({q.tense})</span>
+                  <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
+                </div>
+              )
+            )}
           </div>
         </div>
       )}
