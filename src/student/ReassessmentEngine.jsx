@@ -10,29 +10,27 @@ import {
   startReassessmentAttempt,
   saveReassessmentAnswers,
   finishReassessmentAttempt,
+  reassertActiveReassessmentLock,
+  logReassessmentTabSwitch,
+  gradeAnswers,
 } from '../utils/reassessmentData';
 import { fetchClassSchedule, fetchScheduleOverrideForDate, mergeScheduleBlocks, isReassessmentWindowOpen } from '../utils/classSchedule';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 
-const gradeAnswers = (questions, answerMap) => {
-  let correct = 0;
-  (questions || []).forEach((q, idx) => {
-    const userVal = (answerMap[idx] || '').trim().toLowerCase();
-    const allowed = (q.forma || '').toLowerCase().split(/[/|;,]/).map((a) => a.trim());
-    if (allowed.includes(userVal)) correct += 1;
-  });
-  const total = (questions || []).length;
-  return { correct, total, score: total > 0 ? Math.round((correct / total) * 100) : 0 };
-};
-
-const Shell = ({ children }) => (
+// `hideNav` drops the "← Volver" link while an attempt is in_progress —
+// it would be a dead end anyway (ReassessmentLockGuard bounces any other
+// route straight back here while the lockout flag is set), so showing a
+// working-looking way to leave the exam is just confusing during lockout.
+const Shell = ({ children, hideNav = false }) => (
   <div className="min-h-screen bg-slate-950 p-4 md:p-8 text-white">
     <div className="max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-black">🎯 Reevaluación</h1>
-        <Link to="/recuperacion" className="text-slate-400 hover:text-white font-bold text-xs bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
-          ← Volver
-        </Link>
+        {!hideNav && (
+          <Link to="/recuperacion" className="text-slate-400 hover:text-white font-bold text-xs bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+            ← Volver
+          </Link>
+        )}
       </div>
       {children}
     </div>
@@ -44,10 +42,13 @@ const Shell = ({ children }) => (
 // links here once a circle is both `passed` and has a reassessment_configs
 // doc). Two real checks gate starting an attempt — has this student passed
 // THIS circle's gate, and is it currently their own class's A/B-day window
-// (config/class_schedule, see classSchedule.js) — but there is no
-// lockout/tab-switch enforcement yet and no override UI (later phases), so
-// a closed window simply shows why rather than offering any way around it.
-// No points are awarded here, same as the gate itself (see
+// (config/class_schedule, see classSchedule.js), or a teacher-granted
+// override (schedule date override or a per-student "open now"). Once
+// started, userData.activeReassessment locks the student into this page
+// site-wide (see ReassessmentLockGuard) until they submit, time runs out,
+// or a teacher intervenes; tab-switch/blur events are logged for the
+// teacher to see next to the score. No points are awarded here, same as
+// the gate itself (see
 // recuperacionData.js's own top comment) — a reassessment replaces an
 // official Schoology grade, it isn't a points-earning activity. By design
 // this is a single official attempt: once `finished`, it shows the result
@@ -122,6 +123,14 @@ export default function ReassessmentEngine() {
             setPhase('finished');
             return;
           }
+          // Defensive: re-assert the lock on every resume (page refresh,
+          // reopening the tab) rather than trusting it survived whatever
+          // brought the student back here — a genuine glitch could have
+          // dropped it, and re-setting it to the same value is a no-op
+          // otherwise.
+          reassertActiveReassessmentLock(uid, circleId, existingAttempt.expiresAt).catch((err) =>
+            console.error('Error reasserting reassessment lock:', err)
+          );
           setAttempt(existingAttempt);
           setAnswers(existingAttempt.answers || {});
           setRemainingSeconds(Math.max(0, Math.round((expiresAt - new Date()) / 1000)));
@@ -235,6 +244,27 @@ export default function ReassessmentEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, remainingSeconds]);
 
+  // Integrity log — only active while an attempt is in_progress. Two
+  // distinct event types since visibilitychange and blur can catch
+  // different things depending on browser/OS (switching tabs, minimizing,
+  // clicking into another app's window) and can occasionally both fire for
+  // the same action; a little overlap in the log is fine — it's a trust
+  // signal for the teacher to review, not an exact forensic count.
+  useEffect(() => {
+    if (phase !== 'in_progress') return;
+    const logType = (type) => logReassessmentTabSwitch(uid, circleId, type).catch((err) => console.error('Error logging tab switch:', err));
+    const onVisibility = () => {
+      if (document.hidden) logType('tab_hidden');
+    };
+    const onBlur = () => logType('window_blur');
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [phase, uid, circleId]);
+
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -328,7 +358,7 @@ export default function ReassessmentEngine() {
   if (phase === 'in_progress') {
     const questions = attempt?.questions || [];
     return (
-      <Shell>
+      <Shell hideNav>
         <div className="sticky top-0 z-10 bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4 flex justify-between items-center">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{config.evalLabel}</span>
           <span className={`font-mono font-black text-lg ${remainingSeconds <= 30 ? 'text-rose-400' : 'text-sky-400'}`}>

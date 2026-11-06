@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { ThemeProvider } from './context/ThemeContext';
 import ScrollToTop from './components/ScrollToTop';
+import ReassessmentLockGuard from './components/ReassessmentLockGuard';
 
 // 🎓 STUDENT ECOSYSTEM & PAGES
 import Login from './student/Login';
@@ -180,6 +181,7 @@ function App() {
     <ThemeProvider>
     <BrowserRouter>
       <ScrollToTop />
+      <ReassessmentLockGuard />
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {user?.isAnonymous && (
           <div className="print:hidden sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md">
