@@ -411,9 +411,11 @@ export default function ReassessmentEngine() {
                 <span className="text-xs font-black uppercase text-slate-600">
                   {idx + 1}.{' '}
                   {q.type === 'sentence_recall' ? (
-                    <>
-                      {q.subject} <span className="text-sky-600 italic">({q.infinitive})</span>
-                    </>
+                    // The authored line already carries its own infinitive/
+                    // subject hint (e.g. "hablar (yo) - todos los días
+                    // ________") — unlike the verb-group format below, it
+                    // needs no extra badge appended.
+                    q.subject
                   ) : (
                     <>
                       {q.sujeto} ({q.palabra}) — <span className="text-sky-600 italic">{q.tense}</span>
@@ -463,9 +465,7 @@ export default function ReassessmentEngine() {
             >
               <p className="text-xs font-bold text-slate-300">
                 {q.type === 'sentence_recall' ? (
-                  <>
-                    {q.subject} <span className="text-slate-500">({q.infinitive})</span>
-                  </>
+                  q.subject
                 ) : (
                   <>
                     {q.sujeto} ({q.palabra}, {q.tense})
