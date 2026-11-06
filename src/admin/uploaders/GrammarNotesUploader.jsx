@@ -68,6 +68,10 @@ const validateBlock = (b, bNum, noteLabel) => {
       else errs.push(...validateQuestion(b.question, 1, tag));
       break;
     }
+    case 'digdeeper': {
+      if (!isNonEmptyString(b.text)) errs.push(`${tag}: falta "text".`);
+      break;
+    }
     case 'drill': {
       const colCount = Array.isArray(b.contextColumns) ? b.contextColumns.length : -1;
       if (colCount < 0) errs.push(`${tag}: "contextColumns" debe ser un arreglo (puede estar vacío).`);
@@ -157,6 +161,11 @@ const GrammarNotesUploader = () => {
   const [errors, setErrors] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Off by default — the existing-id block below is a deliberate safety
+  // net (these ids are durable, linked-to-directly ids). Checking this is
+  // an explicit, one-time choice to overwrite, not a standing setting —
+  // it resets to off after every upload, same as jsonInput/pickedFiles.
+  const [allowUpdate, setAllowUpdate] = useState(false);
 
   const handleUpload = async () => {
     setStatus('');
@@ -198,12 +207,16 @@ const GrammarNotesUploader = () => {
       const snap = await getDocs(collection(db, 'grammar_pages'));
       const existingIds = new Set(snap.docs.map((d) => d.id));
 
-      // ID collisions are a hard error here — unlike curiosidades, these ids
-      // are durable (other notes and the day-sequencer link to them
-      // directly), so this importer never auto-renames; a collision must be
-      // resolved by hand.
+      // ID collisions are a hard error here by default — unlike curiosidades,
+      // these ids are durable (other notes and the day-sequencer link to
+      // them directly), so this importer never auto-renames; a collision
+      // must be resolved by hand. Checking "allowUpdate" is the explicit
+      // escape hatch for a deliberate amend (export from the Manager, add
+      // content, paste back here) — a duplicate WITHIN the same batch is
+      // still always an error regardless, since that's never intentional.
       const idErrors = [];
       const seenInBatch = new Map();
+      let updateCount = 0;
       parsedData.forEach((item, idx) => {
         const id = item?.id;
         if (!isNonEmptyString(id)) return; // already reported by validateNote
@@ -213,7 +226,11 @@ const GrammarNotesUploader = () => {
           seenInBatch.set(id, idx);
         }
         if (existingIds.has(id)) {
-          idErrors.push(`"${id}" ya existe en Firestore — este importador no sobrescribe notas existentes (edítala en el Manager si quieres cambiarla).`);
+          if (allowUpdate) {
+            updateCount += 1;
+          } else {
+            idErrors.push(`"${id}" ya existe en Firestore — marca "Permitir actualizar notas existentes" si quieres reemplazarla, o edítala en el Manager.`);
+          }
         }
       });
 
@@ -283,10 +300,14 @@ const GrammarNotesUploader = () => {
       }
       invalidateCollectionCache('grammar_pages');
 
-      setStatus(`✅ ¡Éxito! Se subieron ${parsedData.length} nota(s) a Firestore.`);
+      const createCount = parsedData.length - updateCount;
+      setStatus(
+        `✅ ¡Éxito! ${createCount} nota(s) nueva(s)${updateCount > 0 ? `, ${updateCount} actualizada(s)` : ''}.`
+      );
       setWarnings(linkWarnings);
       setJsonInput('');
       setPickedFiles([]);
+      setAllowUpdate(false);
     } catch (error) {
       console.error('Error uploading grammar notes:', error);
       setErrors([`Error al subir: ${error.message}`]);
@@ -306,9 +327,9 @@ const GrammarNotesUploader = () => {
         </div>
         <p className="text-slate-500 font-medium mb-6">
           Pega tu arreglo JSON completo abajo. Cada nota necesita su propio <code className="bg-slate-100 px-1 rounded">"id"</code> explícito — este
-          importador nunca sobrescribe una nota existente ni genera ids automáticamente, porque otras notas y el secuenciador diario enlazan a ellos
-          directamente. Si algún bloque hace referencia a una imagen local (p. ej.{' '}
-          <code className="bg-slate-100 px-1 rounded">"image": "diagrama.jpg"</code>), selecciona esos archivos abajo también.
+          importador nunca genera ids automáticamente, y por defecto nunca sobrescribe una nota existente, porque otras notas y el secuenciador diario
+          enlazan a ellos directamente (ver la casilla de abajo si de verdad quieres reemplazar una). Si algún bloque hace referencia a una imagen local
+          (p. ej. <code className="bg-slate-100 px-1 rounded">"image": "diagrama.jpg"</code>), selecciona esos archivos abajo también.
         </p>
 
         <textarea
@@ -318,6 +339,21 @@ const GrammarNotesUploader = () => {
           placeholder='[ { "id": "imperfecto:notas_generales", "title": "Imperfecto", "type": "subtopic", "blocks": [...] } ]'
           className="w-full font-mono text-xs bg-slate-100 border border-slate-200 rounded-xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
         ></textarea>
+
+        <label className="flex items-start gap-2 mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowUpdate}
+            onChange={(e) => setAllowUpdate(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-xs text-amber-800">
+            <span className="font-black uppercase tracking-widest">🔓 Permitir actualizar notas existentes</span>
+            <br />
+            Si lo marcas, un id que ya existe se REEMPLAZA por completo en vez de bloquear la subida — úsalo solo cuando pegues una nota exportada y
+            modificada a propósito. Se desmarca automáticamente después de subir.
+          </span>
+        </label>
 
         <div className="mb-6">
           <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Imágenes locales referenciadas en el JSON (opcional)</label>

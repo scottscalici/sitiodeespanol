@@ -150,6 +150,39 @@ const GrammarNotesManager = () => {
     [items]
   );
 
+  const [exportCategory, setExportCategory] = useState('');
+  const [exportedJson, setExportedJson] = useState('');
+  const [exportCopyStatus, setExportCopyStatus] = useState('');
+
+  // Reverses writeNote's own shape back into exactly what the bulk uploader
+  // expects — "export, amend by hand (or with Claude), paste back into the
+  // uploader with its 'permitir actualizar' box checked" is the whole point
+  // of this button: nothing here should ever require reshaping by hand.
+  // Legacy (htmlContent) notes are skipped — they don't have a blocks/
+  // subtopics shape at all, so round-tripping them through this schema
+  // would produce JSON the uploader would rightly reject.
+  const handleExport = () => {
+    setExportCopyStatus('');
+    const toExport = items.filter((it) => !it.isLegacy && (!exportCategory || it.category === exportCategory));
+    const skippedLegacy = items.filter((it) => it.isLegacy && (!exportCategory || it.category === exportCategory)).length;
+    const payload = toExport.map((it) => {
+      const note = { id: it.id, title: it.title, category: it.category || '', topic: it.topic || '', type: it.noteType };
+      if (it.noteType === 'landing') {
+        note.subtopics = it.subtopics;
+        if (it.blocks.length > 0) note.blocks = it.blocks;
+      } else {
+        note.blocks = it.blocks;
+      }
+      return note;
+    });
+    const json = JSON.stringify(payload, null, 2);
+    setExportedJson(json);
+    navigator.clipboard
+      ?.writeText(json)
+      .then(() => setExportCopyStatus(`✅ ${toExport.length} nota(s) copiada(s) al portapapeles${skippedLegacy > 0 ? ` (${skippedLegacy} en formato antiguo omitida(s))` : ''}.`))
+      .catch(() => setExportCopyStatus('⚠️ No se pudo copiar automáticamente — selecciona el texto de abajo y cópialo a mano.'));
+  };
+
   const handleSaveCategoryColors = async (colors) => {
     await setDoc(doc(db, 'config', 'grammar_categories'), colors);
     invalidateDocCache('config', 'grammar_categories');
@@ -256,6 +289,44 @@ const GrammarNotesManager = () => {
             </p>
           </div>
         )}
+
+        <div className="p-4 bg-indigo-50 border-b-2 border-indigo-200">
+          <p className="text-xs font-black text-indigo-800 uppercase tracking-widest mb-2">📤 Exportar notas (para amendar sin perder nada)</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={exportCategory}
+              onChange={(e) => setExportCategory(e.target.value)}
+              className="bg-white border border-indigo-300 rounded-lg p-2 text-xs font-bold text-indigo-800"
+            >
+              <option value="">Todas las categorías</option>
+              {categoryNames.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              Exportar a JSON
+            </button>
+            {exportCopyStatus && <span className="text-xs font-bold text-indigo-700">{exportCopyStatus}</span>}
+          </div>
+          <p className="text-xs text-indigo-700 mt-2">
+            Copia el JSON, pídeme que le agregue contenido (p. ej. bloques "Profundiza Más"), y pégalo de vuelta en el Subir JSON con "Permitir actualizar notas existentes" marcado.
+          </p>
+          {exportedJson && (
+            <textarea
+              readOnly
+              rows={8}
+              value={exportedJson}
+              onClick={(e) => e.target.select()}
+              className="w-full mt-3 font-mono text-[10px] bg-white border border-indigo-200 rounded-lg p-3"
+            />
+          )}
+        </div>
 
         <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-4 p-4 bg-slate-100 border-b border-slate-200 font-black text-[10px] uppercase tracking-widest text-slate-500 items-center">
           <div className="col-span-3 text-indigo-600">ID</div>

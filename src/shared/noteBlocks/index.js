@@ -24,6 +24,7 @@ import * as media from './media';
 import * as question from './question';
 import * as comparison from './comparison';
 import * as drill from './drill';
+import * as digdeeper from './digdeeper';
 
 export const BLOCK_TYPES = {
   [rule.TYPE_KEY]: rule,
@@ -34,6 +35,7 @@ export const BLOCK_TYPES = {
   [question.TYPE_KEY]: question,
   [comparison.TYPE_KEY]: comparison,
   [drill.TYPE_KEY]: drill,
+  [digdeeper.TYPE_KEY]: digdeeper,
 };
 
 export const BLOCK_LABELS = Object.fromEntries(Object.entries(BLOCK_TYPES).map(([key, mod]) => [key, mod.TYPE_LABEL]));
