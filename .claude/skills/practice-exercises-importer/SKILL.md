@@ -51,7 +51,10 @@ A plain JSON array, each entry one practice card:
   replacing the teacher's real card.
 - **title**: short, human-readable (shows in the Creator's card list and
   on the Dashboard).
-- **course**: `"s2"` or `"s4"`.
+- **course**: `"s2"`, `"s4"`, `"both"`, or an array like `["s2","s4"]` — the
+  latter two write ONE card per course (ids suffixed `_s2`/`_s4`
+  automatically), so a card meant for both classes only needs to be
+  generated once, not pasted twice under two different ids.
 - **dia**: a number to assign it to a specific class day, or `null` to
   leave it in the 📦 Banco — default to `null` unless told a day.
 - **gradeWeight**/**excused**: omit unless the teacher says otherwise
@@ -63,7 +66,11 @@ A plain JSON array, each entry one practice card:
 ## Question types — pick the one that matches what's actually on the page
 
 Every question needs a `"type"` field. These nine are good candidates for
-extraction from a worksheet:
+extraction from a worksheet. **Every type below accepts an optional
+`"explanation"` field** (feedback text shown once the student has answered,
+right or wrong) — not just `multiple_choice`; add it whenever the worksheet
+or answer key has a note explaining WHY an answer is correct, not just what
+it is.
 
 ### `write` — one blank, free-typed answer
 The default for a simple fill-in-the-blank or "conjugate this verb" item.
@@ -182,6 +189,14 @@ is the Spanish text that gets converted to speech, not shown to the student:
 ```
 
 ## Pictures on the worksheet: cropping them out of a photo
+
+If the teacher already has a FINISHED image file (already cropped, a PDF's
+own embedded image already saved, a diagram with no cropping needed at
+all), none of this section applies — just reference it by filename in the
+question's image field like normal (e.g. `"promptImage": "rivera_mural.png"`)
+and tell the teacher to select that exact file in the uploader's regular
+file picker. The crop tool below is only for the specific case of pulling
+ONE piece out of a LARGER photo.
 
 A PDF's own embedded images can be referenced directly once uploaded, but a
 **photo of a printed worksheet** is one flat image — any picture a question
