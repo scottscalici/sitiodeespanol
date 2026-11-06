@@ -181,26 +181,92 @@ is the Spanish text that gets converted to speech, not shown to the student:
 { "type": "listen", "prompt": "Buenos días, ¿cómo estás?", "answer": "Buenos días, ¿cómo estás?" }
 ```
 
-## Two types NOT to generate from a worksheet
+## Pictures on the worksheet: cropping them out of a photo
 
-`image_select` (pick the right picture) and `hotspot` (click a spot on an
-image) both need a real, already-hosted image URL and — for hotspot —
-hand-picked click coordinates. A photo or PDF of a worksheet gives no such
-hosted image to point to, so don't generate these two unless the teacher
-supplies actual image URLs themselves; the importer will accept them
-without an image either way, but the resulting card is unusable until
-someone uploads one by hand in the Creator.
+A PDF's own embedded images can be referenced directly once uploaded, but a
+**photo of a printed worksheet** is one flat image — any picture a question
+needs (a promptImage, an `image_select` option's `img`, etc.) has to be
+*cropped* out of that photo instead. The Practice Cards uploader has a
+built-in crop tool (`ImageCropAssist`, under "✂️ Recortar imágenes" on the
+`/admin-practice-cards-upload` page) for exactly this: it takes a crop
+instructions JSON, lets the teacher fine-tune each box over the real photo,
+then produces real cropped files the main JSON references by filename —
+nothing here requires the teacher to crop/upload anything by hand first.
+
+Whenever a worksheet **photo** has a picture a question needs, produce a
+**second JSON array**, separate from the cards array, one entry per picture:
+
+```json
+{
+  "sourcePhoto": "hoja1.jpg",
+  "crop": { "x": 0.11, "y": 0.355, "width": 0.26, "height": 0.21 },
+  "targetFilename": "pic_a.png",
+  "role": "question"
+}
+```
+
+- **sourcePhoto**: the exact filename the teacher will select for that
+  photo in the crop tool's file picker — since this has to match exactly
+  (including the extension, e.g. `.jpg` vs `.jpeg`), ALWAYS tell the
+  teacher explicitly what to save/rename the photo as, right before the
+  JSON blocks (e.g. "Save this photo as `hoja1.jpg` before uploading it.").
+  Never guess at a filename she hasn't told you and silently hope it
+  matches — state it as an instruction.
+- **crop**: `{x, y, width, height}`, each a fraction from 0 to 1 of the
+  *whole photo's* width/height (not pixels) — estimate this by eye from
+  where the picture sits on the page. It only needs to be reasonably
+  close: the teacher gets an interactive box to drag/resize over the real
+  photo before confirming, so this is a starting point, not a final
+  answer. Err toward a slightly tight box that excludes any surrounding
+  chrome (a lettered circle badge like "a", "b", answer blanks, borders)
+  the teacher wouldn't want baked into the picture — those stay visible if
+  included, and for a shuffled exercise (matching, image_select) a visible
+  "a/b/c" badge can look confusing once the pictures are reordered.
+- **targetFilename**: a plain, teacher-meaningful name (e.g.
+  `pic_a.png`) — this is exactly what you then reference in the main
+  cards JSON's `promptImage`/`img` field, as if it were any other local
+  filename.
+- **role**: `"question"` for a picture a question actually uses,
+  `"decorative"` otherwise — purely descriptive for your own bookkeeping
+  when writing the crop list; the app doesn't treat them differently.
+
+When a worksheet exercise is fundamentally "match each word/picture to its
+image" (one picture per word/item, picked from a photo), `matching` is
+usually the right type, with the image side as `right: { "image":
+"pic_a.png" }` (no `text` needed on that side) — see the example above.
+`image_select` also now works from a worksheet photo this way, with each
+option's own cropped `img`.
+
+Output order when crops are involved: the cards JSON array first, then a
+line telling the teacher what to save the source photo(s) as, then the
+crop instructions array, each clearly labeled. This is the one case where
+more than a bare JSON array is expected in the output — see "Important"
+below.
+
+## One type still NOT to generate from a worksheet
+
+`hotspot` (click a spot on an image) needs hand-picked click coordinates a
+cropped picture alone doesn't give you — even with its image cropped out
+via the method above, the click target still has to be placed by the
+teacher afterward in the Creator. Don't generate `hotspot` questions from a
+worksheet; `image_select` (pick the right whole picture, no click-target
+needed) covers the vast majority of what a worksheet actually asks for
+image-wise.
 
 ## Important
 
 - Output nothing but the JSON array — no intro, no explanation, no
   markdown code fence commentary beyond the code block itself. The teacher
-  is going to copy it straight into the importer's paste box.
+  is going to copy it straight into the importer's paste box. The one
+  exception is when crop instructions are involved (see above): then the
+  cards JSON, a one-line filename instruction, and the crop JSON are all
+  expected, since the teacher needs to paste two different things into two
+  different boxes on the same page.
 - Split a worksheet's distinct exercises into separate question objects
   inside one card's `questions` array (one card per worksheet page is the
   usual grain) rather than cramming everything into a single question.
 - Keep prompts and answers in the exact Spanish/English the worksheet
   uses — don't "improve" or rephrase the source material.
-- If a worksheet exercise doesn't cleanly fit any of the eight types above
+- If a worksheet exercise doesn't cleanly fit any of the types above
   (e.g. an open-ended essay prompt), skip it rather than forcing a bad fit,
   and say so in one line after the JSON.
