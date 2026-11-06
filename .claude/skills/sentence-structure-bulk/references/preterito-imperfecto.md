@@ -38,6 +38,63 @@ for this curriculum without a clear cue word or phrase (see the cue lists
 under each use below) — if a sentence doesn't obviously need one because
 of its own content, add a cue anyway rather than relying on implication.
 
+## Keep sentences short — lean on one strong cue, not a narrative
+
+Default to the shortest sentence that still makes grammatical sense:
+subject + cue + the blanked verb, with little or no extra elaboration
+(object, location, reason, etc.). The cue word or phrase IS the exercise —
+padding it with narrative detail ("...con mi profesora sobre el examen")
+doesn't add any teaching value and just makes the sentence slower to read.
+This matters even more for anything headed for a reassessment bank (see
+above): the teacher's own printed exams drill this exact way — a bare
+"verbo (sujeto) — cue ___" line, nothing more.
+
+Good (short, one clear cue doing all the work):
+`Ayer yo [[hablé|hablar]].` · `Siempre [[llovía|llover]] en abril.`
+
+Avoid (same cue, buried in unneeded narrative):
+`Ayer yo [[hablé|hablar]] con mi profesora sobre el examen final de la clase.`
+
+A little context is fine when the verb genuinely needs an object to make
+sense (e.g. *comer*, *visitar*) — keep it to one short phrase, not a full
+clause with extra detail tacked on.
+
+## Fuller cue-phrase bank (use alongside the cue lists under each use below)
+
+A more exhaustive list of real cue words/phrases, grouped by what they
+signal — draw from here (not just the shorter illustrative lists under
+each lettered use) whenever generating a batch, and still prefer whichever
+cue is the single clearest, most unambiguous signal for that line:
+
+**Pretérito — definite start/end (maps to uses A and C):** ayer, anoche,
+anteayer, el lunes (pasado), la semana/el mes/el año pasado, el otro día,
+hace + tiempo, esta mañana/esta tarde (si ya terminó), el fin de semana
+pasado, en + fecha (año, mes o festividad).
+
+**Pretérito — defined duration/count (maps to use E, and A for the count
+phrases):** una vez/dos veces/tres veces, ayer por la mañana/por la noche,
+durante + periodo, por fin/al fin/finalmente, de repente/de pronto.
+
+**Marks the start or end of an action (maps to use A/G):** al empezar, al
+terminar, en ese momento, entonces/luego/después, una mañana/una
+noche/un día.
+
+**Pretérito — common narrative expressions (maps to uses A and I):** de
+repente/de pronto, en seguida/inmediatamente, and *y cuando* for marking
+an interruption.
+
+**Imperfecto — habitual frequency (maps to use D):** siempre, a
+menudo/frecuentemente, generalmente/por lo general, normalmente, todos los
+días/los lunes/las semanas/los veranos, cada día/cada semana/cada año,
+muchas veces/varias veces, de vez en cuando, a veces.
+
+**Imperfecto — continuous/indeterminate time (maps to uses B, H, and I):**
+mientras, en aquel entonces/en esa época, cuando era niño/joven, antes,
+siempre que, todo el tiempo.
+
+**Imperfecto — description/context, use sparingly (maps to use F):** era/
+estaba/había, hacía + tiempo, tenía + emoción/edad/característica.
+
 ## The segments
 
 | # | Segment | Uses drilled |
