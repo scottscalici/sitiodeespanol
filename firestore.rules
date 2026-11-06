@@ -108,15 +108,15 @@ service cloud.firestore {
     }
 
     // --- REASSESSMENT ATTEMPTS (the timed, auto-graded quiz that follows a
-    // passed recuperación gate) --- A student may only create their own
-    // attempt (starting it) and update it (autosaving answers, submitting).
-    // Unlike recuperaciones, an admin (teacher) CAN also update here — a
-    // finished attempt only clears (archiving the old score into `history`)
-    // when the teacher does it from the Recuperación tab, so a student can
-    // never self-service a retake.
+    // passed recuperación gate) --- A student may create/update their own
+    // attempt (starting it, autosaving answers, submitting). An admin
+    // (teacher) can also create or update any student's doc — needed both
+    // for "🔄 Reiniciar" (archiving a finished attempt) and "🔓 Abrir Ahora"
+    // (granting a student override can mean CREATING this doc for a
+    // student who has never opened the reassessment page at all yet).
     match /reassessment_attempts/{docId} {
       allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
-      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow create: if isLoggedIn() && (isAdmin() || request.resource.data.uid == request.auth.uid);
       allow update: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
     }
 

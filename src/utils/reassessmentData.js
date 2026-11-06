@@ -48,6 +48,30 @@ export const saveReassessmentAnswers = async (uid, circleId, answers) => {
   await setDoc(doc(db, 'reassessment_attempts', docId(uid, circleId)), { answers }, { merge: true });
 };
 
+// Teacher-only: "🔓 Abrir Ahora" — bypasses the A/B class-window check for
+// ONE student for a limited time (default 20 min), e.g. they're meeting
+// the teacher outside class. ReassessmentEngine checks this alongside the
+// regular window; it never bypasses the gate-pass check. Works whether or
+// not the student has ever opened the reassessment page before (a plain
+// merge onto a doc that may not exist yet — see the firestore.rules
+// create/update rule, which allows admin either way). No separate "close
+// it after they submit" logic is needed: once an attempt exists with a
+// status, the engine's own status check runs before the window/override
+// check ever does, so the override is moot the moment they start; if they
+// never start, openUntil passing is the only other way it stops mattering.
+export const grantReassessmentOverride = async (uid, circleId, minutes = 20) => {
+  const ref = doc(db, 'reassessment_attempts', docId(uid, circleId));
+  await setDoc(
+    ref,
+    {
+      uid,
+      circleId,
+      override: { openUntil: new Date(Date.now() + minutes * 60000).toISOString(), grantedAt: new Date().toISOString() },
+    },
+    { merge: true }
+  );
+};
+
 export const finishReassessmentAttempt = async (uid, circleId, { answers, score }) => {
   await setDoc(
     doc(db, 'reassessment_attempts', docId(uid, circleId)),

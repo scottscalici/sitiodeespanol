@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../../../utils/evaluaciones';
-import { clearReassessmentAttempt } from '../../../utils/reassessmentData';
+import { clearReassessmentAttempt, grantReassessmentOverride } from '../../../utils/reassessmentData';
 import { resetRecuperacionForRetake } from '../../../utils/recuperacionData';
 
 // Teacher-facing eligibility list: only who's PASSED the recuperación gate
@@ -65,6 +65,7 @@ export default function TeacherRecuperacionTab() {
           byCourse[meta.course][key] = { evalDia: meta.evalDia, evalLabel: meta.evalLabel, students: [] };
         }
         const attempt = attemptsByKey[`${d.uid}__${d.circleId}`];
+        const overrideActive = attempt?.override?.openUntil && new Date(attempt.override.openUntil) > new Date();
         byCourse[meta.course][key].students.push({
           uid: d.uid,
           circleId: d.circleId,
@@ -72,6 +73,7 @@ export default function TeacherRecuperacionTab() {
           bestScore: d.bestScore,
           passedAt: d.passedAt,
           reassessment: attempt?.status ? { status: attempt.status, score: attempt.score } : null,
+          overrideUntil: overrideActive ? attempt.override.openUntil : null,
         });
       });
 
@@ -103,6 +105,24 @@ export default function TeacherRecuperacionTab() {
       await load();
     } catch (err) {
       console.error('Error resetting reassessment attempt:', err);
+    } finally {
+      setResettingKey(null);
+    }
+  };
+
+  // "They're meeting me outside class" — bypasses the A/B window check for
+  // 20 minutes for this one student/quiz, never the gate-pass check. Does
+  // NOT need a reassessment doc to already exist (see firestore.rules —
+  // admin can create one too).
+  const handleOpenNow = async (uid, circleId) => {
+    const key = `${uid}__${circleId}`;
+    setResettingKey(key);
+    try {
+      await grantReassessmentOverride(uid, circleId, 20);
+      invalidateCollectionCache('reassessment_attempts');
+      await load();
+    } catch (err) {
+      console.error('Error granting reassessment override:', err);
     } finally {
       setResettingKey(null);
     }
@@ -143,6 +163,23 @@ export default function TeacherRecuperacionTab() {
                             {resettingKey === key ? '...' : '🔄 Reiniciar'}
                           </button>
                         </>
+                      )}
+                      {!s.reassessment && (
+                        s.overrideUntil ? (
+                          <span className="text-violet-400 font-black uppercase tracking-widest text-[10px]" title="Puede empezar aunque esté fuera de su horario">
+                            🔓 Abierto hasta {new Date(s.overrideUntil).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenNow(s.uid, s.circleId)}
+                            disabled={resettingKey === key}
+                            className="bg-violet-700 hover:bg-violet-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded disabled:opacity-50"
+                            title="Permite empezar la reevaluación ahora mismo, fuera de su horario normal (20 min)"
+                          >
+                            {resettingKey === key ? '...' : '🔓 Abrir Ahora'}
+                          </button>
+                        )
                       )}
                     </div>
                   </div>

@@ -11,7 +11,7 @@ import {
   saveReassessmentAnswers,
   finishReassessmentAttempt,
 } from '../utils/reassessmentData';
-import { fetchClassSchedule, isReassessmentWindowOpen } from '../utils/classSchedule';
+import { fetchClassSchedule, fetchScheduleOverrideForDate, mergeScheduleBlocks, isReassessmentWindowOpen } from '../utils/classSchedule';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 
 const gradeAnswers = (questions, answerMap) => {
@@ -60,6 +60,7 @@ export default function ReassessmentEngine() {
 
   const [phase, setPhase] = useState('loading'); // loading | gate_locked | no_config | window_closed | ready | in_progress | finished
   const [windowInfo, setWindowInfo] = useState(null);
+  const [overrideUntil, setOverrideUntil] = useState(null);
   const [config, setConfig] = useState(null);
   const [verbGroupsById, setVerbGroupsById] = useState({});
   const [masterVerbsMap, setMasterVerbsMap] = useState({});
@@ -75,11 +76,13 @@ export default function ReassessmentEngine() {
     const load = async () => {
       if (!uid || !circleId) return;
       try {
-        const [recupDoc, configSnap, calSnap, scheduleBlocks, groups, verbsArray, existingAttempt] = await Promise.all([
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const [recupDoc, configSnap, calSnap, scheduleBlocks, overrideBlocks, groups, verbsArray, existingAttempt] = await Promise.all([
           fetchRecuperacionDoc(uid, circleId),
           getDoc(doc(db, 'reassessment_configs', circleId)),
           getDoc(doc(db, 'config', 'academic_year_2026_2027')),
           fetchClassSchedule(),
+          fetchScheduleOverrideForDate(todayStr),
           getCachedCollection('verbGroups'),
           getCachedBucketedCollection('verbs'),
           fetchReassessmentAttempt(uid, circleId),
@@ -136,13 +139,20 @@ export default function ReassessmentEngine() {
         }
 
         const calendarArray = calSnap.exists() ? calSnap.data().map || [] : [];
-        const todayStr = new Date().toLocaleDateString('en-CA');
         const todaysEntry = calendarArray.find((c) => c.fecha === todayStr);
         const todaysCiclo = todaysEntry?.ciclo || null;
 
-        const windowResult = isReassessmentWindowOpen(userData?.section, scheduleBlocks, todaysCiclo);
+        const effectiveBlocks = mergeScheduleBlocks(scheduleBlocks, overrideBlocks);
+        const windowResult = isReassessmentWindowOpen(userData?.section, effectiveBlocks, todaysCiclo);
         setWindowInfo(windowResult);
-        setPhase(windowResult.open ? 'ready' : 'window_closed');
+
+        // A teacher's "🔓 Abrir Ahora" override (reassessment_attempts'
+        // own `override.openUntil`) bypasses a closed window — never the
+        // gate check above, which already returned if it failed.
+        const override = existingAttempt?.override;
+        const overrideOpen = !!override?.openUntil && new Date() < new Date(override.openUntil);
+        setOverrideUntil(overrideOpen ? override.openUntil : null);
+        setPhase(windowResult.open || overrideOpen ? 'ready' : 'window_closed');
       } catch (err) {
         console.error('Error loading reassessment:', err);
         setErrorMessage('Hubo un error al cargar la reevaluación.');
@@ -291,6 +301,11 @@ export default function ReassessmentEngine() {
       <Shell>
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center space-y-4">
           <p className="text-lg font-bold text-emerald-400">✅ Disponible ahora</p>
+          {overrideUntil && !windowInfo?.open && (
+            <p className="text-xs text-violet-400 font-bold">
+              🔓 Tu profesor te abrió acceso especial hasta las {new Date(overrideUntil).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
           <p className="text-sm text-slate-400">{config.evalLabel}</p>
           <p className="text-xs text-slate-500 font-mono">
             {totalQuestions} preguntas · {Math.round(config.timeLimitSeconds / 60)} minutos
