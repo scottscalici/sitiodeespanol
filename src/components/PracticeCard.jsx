@@ -16,8 +16,12 @@ export default function PracticeCard({ card }) {
   if (!card) return null;
 
   return (
+    // Links by the card's own doc id, not course+día — a day can have more
+    // than one practice card assigned (e.g. preterite + imperfect the same
+    // día), and the old course+día route only ever resolved the first
+    // match, silently sending every tile for that día to the same card.
     <Link
-      to={`/practica/tarjeta/${card.course}/${card.dia}`}
+      to={`/practica/tarjeta/${card.id}`}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
       style={cardTheme.style}
     >

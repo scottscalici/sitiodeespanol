@@ -229,6 +229,7 @@ function App() {
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
+            <Route path="/practica/tarjeta/:cardId" element={<PracticeCardEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
             <Route path="/lectura/tarjeta/:readingId" element={<ReadingCardEngine />} />
             <Route path="/lectura/tarjeta/:courseId/:targetDia" element={<ReadingCardEngine />} />

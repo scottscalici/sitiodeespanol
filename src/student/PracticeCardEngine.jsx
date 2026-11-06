@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { awardPoints } from '../utils/pointsHelper';
@@ -20,7 +20,13 @@ import { normalizeLegacyPracticeQuestion } from '../utils/legacyPracticeQuestion
 // src/utils/warmupBreakdown.js), and completing it for the first time awards
 // its point value as ordinary XP (never re-awarded on a later resubmit).
 export default function PracticeCardEngine({ onClose }) {
-  const { courseId, targetDia } = useParams();
+  // Two route shapes resolve here: /practica/tarjeta/:cardId (direct, by
+  // doc id — what every real entry point now links to) and
+  // /practica/tarjeta/:courseId/:targetDia (by course+día, kept only
+  // because it's possible some old link/bookmark still points at it — see
+  // the note on the day+course query below for why it's no longer safe to
+  // treat as a card's canonical address).
+  const { cardId, courseId, targetDia } = useParams();
   const { userData } = useAuth();
   const navigate = useNavigate();
 
@@ -59,29 +65,49 @@ export default function PracticeCardEngine({ onClose }) {
   const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!targetDia || !courseId) return;
+    if (!cardId && !(targetDia && courseId)) return;
     const fetchCard = async () => {
       try {
-        const formattedCourse = String(courseId).toLowerCase();
-        const targetDiaNum = Number(targetDia);
-        const q = query(
-          collection(db, 'practice_cards'),
-          where('dia', '==', targetDiaNum),
-          where('course', '==', formattedCourse)
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const cardId = snap.docs[0].id;
-          const data = snap.docs[0].data();
+        let resolvedId = null;
+        let data = null;
+
+        if (cardId) {
+          const snap = await getDoc(doc(db, 'practice_cards', cardId));
+          if (snap.exists()) {
+            resolvedId = snap.id;
+            data = snap.data();
+          }
+        } else {
+          // Legacy day+course lookup — kept only for an old link/bookmark
+          // still pointing at it. Takes the FIRST match only, so it's
+          // unsafe the moment more than one card shares a course+día (see
+          // PracticeCard.jsx and Dashboard.jsx, which now link by id
+          // directly instead of through this route for exactly that
+          // reason).
+          const formattedCourse = String(courseId).toLowerCase();
+          const targetDiaNum = Number(targetDia);
+          const q = query(
+            collection(db, 'practice_cards'),
+            where('dia', '==', targetDiaNum),
+            where('course', '==', formattedCourse)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            resolvedId = snap.docs[0].id;
+            data = snap.docs[0].data();
+          }
+        }
+
+        if (data) {
           const loadedQuestions = (data.questions || []).map(normalizeLegacyPracticeQuestion);
-          setCardData({ id: cardId, ...data, questions: loadedQuestions });
+          setCardData({ id: resolvedId, ...data, questions: loadedQuestions });
 
           // Restoring an interrupted session: applied here, synchronously
           // alongside setCardData (same batch, before the loading spinner
           // clears), so the UI never flashes question 1 before snapping to
           // a restored later question on a separate render.
           if (userData?.role !== 'admin') {
-            const inProgress = userData?.progress?.practiceCards?.[cardId]?.inProgress;
+            const inProgress = userData?.progress?.practiceCards?.[resolvedId]?.inProgress;
             if (inProgress) {
               questionStatesRef.current = { ...(inProgress.questionStates || {}) };
               setSubmitted(!!inProgress.submitted);
@@ -101,7 +127,7 @@ export default function PracticeCardEngine({ onClose }) {
     };
     fetchCard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetDia, courseId]);
+  }, [cardId, targetDia, courseId]);
 
   const questions = cardData?.questions || [];
   const currentQ = questions[currentIndex];

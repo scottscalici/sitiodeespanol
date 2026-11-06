@@ -987,7 +987,7 @@ const Dashboard = () => {
                           to: isCuriosidad
                             ? `/curiosidad-quiz/${item.id}`
                             : isPractica
-                            ? `/practica/tarjeta/${item.course}/${item.dia}`
+                            ? `/practica/tarjeta/${item.id}`
                             : `/calentamiento/${item.course}/${item.dia}`,
                           onClick: () => setShowWarmupModal(false),
                         };
