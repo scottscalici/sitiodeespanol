@@ -254,6 +254,8 @@ export default function ReadingCardEngine() {
             {questions.map((question, qIdx) => {
               const TypeRenderer = QUESTION_TYPES[question.type]?.Renderer;
               if (!TypeRenderer) return null;
+              const openEndedGrade =
+                question.type === 'open_ended' ? userData?.progress?.readingCards?.[cardData.id]?.grades?.[qIdx] : null;
               return (
                 <div key={qIdx} className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl">
                   <TypeRenderer
@@ -263,6 +265,12 @@ export default function ReadingCardEngine() {
                     initialState={questionStatesRef.current[qIdx]}
                     onStateChange={(state) => handleStateChange(qIdx, state)}
                   />
+                  {openEndedGrade && (
+                    <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                      <p className="text-emerald-700 font-black text-sm">✅ Calificado · {openEndedGrade.points} pts</p>
+                      {openEndedGrade.comment && <p className="text-emerald-600 text-sm mt-1">{openEndedGrade.comment}</p>}
+                    </div>
+                  )}
                 </div>
               );
             })}

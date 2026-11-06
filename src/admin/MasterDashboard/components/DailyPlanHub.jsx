@@ -392,6 +392,7 @@ const DailyPlanHub = () => {
                   <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeReadingCards.length}</span>
                 </div>
                 <div className="flex gap-2">
+                  <Link to="/admin-reading-cards-grading" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📝 Calificar</Link>
                   <Link to="/admin-reading-cards-sequencer" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Sequencer</Link>
                   <Link to="/admin-reading-cards-upload" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">+ Importar</Link>
                 </div>
