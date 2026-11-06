@@ -34,7 +34,10 @@ export const startReassessmentAttempt = async (uid, meta, questions, timeLimitSe
     expiresAt: new Date(now.getTime() + timeLimitSeconds * 1000).toISOString(),
     finishedAt: null,
   };
-  await setDoc(doc(db, 'reassessment_attempts', docId(uid, meta.circleId)), payload);
+  // merge: true — a retake after a teacher clear leaves `history` sitting
+  // on this same doc (see clearReassessmentAttempt); a plain overwrite here
+  // would silently wipe that past-attempts record the moment a new one starts.
+  await setDoc(doc(db, 'reassessment_attempts', docId(uid, meta.circleId)), payload, { merge: true });
   return payload;
 };
 
@@ -51,4 +54,32 @@ export const finishReassessmentAttempt = async (uid, circleId, { answers, score 
     { status: 'finished', answers, score, finishedAt: new Date().toISOString() },
     { merge: true }
   );
+};
+
+// Teacher-only: archives a finished attempt into `history` and clears the
+// active fields back to null, so ReassessmentEngine sees no current
+// attempt and lets the student start a brand new one next time their
+// window is open. A student can never do this themselves — the whole
+// point is that retaking a reassessment requires the teacher to let it
+// happen, not a self-service "try again" — so this is only ever called
+// from an admin-only UI (TeacherRecuperacionTab's reset button).
+export const clearReassessmentAttempt = async (uid, circleId) => {
+  const ref = doc(db, 'reassessment_attempts', docId(uid, circleId));
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const history = [...(data.history || [])];
+  if (data.status === 'finished') {
+    history.push({ score: data.score, finishedAt: data.finishedAt, questions: data.questions || [], answers: data.answers || {} });
+  }
+  await setDoc(ref, {
+    status: null,
+    questions: [],
+    answers: {},
+    score: null,
+    startedAt: null,
+    expiresAt: null,
+    finishedAt: null,
+    history,
+  }, { merge: true });
 };

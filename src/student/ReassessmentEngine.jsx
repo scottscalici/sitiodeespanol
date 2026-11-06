@@ -95,9 +95,13 @@ export default function ReassessmentEngine() {
         const cfg = configSnap.exists() ? configSnap.data() : null;
         setConfig(cfg);
 
-        // Already has an attempt — its own state decides the phase,
-        // regardless of gate/window (those only gate STARTING a new one).
-        if (existingAttempt) {
+        // Already has an ACTIVE attempt (status set) — its own state
+        // decides the phase, regardless of gate/window (those only gate
+        // STARTING a new one). A doc can exist with status cleared back to
+        // null (see clearReassessmentAttempt) — that's treated exactly like
+        // no attempt at all, falling through to the normal gate/window
+        // checks below so a teacher-approved retake works.
+        if (existingAttempt?.status) {
           if (existingAttempt.status === 'finished') {
             setAttempt(existingAttempt);
             setResult({ score: existingAttempt.score, finishedAnswers: existingAttempt.answers || {} });

@@ -108,15 +108,16 @@ service cloud.firestore {
     }
 
     // --- REASSESSMENT ATTEMPTS (the timed, auto-graded quiz that follows a
-    // passed recuperación gate) --- Same ownership-by-field pattern as
-    // recuperaciones above: a student may only create/update their own
-    // attempt (starting it, autosaving answers, submitting); an admin
-    // (teacher) can read every student's for the gradebook tab, but never
-    // write one directly.
+    // passed recuperación gate) --- A student may only create their own
+    // attempt (starting it) and update it (autosaving answers, submitting).
+    // Unlike recuperaciones, an admin (teacher) CAN also update here — a
+    // finished attempt only clears (archiving the old score into `history`)
+    // when the teacher does it from the Recuperación tab, so a student can
+    // never self-service a retake.
     match /reassessment_attempts/{docId} {
       allow read: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
       allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isLoggedIn() && resource.data.uid == request.auth.uid;
+      allow update: if isLoggedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
     }
 
     // --- CONVERSACIÓN NOTES (per-student scratch notes on a conversación activity) ---
