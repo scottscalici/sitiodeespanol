@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +41,7 @@ export default function Recuperacion() {
   const [liveDia, setLiveDia] = useState(1);
   const [gateCircles, setGateCircles] = useState([]); // every gate-enabled circle for this course, with live-resolved día
   const [docsByCircle, setDocsByCircle] = useState({}); // circleId -> recuperacion doc (or null)
+  const [reassessableIds, setReassessableIds] = useState(new Set()); // circleIds with a reassessment_configs doc
 
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [phase, setPhase] = useState('list'); // 'list' | 'reflect' | 'gate' | 'session'
@@ -63,10 +64,12 @@ export default function Recuperacion() {
           : 1;
         setLiveDia(currentDay);
 
-        const [podDocs, currentEvalOptions] = await Promise.all([
+        const [podDocs, currentEvalOptions, reassessmentConfigs] = await Promise.all([
           getCachedCollection('practice_pods'),
           fetchEvaluacionOptions(course),
+          getCachedCollection('reassessment_configs'),
         ]);
+        setReassessableIds(new Set(reassessmentConfigs.map((cfg) => cfg.id)));
 
         const circles = [];
         podDocs
@@ -210,17 +213,17 @@ export default function Recuperacion() {
               const passed = d?.passed;
               const hasReflection = !!d?.reflection;
               const bestScore = d?.bestScore || 0;
+              const canReassess = passed && reassessableIds.has(c.id);
               return (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => openCircle(c)}
-                  className="w-full text-left bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all flex items-center justify-between"
+                  className="w-full bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-rose-300 transition-all flex items-center justify-between gap-4"
                 >
-                  <div>
+                  <button onClick={() => openCircle(c)} className="text-left flex-1">
                     <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-1">Día {c.evalDia}</p>
                     <p className="font-bold text-slate-800">{c.evalLabel}</p>
-                  </div>
-                  <div>
+                  </button>
+                  <div className="flex items-center gap-2">
                     {passed ? (
                       <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full">
                         ✓ Aprobado ({bestScore}%)
@@ -234,8 +237,16 @@ export default function Recuperacion() {
                         Sin empezar
                       </span>
                     )}
+                    {canReassess && (
+                      <Link
+                        to={`/reevaluacion/${c.id}`}
+                        className="text-[10px] font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-full transition-colors"
+                      >
+                        🎯 Reevaluación
+                      </Link>
+                    )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

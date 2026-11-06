@@ -158,9 +158,14 @@ export default function ReassessmentConfigManager() {
         <h2 className="text-2xl font-black uppercase tracking-widest text-violet-400 flex items-center gap-3">
           <span>🎲</span> Configurar Reevaluaciones
         </h2>
-        <Link to="/admin-secret-portal-master" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700">
-          ← Volver
-        </Link>
+        <div className="flex gap-2">
+          <Link to="/admin-class-schedule" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700">
+            🕐 Horario
+          </Link>
+          <Link to="/admin-secret-portal-master" className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700">
+            ← Volver
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-1.5 mb-4">

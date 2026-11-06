@@ -74,6 +74,8 @@ import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequen
 import ReadingCardsSequencer from './admin/MasterDashboard/components/ReadingCardsSequencer';
 import ReadingGradingQueue from './admin/MasterDashboard/components/ReadingGradingQueue';
 import ReassessmentConfigManager from './admin/MasterDashboard/components/ReassessmentConfigManager';
+import ClassScheduleManager from './admin/MasterDashboard/components/ClassScheduleManager';
+import ReassessmentEngine from './student/ReassessmentEngine';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
@@ -221,6 +223,7 @@ function App() {
             <Route path="/kpractice" element={<KPracticePage />} />
             <Route path="/practice-hub" element={<PracticeHub />} />
             <Route path="/recuperacion" element={<Recuperacion />} />
+            <Route path="/reevaluacion/:circleId" element={<ReassessmentEngine />} />
             <Route path="/student-learning-path-questions" element={<WorkoutEngine />} />
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
@@ -673,6 +676,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ReassessmentConfigManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-class-schedule"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ClassScheduleManager />
                 </AdminRoute>
               }
             />
