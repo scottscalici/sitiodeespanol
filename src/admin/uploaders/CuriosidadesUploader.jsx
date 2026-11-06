@@ -6,6 +6,7 @@ import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import { uploadAdminImage, uploadAdminAudio, importImageFromUrl, importAudioFromUrl } from '../../utils/imageUpload';
 import { finalizeQuestion } from '../../shared/questionTypes';
 import { isNonEmptyString, validateQuestion, collectQuestionImageRefs, collectQuestionAudioRefs } from '../../utils/validateQuestion';
+import { validateMediaRefs, resolveMediaRefs } from '../../utils/mediaImport';
 
 const BUNDLE_DOC_ID = '_bundle';
 
@@ -35,28 +36,6 @@ const ensureUniqueId = (candidate, existingIds) => {
   }
   existingIds.add(id);
   return id;
-};
-
-const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
-
-// A raw.githubusercontent.com link (e.g. into the teacher's own `imagenes`
-// asset repo) is treated as a SOURCE to fetch and re-host, not an already-
-// final URL — these links are known to break on some networks' content
-// filters (see MediaMigrationManager's own comment on the same issue), so
-// everything the app stores long-term goes through Firebase Storage instead.
-const isGithubRawUrl = (v) => typeof v === 'string' && /^https:\/\/raw\.githubusercontent\.com\//i.test(v);
-
-// Only a local filename or a raw-GitHub source URL needs resolving (upload
-// or fetch+reupload) — any other already-hosted URL (Firebase Storage, an
-// old Schoology link, etc.) is left exactly as given, same as before.
-const needsResolution = (value) => isNonEmptyString(value) && (!isUrl(value) || isGithubRawUrl(value));
-
-const basenameFromUrl = (url, fallback) => {
-  try {
-    return decodeURIComponent(new URL(url).pathname.split('/').pop()) || fallback;
-  } catch {
-    return fallback;
-  }
 };
 
 const validateItem = (item, idx) => {
@@ -94,42 +73,7 @@ const collectAudioRefs = (item) => {
   return refs;
 };
 
-// A local filename (not a URL at all) must be in the picked-files list; a
-// raw-GitHub URL doesn't need one, since it's fetched directly instead.
-const validateMediaRefs = (items, fileMap, collectRefs, label) => {
-  const errs = [];
-  items.forEach((item, idx) => {
-    if (!item || typeof item !== 'object') return;
-    const itemLabel = `Curiosidad ${idx + 1}${item.title ? ` ("${item.title}")` : ''}`;
-    collectRefs(item).forEach(({ obj, key }) => {
-      const value = obj[key];
-      if (needsResolution(value) && !isGithubRawUrl(value) && !fileMap.has(value)) {
-        errs.push(`${itemLabel}: ${label} "${value}" no fue proporcionado en los archivos seleccionados.`);
-      }
-    });
-  });
-  return errs;
-};
-
-// Resolves every ref's value to a final Storage URL in place — a local
-// filename goes through uploadFn (matched against fileMap), a raw-GitHub
-// source URL goes through importFn (fetched and re-hosted); anything else
-// is already final and untouched. One pass across every item's refs so the
-// same source file/URL referenced from several places only uploads once.
-const resolveMediaRefs = async (items, collectRefs, fileMap, folder, uploadFn, importFn, fallbackName) => {
-  const allRefs = items.flatMap((item) => collectRefs(item));
-  const urlMap = new Map();
-  const neededValues = new Set(allRefs.map(({ obj, key }) => obj[key]).filter(needsResolution));
-  for (const value of neededValues) {
-    const url = isGithubRawUrl(value)
-      ? await importFn(value, folder, basenameFromUrl(value, fallbackName))
-      : await uploadFn(fileMap.get(value), folder);
-    urlMap.set(value, url);
-  }
-  allRefs.forEach(({ obj, key }) => {
-    if (needsResolution(obj[key])) obj[key] = urlMap.get(obj[key]);
-  });
-};
+const itemLabel = (item, idx) => `Curiosidad ${idx + 1}${item.title ? ` ("${item.title}")` : ''}`;
 
 const CuriosidadesUploader = () => {
   const [jsonInput, setJsonInput] = useState('');
@@ -164,8 +108,8 @@ const CuriosidadesUploader = () => {
     // the batch is reported up front instead of leaving a partial import.
     const shapeErrors = parsedData.flatMap((item, idx) => validateItem(item, idx));
     const fileMap = new Map(pickedFiles.map((f) => [f.name, f]));
-    const imageErrors = validateMediaRefs(parsedData, fileMap, collectImageRefs, 'la imagen');
-    const audioErrors = validateMediaRefs(parsedData, fileMap, collectAudioRefs, 'el audio');
+    const imageErrors = validateMediaRefs(parsedData, fileMap, collectImageRefs, 'la imagen', itemLabel);
+    const audioErrors = validateMediaRefs(parsedData, fileMap, collectAudioRefs, 'el audio', itemLabel);
     const allErrors = [...shapeErrors, ...imageErrors, ...audioErrors];
     if (allErrors.length > 0) {
       setErrors(allErrors);

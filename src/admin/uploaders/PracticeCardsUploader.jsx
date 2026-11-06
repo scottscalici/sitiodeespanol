@@ -3,17 +3,29 @@ import { Link } from 'react-router-dom';
 import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
-import { isNonEmptyString } from '../../utils/validateQuestion';
+import { isNonEmptyString, collectQuestionImageRefs, collectQuestionAudioRefs } from '../../utils/validateQuestion';
+import { validateMediaRefs, resolveMediaRefs } from '../../utils/mediaImport';
+import { uploadAdminImage, uploadAdminAudio, importImageFromUrl, importAudioFromUrl } from '../../utils/imageUpload';
 import { QUESTION_TYPES, finalizeQuestion } from '../../shared/questionTypes';
+import ImageCropAssist from '../shared/ImageCropAssist';
+
+// Practice cards have no top-level img/audio field (unlike Curiosidades) —
+// every media reference lives inside a question, so collecting refs for a
+// whole card is just collecting them from its questions array.
+const collectCardImageRefs = (card) => (card.questions || []).flatMap(collectQuestionImageRefs);
+const collectCardAudioRefs = (card) => (card.questions || []).flatMap(collectQuestionAudioRefs);
+const cardLabel = (item, idx) => `Tarjeta ${idx + 1}${item?.title ? ` ("${item.title}")` : ''}`;
 
 const COURSE_IDS = new Set(['s2', 's4']);
 
 // Deliberately lighter than a full per-field schema check for every type —
 // just enough to catch an obviously malformed question (wrong shape, a
-// typo'd type key) before it's written. image_select/hotspot both need a
-// real uploaded image this importer can't supply (a photo/PDF source has no
-// hosted image URL to put there), so those two still need a manual image
-// pass afterward in the regular editor — flagged below, not blocked.
+// typo'd type key) before it's written. image_select and hotspot both now
+// get their image resolved the same way every other type's promptImage
+// does (a picked file, a raw-GitHub URL, or a cropped file from
+// ImageCropAssist) — hotspot's click-target coordinates still can't be
+// guessed from a photo, though, so that one still needs a manual pass in
+// the regular editor afterward.
 const QUESTION_VALIDATORS = {
   multiple_choice: (q) => {
     const errs = [];
@@ -100,7 +112,10 @@ const QUESTION_VALIDATORS = {
   },
 };
 
-const IMAGE_DEPENDENT_TYPES = new Set(['image_select', 'hotspot']);
+// Only hotspot still needs a manual pass afterward — its click-target
+// coordinates can't be guessed from a photo. image_select's own image is
+// now resolved like any other (file/URL/crop), so it's no longer flagged.
+const NEEDS_MANUAL_COORDINATES = new Set(['hotspot']);
 
 const validateQuestion = (q, qNum, label) => {
   const tag = `${label}, pregunta ${qNum}`;
@@ -112,7 +127,7 @@ const validateQuestion = (q, qNum, label) => {
 
 const validateCard = (item, idx) => {
   const label = `Tarjeta ${idx + 1}${item?.title ? ` ("${item.title}")` : ''}`;
-  if (!item || typeof item !== 'object') return { errors: [`${label}: no es un objeto válido.`], needsImages: false };
+  if (!item || typeof item !== 'object') return { errors: [`${label}: no es un objeto válido.`], needsCoordinates: false };
   const errors = [];
   if (!isNonEmptyString(item.id)) errors.push(`${label}: falta "id" (requerido — este importador nunca genera ids automáticamente).`);
   if (!isNonEmptyString(item.title)) errors.push(`${label}: falta "title".`);
@@ -120,20 +135,22 @@ const validateCard = (item, idx) => {
   if (item.dia !== null && item.dia !== undefined && typeof item.dia !== 'number') {
     errors.push(`${label}: "dia" debe ser un número, o null/omitido para guardarla en el 📦 Banco sin asignar.`);
   }
-  let needsImages = false;
+  let needsCoordinates = false;
   if (!Array.isArray(item.questions) || item.questions.length === 0) {
     errors.push(`${label}: "questions" debe ser un arreglo no vacío.`);
   } else {
     item.questions.forEach((q, qi) => {
       errors.push(...validateQuestion(q, qi + 1, label));
-      if (IMAGE_DEPENDENT_TYPES.has(q?.type)) needsImages = true;
+      if (NEEDS_MANUAL_COORDINATES.has(q?.type)) needsCoordinates = true;
     });
   }
-  return { errors, needsImages };
+  return { errors, needsCoordinates };
 };
 
 const PracticeCardsUploader = () => {
   const [jsonInput, setJsonInput] = useState('');
+  const [pickedFiles, setPickedFiles] = useState([]);
+  const [croppedFiles, setCroppedFiles] = useState([]);
   const [status, setStatus] = useState('');
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -160,14 +177,26 @@ const PracticeCardsUploader = () => {
 
     const validated = parsedData.map((item, idx) => validateCard(item, idx));
     const shapeErrors = validated.flatMap((v) => v.errors);
-    if (shapeErrors.length > 0) {
-      setErrors(shapeErrors);
+    // Cropped files take priority over a same-named picked file (the admin
+    // adjusted it on purpose), then fall back to whatever was picked by hand.
+    const fileMap = new Map([...pickedFiles, ...croppedFiles].map((f) => [f.name, f]));
+    const imageErrors = validateMediaRefs(parsedData, fileMap, collectCardImageRefs, 'la imagen', cardLabel);
+    const audioErrors = validateMediaRefs(parsedData, fileMap, collectCardAudioRefs, 'el audio', cardLabel);
+    const allErrors = [...shapeErrors, ...imageErrors, ...audioErrors];
+    if (allErrors.length > 0) {
+      setErrors(allErrors);
       return;
     }
-    const anyNeedsImages = validated.some((v) => v.needsImages);
+    const anyNeedsCoordinates = validated.some((v) => v.needsCoordinates);
 
     setLoading(true);
     try {
+      setStatus('Subiendo imágenes...');
+      await resolveMediaRefs(parsedData, collectCardImageRefs, fileMap, 'practice_cards', uploadAdminImage, importImageFromUrl, 'imagen.png');
+
+      setStatus('Subiendo audio...');
+      await resolveMediaRefs(parsedData, collectCardAudioRefs, fileMap, 'practice_cards', uploadAdminAudio, importAudioFromUrl, 'audio.mp3');
+
       setStatus('Revisando ids existentes...');
       const snap = await getDocs(collection(db, 'practice_cards'));
       const existingIds = new Set(snap.docs.map((d) => d.id));
@@ -215,9 +244,11 @@ const PracticeCardsUploader = () => {
 
       setStatus(
         `✅ ¡Éxito! Se subieron ${parsedData.length} tarjeta(s) a Firestore.` +
-        (anyNeedsImages ? ' ⚠️ Una o más preguntas de imagen necesitan que subas la imagen real en el Creador antes de usarse.' : '')
+        (anyNeedsCoordinates ? ' ⚠️ Una o más preguntas "hotspot" necesitan que coloques las coordenadas del punto en el Creador.' : '')
       );
       setJsonInput('');
+      setPickedFiles([]);
+      setCroppedFiles([]);
     } catch (error) {
       console.error('Error uploading practice cards:', error);
       setErrors([`Error al subir: ${error.message}`]);
@@ -239,8 +270,9 @@ const PracticeCardsUploader = () => {
           Pega tu arreglo JSON completo abajo. Cada tarjeta necesita su propio <code className="bg-slate-100 px-1 rounded">"id"</code> explícito
           — este importador nunca sobrescribe una tarjeta existente ni genera ids automáticamente. Deja <code className="bg-slate-100 px-1 rounded">"dia"</code>{' '}
           en null/omitido para guardarla en el 📦 Banco sin asignar. Tipos de pregunta soportados: {Object.keys(QUESTION_TYPES).join(', ')}.
-          Las preguntas de tipo <code className="bg-slate-100 px-1 rounded">image_select</code>/<code className="bg-slate-100 px-1 rounded">hotspot</code> se
-          suben sin imagen real — hay que subirla a mano en el Creador después.
+          Si una pregunta referencia una imagen o audio local (p. ej. <code className="bg-slate-100 px-1 rounded">"promptImage": "pic1.png"</code>),
+          selecciónalo abajo o usa un enlace <code className="bg-slate-100 px-1 rounded">raw.githubusercontent.com</code> directamente en el JSON.
+          La pregunta de tipo <code className="bg-slate-100 px-1 rounded">hotspot</code> igual necesita que coloques las coordenadas del punto a mano en el Creador después.
         </p>
 
         <textarea
@@ -262,6 +294,26 @@ const PracticeCardsUploader = () => {
           }
           className="w-full font-mono text-xs bg-slate-100 border border-slate-200 rounded-xl p-4 mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
         ></textarea>
+
+        <div className="mb-4">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+            Imágenes o audio locales referenciados en el JSON (opcional)
+          </label>
+          <input
+            type="file"
+            multiple
+            accept="image/*,audio/*"
+            onChange={(e) => setPickedFiles(Array.from(e.target.files || []))}
+            className="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white file:text-[10px] file:font-black file:uppercase file:tracking-widest hover:file:bg-slate-600"
+          />
+          {pickedFiles.length > 0 && (
+            <p className="text-[10px] text-slate-500 mt-1">{pickedFiles.length} archivo(s) seleccionados: {pickedFiles.map((f) => f.name).join(', ')}</p>
+          )}
+        </div>
+
+        <div className="mb-6">
+          <ImageCropAssist onCroppedFiles={setCroppedFiles} />
+        </div>
 
         {errors.length > 0 && (
           <div className="mb-6 p-4 bg-rose-50 border border-rose-300 rounded-xl max-h-64 overflow-y-auto">
