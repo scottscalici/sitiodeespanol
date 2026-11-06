@@ -37,12 +37,18 @@ export const basenameFromUrl = (url, fallback) => {
 // for the shape), `itemLabel(item, idx)` formats that item's error prefix.
 export const validateMediaRefs = (items, fileMap, collectRefs, mediaLabel, itemLabel) => {
   const errs = [];
+  // Included in every mismatch error so a near-miss (wrong extension, a
+  // phone renaming a photo on save, a typo) is visible without the admin
+  // having to go dig through the file picker again.
+  const providedNames = fileMap.size > 0 ? [...fileMap.keys()].join(', ') : '(ninguno)';
   items.forEach((item, idx) => {
     if (!item || typeof item !== 'object') return;
     collectRefs(item).forEach(({ obj, key }) => {
       const value = obj[key];
       if (needsResolution(value) && !isGithubRawUrl(value) && !fileMap.has(value)) {
-        errs.push(`${itemLabel(item, idx)}: ${mediaLabel} "${value}" no fue proporcionado en los archivos seleccionados.`);
+        errs.push(
+          `${itemLabel(item, idx)}: ${mediaLabel} "${value}" no fue proporcionado en los archivos seleccionados (archivos disponibles: ${providedNames}).`
+        );
       }
     });
   });

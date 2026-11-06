@@ -80,7 +80,11 @@ const ImageCropAssist = ({ onCroppedFiles }) => {
       });
     }
     if (missingPhotos.size > 0) {
-      setError(`Falta seleccionar la(s) foto(s) de origen: ${[...missingPhotos].join(', ')}.`);
+      const providedNames = sourcePhotos.length > 0 ? sourcePhotos.map((f) => f.name).join(', ') : '(ninguna)';
+      setError(
+        `Falta seleccionar la(s) foto(s) de origen: ${[...missingPhotos].join(', ')} ` +
+        `(fotos seleccionadas: ${providedNames}). Revisa que el nombre coincida exactamente, incluida la extensión.`
+      );
       return;
     }
     setBoxesByPhoto(grouped);
