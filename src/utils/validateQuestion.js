@@ -25,7 +25,15 @@ export const isNonEmptyString = (v) => typeof v === 'string' && v.trim() !== '';
 export const collectQuestionImageRefs = (q) => {
   const refs = [];
   if (!q || typeof q !== 'object') return refs;
-  if (q.type === 'multiple_choice' || q.type === 'ordering' || q.type === 'write' || q.type === 'listen' || q.type === 'matching') {
+  if (
+    q.type === 'multiple_choice' ||
+    q.type === 'ordering' ||
+    q.type === 'write' ||
+    q.type === 'listen' ||
+    q.type === 'matching' ||
+    q.type === 'true_false' ||
+    q.type === 'open_ended'
+  ) {
     if (q.promptImage !== undefined) refs.push({ obj: q, key: 'promptImage' });
   }
   if (q.type === 'multiple_choice') {
@@ -55,14 +63,14 @@ export const collectQuestionImageRefs = (q) => {
   return refs;
 };
 
-// Same idea as collectQuestionImageRefs, for a local audio filename — so
-// far only multiple_choice's promptAudio, but kept as its own walk (rather
-// than merged into the image one) since a future type's audio field won't
-// necessarily live at the same key as its image field.
+// Same idea as collectQuestionImageRefs, for a local audio filename — kept
+// as its own walk (rather than merged into the image one) since a future
+// type's audio field won't necessarily live at the same key as its image
+// field.
 export const collectQuestionAudioRefs = (q) => {
   const refs = [];
   if (!q || typeof q !== 'object') return refs;
-  if (q.type === 'multiple_choice' && q.promptAudio !== undefined) {
+  if ((q.type === 'multiple_choice' || q.type === 'true_false' || q.type === 'open_ended') && q.promptAudio !== undefined) {
     refs.push({ obj: q, key: 'promptAudio' });
   }
   return refs;
@@ -161,6 +169,15 @@ export const validateQuestion = (q, qNum, ownerLabel) => {
           `${tag}: "target" debe ser {x, y, radius} (círculo) o {shape: "box", x, y, width, height} (caja) — porcentajes 0-100. Estas coordenadas no se pueden adivinar desde una captura de pantalla; colócalas en el editor dentro de la app después de subir esta pregunta.`
         );
       }
+      break;
+    }
+    case 'true_false': {
+      if (!isNonEmptyString(q.prompt)) errs.push(`${tag}: falta "prompt".`);
+      if (typeof q.answer !== 'boolean') errs.push(`${tag}: "answer" debe ser true o false.`);
+      break;
+    }
+    case 'open_ended': {
+      if (!isNonEmptyString(q.prompt)) errs.push(`${tag}: falta "prompt".`);
       break;
     }
     case 'line_bank_cloze': {

@@ -14,6 +14,7 @@ import AtandoCabosPage from './student/AtandoCabosPage';
 import CalentamientoEngine from './student/CalentamientoEngine';
 import CuriosidadQuizEngine from './student/CuriosidadQuizEngine';
 import PracticeCardEngine from './student/PracticeCardEngine';
+import ReadingCardEngine from './student/ReadingCardEngine';
 import CulturaSandbox from './student/CulturaSandbox';
 import EslabonesFinales from './student/EslabonesFinales';
 import RecreoHub from './student/RecreoHub';
@@ -78,6 +79,7 @@ import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import PracticeCardsUploader from './admin/uploaders/PracticeCardsUploader';
+import ReadingCardsUploader from './admin/uploaders/ReadingCardsUploader';
 import VerbEditor from './admin/managers/VerbEditor';
 import VerbAudit from './admin/managers/VerbAudit';
 import VerbSchoologyExport from './admin/managers/VerbSchoologyExport';
@@ -220,6 +222,7 @@ function App() {
             <Route path="/calentamiento/:courseId/:targetDia" element={<CalentamientoEngine />} />
             <Route path="/curiosidad-quiz/:curiosidadId" element={<CuriosidadQuizEngine />} />
             <Route path="/practica/tarjeta/:courseId/:targetDia" element={<PracticeCardEngine />} />
+            <Route path="/lectura/tarjeta/:readingId" element={<ReadingCardEngine />} />
             <Route path="/gramatica" element={<GrammarIndexPage />} />
             <Route path="/gramatica/imprimir" element={<GrammarPrintView />} />
             <Route path="/gramatica/categoria/:categoryName" element={<GrammarCategoryPage />} />
@@ -650,6 +653,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PracticeCardsUploader />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-reading-cards-upload"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ReadingCardsUploader />
                 </AdminRoute>
               }
             />

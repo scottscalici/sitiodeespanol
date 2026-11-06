@@ -110,6 +110,12 @@ const QUESTION_VALIDATORS = {
     if (!q.target) errs.push('falta "target".');
     return errs;
   },
+  true_false: (q) => {
+    const errs = [];
+    if (typeof q.answer !== 'boolean') errs.push('"answer" debe ser true o false.');
+    return errs;
+  },
+  open_ended: () => [],
 };
 
 // Only hotspot still needs a manual pass afterward — its click-target
