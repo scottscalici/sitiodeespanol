@@ -48,6 +48,7 @@ import ZasLobbyPage from './student/ZasLobbyPage';
 import ZasRoomPage from './student/ZasRoomPage';
 import SampleSentencesPage from './student/SampleSentencesPage';
 import SilabasPage from './student/SilabasPage';
+import FallingWordsGame from './games/FallingWords/FallingWordsGame';
 import HallOfFamePage from './student/HallOfFamePage';
 
 
@@ -216,6 +217,7 @@ function App() {
             <Route path="/juegos/zas" element={<ZasLobbyPage />} />
             <Route path="/juegos/zas/:roomCode" element={<ZasRoomPage />} />
             <Route path="/juegos/silabas" element={<SilabasPage />} />
+            <Route path="/juegos/palabras-cayendo" element={<FallingWordsGame />} />
             <Route path="/practica/oraciones/:courseId/:targetDia" element={<SampleSentencesPage />} />
             <Route path="/musica/:id" element={<MusicaEngine />} />
             <Route path="/student-learning-path/:targetDia?" element={<StudentLearningPath />} />
