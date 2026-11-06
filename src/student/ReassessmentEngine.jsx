@@ -265,6 +265,20 @@ export default function ReassessmentEngine() {
     };
   }, [phase, uid, circleId]);
 
+  // Native "are you sure you want to leave?" prompt on an actual close/
+  // reload attempt — a physical speed bump on top of the warning text, not
+  // a replacement for it (a browser's own dialog wording is never
+  // customizable, so the real warning still has to live in the page copy).
+  useEffect(() => {
+    if (phase !== 'in_progress') return;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [phase]);
+
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -343,6 +357,14 @@ export default function ReassessmentEngine() {
           <p className="text-xs text-amber-400 font-bold">
             Una vez que empieces, el tiempo corre — no podrás pausar.
           </p>
+          <div className="bg-rose-950/40 border border-rose-800 rounded-xl p-4 text-left">
+            <p className="text-rose-300 font-bold text-sm">
+              ⚠️ Do not leave this tab during the reassessment.
+            </p>
+            <p className="text-rose-400/90 text-xs mt-1">
+              Switching tabs, minimizing, or clicking into another window is logged and may be reflected in your grade.
+            </p>
+          </div>
           {errorMessage && <p className="text-xs text-rose-400 font-bold">{errorMessage}</p>}
           <button
             onClick={handleStart}
@@ -359,11 +381,16 @@ export default function ReassessmentEngine() {
     const questions = attempt?.questions || [];
     return (
       <Shell hideNav>
-        <div className="sticky top-0 z-10 bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4 flex justify-between items-center">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{config.evalLabel}</span>
-          <span className={`font-mono font-black text-lg ${remainingSeconds <= 30 ? 'text-rose-400' : 'text-sky-400'}`}>
-            ⏱ {formatTime(remainingSeconds)}
-          </span>
+        <div className="sticky top-0 z-10 bg-slate-900 border border-slate-700 rounded-2xl p-4 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{config.evalLabel}</span>
+            <span className={`font-mono font-black text-lg ${remainingSeconds <= 30 ? 'text-rose-400' : 'text-sky-400'}`}>
+              ⏱ {formatTime(remainingSeconds)}
+            </span>
+          </div>
+          <p className="text-rose-400 font-bold text-[11px] mt-2 text-center">
+            ⚠️ Stay on this tab — leaving is logged.
+          </p>
         </div>
         <div className="space-y-3">
           {questions.map((q, idx) => (
