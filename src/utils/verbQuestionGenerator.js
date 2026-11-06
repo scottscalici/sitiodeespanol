@@ -87,7 +87,14 @@ export const formatSubjectAndTranslation = (rawSubject, rawEnglish, tense) => {
 };
 
 // --- GENERATE A FRESH RANDOM SET OF VERB QUESTIONS FROM configBlocks ---
-export const generateVerbQuestions = (configBlocks, masterVerbsMap, { includeVosotros = false } = {}) => {
+// `withoutReplacement` (opt-in, default false to keep every existing caller's
+// behavior — a calentamiento's own bake, and a redo's re-run of its saved
+// configBlocks — exactly as it was) removes each drawn verb from its block's
+// own pool so the same verb can't be asked twice within one block. Added for
+// reassessments, where repeating a verb across a single attempt would narrow
+// an intentionally broad draw; scoped per block, not across the whole
+// config, so the same verb CAN still appear under a different tense/group.
+export const generateVerbQuestions = (configBlocks, masterVerbsMap, { includeVosotros = false, withoutReplacement = false } = {}) => {
   let finalizedQuestions = [];
 
   for (const block of configBlocks || []) {
@@ -98,7 +105,9 @@ export const generateVerbQuestions = (configBlocks, masterVerbsMap, { includeVos
     }
 
     for (let i = 0; i < block.count && pool.length > 0; i++) {
-      const randomVerb = pool[Math.floor(Math.random() * pool.length)];
+      const randomIndex = Math.floor(Math.random() * pool.length);
+      const randomVerb = pool[randomIndex];
+      if (withoutReplacement) pool = pool.filter((_, idx) => idx !== randomIndex);
       const chosenTense = block.tense;
 
       const tenseMap = randomVerb.tenses?.[chosenTense] || {};

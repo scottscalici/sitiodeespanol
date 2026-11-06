@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getCachedCollection } from '../../../utils/firestoreCache';
 import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../../../utils/evaluaciones';
 
@@ -95,11 +96,19 @@ export default function TeacherRecuperacionTab() {
 
   return (
     <main className="max-w-6xl mx-auto bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl">
-      <div className="mb-6 pb-4 border-b border-slate-700">
-        <h2 className="text-lg font-black text-white uppercase tracking-wider">📋 Recuperación — Elegibles</h2>
-        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-          Estudiantes que completaron reflexión + práctica y están listos para repetir la evaluación en Schoology
-        </p>
+      <div className="mb-6 pb-4 border-b border-slate-700 flex justify-between items-start gap-4">
+        <div>
+          <h2 className="text-lg font-black text-white uppercase tracking-wider">📋 Recuperación — Elegibles</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
+            Estudiantes que completaron reflexión + práctica y están listos para repetir la evaluación en Schoology
+          </p>
+        </div>
+        <Link
+          to="/admin-reassessment-config"
+          className="shrink-0 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg"
+        >
+          🎲 Reevaluaciones
+        </Link>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {renderCourseColumn('Español II (S2)', groupsByCourse.s2)}

@@ -73,6 +73,7 @@ import LecturaEditorPage from './admin/MasterDashboard/components/LecturaEditorP
 import LecturasSequencer from './admin/MasterDashboard/components/LecturasSequencer';     // 👈 NEW ADMIN SEQUENCER
 import ReadingCardsSequencer from './admin/MasterDashboard/components/ReadingCardsSequencer';
 import ReadingGradingQueue from './admin/MasterDashboard/components/ReadingGradingQueue';
+import ReassessmentConfigManager from './admin/MasterDashboard/components/ReassessmentConfigManager';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import GamificationManager from './admin/managers/GamificationManager';
@@ -664,6 +665,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PracticeCardsUploader />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-reassessment-config"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ReassessmentConfigManager />
                 </AdminRoute>
               }
             />
