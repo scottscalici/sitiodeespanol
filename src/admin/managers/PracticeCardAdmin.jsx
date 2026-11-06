@@ -5,6 +5,7 @@ import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPES, TYPE_LABELS, finalizeQuestion, reconstructQuestion, parseBulkRowPlain, parseBulkSections } from '../../shared/questionTypes';
 import { normalizeLegacyPracticeQuestion } from '../../utils/legacyPracticeQuestion';
+import PracticeCardPreviewModal from './PracticeCardPreviewModal';
 
 const DEFAULT_TYPE = 'multiple_choice';
 const emptyQuestion = () => QUESTION_TYPES[DEFAULT_TYPE].emptyQuestion();
@@ -32,6 +33,8 @@ export default function PracticeCardAdmin() {
   const [sectionImportOpen, setSectionImportOpen] = useState(false);
   const [sectionBulkText, setSectionBulkText] = useState('');
   const [sectionBulkStatus, setSectionBulkStatus] = useState('');
+
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     getCachedCollection('practice_cards')
@@ -277,7 +280,16 @@ export default function PracticeCardAdmin() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-wrap gap-2">
             <h2 className="text-lg font-black text-slate-800 uppercase">Preguntas ({questions.length})</h2>
-            <div className="flex flex-wrap gap-2 justify-end">
+            <div className="flex flex-wrap gap-2 justify-end items-center">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                disabled={questions.length === 0}
+                className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-xl text-[10px] uppercase tracking-wider shadow-sm disabled:opacity-40"
+                title="Ver y responder esta tarjeta exactamente como la vería un estudiante — no se guarda nada"
+              >
+                👁️ Vista Previa
+              </button>
               {Object.values(QUESTION_TYPES).map((mod) => (
                 <button
                   key={mod.TYPE_KEY}
@@ -456,6 +468,10 @@ export default function PracticeCardAdmin() {
           </button>
         </div>
       </form>
+
+      {previewOpen && (
+        <PracticeCardPreviewModal questions={questions} title={title} onClose={() => setPreviewOpen(false)} />
+      )}
     </div>
   );
 }
