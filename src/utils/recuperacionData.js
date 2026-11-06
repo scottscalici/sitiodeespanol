@@ -65,3 +65,37 @@ export const fetchRecuperacionDocsForCourse = async (course) => {
   const docs = await getCachedCollection('recuperaciones');
   return docs.filter((d) => d.course === course);
 };
+
+// Teacher-only, called together with clearReassessmentAttempt from the
+// "🔄 Reiniciar" button (TeacherRecuperacionTab): a retake means the FULL
+// process starts over — reflection, gate practice, and the reassessment —
+// never just a fresh reassessment handed to someone who already passed
+// once. Archives the prior reflection/attempts/pass record into `history`
+// (nothing is discarded) and resets the active fields so Recuperacion.jsx's
+// own `existing?.reflection ? 'gate' : 'reflect'` check sends the student
+// back to the reflection step, exactly like a brand new circle.
+export const resetRecuperacionForRetake = async (uid, circleId) => {
+  const ref = doc(db, 'recuperaciones', docId(uid, circleId));
+  const existing = await fetchRecuperacionDoc(uid, circleId);
+  if (!existing) return;
+  const history = [
+    ...(existing.history || []),
+    {
+      reflection: existing.reflection || null,
+      attempts: existing.attempts || [],
+      bestScore: existing.bestScore || 0,
+      passed: !!existing.passed,
+      passedAt: existing.passedAt || null,
+    },
+  ];
+  await setDoc(ref, {
+    reflection: null,
+    attempts: [],
+    bestScore: 0,
+    passed: false,
+    passedAt: null,
+    history,
+    updated_at: new Date().toISOString(),
+  }, { merge: true });
+  invalidateCollectionCache('recuperaciones');
+};

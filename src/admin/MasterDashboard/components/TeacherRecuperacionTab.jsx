@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom';
 import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../../../utils/evaluaciones';
 import { clearReassessmentAttempt } from '../../../utils/reassessmentData';
+import { resetRecuperacionForRetake } from '../../../utils/recuperacionData';
 
 // Teacher-facing eligibility list: only who's PASSED the recuperación gate
 // for a given quiz, grouped by course and quiz, most recent quiz first —
 // never the reflection text itself, which is private to the student. Also
 // shows each passed student's reassessment status (finished/in progress),
 // since a finished reassessment is a one-shot the student can't retake on
-// their own — "🔄 Reiniciar" here is the only way to let them try again
-// (see clearReassessmentAttempt: it archives the old score instead of
-// deleting it outright).
+// their own — "🔄 Reiniciar" is the only way back in, and it resets the
+// FULL process (reflection + gate practice + reassessment), not just the
+// reassessment: a retake means doing all of it again, never a shortcut
+// straight back to the quiz (see resetRecuperacionForRetake and
+// clearReassessmentAttempt — both archive the prior record, never discard it).
 export default function TeacherRecuperacionTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [groupsByCourse, setGroupsByCourse] = useState({ s2: [], s4: [] });
@@ -93,7 +96,9 @@ export default function TeacherRecuperacionTab() {
     const key = `${uid}__${circleId}`;
     setResettingKey(key);
     try {
-      await clearReassessmentAttempt(uid, circleId);
+      // Both together, always — a retake is the full process over again,
+      // never just a fresh reassessment on top of an already-passed gate.
+      await Promise.all([resetRecuperacionForRetake(uid, circleId), clearReassessmentAttempt(uid, circleId)]);
       invalidateCollectionCache('reassessment_attempts');
       await load();
     } catch (err) {
@@ -133,7 +138,7 @@ export default function TeacherRecuperacionTab() {
                             onClick={() => handleReset(s.uid, s.circleId)}
                             disabled={resettingKey === key}
                             className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded disabled:opacity-50"
-                            title="Permitir que el estudiante repita la reevaluación"
+                            title="Reinicia todo el proceso: reflexión, práctica, y reevaluación"
                           >
                             {resettingKey === key ? '...' : '🔄 Reiniciar'}
                           </button>
