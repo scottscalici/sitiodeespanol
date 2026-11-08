@@ -65,6 +65,18 @@ const buildPinnedSentence = (s) => ({
   fullData: s,
 });
 
+// A "Sección X.X" tag alone isn't unique — section numbering restarts per
+// chapter regardless of textbook/course, so a different book's own chapter
+// 2 section 1 can carry the identical "Sección 2.1" tag. The
+// vocab-sentences-bulk skill always tags the textbook name as its own
+// separate entry in the same array (per its SKILL.md), so requiring BOTH
+// tags is what actually scopes a sentence to this specific chapter.
+const matchesSentenceSection = (s, textbook, section) =>
+  (s.grammarTags || []).includes(textbook) && (s.grammarTags || []).includes(`Sección ${section}`);
+
+const findPinnedSentences = (sentenceBank, textbook, section) =>
+  sentenceBank.filter((s) => matchesSentenceSection(s, textbook, section)).map(buildPinnedSentence);
+
 export default function ChapterLearningPathImporter() {
   const [jsonText, setJsonText] = useState('');
   const [validating, setValidating] = useState(false);
@@ -121,7 +133,27 @@ export default function ChapterLearningPathImporter() {
 
         const podId = slugSection(sec.section);
         if (existingPodIds.has(podId)) {
-          sectionReports.push({ status: 'skip', section: sec.section, podId, reason: 'Ya existe — no se toca.' });
+          // Already imported — never touch the pod itself, but DO check
+          // whether its pinned_sentences match what the (correctly scoped)
+          // query would produce today, so a section imported before the
+          // textbook-scoping fix (or before real sentences existed yet) can
+          // be repaired without re-importing the whole section.
+          const existingPod = existingLearningPods.find((p) => p.id === podId);
+          const currentSentences = existingPod?.segments?.[0]?.pinned_sentences || [];
+          const correctSentences = findPinnedSentences(sentenceBank, input.textbook, sec.section);
+          const currentIds = new Set(currentSentences.map((p) => p.id));
+          const correctIds = new Set(correctSentences.map((p) => p.id));
+          const sentencesMatch = currentIds.size === correctIds.size && [...currentIds].every((id) => correctIds.has(id));
+          sectionReports.push({
+            status: 'skip',
+            section: sec.section,
+            podId,
+            reason: 'Ya existe — no se toca.',
+            needsSentenceRepair: !!existingPod && !sentencesMatch,
+            currentSentenceCount: currentIds.size,
+            correctSentenceCount: correctIds.size,
+            correctSentences,
+          });
           continue;
         }
 
@@ -147,10 +179,7 @@ export default function ChapterLearningPathImporter() {
           continue;
         }
 
-        const sentenceTag = `Sección ${sec.section}`;
-        const sentenceList = sentenceBank
-          .filter((s) => (s.grammarTags || []).includes(sentenceTag))
-          .map(buildPinnedSentence);
+        const sentenceList = findPinnedSentences(sentenceBank, input.textbook, sec.section);
 
         sectionReports.push({
           status: 'new',
@@ -174,6 +203,38 @@ export default function ChapterLearningPathImporter() {
       setParseError(`Error al validar: ${err.message}`);
     } finally {
       setValidating(false);
+    }
+  };
+
+  // Overwrites ONLY one existing pod's pinned_sentences in learning_paths —
+  // never touches concepts, questionMix, or anything else on the pod — so a
+  // section imported before this fix (or before its real sentences existed
+  // yet) can be corrected without re-importing it from scratch.
+  const handleRepairSentences = async (sectionReport) => {
+    if (!report) return;
+    setImportStatus('');
+    try {
+      const pathId = report.input.pathId;
+      const snap = await getDoc(doc(db, 'learning_paths', pathId));
+      if (!snap.exists()) throw new Error(`learning_paths/${pathId} ya no existe.`);
+      const data = snap.data();
+      const pods = (data.pods || []).map((p) =>
+        p.id === sectionReport.podId
+          ? { ...p, segments: p.segments.map((seg, i) => (i === 0 ? { ...seg, pinned_sentences: sectionReport.correctSentences } : seg)) }
+          : p
+      );
+      await setDoc(doc(db, 'learning_paths', pathId), { pods, updated_at: new Date().toISOString() }, { merge: true });
+      invalidateCollectionCache('learning_paths');
+      setImportStatus(`✅ Oraciones corregidas para la sección ${sectionReport.section}.`);
+      setReport({
+        ...report,
+        sections: report.sections.map((s) =>
+          s.podId === sectionReport.podId ? { ...s, needsSentenceRepair: false, currentSentenceCount: sectionReport.correctSentenceCount } : s
+        ),
+      });
+    } catch (err) {
+      console.error('Error repairing pinned sentences:', err);
+      setImportStatus(`❌ Error al corregir: ${err.message}`);
     }
   };
 
@@ -388,6 +449,20 @@ export default function ChapterLearningPathImporter() {
                 </p>
               )}
               {s.reason && <p className="text-xs text-slate-400 mt-1">{s.reason}</p>}
+              {s.needsSentenceRepair && (
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="text-amber-400 text-xs font-bold">
+                    ⚠️ Oraciones fijadas: {s.currentSentenceCount} (deberían ser {s.correctSentenceCount}).
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRepairSentences(s)}
+                    className="text-[10px] font-black uppercase tracking-widest bg-amber-600 hover:bg-amber-500 px-2.5 py-1.5 rounded-lg"
+                  >
+                    🔧 Corregir oraciones
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
