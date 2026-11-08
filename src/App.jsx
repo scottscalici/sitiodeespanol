@@ -83,6 +83,7 @@ import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
+import ChapterLearningPathImporter from './admin/uploaders/ChapterLearningPathImporter';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
 import PracticeCardsUploader from './admin/uploaders/PracticeCardsUploader';
 import ReadingCardsUploader from './admin/uploaders/ReadingCardsUploader';
@@ -663,6 +664,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PracticeCardAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-chapter-import"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ChapterLearningPathImporter />
                 </AdminRoute>
               }
             />
