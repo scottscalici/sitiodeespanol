@@ -6,6 +6,7 @@ import { getCachedCollection, getCachedBucketedCollection } from '../../../utils
 import { fetchEvaluacionOptions, resolveCurrentEvalDia } from '../../../utils/evaluaciones';
 import { generateVerbQuestions } from '../../../utils/verbQuestionGenerator';
 import { generateSentenceRecallQuestions } from '../../../utils/reassessmentSentenceGenerator';
+import { generateVocabRecallQuestions } from '../../../utils/reassessmentVocabGenerator';
 import { VERB_TENSES } from '../../../utils/verbTenses';
 
 // Phase A of Reassessments: define, per gate-enabled Practice Hub circle
@@ -22,11 +23,13 @@ export default function ReassessmentConfigManager() {
   const [verbGroups, setVerbGroups] = useState([]);
   const [masterVerbsMap, setMasterVerbsMap] = useState({});
   const [sentenceBank, setSentenceBank] = useState([]);
+  const [vocabulary, setVocabulary] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedCircleId, setSelectedCircleId] = useState('');
   const [groupRows, setGroupRows] = useState([]); // { groupId, tense, count }
   const [sentenceRows, setSentenceRows] = useState([]); // { tag, count } — discernment questions drawn from tagged Sentence Bank [[forma|infinitivo]] entries
+  const [vocabRows, setVocabRows] = useState([]); // { section, count } — "translate this word" questions drawn from vocabulary.metadata.secciones
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(15);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -36,15 +39,17 @@ export default function ReassessmentConfigManager() {
     const load = async () => {
       setLoading(true);
       try {
-        const [podDocs, groups, verbsArray, s2Options, s4Options, sentences] = await Promise.all([
+        const [podDocs, groups, verbsArray, s2Options, s4Options, sentences, vocabItems] = await Promise.all([
           getCachedCollection('practice_pods'),
           getCachedCollection('verbGroups'),
           getCachedBucketedCollection('verbs'),
           fetchEvaluacionOptions('s2'),
           fetchEvaluacionOptions('s4'),
           getCachedCollection('sentence_bank'),
+          getCachedCollection('vocabulary'),
         ]);
         setSentenceBank(sentences);
+        setVocabulary(vocabItems);
         const evalOptionsByCourse = { s2: s2Options, s4: s4Options };
 
         const allCircles = [];
@@ -90,6 +95,7 @@ export default function ReassessmentConfigManager() {
     if (!circleId) {
       setGroupRows([]);
       setSentenceRows([]);
+      setVocabRows([]);
       return;
     }
     try {
@@ -98,10 +104,12 @@ export default function ReassessmentConfigManager() {
         const data = snap.data();
         setGroupRows(data.groups || []);
         setSentenceRows(data.sentenceBlocks || []);
+        setVocabRows(data.vocabBlocks || []);
         setTimeLimitMinutes(Math.round((data.timeLimitSeconds || 900) / 60));
       } else {
         setGroupRows([]);
         setSentenceRows([]);
+        setVocabRows([]);
         setTimeLimitMinutes(15);
       }
     } catch (err) {
@@ -125,11 +133,23 @@ export default function ReassessmentConfigManager() {
   const updateSentenceRow = (idx, patch) => setSentenceRows(sentenceRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const removeSentenceRow = (idx) => setSentenceRows(sentenceRows.filter((_, i) => i !== idx));
 
+  // Only sections that actually have at least one vocabulary word are
+  // offered — matches the section tagging convention vocab docs already use
+  // (metadata.secciones), same way availableSentenceTags only lists tags
+  // that have real [[forma|infinitivo]] content behind them.
+  const availableVocabSections = [...new Set(vocabulary.flatMap((v) => v.metadata?.secciones || []))].sort();
+
+  const addVocabRow = () => setVocabRows([...vocabRows, { section: '', count: 10 }]);
+  const updateVocabRow = (idx, patch) => setVocabRows(vocabRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const removeVocabRow = (idx) => setVocabRows(vocabRows.filter((_, i) => i !== idx));
+
   const validRows = groupRows.filter((r) => r.groupId);
   const validSentenceRows = sentenceRows.filter((r) => r.tag);
+  const validVocabRows = vocabRows.filter((r) => r.section);
   const totalQuestions =
     validRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0) +
-    validSentenceRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
+    validSentenceRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0) +
+    validVocabRows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
 
   const blocksFromRows = () =>
     validRows.map((r) => {
@@ -147,10 +167,14 @@ export default function ReassessmentConfigManager() {
   const sentenceBlocksFromRows = () =>
     validSentenceRows.map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
 
+  const vocabBlocksFromRows = () =>
+    validVocabRows.map((r) => ({ label: r.section, section: r.section, count: Number(r.count) || 0 }));
+
   const handlePreview = () => {
     const verbQuestions = generateVerbQuestions(blocksFromRows(), masterVerbsMap, { withoutReplacement: true });
     const sentenceQuestions = generateSentenceRecallQuestions(sentenceBlocksFromRows(), sentenceBank, { withoutReplacement: true });
-    setPreviewQuestions([...verbQuestions, ...sentenceQuestions]);
+    const vocabQuestions = generateVocabRecallQuestions(vocabBlocksFromRows(), vocabulary, { withoutReplacement: true });
+    setPreviewQuestions([...verbQuestions, ...sentenceQuestions, ...vocabQuestions]);
   };
 
   const handleSave = async () => {
@@ -164,6 +188,7 @@ export default function ReassessmentConfigManager() {
         evalLabel: selectedCircle.evalLabel,
         groups: validRows,
         sentenceBlocks: validSentenceRows,
+        vocabBlocks: validVocabRows,
         timeLimitSeconds: Math.max(60, Number(timeLimitMinutes) || 15) * 60,
         updatedAt: new Date().toISOString(),
       });
@@ -342,6 +367,58 @@ export default function ReassessmentConfigManager() {
             </p>
           )}
 
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+            <h3 className="font-bold text-white text-sm">Vocabulario (traducir al español)</h3>
+            <button
+              type="button"
+              onClick={addVocabRow}
+              className="text-[10px] font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-500 px-3 py-1.5 rounded-lg"
+            >
+              + Agregar sección
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 italic -mt-2">
+            Para una reevaluación de vocabulario — saca al azar palabras de esta sección del Vocabulario (misma
+            etiqueta metadata.secciones que usa el picker de rutas de aprendizaje) y pide traducirlas al español.
+          </p>
+
+          {vocabRows.length > 0 && (
+            <div className="space-y-2">
+              {vocabRows.map((row, idx) => (
+                <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-3">
+                  <select
+                    value={row.section}
+                    onChange={(e) => updateVocabRow(idx, { section: e.target.value })}
+                    className="flex-1 min-w-[160px] bg-slate-800 border border-slate-700 rounded-md p-2 text-xs"
+                  >
+                    <option value="">Elige una sección...</option>
+                    {availableVocabSections.map((section) => (
+                      <option key={section} value={section}>
+                        {section}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    value={row.count}
+                    onChange={(e) => updateVocabRow(idx, { count: e.target.value })}
+                    className="w-20 bg-slate-800 border border-slate-700 rounded-md p-2 text-center text-sm font-bold"
+                  />
+                  <button type="button" onClick={() => removeVocabRow(idx)} className="text-rose-400 hover:text-rose-300 text-xs font-black px-2">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {availableVocabSections.length === 0 && (
+            <p className="text-xs text-slate-600 italic">
+              Ninguna palabra en Vocabulario tiene todavía una sección asignada (metadata.secciones) — agrega
+              secciones desde VocabVault para poder usarlas aquí.
+            </p>
+          )}
+
           <div className="flex items-center gap-4 pt-2 border-t border-slate-800">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Límite de tiempo (min)</label>
             <input
@@ -358,7 +435,7 @@ export default function ReassessmentConfigManager() {
             <button
               type="button"
               onClick={handlePreview}
-              disabled={validRows.length === 0 && validSentenceRows.length === 0}
+              disabled={validRows.length === 0 && validSentenceRows.length === 0 && validVocabRows.length === 0}
               className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-black uppercase tracking-widest rounded-lg disabled:opacity-50"
             >
               🎲 Vista previa (nuevo sorteo)
@@ -366,7 +443,7 @@ export default function ReassessmentConfigManager() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || (validRows.length === 0 && validSentenceRows.length === 0)}
+              disabled={saving || (validRows.length === 0 && validSentenceRows.length === 0 && validVocabRows.length === 0)}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest rounded-lg disabled:opacity-50"
             >
               {saving ? '...' : 'Guardar configuración'}
@@ -388,21 +465,32 @@ export default function ReassessmentConfigManager() {
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {previewQuestions.map((q, i) =>
-              q.type === 'sentence_recall' ? (
-                <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
-                  <span className="text-white">{q.subject}</span>
-                  <span className="text-slate-500"> ({q.infinitive})</span>
-                  <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
-                </div>
-              ) : (
+            {previewQuestions.map((q, i) => {
+              if (q.type === 'sentence_recall') {
+                return (
+                  <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
+                    <span className="text-white">{q.subject}</span>
+                    <span className="text-slate-500"> ({q.infinitive})</span>
+                    <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
+                  </div>
+                );
+              }
+              if (q.type === 'vocab_recall') {
+                return (
+                  <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
+                    <span className="text-slate-400">Traduce:</span> <span className="font-bold text-white">{q.prompt}</span>
+                    <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
+                  </div>
+                );
+              }
+              return (
                 <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
                   <span className="text-slate-400">{q.sujeto}</span> <span className="font-bold text-white">{q.palabra}</span>
                   <span className="text-slate-500"> ({q.tense})</span>
                   <p className="text-emerald-400 font-black mt-1">{q.forma}</p>
                 </div>
-              )
-            )}
+              );
+            })}
           </div>
         </div>
       )}
