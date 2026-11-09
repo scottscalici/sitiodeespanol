@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "country-flag-emoji-polyfill": "^0.1.10",
     "firebase": "^10.8.1",
     "jszip": "^3.10.2",
     "react": "^19.2.5",
