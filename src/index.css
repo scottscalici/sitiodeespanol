@@ -10,6 +10,14 @@
 @source inline("bg-gradient-to-{r,l,t,b,tr,tl,br,bl} {from,via,to}-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
 @source inline("bg-gradient-to-{r,l,t,b,tr,tl,br,bl} {from,via,to}-{white,black}");
 
+/* Put the flags-only font in front of Tailwind's font-sans/serif/mono too
+   (Tailwind's defaults otherwise unchanged). */
+@theme {
+  --font-sans: 'Twemoji Country Flags', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-serif: 'Twemoji Country Flags', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --font-mono: 'Twemoji Country Flags', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
 
 :root {
   --text: #6b6375;
@@ -24,9 +32,11 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* 'Twemoji Country Flags' only contains flag emojis, so it changes nothing
+     else — it just lets 🇪🇸 render as a flag on Windows (see main.jsx). */
+  --sans: 'Twemoji Country Flags', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Twemoji Country Flags', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'Twemoji Country Flags', ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;

@@ -98,7 +98,10 @@ export function ThemeStyleSync({ theme }) {
       const family = (fontsField && theme?.styles?.fonts?.[fontsField]) || (legacyField && theme?.styles?.[legacyField]);
       if (!family) return;
       loadGoogleFont(family, weightsFor(fontList, family));
-      root.style.setProperty(cssVar, family.includes(',') ? family : `'${family}', ${fallbackStack}`);
+      // Flags-only font first so 🇪🇸 still renders as a flag on Windows under
+      // any theme font (see main.jsx).
+      const stack = family.includes(',') ? family : `'${family}', ${fallbackStack}`;
+      root.style.setProperty(cssVar, `'Twemoji Country Flags', ${stack}`);
     });
 
     const cleanupTextEffects = syncTextEffectPresets(theme?.styles?.textEffects?.presets);
