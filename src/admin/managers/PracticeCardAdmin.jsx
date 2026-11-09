@@ -20,6 +20,7 @@ export default function PracticeCardAdmin() {
   const [course, setCourse] = useState('s2');
   const [gradeWeight, setGradeWeight] = useState(1);
   const [excused, setExcused] = useState(false);
+  const [topic, setTopic] = useState('');
   const [questions, setQuestions] = useState([emptyQuestion()]);
 
   const [savedCards, setSavedCards] = useState([]);
@@ -53,6 +54,7 @@ export default function PracticeCardAdmin() {
       setCourse(c.course || 's2');
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
+      setTopic(c.topic || '');
       setQuestions(c.questions?.length ? reconstructEditableFields(c.questions) : [emptyQuestion()]);
     }
   };
@@ -164,6 +166,7 @@ export default function PracticeCardAdmin() {
           course,
           gradeWeight: Number(gradeWeight) || 1,
           excused,
+          topic: topic.trim(),
           questions: cleanQuestions,
           createdAt: new Date().toISOString(),
         },
@@ -182,6 +185,8 @@ export default function PracticeCardAdmin() {
   if (loadingMeta) {
     return <div className="p-10 text-center font-bold text-slate-400">Cargando tarjetas de práctica...</div>;
   }
+
+  const hasAnySection = questions.some((q) => (q.section || '').trim());
 
   return (
     <div className="max-w-5xl mx-auto p-6 font-sans pb-20">
@@ -250,6 +255,16 @@ export default function PracticeCardAdmin() {
               <input type="number" value={dia} onChange={(e) => setDia(e.target.value)} className="w-1/2 p-2.5 border rounded-xl font-bold text-center" />
             </div>
           </div>
+          <div className="md:col-span-4">
+            <label className="block text-xs font-black text-slate-500 uppercase mb-1">Tema (opcional)</label>
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="ej. pretérito vs. imperfecto, por vs. para"
+              className="w-full p-2.5 border rounded-xl font-bold placeholder:font-normal placeholder:text-slate-400"
+            />
+          </div>
         </div>
 
         <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-800 font-bold">
@@ -307,47 +322,73 @@ export default function PracticeCardAdmin() {
             const mod = QUESTION_TYPES[q.type];
             if (!mod) return null;
             const Editor = mod.Editor;
+            // A section header only ever appears once ANY question in the
+            // card has a non-empty section — a card nobody has sectioned
+            // yet renders exactly as it always has, flat with no headers.
+            const prevSection = qIdx > 0 ? (questions[qIdx - 1].section || '').trim() : null;
+            const thisSection = (q.section || '').trim();
+            const showSectionHeader = hasAnySection && thisSection && thisSection !== prevSection;
             return (
-              <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex justify-between items-center">
-                  <select value={q.type} onChange={(e) => changeType(qIdx, e.target.value)} className="p-1.5 border rounded-lg text-xs font-bold bg-white">
-                    {Object.values(QUESTION_TYPES).map((m) => (
-                      <option key={m.TYPE_KEY} value={m.TYPE_KEY}>{TYPE_LABELS[m.TYPE_KEY]}</option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => moveQuestion(qIdx, -1)}
-                      disabled={qIdx === 0}
-                      title="Mover arriba"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveQuestion(qIdx, 1)}
-                      disabled={qIdx === questions.length - 1}
-                      title="Mover abajo"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
-                    >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => duplicateQuestion(qIdx)}
-                      title="Duplicar pregunta"
-                      className="p-1.5 text-indigo-500 hover:text-indigo-700 font-bold text-xs"
-                    >
-                      ⧉
-                    </button>
-                    <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
+              <React.Fragment key={qIdx}>
+                {showSectionHeader && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <span className="text-[10px] font-black text-violet-600 uppercase tracking-widest bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg">
+                      📑 Sección: {thisSection}
+                    </span>
+                    <div className="flex-1 border-t border-violet-100" />
                   </div>
-                </div>
+                )}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <select value={q.type} onChange={(e) => changeType(qIdx, e.target.value)} className="p-1.5 border rounded-lg text-xs font-bold bg-white">
+                        {Object.values(QUESTION_TYPES).map((m) => (
+                          <option key={m.TYPE_KEY} value={m.TYPE_KEY}>{TYPE_LABELS[m.TYPE_KEY]}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={q.section || ''}
+                        onChange={(e) => updateQuestionData(qIdx, { section: e.target.value })}
+                        placeholder="Sección (opcional)"
+                        title="Etiqueta corta para poder asignar solo esta parte de la tarjeta en un día (ej. 'A', 'Noticias')"
+                        className="w-36 p-1.5 border rounded-lg text-xs font-bold bg-white placeholder:font-normal placeholder:text-slate-400"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveQuestion(qIdx, -1)}
+                        disabled={qIdx === 0}
+                        title="Mover arriba"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveQuestion(qIdx, 1)}
+                        disabled={qIdx === questions.length - 1}
+                        title="Mover abajo"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 disabled:hover:text-slate-400 text-sm"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => duplicateQuestion(qIdx)}
+                        title="Duplicar pregunta"
+                        className="p-1.5 text-indigo-500 hover:text-indigo-700 font-bold text-xs"
+                      >
+                        ⧉
+                      </button>
+                      <button type="button" onClick={() => removeQuestion(qIdx)} className="p-1.5 text-rose-500 font-bold text-sm" title="Eliminar pregunta">🗑️</button>
+                    </div>
+                  </div>
 
-                <Editor question={q} onChange={(patch) => updateQuestionData(qIdx, patch)} instanceId={qIdx} showCategory={false} />
-              </div>
+                  <Editor question={q} onChange={(patch) => updateQuestionData(qIdx, patch)} instanceId={qIdx} showCategory={false} />
+                </div>
+              </React.Fragment>
             );
           })}
 
