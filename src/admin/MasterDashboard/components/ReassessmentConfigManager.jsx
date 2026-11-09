@@ -189,7 +189,11 @@ export default function ReassessmentConfigManager() {
         groups: validRows,
         sentenceBlocks: validSentenceRows,
         vocabBlocks: validVocabRows,
-        timeLimitSeconds: Math.max(60, Number(timeLimitMinutes) || 15) * 60,
+        // The 60-second floor must apply to the final SECONDS value, not to
+        // the minutes input — applying it before multiplying (the old
+        // `Math.max(60, minutes) * 60`) silently forced anything under 60
+        // MINUTES up to a full hour, since 5 < 60 triggered the clamp.
+        timeLimitSeconds: Math.max(60, (Number(timeLimitMinutes) || 15) * 60),
         updatedAt: new Date().toISOString(),
       });
       setStatus('✅ Guardado');
