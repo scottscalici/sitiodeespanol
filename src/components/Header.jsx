@@ -11,6 +11,7 @@ import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
 import ThemeUnlockToggle from './ThemeUnlockToggle';
+import SeatPickPrompt from './SeatPickPrompt';
 import { useActiveTheme } from '../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { getTextEffectStyle } from '../utils/textEffects';
@@ -280,6 +281,10 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
         celebration={celebrationQueue[0]}
         onContinue={() => setCelebrationQueue((prev) => prev.slice(1))}
       />
+
+      {userData?.seatPickGrant && currentUser?.uid && (
+        <SeatPickPrompt grant={userData.seatPickGrant} uid={currentUser.uid} course={userData.course} section={userData.section} />
+      )}
     </header>
   );
 };

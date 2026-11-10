@@ -764,6 +764,9 @@ const DailyPlanHub = () => {
                 <Link to="/admin-secret-portal-unlockables" className="flex-1 text-center bg-amber-900/40 hover:bg-amber-900/80 text-amber-300 text-[10px] font-bold px-2 py-2 rounded border border-amber-700/50 uppercase tracking-widest">
                   🔓 Desbloqueables
                 </Link>
+                <Link to="/admin-secret-portal-seating-chart" className="flex-1 text-center bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-2 rounded border border-cyan-700/50 uppercase tracking-widest">
+                  🪑 Asientos
+                </Link>
               </div>
               <div className="text-center py-2">
                 <p className="text-emerald-500/50 text-xs italic font-bold">
