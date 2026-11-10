@@ -207,6 +207,8 @@ const DailyPlanHub = () => {
               <Link to="/admin-media-migration" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📤 Migración de Imágenes</Link>
               <Link to="/admin-secret-portal-master?tipo=temas" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎨 Temas</Link>
               <Link to="/admin-faq-editor" className="bg-neutral-800 hover:bg-neutral-700 text-amber-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">❓ Preguntas Frecuentes</Link>
+              <Link to="/admin-secret-portal-unlockables" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🔓 Desbloqueables</Link>
+              <Link to="/admin-secret-portal-seating-chart" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🪑 Asientos</Link>
             </div>
           </div>
 
@@ -760,12 +762,6 @@ const DailyPlanHub = () => {
                 </Link>
                 <Link to="/admin-secret-portal-silabas" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
                   🔤 Sílabas
-                </Link>
-                <Link to="/admin-secret-portal-unlockables" className="flex-1 text-center bg-amber-900/40 hover:bg-amber-900/80 text-amber-300 text-[10px] font-bold px-2 py-2 rounded border border-amber-700/50 uppercase tracking-widest">
-                  🔓 Desbloqueables
-                </Link>
-                <Link to="/admin-secret-portal-seating-chart" className="flex-1 text-center bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-2 rounded border border-cyan-700/50 uppercase tracking-widest">
-                  🪑 Asientos
                 </Link>
               </div>
               <div className="text-center py-2">
