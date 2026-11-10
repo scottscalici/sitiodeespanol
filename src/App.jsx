@@ -111,6 +111,7 @@ import GrammarNotesUploader from './admin/uploaders/GrammarNotesUploader';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
+import SentenceTagMigration from './admin/uploaders/SentenceTagMigration';
 // 📦 LEGACY ADMIN UPLOADERS
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
@@ -540,6 +541,14 @@ function App() {
     </AdminRoute>
   }
 />
+            <Route
+              path="/admin-secret-portal-sentence-tag-migration"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SentenceTagMigration />
+                </AdminRoute>
+              }
+            />
             <Route
               path="/admin-secret-portal-grades"
               element={

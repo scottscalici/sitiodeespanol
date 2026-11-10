@@ -12,7 +12,8 @@ import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 // coverage, gate + evalLink) per section, plus one reassessment_configs doc
 // per circle — without the teacher re-entering any vocab or sentence
 // content. Vocab/sentences are pulled live from `vocabulary`
-// (metadata.secciones) and `sentence_bank` ("Sección X.X" grammarTags) —
+// (metadata.secciones) and `sentence_bank` ("<Textbook> — Sección X.X"
+// grammarTags) —
 // the exact same section tagging those collections already use elsewhere
 // (FormLearningPath's own vault picker, the vocab-sentences-bulk skill) —
 // and evaluaciones are only ever VALIDATED against
@@ -65,14 +66,15 @@ const buildPinnedSentence = (s) => ({
   fullData: s,
 });
 
-// A "Sección X.X" tag alone isn't unique — section numbering restarts per
-// chapter regardless of textbook/course, so a different book's own chapter
-// 2 section 1 can carry the identical "Sección 2.1" tag. The
-// vocab-sentences-bulk skill always tags the textbook name as its own
-// separate entry in the same array (per its SKILL.md), so requiring BOTH
-// tags is what actually scopes a sentence to this specific chapter.
+// A bare "Sección X.X" tag isn't unique on its own — section numbering
+// restarts per chapter regardless of textbook, so a different book's own
+// chapter 2 section 1 could carry the identical tag. The
+// vocab-sentences-bulk skill now folds the textbook name directly into
+// the section tag itself (e.g. "Descubre 2 — Sección 2.1"), so a single
+// tag is self-describing and unambiguous — no second sibling tag needs
+// checking alongside it.
 const matchesSentenceSection = (s, textbook, section) =>
-  (s.grammarTags || []).includes(textbook) && (s.grammarTags || []).includes(`Sección ${section}`);
+  (s.grammarTags || []).includes(`${textbook} — Sección ${section}`);
 
 const findPinnedSentences = (sentenceBank, textbook, section) =>
   sentenceBank.filter((s) => matchesSentenceSection(s, textbook, section)).map(buildPinnedSentence);
@@ -383,7 +385,7 @@ export default function ChapterLearningPathImporter() {
       <p className="text-xs text-slate-500 mb-4 leading-relaxed">
         Crea, en un solo paso, la Ruta de Aprendizaje graduada y los Círculos de Práctica de un capítulo de vocabulario,
         más su reevaluación — por cada sección, leyendo las palabras y oraciones que ya existen (por{' '}
-        <code className="text-slate-400">metadata.secciones</code> y la etiqueta <code className="text-slate-400">"Sección X.X"</code>),
+        <code className="text-slate-400">metadata.secciones</code> y la etiqueta <code className="text-slate-400">"{'{Libro}'} — Sección X.X"</code>),
         sin que tengas que volver a escribirlas. Las evaluaciones deben existir YA en el Secuenciador — esto solo las
         valida, nunca las crea ni las sobrescribe. Volver a correr esto para el mismo pathId solo AGREGA secciones
         nuevas; una sección que ya existe se salta, nunca se toca.
