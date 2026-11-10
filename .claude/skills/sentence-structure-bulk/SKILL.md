@@ -72,6 +72,17 @@ at all if it's just modeling the word in context rather than quizzing it.
 - **etiquetas**: comma-separated keywords (e.g. `pretérito, viajes`) for
   organizing/filtering in the Learning Path builder. These do NOT limit
   where distractors come from — see the next two columns for that.
+  - **A textbook section tag must name its book**: write
+    `"Descubre 2 — Sección 2.1"` or `"Reporteros 4 — Sección 2.1"`, never
+    a bare `"Sección 2.1"` — section numbering restarts per chapter
+    regardless of textbook, so a bare section tag isn't unique and
+    silently mixes content from the wrong book. Use an em dash with a
+    space on each side (` — `), not a plain hyphen.
+  - **A makeup-quiz/reteach tag must name its actual topic**: write
+    `"Repaso: Pretérito-Imperfecto (Marcadores Temporales)"`-style tags —
+    `"Repaso: <topic>"` — never a generic `"Repaso Examen"`, since that
+    collides the moment a second makeup-quiz batch (for a different
+    topic) gets added.
 - **grupo_distractores** (optional): a single, narrower tag than the
   topic tags, used only to *prefer* a tighter pool of sentences as this
   one's multiple-choice distractors. This does not guarantee any specific
