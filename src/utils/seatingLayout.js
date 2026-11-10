@@ -2,13 +2,15 @@
 // positions, and each table's size) — matches Scott's actual room exactly.
 // Students are assigned to a TABLE (a "pod"), not an individual seat within
 // it, so a pod only tracks a capacity and an unordered list of student ids.
+// `enLabel` is used by the student-facing seat-pick prompt (English, per
+// Scott's request) — the admin builder always uses `label` (Spanish).
 export const ROOM_PODS = [
-  { id: 'pod_a', label: 'Mesa A', capacity: 6, area: 'podA' },
-  { id: 'pod_b', label: 'Mesa B', capacity: 6, area: 'podB' },
-  { id: 'pod_c', label: 'Mesa C', capacity: 6, area: 'podC' },
-  { id: 'pod_d', label: 'Mesa D', capacity: 6, area: 'podD' },
-  { id: 'pod_e', label: 'Mesa E', capacity: 6, area: 'podE' },
-  { id: 'pod_f', label: 'Mesa F', capacity: 6, area: 'podF' },
+  { id: 'pod_a', label: 'Mesa A', enLabel: 'Table A', capacity: 6, area: 'podA' },
+  { id: 'pod_b', label: 'Mesa B', enLabel: 'Table B', capacity: 6, area: 'podB' },
+  { id: 'pod_c', label: 'Mesa C', enLabel: 'Table C', capacity: 6, area: 'podC' },
+  { id: 'pod_d', label: 'Mesa D', enLabel: 'Table D', capacity: 6, area: 'podD' },
+  { id: 'pod_e', label: 'Mesa E', enLabel: 'Table E', capacity: 6, area: 'podE' },
+  { id: 'pod_f', label: 'Mesa F', enLabel: 'Table F', capacity: 6, area: 'podF' },
 ];
 
 // Tables closest to the board — used by a student's "preferFront" note when

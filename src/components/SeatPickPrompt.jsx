@@ -64,7 +64,7 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
   const handleSubmit = async () => {
     if (!selectedPodId) return;
     if (podOpenCount(selectedPodId) < neededSeats) {
-      setError('Esa mesa ya no tiene suficiente espacio — elige otra.');
+      setError("That table doesn't have enough room anymore — pick another.");
       return;
     }
     setSaving(true);
@@ -82,7 +82,7 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
       invalidateCollectionCache('users');
     } catch (err) {
       console.error('Error saving seat pick:', err);
-      setError('Hubo un error al guardar — intenta de nuevo.');
+      setError('Something went wrong saving — try again.');
       setSaving(false);
     }
   };
@@ -92,14 +92,14 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
   return (
     <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[300] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-gradient-to-br from-amber-600 via-orange-600 to-rose-600 rounded-3xl shadow-2xl p-6 max-w-2xl w-full text-white">
-        <p className="text-xs font-black uppercase tracking-widest text-white/70 mb-1">🌟 ¡Tú ganaste más puntos este mes!</p>
-        <h2 className="text-2xl font-black mb-3">Elige tu mesa{grant.allowedFriends > 0 ? ' y a quién invitar' : ''}</h2>
+        <p className="text-xs font-black uppercase tracking-widest text-white/70 mb-1">🌟 You earned the most points this month!</p>
+        <h2 className="text-2xl font-black mb-3">Choose your table{grant.allowedFriends > 0 ? ' and who to invite' : ''}</h2>
 
         <div
           className="grid gap-2 bg-slate-950/40 rounded-2xl p-3"
           style={{ ...ROOM_GRID_STYLE, minHeight: 380 }}
         >
-          <RoomChrome />
+          <RoomChrome english />
           {ROOM_PODS.map((pod) => {
             const open = podOpenCount(pod.id);
             const isSelected = selectedPodId === pod.id;
@@ -119,8 +119,8 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
                     : 'bg-slate-900/30 border-slate-700 opacity-40 cursor-not-allowed'
                 }`}
               >
-                <p className="text-[10px] font-black uppercase tracking-widest">{pod.label}</p>
-                <p className="text-[9px]">{open} lugar(es) libres</p>
+                <p className="text-[10px] font-black uppercase tracking-widest">{pod.enLabel}</p>
+                <p className="text-[9px]">{open} seat(s) open</p>
               </button>
             );
           })}
@@ -129,7 +129,7 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
         {grant.allowedFriends > 0 && (
           <div className="mt-4">
             <p className="text-xs font-black uppercase tracking-widest text-white/80 mb-2">
-              Invita hasta {grant.allowedFriends} compañero(s) ({selectedFriendIds.length}/{grant.allowedFriends})
+              Invite up to {grant.allowedFriends} classmate(s) ({selectedFriendIds.length}/{grant.allowedFriends})
             </p>
             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
               {classmates.map((s) => (
@@ -156,7 +156,7 @@ export default function SeatPickPrompt({ grant, uid, course, section }) {
           disabled={!selectedPodId || saving}
           className="mt-4 w-full bg-white text-orange-700 font-black uppercase tracking-widest text-xs py-3 rounded-xl shadow-lg hover:bg-white/90 active:scale-95 transition-all disabled:opacity-50"
         >
-          {saving ? 'Guardando...' : 'Confirmar mesa 🎉'}
+          {saving ? 'Saving...' : 'Confirm table 🎉'}
         </button>
       </div>
     </div>

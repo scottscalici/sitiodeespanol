@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
-import {
-  getCachedCollection,
-  invalidateCollectionCache,
-  getCachedDoc,
-  invalidateDocCache,
-} from '../../utils/firestoreCache';
+import { getCachedCollection, invalidateCollectionCache, invalidateDocCache } from '../../utils/firestoreCache';
 import RoomChrome from '../../components/RoomChrome';
 import { ROOM_PODS, FRONT_POD_IDS, ROOM_GRID_STYLE, chartIdFor, emptyAssignments, podById } from '../../utils/seatingLayout';
 
@@ -58,15 +53,17 @@ export default function SeatingChartManager() {
 
   const chartId = selectedPair ? chartIdFor(selectedPair.course, selectedPair.section) : null;
 
+  // A live listener (not a one-time cached fetch) — so when a student
+  // submits their own seat pick (SeatPickPrompt.jsx), this view updates on
+  // its own instead of showing stale assignments until the page is reloaded.
   useEffect(() => {
     if (!chartId) return;
-    let cancelled = false;
-    getCachedDoc('seating_charts', chartId).then((data) => {
-      if (!cancelled) setAssignments(data?.assignments || emptyAssignments());
-    });
-    return () => {
-      cancelled = true;
-    };
+    const unsub = onSnapshot(
+      doc(db, 'seating_charts', chartId),
+      (snap) => setAssignments(snap.exists() ? snap.data().assignments || emptyAssignments() : emptyAssignments()),
+      (err) => console.error('Error watching seating chart:', err)
+    );
+    return unsub;
   }, [chartId]);
 
   const roster = useMemo(
