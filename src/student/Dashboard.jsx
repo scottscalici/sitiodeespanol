@@ -55,7 +55,15 @@ const PLATFORM_TAREA_INFO = {
 
 const Dashboard = () => {
   const { userData } = useAuth();
-  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate, isPreviewing } = useActiveTheme() || {};
+  const {
+    theme: todayTheme,
+    loaded: themeLoaded,
+    resolveThemeForDate,
+    isPreviewing,
+    resolvedThemeId,
+    manualThemeId,
+    setManualTheme,
+  } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
   // The student's own A/B block-schedule cycle (trailing letter of their
@@ -432,8 +440,13 @@ const Dashboard = () => {
     // Estructura, Evaluacion, LecturaCard, GamesSidebar, ResourceHub,
     // LeaderboardCard, LearningPathTile, PracticeHubTile — all read
     // useActiveTheme() themselves) picks up the VIEWED DAY's theme instead
-    // of today's, with no prop drilling needed.
-    <ThemeContext.Provider value={{ theme, loaded: themeLoaded, resolveThemeForDate }}>
+    // of today's, with no prop drilling needed. resolvedThemeId/manualThemeId/
+    // setManualTheme/isPreviewing are passed straight through from the root
+    // provider (unrelated to which día is being viewed) so Header's theme
+    // toggle still works here instead of silently losing its setter.
+    <ThemeContext.Provider
+      value={{ theme, loaded: themeLoaded, resolveThemeForDate, isPreviewing, resolvedThemeId, manualThemeId, setManualTheme }}
+    >
       <ThemeStyleSync theme={theme} />
       <div
         className={`min-h-screen relative ${pageBgStyle ? '' : pageBgClass}`}
