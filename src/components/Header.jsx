@@ -10,6 +10,7 @@ import { getTitleForPoints, getAllEarnedBadges, isBadgeUpgrade, DEFAULT_TITLE_TI
 import BadgeIcon from './BadgeIcon';
 import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
+import ThemeUnlockToggle from './ThemeUnlockToggle';
 import { useActiveTheme } from '../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { getTextEffectStyle } from '../utils/textEffects';
@@ -260,6 +261,8 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
           <span className="text-lg font-black">{monthlyPoints}</span>
           <span className="text-[9px] font-bold uppercase tracking-widest text-white/60">Este Mes</span>
         </div>
+
+        <ThemeUnlockToggle totalPoints={totalPoints} isLoggedIn={!!currentUser} />
       </div>
 
       {showTrophyCase && (

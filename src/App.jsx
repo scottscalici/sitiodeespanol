@@ -79,6 +79,7 @@ import ClassScheduleManager from './admin/MasterDashboard/components/ClassSchedu
 import ReassessmentEngine from './student/ReassessmentEngine';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
+import UnlockablesManager from './admin/managers/UnlockablesManager';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
@@ -434,6 +435,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ImpostorThemesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-unlockables"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <UnlockablesManager />
                 </AdminRoute>
               }
             />
