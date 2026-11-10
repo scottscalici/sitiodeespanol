@@ -242,6 +242,17 @@ export default function SeatingChartManager() {
             🎲 Mezclar
           </button>
 
+          {chartId && (
+            <Link
+              to={`/print-seating-chart/${chartId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-sky-600 hover:bg-sky-500 text-white font-black uppercase tracking-widest text-xs px-4 py-2.5 rounded-xl"
+            >
+              🖨️ Imprimir
+            </Link>
+          )}
+
           {status && <p className="text-xs font-bold text-amber-300">{status}</p>}
         </div>
 

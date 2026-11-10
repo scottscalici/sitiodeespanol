@@ -81,6 +81,7 @@ import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import UnlockablesManager from './admin/managers/UnlockablesManager';
 import SeatingChartManager from './admin/managers/SeatingChartManager';
+import PrintSeatingChart from './admin/managers/PrintSeatingChart';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
@@ -452,6 +453,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SeatingChartManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/print-seating-chart/:chartId"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PrintSeatingChart />
                 </AdminRoute>
               }
             />
