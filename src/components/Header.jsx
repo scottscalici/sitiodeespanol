@@ -17,7 +17,18 @@ import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { getTextEffectStyle } from '../utils/textEffects';
 import { darkenHex } from '../utils/color';
 
-const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin, onToggleCourse }) => {
+const Header = ({
+  liveDia,
+  setLiveDia,
+  maxAllowedDay,
+  course,
+  cal = [],
+  isAdmin,
+  onToggleCourse,
+  previewSections = [],
+  previewSectionId,
+  onPreviewSection,
+}) => {
   const { userData, currentUser } = useAuth();
   const { theme } = useActiveTheme() || {};
   const headerGradientClass = theme?.styles?.header || 'bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#b91c1c]';
@@ -166,7 +177,26 @@ const Header = ({ liveDia, setLiveDia, maxAllowedDay, course, cal = [], isAdmin,
       </div>
 
       <div className="hidden sm:flex flex-col items-end gap-3">
-        
+
+        {/* PREVIEW AS A STUDENT IN ONE OF THESE SECTIONS (admin only) */}
+        {isAdmin && previewSections.length > 0 && (
+          <div className="flex items-center gap-1.5 bg-white/10 border border-white/20 shadow-sm px-2 py-1.5 rounded-xl backdrop-blur-sm">
+            <label className="text-[10px] font-black uppercase tracking-wider text-slate-200 px-1">👁️ Vista Previa:</label>
+            {previewSections.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onPreviewSection?.(p.id)}
+                className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all ${
+                  previewSectionId === p.id ? 'bg-white text-slate-900' : 'text-white/70 hover:bg-white/20'
+                }`}
+              >
+                {p.id}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* DAY SELECTOR WITH ADMIN OVERRIDE LOGIC */}
         <div className="flex items-center gap-3 bg-white/10 border border-white/20 shadow-sm px-4 py-1.5 rounded-xl backdrop-blur-sm">
           <label className="text-[10px] font-black uppercase tracking-wider text-slate-200">
