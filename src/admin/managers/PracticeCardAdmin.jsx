@@ -22,6 +22,12 @@ export default function PracticeCardAdmin() {
   const [excused, setExcused] = useState(false);
   const [topic, setTopic] = useState('');
   const [questions, setQuestions] = useState([emptyQuestion()]);
+  // Extra scheduled occurrences beyond the card's own Curso/Día above —
+  // each one can optionally be narrowed to just some of the card's
+  // sections (see the "Asignaciones" panel below). An empty array (the
+  // default, and every card saved before this existed) means the card's
+  // top-level Curso/Día is its only occurrence, exactly as always.
+  const [assignments, setAssignments] = useState([]);
 
   const [savedCards, setSavedCards] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -55,6 +61,7 @@ export default function PracticeCardAdmin() {
       setGradeWeight(c.gradeWeight || 1);
       setExcused(c.excused || false);
       setTopic(c.topic || '');
+      setAssignments(c.assignments || []);
       setQuestions(c.questions?.length ? reconstructEditableFields(c.questions) : [emptyQuestion()]);
     }
   };
@@ -85,6 +92,44 @@ export default function PracticeCardAdmin() {
       [next[index], next[targetIdx]] = [next[targetIdx], next[index]];
       return next;
     });
+  };
+
+  // Distinct section labels, in first-appearance order — what the
+  // "Asignaciones" checklist below lets a teacher pick from. A card with
+  // no sectioned questions has an empty list, so no checklist shows.
+  const distinctSections = [];
+  questions.forEach((q) => {
+    const s = (q.section || '').trim();
+    if (s && !distinctSections.includes(s)) distinctSections.push(s);
+  });
+
+  const addAssignment = () =>
+    setAssignments([
+      ...assignments,
+      // A brand-new occurrence defaults to covering the whole card
+      // (sections: null) — the teacher narrows it by unchecking boxes,
+      // rather than starting from an empty, unusable assignment.
+      { id: `asg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, course: 's2', dia: '', sections: null },
+    ]);
+  const updateAssignment = (idx, patch) =>
+    setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
+  const removeAssignment = (idx) => setAssignments((prev) => prev.filter((_, i) => i !== idx));
+
+  // Toggling a box always recomputes from the FULL distinctSections list
+  // (not just what's currently checked) so a question added/renamed to a
+  // new section after an assignment was created doesn't silently get
+  // left out or locked in — the checklist always reflects the card as it
+  // stands right now. Checking every box collapses back to `null` (whole
+  // card) rather than storing a redundant "all of them" array.
+  const toggleAssignmentSection = (idx, section) => {
+    setAssignments((prev) =>
+      prev.map((a, i) => {
+        if (i !== idx) return a;
+        const current = a.sections ?? distinctSections;
+        const next = current.includes(section) ? current.filter((s) => s !== section) : [...current, section];
+        return { ...a, sections: next.length === distinctSections.length ? null : next };
+      })
+    );
   };
 
   const handleBulkImport = () => {
@@ -167,6 +212,7 @@ export default function PracticeCardAdmin() {
           gradeWeight: Number(gradeWeight) || 1,
           excused,
           topic: topic.trim(),
+          assignments,
           questions: cleanQuestions,
           createdAt: new Date().toISOString(),
         },
@@ -290,6 +336,82 @@ export default function PracticeCardAdmin() {
             <input type="checkbox" checked={excused} onChange={(e) => setExcused(e.target.checked)} className="rounded text-amber-500" />
             <span>Excusada</span>
           </label>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <div>
+              <h2 className="text-lg font-black text-slate-800 uppercase">Asignaciones Adicionales</h2>
+              <p className="text-[11px] text-slate-400">
+                El Curso/Día de arriba sigue siendo una asignación de la tarjeta completa. Usa esto para asignar{' '}
+                <strong>otro día, solo algunas secciones</strong> — la tarjeta sigue entera en el banco.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={addAssignment}
+              className="shrink-0 text-[10px] font-black uppercase tracking-widest bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-xl"
+            >
+              + Agregar asignación
+            </button>
+          </div>
+
+          {assignments.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">Ninguna asignación adicional todavía.</p>
+          ) : (
+            <div className="space-y-3">
+              {assignments.map((a, aIdx) => (
+                <div key={a.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={a.course}
+                      onChange={(e) => updateAssignment(aIdx, { course: e.target.value })}
+                      className="p-1.5 border rounded-lg text-xs font-bold uppercase bg-white"
+                    >
+                      <option value="s2">S2</option>
+                      <option value="s4">S4</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={a.dia}
+                      onChange={(e) => updateAssignment(aIdx, { dia: e.target.value })}
+                      placeholder="Día"
+                      className="w-20 p-1.5 border rounded-lg text-xs font-bold text-center bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAssignment(aIdx)}
+                      className="ml-auto p-1.5 text-rose-500 font-bold text-sm"
+                      title="Eliminar esta asignación"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+
+                  {distinctSections.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic">
+                      Esta tarjeta no tiene secciones etiquetadas todavía — esta asignación siempre incluirá la tarjeta completa.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {distinctSections.map((s) => {
+                        const checked = a.sections == null || a.sections.includes(s);
+                        return (
+                          <label
+                            key={s}
+                            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer bg-white px-2.5 py-1.5 rounded-lg border"
+                          >
+                            <input type="checkbox" checked={checked} onChange={() => toggleAssignmentSection(aIdx, s)} className="rounded text-violet-500" />
+                            <span>{s}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">

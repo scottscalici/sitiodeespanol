@@ -388,9 +388,26 @@ const Dashboard = () => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
 
-  const activePracticeCards = practiceCards.filter(
-    (pc) => pc.course === course && Number(pc.dia) === liveDia && !pc.excused
-  );
+  // A card can have scheduled occurrences beyond its own top-level
+  // course/día (see PracticeCardAdmin's "Asignaciones") — each becomes
+  // its own tile here, carrying its own assignmentId/sections so
+  // PracticeCard.jsx can link to just that occurrence and show only its
+  // questions' count. A card with none of these (the common case, and
+  // every card saved before this existed) surfaces exactly as it always
+  // has, under its own plain id.
+  const activePracticeCards = practiceCards.flatMap((pc) => {
+    if (pc.excused) return [];
+    const occurrences = [];
+    if (pc.course === course && Number(pc.dia) === liveDia) {
+      occurrences.push({ ...pc, assignmentId: null, sections: null });
+    }
+    (pc.assignments || []).forEach((a) => {
+      if (a.course === course && Number(a.dia) === liveDia) {
+        occurrences.push({ ...pc, dia: a.dia, course: a.course, assignmentId: a.id, sections: a.sections ?? null });
+      }
+    });
+    return occurrences;
+  });
 
   const activeReadingCards = readingCards.filter(
     (rc) => rc.course === course && Number(rc.dia) === liveDia && !rc.excused
@@ -529,7 +546,7 @@ const Dashboard = () => {
 
               {/* ✏️ PRÁCTICA — SMALL GRADED ACTIVITIES (GUSTAR, ETC.) */}
               {activePracticeCards.map((card) => (
-                <PracticeCard key={card.id} card={card} />
+                <PracticeCard key={card.assignmentId ? `${card.id}_${card.assignmentId}` : card.id} card={card} />
               ))}
 
               {/* 📖 LECTURA — comprehension readings assigned for today */}

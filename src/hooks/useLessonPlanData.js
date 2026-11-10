@@ -97,7 +97,11 @@ export const computeLessonPlanDay = (raw, course, selectedDay) => {
   const verbList = activeCalentamientoVerbs.flatMap((c) => c.bakedQuestions || []).map((q) => `${q.sujeto} ${q.palabra}`).join(', ');
   const vocabList = activeCalentamientoVocab.flatMap((v) => v.sequence || []).map((w) => w.palabra).join(', ');
 
-  const activePracticeCards = raw.practiceCards.filter((p) => p.course === course && Number(p.dia) === selectedDay);
+  const activePracticeCards = raw.practiceCards.filter(
+    (p) =>
+      (p.course === course && Number(p.dia) === selectedDay) ||
+      (p.assignments || []).some((a) => a.course === course && Number(a.dia) === selectedDay)
+  );
   const activeSentenceSets = raw.sentenceSets.filter((s) => (s.assignments || []).some((a) => a.course === course && Number(a.dia) === selectedDay));
   const activeCuriosidades = raw.curiosidades.filter((c) => (course === 's2' ? c.s2_dia === selectedDay : c.s4_dia === selectedDay));
   const activeGramatica = (raw.gramatica[course] || []).filter((g) => Number(g.dia) === selectedDay);

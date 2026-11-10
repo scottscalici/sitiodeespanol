@@ -15,13 +15,23 @@ export default function PracticeCard({ card }) {
 
   if (!card) return null;
 
+  // `assignmentId`/`sections` (set only for a scheduled occurrence that
+  // narrows the card to some of its sections — see PracticeCardAdmin's
+  // "Asignaciones") decide both the link and the question count shown,
+  // so the tile never promises more than what that occurrence actually
+  // includes. Absent for the common case: the whole card, same as always.
+  const href = card.assignmentId ? `/practica/tarjeta/${card.id}?assignment=${card.assignmentId}` : `/practica/tarjeta/${card.id}`;
+  const questionCount = card.sections
+    ? (card.questions || []).filter((q) => card.sections.includes((q.section || '').trim())).length
+    : card.questions?.length || 0;
+
   return (
     // Links by the card's own doc id, not course+día — a day can have more
     // than one practice card assigned (e.g. preterite + imperfect the same
     // día), and the old course+día route only ever resolved the first
     // match, silently sending every tile for that día to the same card.
     <Link
-      to={`/practica/tarjeta/${card.id}`}
+      to={href}
       className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
       style={cardTheme.style}
     >
@@ -41,7 +51,7 @@ export default function PracticeCard({ card }) {
         <div className="min-w-0 flex-1">
           <span className="block text-xs font-black uppercase tracking-widest text-violet-100 mb-1">Práctica · Día {card.dia}</span>
           <h3 className="text-2xl font-black text-white uppercase tracking-tighter truncate" style={{ color: cardTheme.headingColor }}>{card.title}</h3>
-          <p className="text-violet-50/80 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme.textColor }}>{card.questions?.length || 0} preguntas rápidas.</p>
+          <p className="text-violet-50/80 text-sm font-medium mt-1 line-clamp-2" style={{ color: cardTheme.textColor }}>{questionCount} preguntas rápidas.</p>
         </div>
       </div>
 
