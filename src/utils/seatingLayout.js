@@ -6,7 +6,7 @@ export const ROOM_PODS = [
   { id: 'pod_a', label: 'Mesa A', capacity: 6, area: 'podA' },
   { id: 'pod_b', label: 'Mesa B', capacity: 6, area: 'podB' },
   { id: 'pod_c', label: 'Mesa C', capacity: 6, area: 'podC' },
-  { id: 'pod_d', label: 'Mesa D', capacity: 5, area: 'podD' },
+  { id: 'pod_d', label: 'Mesa D', capacity: 6, area: 'podD' },
   { id: 'pod_e', label: 'Mesa E', capacity: 6, area: 'podE' },
   { id: 'pod_f', label: 'Mesa F', capacity: 6, area: 'podF' },
 ];
