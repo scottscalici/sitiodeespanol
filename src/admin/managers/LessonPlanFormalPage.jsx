@@ -5,7 +5,8 @@ import { db } from '../../firebase';
 import { useLessonPlanData } from '../../hooks/useLessonPlanData';
 import { COURSE_TITLES, SECTION_STANDARDS, ACTIVITY_STANDARDS, getEvaluacionStandard } from '../../utils/lessonPlanStandards';
 import { TYPE_LABELS, getQuestionPreview } from '../../shared/questionTypes';
-import { renderFormattedText } from '../../utils/formattedText';
+import { renderFormattedText, getTextSnippet } from '../../utils/formattedText';
+import { SECTION_DEFS } from '../../utils/lessonPlanSections';
 
 const MAX_DAYS = 80;
 const SERIF = '"Baskerville Old Face", "Libre Baskerville", Georgia, serif';
@@ -142,145 +143,170 @@ export default function LessonPlanFormalPage() {
           />
         </div>
 
-        {/* Timed-agenda sections, each tagged with its standard */}
+        {/* Timed-agenda sections, each tagged with its standard — rendered
+            in SECTION_DEFS's order (imported from LessonPlanPage.jsx) so
+            this page always matches the normal plan page's section order
+            instead of maintaining its own separate hardcoded sequence. */}
         <div className="space-y-4 mb-6">
-          {planData.destacado.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">🌟 Destacado del Día</h3>
-                <StandardTag standard={SECTION_STANDARDS.destacado} />
-              </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.destacado.map((d) => (
-                  <li key={d.id}>
-                    <span className="font-bold">{d.header || d.type}</span>
-                    {d.word_of_the_day?.word && (
-                      <> — palabra del día: <span className="italic">{d.word_of_the_day.word}</span>{d.word_of_the_day.translation ? ` (${d.word_of_the_day.translation})` : ''}</>
-                    )}
-                    {d.spanish && <p className="font-normal text-gray-700 mt-1">{d.spanish}</p>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {(planData.calentamiento.verbs.length + planData.calentamiento.vocab.length) > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">⏱️ Calentamiento</h3>
-                <StandardTag standard={SECTION_STANDARDS.calentamiento} />
-              </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.calentamiento.verbs.map((c) => (
-                  <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
-                ))}
-                {planData.calentamiento.vocab.map((v) => (
-                  <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
-                ))}
-              </ul>
-              {planData.calentamiento.verbList && <p className="text-sm font-sans text-gray-700 mt-2">{planData.calentamiento.verbList}</p>}
-              {planData.calentamiento.vocabList && <p className="text-sm font-sans text-gray-700 mt-1">{planData.calentamiento.vocabList}</p>}
-            </div>
-          )}
-
-          {planData.oraciones.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">✍️ Oraciones de Práctica</h3>
-                <StandardTag standard={SECTION_STANDARDS.oraciones} />
-              </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.oraciones.map((s) => <li key={s.id}>{s.title || 'Oraciones'}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {planData.curiosidad.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">💡 Curiosidad</h3>
-                <StandardTag standard={SECTION_STANDARDS.curiosidad} />
-              </div>
-              <div className="space-y-3">
-                {planData.curiosidad.map((c) => (
-                  <div key={c.id}>
-                    <p className="font-bold">{c.title} ({(c.questions || []).length} preguntas)</p>
-                    {(c.questions || []).length > 0 && (
-                      <ol className="list-decimal pl-6 space-y-0.5 text-sm font-sans text-gray-700">
-                        {c.questions.map((q, idx) => (
-                          <li key={idx}>
-                            <span className="text-gray-400">[{TYPE_LABELS[q.type] || q.type}]</span>{' '}
-                            {getQuestionPreview(q) || '(sin texto)'}
-                          </li>
-                        ))}
-                      </ol>
-                    )}
+          {SECTION_DEFS.map(({ key }) => {
+            if (key === 'destacado' && planData.destacado.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">🌟 Destacado del Día</h3>
+                    <StandardTag standard={SECTION_STANDARDS.destacado} />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {(videos.length + conversaciones.length + musica.length + cultura.length + lecturas.length) > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <h3 className="text-base font-bold uppercase tracking-wide mb-2">🎬 Actividades</h3>
-              <ul className="space-y-1">
-                {videos.map((v) => (
-                  <li key={`vid-${v.id}`} className="flex justify-between items-center gap-3"><span>🎬 Video: {v.title}</span><StandardTag standard={ACTIVITY_STANDARDS.video} /></li>
-                ))}
-                {lecturas.map((l) => (
-                  <li key={`lec-${l.id}`} className="flex justify-between items-center gap-3"><span>📖 Lectura: {l.subtitulo || 'Comprensión de Lectura'}</span><StandardTag standard={ACTIVITY_STANDARDS.lectura} /></li>
-                ))}
-                {conversaciones.map((c) => (
-                  <li key={`conv-${c.id}`} className="flex justify-between items-center gap-3"><span>🗣️ Conversación: {c.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.conversacion} /></li>
-                ))}
-                {musica.map((m) => (
-                  <li key={`mus-${m.id}`} className="flex justify-between items-center gap-3"><span>🎵 Música: {m.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.musica} /></li>
-                ))}
-                {cultura.map((c) => (
-                  <li key={`cul-${c.id}`} className="flex justify-between items-center gap-3"><span>🌎 Cultura: {c.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.cultura} /></li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {planData.gramatica.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">📚 Gramática / Estructuras</h3>
-                <StandardTag standard={SECTION_STANDARDS.gramatica} />
-              </div>
-              {planData.gramatica.map((g, idx) => (
-                <div key={idx}>
-                  {g.introText && <p><span className="font-bold">Introducir:</span> {renderFormattedText(g.introText)}</p>}
-                  {g.repasoText && <p><span className="font-bold">Repasar:</span> {renderFormattedText(g.repasoText)}</p>}
+                  <ul className="list-disc pl-5 space-y-1">
+                    {planData.destacado.map((d) => (
+                      <li key={d.id}>
+                        <span className="font-bold">{d.header || d.type}</span>
+                        {d.word_of_the_day?.word && (
+                          <> — palabra del día: <span className="italic">{d.word_of_the_day.word}</span>{d.word_of_the_day.translation ? ` (${d.word_of_the_day.translation})` : ''}</>
+                        )}
+                        {(d.content?.spanish || d.body_es) && (
+                          <p className="font-normal text-gray-700 mt-1">{getTextSnippet(d.content?.spanish || d.body_es)}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            }
 
-          {planData.evaluacion.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <h3 className="text-base font-bold uppercase tracking-wide mb-2">🎯 Evaluación</h3>
-              <ul className="space-y-1">
-                {planData.evaluacion.map((e, idx) => (
-                  <li key={idx} className="flex justify-between items-center gap-3"><span className="font-bold">{e.label}</span><StandardTag standard={getEvaluacionStandard(e.label, course)} /></li>
-                ))}
-              </ul>
-            </div>
-          )}
+            if (key === 'calentamiento' && (planData.calentamiento.verbs.length + planData.calentamiento.vocab.length) > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">⏱️ Calentamiento</h3>
+                    <StandardTag standard={SECTION_STANDARDS.calentamiento} />
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {planData.calentamiento.verbs.map((c) => (
+                      <li key={`v-${c.id}`}>Verbos: {c.title} ({c.bakedQuestions?.length || 0} preguntas)</li>
+                    ))}
+                    {planData.calentamiento.vocab.map((v) => (
+                      <li key={`voc-${v.id}`}>Vocabulario: {v.name} ({v.sequence?.length || 0} términos)</li>
+                    ))}
+                  </ul>
+                  {planData.calentamiento.verbList && <p className="text-sm font-sans text-gray-700 mt-2">{planData.calentamiento.verbList}</p>}
+                  {planData.calentamiento.vocabList && <p className="text-sm font-sans text-gray-700 mt-1">{planData.calentamiento.vocabList}</p>}
+                </div>
+              );
+            }
 
-          {planData.practica.length > 0 && (
-            <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
-              <div className="flex justify-between items-start gap-3 mb-2">
-                <h3 className="text-base font-bold uppercase tracking-wide">✏️ Práctica</h3>
-                <StandardTag standard={SECTION_STANDARDS.practica} />
-              </div>
-              <ul className="list-disc pl-5 space-y-1">
-                {planData.practica.map((p) => <li key={p.id}>{p.title}</li>)}
-              </ul>
-            </div>
-          )}
+            if (key === 'oraciones' && planData.oraciones.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">✍️ Oraciones de Práctica</h3>
+                    <StandardTag standard={SECTION_STANDARDS.oraciones} />
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {planData.oraciones.map((s) => <li key={s.id}>{s.title || 'Oraciones'}</li>)}
+                  </ul>
+                </div>
+              );
+            }
+
+            if (key === 'curiosidad' && planData.curiosidad.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">💡 Curiosidad</h3>
+                    <StandardTag standard={SECTION_STANDARDS.curiosidad} />
+                  </div>
+                  <div className="space-y-3">
+                    {planData.curiosidad.map((c) => (
+                      <div key={c.id}>
+                        <p className="font-bold">{c.title} ({(c.questions || []).length} preguntas)</p>
+                        {(c.questions || []).length > 0 && (
+                          <ol className="list-decimal pl-6 space-y-0.5 text-sm font-sans text-gray-700">
+                            {c.questions.map((q, idx) => (
+                              <li key={idx}>
+                                <span className="text-gray-400">[{TYPE_LABELS[q.type] || q.type}]</span>{' '}
+                                {getQuestionPreview(q) || '(sin texto)'}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (key === 'actividades' && (videos.length + conversaciones.length + musica.length + cultura.length + lecturas.length) > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <h3 className="text-base font-bold uppercase tracking-wide mb-2">🎬 Actividades</h3>
+                  <ul className="space-y-1">
+                    {videos.map((v) => (
+                      <li key={`vid-${v.id}`} className="flex justify-between items-center gap-3"><span>🎬 Video: {v.title}</span><StandardTag standard={ACTIVITY_STANDARDS.video} /></li>
+                    ))}
+                    {lecturas.map((l) => (
+                      <li key={`lec-${l.id}`} className="flex justify-between items-center gap-3"><span>📖 Lectura: {l.subtitulo || 'Comprensión de Lectura'}</span><StandardTag standard={ACTIVITY_STANDARDS.lectura} /></li>
+                    ))}
+                    {conversaciones.map((c) => (
+                      <li key={`conv-${c.id}`} className="flex justify-between items-center gap-3"><span>🗣️ Conversación: {c.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.conversacion} /></li>
+                    ))}
+                    {musica.map((m) => (
+                      <li key={`mus-${m.id}`} className="flex justify-between items-center gap-3"><span>🎵 Música: {m.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.musica} /></li>
+                    ))}
+                    {cultura.map((c) => (
+                      <li key={`cul-${c.id}`} className="flex justify-between items-center gap-3"><span>🌎 Cultura: {c.titulo}</span><StandardTag standard={ACTIVITY_STANDARDS.cultura} /></li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            }
+
+            if (key === 'gramatica' && planData.gramatica.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">📚 Gramática / Estructuras</h3>
+                    <StandardTag standard={SECTION_STANDARDS.gramatica} />
+                  </div>
+                  {planData.gramatica.map((g, idx) => (
+                    <div key={idx}>
+                      {g.introText && <p><span className="font-bold">Introducir:</span> {renderFormattedText(g.introText)}</p>}
+                      {g.repasoText && <p><span className="font-bold">Repasar:</span> {renderFormattedText(g.repasoText)}</p>}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
+            if (key === 'evaluacion' && planData.evaluacion.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <h3 className="text-base font-bold uppercase tracking-wide mb-2">🎯 Evaluación</h3>
+                  <ul className="space-y-1">
+                    {planData.evaluacion.map((e, idx) => (
+                      <li key={idx} className="flex justify-between items-center gap-3"><span className="font-bold">{e.label}</span><StandardTag standard={getEvaluacionStandard(e.label, course)} /></li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            }
+
+            if (key === 'practica' && planData.practica.length > 0) {
+              return (
+                <div key={key} className="break-inside-avoid border border-gray-300 rounded-lg p-4">
+                  <div className="flex justify-between items-start gap-3 mb-2">
+                    <h3 className="text-base font-bold uppercase tracking-wide">✏️ Práctica</h3>
+                    <StandardTag standard={SECTION_STANDARDS.practica} />
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {planData.practica.map((p) => <li key={p.id}>{p.title}</li>)}
+                  </ul>
+                </div>
+              );
+            }
+
+            return null;
+          })}
 
           {hasTarea && (
             <div className="break-inside-avoid border border-gray-300 rounded-lg p-4">
