@@ -98,14 +98,20 @@ export default function SeatingChartManager() {
     }
   };
 
-  const addToPod = async (podId, studentId) => {
+  // Adds a student to a table — if they're already seated somewhere else,
+  // this moves them (pulls them out of their old table first) so switching
+  // two students' tables is a single pick per student instead of a
+  // remove-then-re-add round trip.
+  const moveToPod = async (podId, studentId) => {
     const pod = podById(podId);
-    const current = assignments[podId] || [];
-    if (current.length >= pod.capacity) {
+    const withoutStudent = Object.fromEntries(
+      Object.entries(assignments).map(([id, occupants]) => [id, occupants.filter((o) => o !== studentId)])
+    );
+    if ((withoutStudent[podId] || []).length >= pod.capacity) {
       setStatus(`❌ ${pod.label} ya está lleno.`);
       return;
     }
-    await persist({ ...assignments, [podId]: [...current, studentId] });
+    await persist({ ...withoutStudent, [podId]: [...(withoutStudent[podId] || []), studentId] });
     setAddingToPod(null);
   };
 
@@ -304,18 +310,25 @@ export default function SeatingChartManager() {
                       <select
                         autoFocus
                         defaultValue=""
-                        onChange={(e) => e.target.value && addToPod(pod.id, e.target.value)}
+                        onChange={(e) => e.target.value && moveToPod(pod.id, e.target.value)}
                         onBlur={() => setAddingToPod(null)}
                         className="mt-1 bg-slate-700 text-white text-[10px] rounded px-1 py-1"
                       >
                         <option value="" disabled>
-                          + agregar...
+                          + agregar / mover...
                         </option>
-                        {unassigned.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {displayName(s)}
-                          </option>
-                        ))}
+                        {roster
+                          .filter((s) => !occupantIds.includes(s.id))
+                          .sort((a, b) => displayName(a).localeCompare(displayName(b)))
+                          .map((s) => {
+                            const currentPodId = ROOM_PODS.find((p) => (assignments[p.id] || []).includes(s.id))?.id;
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {displayName(s)}
+                                {currentPodId ? ` (en ${podById(currentPodId).label})` : ''}
+                              </option>
+                            );
+                          })}
                       </select>
                     ) : (
                       <button

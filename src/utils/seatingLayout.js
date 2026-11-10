@@ -26,10 +26,10 @@ export const ROOM_GRID_STYLE = {
   gridTemplateColumns: '48px 1fr 1fr 1fr 48px',
   gridTemplateRows: '36px 1fr 1fr 1fr 40px',
   gridTemplateAreas: `
-    "puerta board1 board2 board3 ventanas"
-    "puerta podA   .      podB   ventanas"
+    "puerta board1 board2 board3 ."
+    "puerta podA   .      podB   ."
     ".      .      podC   podD   ventanas"
-    "senor  podE   .      podF   ."
+    ".      senor  podE   podF   ventanas"
     "idtag  banner banner banner ."
   `,
 };
