@@ -85,6 +85,7 @@ import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
 import ChapterLearningPathImporter from './admin/uploaders/ChapterLearningPathImporter';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
+import PracticeCardsSequencer from './admin/MasterDashboard/components/PracticeCardsSequencer';
 import PracticeCardsUploader from './admin/uploaders/PracticeCardsUploader';
 import ReadingCardsUploader from './admin/uploaders/ReadingCardsUploader';
 import VerbEditor from './admin/managers/VerbEditor';
@@ -672,6 +673,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <ChapterLearningPathImporter />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-practice-cards-sequencer"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PracticeCardsSequencer />
                 </AdminRoute>
               }
             />

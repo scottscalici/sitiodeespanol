@@ -266,6 +266,12 @@ export default function PracticeCardAdmin() {
           >
             📤 Importar en Lote
           </Link>
+          <Link
+            to="/admin-practice-cards-sequencer"
+            className="shrink-0 text-emerald-300 hover:text-emerald-200 text-xs font-bold px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 whitespace-nowrap"
+          >
+            🗓️ Sequencer
+          </Link>
         </div>
         <p className="text-[10px] text-slate-400 uppercase tracking-widest text-right max-w-xs shrink-0">
           Para duplicar para otro día, cárgala y cambia el "Día" y el "ID Documento" antes de guardar. Para eliminar
