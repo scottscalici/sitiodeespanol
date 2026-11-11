@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc, setDoc, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, app } from '../../firebase'; // 👈 Make sure 'app' is imported here!
@@ -37,9 +38,15 @@ const getCurrentQuarter = (quarters, todayStr) => {
 };
 
 export default function TeacherGradebook() {
+  const [searchParams] = useSearchParams();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('gradebook'); // 'gradebook' or 'diagnostics'
+  // Lets a favorited link (e.g. /admin-secret-portal-grades?tab=recuperacion)
+  // deep-link straight into a tab instead of always landing on 'gradebook'.
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    return tab === 'recuperacion' || tab === 'diagnostics' ? tab : 'gradebook';
+  });
   const [unitColumns, setUnitColumns] = useState([]); // [{ path_id, titulo, day_due, courses: Set }]
   const [unitMeta, setUnitMeta] = useState({}); // { [path_id]: { isFlat, pods, totalPods } }
 

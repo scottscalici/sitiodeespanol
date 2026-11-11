@@ -100,6 +100,7 @@ export const ADMIN_SECTIONS = [
     color: 'cyan',
     links: [
       { to: '/admin-secret-portal-grades', label: 'Gradebook', emoji: '📊' },
+      { to: '/admin-secret-portal-grades?tab=recuperacion', label: 'Reevaluaciones (Recuperación)', emoji: '🔁' },
       { to: '/admin-monthly-leaders', label: 'Líderes por Clase', emoji: '📈' },
       { to: '/admin-reassessment-config', label: 'Recuperaciones', emoji: '🔁' },
       { to: '/admin-class-schedule', label: 'Horario de Clases', emoji: '🕐' },
@@ -149,4 +150,5 @@ export const DEFAULT_FAVORITES = [
   '/admin-secret-portal-practice-cards',
   '/admin-grammar-notes',
   '/admin-secret-portal-seating-chart',
+  '/admin-secret-portal-grades?tab=recuperacion',
 ];

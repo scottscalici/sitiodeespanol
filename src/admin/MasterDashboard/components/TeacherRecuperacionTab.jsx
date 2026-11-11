@@ -7,6 +7,7 @@ import {
   grantReassessmentOverride,
   endReassessmentNow,
   unlockReassessmentAccess,
+  setReassessmentEnteredInGradebook,
 } from '../../../utils/reassessmentData';
 import { resetRecuperacionForRetake } from '../../../utils/recuperacionData';
 
@@ -78,11 +79,24 @@ export default function TeacherRecuperacionTab() {
           bestScore: d.bestScore,
           passedAt: d.passedAt,
           reassessment: attempt?.status
-            ? { status: attempt.status, score: attempt.score, tabSwitchCount: (attempt.tabSwitchLog || []).length }
+            ? {
+                status: attempt.status,
+                score: attempt.score,
+                tabSwitchCount: (attempt.tabSwitchLog || []).length,
+                enteredInGradebook: !!attempt.enteredInGradebook,
+              }
             : null,
           overrideUntil: overrideActive ? attempt.override.openUntil : null,
         });
       });
+
+      // Finished-but-not-yet-entered-in-Schoology surfaces first within each
+      // quiz group — that's the actual "am I caught up" question this tab
+      // exists to answer, not just a flat roster.
+      const needsEntry = (s) => s.reassessment?.status === 'finished' && !s.reassessment.enteredInGradebook;
+      Object.values(byCourse.s2)
+        .concat(Object.values(byCourse.s4))
+        .forEach((g) => g.students.sort((a, b) => Number(needsEntry(b)) - Number(needsEntry(a))));
 
       const sortGroups = (obj) => Object.values(obj).sort((a, b) => (b.evalDia || 0) - (a.evalDia || 0));
       setGroupsByCourse({ s2: sortGroups(byCourse.s2), s4: sortGroups(byCourse.s4) });
@@ -165,6 +179,32 @@ export default function TeacherRecuperacionTab() {
       console.error('Error resetting stuck reassessment attempt:', err);
     } finally {
       setResettingKey(null);
+    }
+  };
+
+  // Pure checklist bookkeeping — toggled locally first (so the checkbox
+  // responds instantly) and written in the background; on failure it rolls
+  // the local state back and leaves the error logged rather than silently
+  // losing the click.
+  const handleToggleEntered = async (uid, circleId, nextValue) => {
+    setGroupsByCourse((prev) => {
+      const updateCourse = (groups) =>
+        groups.map((g) => ({
+          ...g,
+          students: g.students.map((s) =>
+            s.uid === uid && s.circleId === circleId
+              ? { ...s, reassessment: { ...s.reassessment, enteredInGradebook: nextValue } }
+              : s
+          ),
+        }));
+      return { s2: updateCourse(prev.s2), s4: updateCourse(prev.s4) };
+    });
+    try {
+      await setReassessmentEnteredInGradebook(uid, circleId, nextValue);
+      invalidateCollectionCache('reassessment_attempts');
+    } catch (err) {
+      console.error('Error toggling enteredInGradebook:', err);
+      await load();
     }
   };
 
@@ -251,6 +291,18 @@ export default function TeacherRecuperacionTab() {
                               ⚠️ {s.reassessment.tabSwitchCount}
                             </span>
                           )}
+                          <label
+                            className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-300 cursor-pointer"
+                            title="Marca que ya metiste este puntaje en Schoology"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={s.reassessment.enteredInGradebook}
+                              onChange={(e) => handleToggleEntered(s.uid, s.circleId, e.target.checked)}
+                              className="accent-emerald-500"
+                            />
+                            {s.reassessment.enteredInGradebook ? '✅ En Schoology' : 'Entrar en Schoology'}
+                          </label>
                           <button
                             type="button"
                             onClick={() => handleReset(s.uid, s.circleId)}

@@ -197,3 +197,15 @@ export const endReassessmentNow = async (uid, circleId) => {
 export const unlockReassessmentAccess = async (uid) => {
   await clearActiveReassessmentLock(uid);
 };
+
+// Teacher-only bookkeeping: a finished reassessment's score still has to be
+// hand-entered into Schoology, so this just tracks whether Scott has
+// already done that for this one — purely a checklist flag, never read by
+// grading/gating logic itself.
+export const setReassessmentEnteredInGradebook = async (uid, circleId, entered) => {
+  await setDoc(
+    doc(db, 'reassessment_attempts', docId(uid, circleId)),
+    { enteredInGradebook: entered, enteredInGradebookAt: entered ? new Date().toISOString() : null },
+    { merge: true }
+  );
+};
