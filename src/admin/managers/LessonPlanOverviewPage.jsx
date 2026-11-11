@@ -140,6 +140,10 @@ function DayRow({ day, note, onNoteChange }) {
   const gramaticaLines = day.gramatica.flatMap((g) => [g.introText, g.repasoText].filter(Boolean));
   const practicaLabels = day.practica.map((p) => p.title).filter(Boolean);
   const quizLabels = day.evaluacion.map((e) => e.label).filter(Boolean);
+  const tareaLabels = [
+    ...day.tarea.dueToday.map((t) => `${t.titulo} — vence hoy`),
+    ...day.tarea.assignedTodayDueLater.map((t) => `${t.titulo} — vence Día ${t.day_due}`),
+  ];
 
   return (
     <div className="break-inside-avoid border border-gray-300 rounded-lg p-3">
@@ -153,7 +157,8 @@ function DayRow({ day, note, onNoteChange }) {
         {curiosidadLabels.length > 0 && <Field label="💡 Curiosidad">{curiosidadLabels.join(', ')}</Field>}
         {gramaticaLines.length > 0 && <Field label="📚 Gramática">{gramaticaLines.join(' · ')}</Field>}
         {practicaLabels.length > 0 && <Field label="✏️ Práctica">{practicaLabels.join(', ')}</Field>}
-        {quizLabels.length + calentamientoLabels.length + curiosidadLabels.length + gramaticaLines.length + practicaLabels.length === 0 && (
+        {tareaLabels.length > 0 && <Field label="📝 Tarea">{tareaLabels.join(', ')}</Field>}
+        {quizLabels.length + calentamientoLabels.length + curiosidadLabels.length + gramaticaLines.length + practicaLabels.length + tareaLabels.length === 0 && (
           <span className="italic text-gray-400">Sin contenido planeado todavía.</span>
         )}
       </div>
@@ -161,8 +166,8 @@ function DayRow({ day, note, onNoteChange }) {
         value={note}
         onChange={(e) => onNoteChange(e.target.value)}
         placeholder="Notas..."
-        rows={1}
-        className="w-full mt-2 border border-gray-200 rounded p-1.5 text-xs font-sans print:border-gray-400"
+        rows={2}
+        className="w-full mt-2 border border-gray-200 rounded p-1.5 text-xs font-sans print:border-gray-400 print:min-h-[110px]"
       />
     </div>
   );
