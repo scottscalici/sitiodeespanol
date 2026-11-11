@@ -223,6 +223,14 @@ const Header = ({
         </div>
 
         <div className="flex items-center gap-4 mt-1">
+          {isAdmin && (
+            <Link
+              to="/admin-daily-plan-hub"
+              className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white border border-white/30 hover:border-white/60 rounded-full px-3 py-1.5 transition-all"
+            >
+              📋 Plan Hub
+            </Link>
+          )}
           <Link
             to="/preguntas-frecuentes"
             className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-amber-400 hover:bg-amber-300 text-slate-900 px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/60 hover:scale-105 active:scale-95 transition-all"
