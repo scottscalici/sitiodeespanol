@@ -585,8 +585,27 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
                       _pointCategory: 'sentence'
                   });
               } else {
-                  let correctWords = cleanDisplay.split(' ');
-                  let wordBank = shuffle([...correctWords, ...getWordDistractors(3, correctWords)]);
+                  // The conjugated blank's own infinitive (`infinitive`) stays
+                  // ONE tile here, even when it's a multi-word verb phrase
+                  // (e.g. "parecer mal") — splitting it on spaces like the
+                  // rest of the sentence would hand the student two separate
+                  // freely-reorderable tiles ("parecer" and "mal") with
+                  // nothing marking them as glued together, so a student who
+                  // clicks every right word can still place "mal" in the
+                  // wrong slot and fail the exact-sequence check below with
+                  // no visible sign of what went wrong (see handleCheck's
+                  // isSyntaxCorrect). A single-word infinitive behaves
+                  // identically either way, so this is a pure generalization,
+                  // not a behavior change for the common case.
+                  const blankStart = spaSentence.indexOf(twoPartMatch[0]);
+                  const cleanPart = (text) => text.replace(/[.,!?¿¡]/g, '').replace(/\s+/g, ' ').trim();
+                  const beforeWords = cleanPart(spaSentence.slice(0, blankStart)).split(' ').filter(Boolean);
+                  const afterWords = cleanPart(spaSentence.slice(blankStart + twoPartMatch[0].length)).split(' ').filter(Boolean);
+                  let correctWords = [...beforeWords, infinitive, ...afterWords];
+                  // Also exclude the phrase's individual words, not just the
+                  // combined tile text, so a distractor draw can't put a
+                  // second freestanding "mal" on the board alongside it.
+                  let wordBank = shuffle([...correctWords, ...getWordDistractors(3, [...correctWords, ...infinitive.split(' ')])]);
                   generatedQueue.push({
                       id: `q_${i}`, type: 'sentence_builder_complex',
                       prompt: engTrans, engTrans: engTrans, options: wordBank,
