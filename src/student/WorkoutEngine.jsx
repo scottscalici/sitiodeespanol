@@ -566,8 +566,15 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
               const targetVerb = twoPartMatch[1].trim();
               const infinitive = twoPartMatch[2].trim();
 
-              let cleanDisplay = spaSentence.replace(twoPartMatch[0], infinitive).replace(/[.,!?¿¡]/g, '');
-              let cleanCorrect = spaSentence.replace(twoPartMatch[0], targetVerb).replace(/[.,!?¿¡]/g, '');
+              // Collapsing whitespace runs here (not just trimming) matters
+              // for the word-order puzzle below: a stray double space
+              // anywhere in the authored sentence — easy to introduce by
+              // pasting from Word/Google Docs — would otherwise survive
+              // into `cleanDisplay.split(' ')` as an invisible empty-string
+              // tile, silently making the "correct" arrangement impossible
+              // to actually assemble.
+              let cleanDisplay = spaSentence.replace(twoPartMatch[0], infinitive).replace(/[.,!?¿¡]/g, '').replace(/\s+/g, ' ');
+              let cleanCorrect = spaSentence.replace(twoPartMatch[0], targetVerb).replace(/[.,!?¿¡]/g, '').replace(/\s+/g, ' ');
 
               if (isSpeedRound) {
                   generatedQueue.push({
@@ -890,7 +897,14 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
     // 🚀 COMPLEX 2-PART CHECK LOGIC
     if (currentQ.type === 'sentence_builder_complex') {
         if (complexPhase === 'build') {
-            const isSyntaxCorrect = builtSentence.join(' ').toLowerCase() === currentQ.correctSyntax.toLowerCase();
+            // NFC-normalized before comparing — the same accented letter can
+            // arrive as one precomposed character or as a base letter plus a
+            // separate combining accent mark (common after a copy/paste from
+            // Word or Google Docs); both render identically on screen but
+            // fail a plain === compare, which would mark a visually-correct
+            // arrangement wrong with no visible sign of why.
+            const isSyntaxCorrect =
+              builtSentence.join(' ').toLowerCase().normalize('NFC') === currentQ.correctSyntax.toLowerCase().normalize('NFC');
             if (isSyntaxCorrect) {
                 setComplexPhase('conjugate');
                 return;

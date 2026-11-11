@@ -20,6 +20,7 @@ export default function PracticeCardPreviewModal({ questions, title, onClose }) 
   const questionStatesRef = useRef({});
 
   const totalItems = finalQuestions.reduce((sum, q) => sum + getItemCount(q), 0);
+  const hasAnySection = finalQuestions.some((q) => (q.section || '').trim());
 
   const handleStateChange = (idx, state) => {
     questionStatesRef.current = { ...questionStatesRef.current, [idx]: state };
@@ -82,15 +83,15 @@ export default function PracticeCardPreviewModal({ questions, title, onClose }) 
 
           {finalQuestions.map((q, idx) => {
             const TypeRenderer = QUESTION_TYPES[q.type]?.Renderer;
-            if (!TypeRenderer) {
-              return (
-                <div key={idx} className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-600 font-bold">
-                  Pregunta {idx + 1}: tipo "{q.type}" desconocido.
-                </div>
-              );
-            }
-            return (
-              <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            const prevSection = idx > 0 ? (finalQuestions[idx - 1].section || '').trim() : null;
+            const thisSection = (q.section || '').trim();
+            const showSectionHeader = hasAnySection && thisSection && thisSection !== prevSection;
+            const card = !TypeRenderer ? (
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-600 font-bold">
+                Pregunta {idx + 1}: tipo "{q.type}" desconocido.
+              </div>
+            ) : (
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Pregunta {idx + 1}</p>
                 <TypeRenderer
                   mode="deferred"
@@ -99,6 +100,19 @@ export default function PracticeCardPreviewModal({ questions, title, onClose }) 
                   initialState={questionStatesRef.current[idx]}
                   onStateChange={(state) => handleStateChange(idx, state)}
                 />
+              </div>
+            );
+            return (
+              <div key={idx}>
+                {showSectionHeader && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] font-black text-violet-600 uppercase tracking-widest bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg">
+                      📑 Sección: {thisSection}
+                    </span>
+                    <div className="flex-1 border-t border-violet-100" />
+                  </div>
+                )}
+                {card}
               </div>
             );
           })}

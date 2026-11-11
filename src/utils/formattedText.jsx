@@ -44,3 +44,18 @@ export const renderFormattedText = (text) => {
       </Fragment>
     ));
 };
+
+// A short plain-text preview of the first `wordLimit` words — for a
+// one-line summary (e.g. a lesson plan's Destacado del Día entry) where
+// the full body would be too long. Strips the same inline markers
+// renderFormattedText displays, so a snippet never gets cut off mid-marker
+// (e.g. a lone trailing "**" from a bold run that continues past the cut).
+export const getTextSnippet = (text, wordLimit = 7) => {
+  if (!text) return '';
+  const plain = String(text)
+    .replace(/\n/g, ' ')
+    .replace(/(?:\*\*(.+?)\*\*)|(?:__(.+?)__)|(?:~~(.+?)~~)|(?:_(.+?)_)/g, '$1$2$3$4');
+  const words = plain.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= wordLimit) return words.join(' ');
+  return `${words.slice(0, wordLimit).join(' ')}…`;
+};

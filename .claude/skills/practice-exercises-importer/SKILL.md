@@ -59,9 +59,31 @@ A plain JSON array, each entry one practice card:
   leave it in the 📦 Banco — default to `null` unless told a day.
 - **gradeWeight**/**excused**: omit unless the teacher says otherwise
   (default to 1 and false).
+- **topic** (optional): a short free-text label for the whole card's
+  grammar point (e.g. `"pretérito vs. imperfecto"`, `"por vs. para"`) —
+  add it whenever the worksheet's own heading/unit title makes one
+  obvious; otherwise omit it rather than guessing.
 - **questions**: non-empty array, each one a question object — a single
   worksheet page/exercise almost always becomes several question objects,
   not one.
+
+### Sections — when a worksheet has several lettered/labeled exercise groups
+
+A worksheet that's visibly split into separate exercises (A, B, C...,
+or named groups like "Noticias") can have each question tagged with an
+optional `"section"` field matching that label, directly on the question
+object — alongside `"type"` and everything else:
+```json
+{ "type": "write", "section": "A", "prompt": "...", "answer": "..." }
+```
+This lets the teacher later assign only SOME sections of the card on a
+given día (via the Creator's "Asignaciones Adicionales" panel or the
+Practice Cards Sequencer) instead of the whole card every time. Tag
+every question with its section whenever the worksheet shows clear,
+labeled groups; leave `section` off entirely for a worksheet with no
+such grouping (a single flowing exercise, or just a handful of unrelated
+items) — don't invent section labels where the source material doesn't
+have any.
 
 ## Question types — pick the one that matches what's actually on the page
 

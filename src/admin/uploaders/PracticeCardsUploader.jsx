@@ -143,7 +143,15 @@ const validateQuestion = (q, qNum, label) => {
   if (!q || typeof q !== 'object') return [`${tag}: no es un objeto.`];
   const validator = QUESTION_VALIDATORS[q.type];
   if (!validator) return [`${tag}: "type" desconocido ("${q.type}"). Debe ser uno de: ${Object.keys(QUESTION_TYPES).join(', ')}.`];
-  return validator(q).map((e) => `${tag}: ${e}`);
+  const errs = validator(q).map((e) => `${tag}: ${e}`);
+  // Optional and type-agnostic (applies the same regardless of question
+  // type) — just a short grouping label, so it's lightly checked, not
+  // required. Existing questions with no "section" at all keep working
+  // exactly as they do now (one implicit, unlabeled section).
+  if (q.section !== undefined && q.section !== null && typeof q.section !== 'string') {
+    errs.push(`${tag}: "section" debe ser texto (ej. "A", "Noticias") si se incluye.`);
+  }
+  return errs;
 };
 
 const validateCard = (item, idx) => {
@@ -265,6 +273,7 @@ const PracticeCardsUploader = () => {
           dia: item.dia ?? null,
           gradeWeight: Number(item.gradeWeight) || 1,
           excused: !!item.excused,
+          topic: (item.topic || '').trim(),
           // Same transform the single-card editor runs at save time — lets a
           // question be authored in its more natural raw shape (e.g.
           // word_bank_cloze's {{answer}}-tagged rawText) instead of the

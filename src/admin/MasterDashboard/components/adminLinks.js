@@ -51,6 +51,8 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-grammar-notes-upload', label: 'Importar Notas', emoji: '📥' },
       { to: '/admin-secret-portal-practice-cards', label: 'Tarjetas de Práctica', emoji: '✏️' },
       { to: '/admin-practice-cards-upload', label: 'Importar Práctica', emoji: '📥' },
+      { to: '/admin-practice-cards-sequencer', label: 'Práctica (Sequencer)', emoji: '🗓️' },
+      { to: '/admin-secret-portal-chapter-import', label: 'Importar Capítulo', emoji: '📦' },
       { to: '/admin-daily-plan-curiosidades', label: 'Curiosidades', emoji: '💡' },
       { to: '/admin-daily-plan-curiosidadesupload', label: 'Importar Curiosidades', emoji: '📥' },
       { to: '/admin-reading-cards-sequencer', label: 'Lecturas', emoji: '📖' },
@@ -60,6 +62,7 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-lecturas-sequencer', label: 'Lecturas IB (Sequencer)', emoji: '📄' },
       { to: '/admin-secret-portal-oraciones', label: 'Oraciones de Práctica', emoji: '✍️' },
       { to: '/admin-secret-portal-sentences', label: 'Sentence Manager', emoji: '✍️' },
+      { to: '/admin-secret-portal-sentence-tag-migration', label: 'Migrar Etiquetas de Oraciones', emoji: '🏷️' },
       { to: '/admin-secret-portal-idioms', label: 'Modismos', emoji: '💬' },
       { to: '/admin-question-pool', label: 'Reserva de Preguntas', emoji: '🧠' },
     ],
@@ -73,6 +76,7 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-secret-portal-learning-path', label: 'Pod Creator (Learning Path)', emoji: '🧱' },
       { to: '/admin-secret-portal-practice-hub', label: 'Practice Circle Builder', emoji: '🎯' },
       { to: '/admin-secret-portal-gamification', label: 'Insignias', emoji: '🏆' },
+      { to: '/admin-secret-portal-unlockables', label: 'Desbloqueables', emoji: '🔓' },
     ],
   },
   {
@@ -99,6 +103,7 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-monthly-leaders', label: 'Líderes por Clase', emoji: '📈' },
       { to: '/admin-reassessment-config', label: 'Recuperaciones', emoji: '🔁' },
       { to: '/admin-class-schedule', label: 'Horario de Clases', emoji: '🕐' },
+      { to: '/admin-secret-portal-seating-chart', label: 'Asientos', emoji: '🪑' },
     ],
   },
   {

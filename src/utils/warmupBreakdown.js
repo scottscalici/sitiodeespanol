@@ -3,11 +3,33 @@
 // breakdown popup and the student dashboard's own "Promedio" popup, so the
 // two always agree on what counts as assigned and how a missing one grades.
 
-// Every calentamiento assigned to `course`, due on or before `todayStr`,
-// not excused, optionally restricted to a date range (a quarter). Sorted
-// oldest-first so a breakdown reads chronologically.
+// A practice card can have more than one scheduled occurrence beyond its
+// own top-level course/día (see PracticeCardAdmin's "Asignaciones") — each
+// with its own course/día and, optionally, a subset of the card's
+// sections. Anything with no `assignments` array (every calentamiento,
+// and any card saved before this existed) expands to exactly the one
+// occurrence it's always had, under its own plain id — unchanged from
+// before this existed. An assignment occurrence's id is
+// `${cardId}__${assignmentId}`, the exact same composite key
+// PracticeCardEngine.jsx uses to store that occurrence's own progress —
+// so `buildWarmupBreakdown` below needs no changes to read the right one.
+export const expandCardOccurrences = (item) => {
+  if (!Array.isArray(item.assignments) || item.assignments.length === 0) return [item];
+  const occurrences = [];
+  if (item.dia != null) occurrences.push(item);
+  item.assignments.forEach((a) => {
+    occurrences.push({ ...item, id: `${item.id}__${a.id}`, dia: a.dia, course: a.course, sections: a.sections ?? null });
+  });
+  return occurrences;
+};
+
+// Every calentamiento (or practice card occurrence) assigned to `course`,
+// due on or before `todayStr`, not excused, optionally restricted to a
+// date range (a quarter). Sorted oldest-first so a breakdown reads
+// chronologically.
 export const getAssignedWarmups = (calentamientos, fechaByDia, course, todayStr, dateRange) => {
   return calentamientos
+    .flatMap(expandCardOccurrences)
     .filter((c) => c.course === course && !c.excused)
     .map((c) => ({ ...c, fecha: c.dia != null ? fechaByDia[Number(c.dia)] : null }))
     .filter((c) => {

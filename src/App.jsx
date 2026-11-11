@@ -79,11 +79,16 @@ import ClassScheduleManager from './admin/MasterDashboard/components/ClassSchedu
 import ReassessmentEngine from './student/ReassessmentEngine';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
+import UnlockablesManager from './admin/managers/UnlockablesManager';
+import SeatingChartManager from './admin/managers/SeatingChartManager';
+import PrintSeatingChart from './admin/managers/PrintSeatingChart';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
 import CalentamientoAdmin from './admin/managers/CalentamientoAdmin';
 import CalentamientoUploader from './admin/uploaders/CalentamientoUploader';
+import ChapterLearningPathImporter from './admin/uploaders/ChapterLearningPathImporter';
 import PracticeCardAdmin from './admin/managers/PracticeCardAdmin';
+import PracticeCardsSequencer from './admin/MasterDashboard/components/PracticeCardsSequencer';
 import PracticeCardsUploader from './admin/uploaders/PracticeCardsUploader';
 import ReadingCardsUploader from './admin/uploaders/ReadingCardsUploader';
 import VerbEditor from './admin/managers/VerbEditor';
@@ -109,6 +114,7 @@ import GrammarNotesUploader from './admin/uploaders/GrammarNotesUploader';
 import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
+import SentenceTagMigration from './admin/uploaders/SentenceTagMigration';
 // 📦 LEGACY ADMIN UPLOADERS
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
@@ -435,6 +441,30 @@ function App() {
               }
             />
             <Route
+              path="/admin-secret-portal-unlockables"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <UnlockablesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-seating-chart"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SeatingChartManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/print-seating-chart/:chartId"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PrintSeatingChart />
+                </AdminRoute>
+              }
+            />
+            <Route
               path="/admin-secret-portal-gamification"
               element={
                 <AdminRoute user={user} role={role}>
@@ -538,6 +568,14 @@ function App() {
     </AdminRoute>
   }
 />
+            <Route
+              path="/admin-secret-portal-sentence-tag-migration"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SentenceTagMigration />
+                </AdminRoute>
+              }
+            />
             <Route
               path="/admin-secret-portal-grades"
               element={
@@ -663,6 +701,22 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PracticeCardAdmin />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-chapter-import"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <ChapterLearningPathImporter />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-practice-cards-sequencer"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PracticeCardsSequencer />
                 </AdminRoute>
               }
             />
