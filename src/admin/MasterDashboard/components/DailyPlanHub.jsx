@@ -1,776 +1,195 @@
-import React, { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '../../../firebase'; 
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { renderFormattedText } from '../../../utils/formattedText';
+import { ADMIN_SECTIONS, DEFAULT_FAVORITES } from './adminLinks';
+
+// Admin hub: a links-only grid of every admin page, grouped into sections.
+// The links themselves live in ./adminLinks.js — add new pages there.
+
+// Full class strings (not built dynamically) so Tailwind keeps them.
+const SECTION_COLORS = {
+  orange: { title: 'text-orange-400', border: 'border-orange-900/40', bg: 'bg-orange-950/20', hover: 'hover:border-orange-500/60 hover:bg-orange-950/40' },
+  amber: { title: 'text-amber-400', border: 'border-amber-900/40', bg: 'bg-amber-950/20', hover: 'hover:border-amber-500/60 hover:bg-amber-950/40' },
+  violet: { title: 'text-violet-400', border: 'border-violet-900/40', bg: 'bg-violet-950/20', hover: 'hover:border-violet-500/60 hover:bg-violet-950/40' },
+  indigo: { title: 'text-indigo-400', border: 'border-indigo-900/40', bg: 'bg-indigo-950/20', hover: 'hover:border-indigo-500/60 hover:bg-indigo-950/40' },
+  emerald: { title: 'text-emerald-400', border: 'border-emerald-900/40', bg: 'bg-emerald-950/20', hover: 'hover:border-emerald-500/60 hover:bg-emerald-950/40' },
+  cyan: { title: 'text-cyan-400', border: 'border-cyan-900/40', bg: 'bg-cyan-950/20', hover: 'hover:border-cyan-500/60 hover:bg-cyan-950/40' },
+  sky: { title: 'text-sky-400', border: 'border-sky-900/40', bg: 'bg-sky-950/20', hover: 'hover:border-sky-500/60 hover:bg-sky-950/40' },
+  rose: { title: 'text-rose-400', border: 'border-rose-900/40', bg: 'bg-rose-950/20', hover: 'hover:border-rose-500/60 hover:bg-rose-950/40' },
+  neutral: { title: 'text-neutral-400', border: 'border-neutral-800', bg: 'bg-neutral-900/40', hover: 'hover:border-neutral-500 hover:bg-neutral-900' },
+};
+
+const FAVORITES_KEY = 'adminHubFavorites';
+
+const loadFavorites = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FAVORITES_KEY));
+    if (Array.isArray(saved)) return saved;
+  } catch {
+    // Storage blocked or bad JSON — fall back to defaults.
+  }
+  return DEFAULT_FAVORITES;
+};
+
+const saveFavorites = (favs) => {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+  } catch {
+    // Not fatal; favorites just won't persist in this browser.
+  }
+};
+
+// Strip accents so "senordle" finds "Señordle" and "practica" finds "Práctica".
+const normalize = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+const HubLink = ({ link, colors, isFavorite, onToggleFavorite }) => (
+  <div className={`group relative flex items-center rounded-lg border ${colors.border} bg-neutral-950 transition-colors ${colors.hover}`}>
+    <Link to={link.to} className="flex-1 flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-neutral-200 hover:text-white min-w-0">
+      <span className="shrink-0">{link.emoji}</span>
+      <span className="truncate" title={link.label}>{link.label}</span>
+    </Link>
+    <button
+      type="button"
+      onClick={() => onToggleFavorite(link.to)}
+      title={isFavorite ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
+      aria-label={isFavorite ? `Quitar ${link.label} de Favoritos` : `Añadir ${link.label} a Favoritos`}
+      className={`shrink-0 px-2.5 py-2.5 text-sm transition-opacity ${isFavorite ? 'text-yellow-400 opacity-100' : 'text-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-yellow-400'}`}
+    >
+      {isFavorite ? '★' : '☆'}
+    </button>
+  </div>
+);
 
 const DailyPlanHub = () => {
-  const [selectedDay, setSelectedDay] = useState(1);
-  const [activeCourse, setActiveCourse] = useState('s2');
-  const [loading, setLoading] = useState(true);
-
-  // Master Data States
-  const [calendarMap, setCalendarMap] = useState({});
-  const [tareasS2, setTareasS2] = useState([]);
-  const [tareasS4, setTareasS4] = useState([]);
-  const [evaluacionesS2, setEvaluacionesS2] = useState([]);
-  const [evaluacionesS4, setEvaluacionesS4] = useState([]);
-  const [gramaticaS2, setGramaticaS2] = useState([]);
-  const [gramaticaS4, setGramaticaS4] = useState([]);
-  const [vocabS2, setVocabS2] = useState({});
-  const [vocabS4, setVocabS4] = useState({});
-  const [allDestacados, setAllDestacados] = useState([]);
-  const [allMusica, setAllMusica] = useState([]);
-  const [allVideos, setAllVideos] = useState([]);
-  const [allConversaciones, setAllConversaciones] = useState([]);
-  const [allCuriosidades, setAllCuriosidades] = useState([]);
-  
-  // Decoupled Calentamiento States
-  const [allCalentamientos, setAllCalentamientos] = useState([]); // Verbs
-  const [allVocabWarmups, setAllVocabWarmups] = useState([]); // Vocab
-  const [allPracticeCards, setAllPracticeCards] = useState([]); // Small graded practice (Gustar, etc.)
-  const [allReadingCards, setAllReadingCards] = useState([]); // Comprehension readings (passage + questions)
-  const [allImageCards, setAllImageCards] = useState([]); // One-off photo shares
-
-  const MAX_DAYS = 80;
-
-  useEffect(() => {
-    const fetchHubData = async () => {
-      try {
-        // 1. Fetch Calendar
-        const configRef = doc(db, 'config', 'academic_year_2026_2027');
-        const configSnap = await getDoc(configRef);
-        if (configSnap.exists()) {
-          const configData = configSnap.data();
-          const mapping = {};
-          if (configData.map && Array.isArray(configData.map)) {
-            configData.map.forEach((item) => {
-              if (item.dia !== null && item.dia !== undefined) {
-                const dayNum = Number(item.dia);
-                if (!mapping[dayNum]) mapping[dayNum] = [];
-                let formattedDate = item.fecha;
-                if (item.fecha && item.fecha.includes('-')) {
-                  const parts = item.fecha.split('-');
-                  if (parts.length === 3) formattedDate = `${parts[1]}/${parts[2]}`;
-                }
-                mapping[dayNum].push(`${formattedDate}${item.ciclo ? ` (${item.ciclo})` : ''}`);
-              }
-            });
-
-            // Same "most recent past calendar entry" resolution useGymData
-            // uses for the student Dashboard's liveDia — not cycle-filtered
-            // here since a día can carry two dates (one per ciclo) and
-            // either one landing on/before today should count.
-            const todayStr = new Date().toLocaleDateString('en-CA');
-            const pastEntries = configData.map.filter((item) => item.fecha && item.fecha <= todayStr && item.dia != null);
-            if (pastEntries.length > 0) {
-              const todayDia = parseInt(pastEntries.sort((a, b) => b.fecha.localeCompare(a.fecha))[0].dia, 10);
-              if (!Number.isNaN(todayDia)) setSelectedDay(todayDia);
-            }
-          }
-          setCalendarMap(mapping);
-        }
-
-        // Fetch Sequences & Collections
-        const [
-          tareasSnap, evalsSnap, gramSnap, vocabMasterSnap, destSnap, musSnap, vidSnap, curSnap, calSnap, vocabWarmupSnap, convSnap, practiceCardsSnap, readingCardsSnap, imageCardsSnap
-        ] = await Promise.all([
-          getDoc(doc(db, 'curriculum_tracks', 'tareas_master')),
-          getDoc(doc(db, 'curriculum_tracks', 'evaluaciones_master')),
-          getDoc(doc(db, 'curriculum_tracks', 'gramatica_master')),
-          getDoc(doc(db, 'curriculum_tracks', 'vocab_master')),
-          getDocs(collection(db, 'destacado_diario')),
-          getDocs(collection(db, 'musica')),
-          getDocs(collection(db, 'videos')),
-          getDocs(collection(db, 'curiosidades')),
-          getDocs(collection(db, 'calentamientos')),
-          getDocs(collection(db, 'dailyVocabWarmups')),
-          getDocs(collection(db, 'conversaciones')),
-          getDocs(collection(db, 'practice_cards')),
-          getDocs(collection(db, 'reading_cards')),
-          getDocs(collection(db, 'image_cards'))
-        ]);
-
-        if (tareasSnap.exists()) {
-          setTareasS2(tareasSnap.data().s2 || []);
-          setTareasS4(tareasSnap.data().s4 || []);
-        }
-        if (evalsSnap.exists()) {
-          setEvaluacionesS2(evalsSnap.data().s2 || []);
-          setEvaluacionesS4(evalsSnap.data().s4 || []);
-        }
-        if (gramSnap.exists()) {
-          setGramaticaS2(gramSnap.data().s2 || []);
-          setGramaticaS4(gramSnap.data().s4 || []);
-        }
-        if (vocabMasterSnap.exists()) {
-          setVocabS2(vocabMasterSnap.data().s2 || {});
-          setVocabS4(vocabMasterSnap.data().s4 || {});
-        }
-
-        setAllDestacados(destSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllMusica(musSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllVideos(vidSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllCuriosidades(curSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllCalentamientos(calSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllVocabWarmups(vocabWarmupSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllConversaciones(convSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllPracticeCards(practiceCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setAllReadingCards(readingCardsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        // Single-bundle-doc collection (see ImageCardsManager) — unwrap its
-        // items map back into a flat array instead of treating the bundle
-        // doc itself as one item.
-        const imageCardsBundle = imageCardsSnap.docs.find((d) => d.id === '_bundle');
-        setAllImageCards(
-          imageCardsBundle ? Object.entries(imageCardsBundle.data().items || {}).map(([id, data]) => ({ id, ...data })) : []
-        );
-
-      } catch (error) {
-        console.error('Error loading Daily Hub data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHubData();
-  }, []);
-
-  // --- LOCAL FILTERING ---
-  const activeTareas = (activeCourse === 's2' ? tareasS2 : tareasS4).filter(t => t.day_assigned === selectedDay);
-  const activeEvaluaciones = (activeCourse === 's2' ? evaluacionesS2 : evaluacionesS4).filter(e => e.dia === selectedDay && e.label && e.label !== 'Nada');
-  const activeGramatica = (activeCourse === 's2' ? gramaticaS2 : gramaticaS4).filter(g => g.dia === selectedDay);
-  const activeVocabBundles = (activeCourse === 's2' ? vocabS2 : vocabS4)[selectedDay.toString()] || [];
-  
-  const activeDestacados = allDestacados.filter(d => Number(d.dia) === selectedDay);
-  const activeMusica = allMusica.filter(m => m.dias && m.dias.includes(selectedDay));
-  const activeVideos = allVideos.filter(v => Number(v.dia) === selectedDay);
-  
-  const activeCalentamientosVerbs = allCalentamientos.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
-  const activeCalentamientosVocab = allVocabWarmups.filter(v => v.course === activeCourse && Number(v.dia) === selectedDay);
-  const activePracticeCards = allPracticeCards.filter(p => p.course === activeCourse && Number(p.dia) === selectedDay);
-  const activeReadingCards = allReadingCards.filter(r => r.course === activeCourse && Number(r.dia) === selectedDay);
-
-  const activeCuriosidades = allCuriosidades.filter(c => {
-    if (activeCourse === 's2') return c.s2_dia === selectedDay;
-    if (activeCourse === 's4') return c.s4_dia === selectedDay;
-    return false;
-  });
-
-  const activeConversaciones = allConversaciones.filter(c =>
-    (c.courses || []).includes(activeCourse) && (c.dias || []).includes(selectedDay)
+  const [favorites, setFavorites] = useState(loadFavorites);
+  const [query, setQuery] = useState('');
+  const [openSections, setOpenSections] = useState(() =>
+    Object.fromEntries(ADMIN_SECTIONS.map((s) => [s.id, !s.collapsed]))
   );
 
-  const activeImageCards = allImageCards.filter(c => c.course === activeCourse && Number(c.dia) === selectedDay);
+  const allLinks = useMemo(
+    () => ADMIN_SECTIONS.flatMap((s) => s.links.map((l) => ({ ...l, section: s }))),
+    []
+  );
 
-  const dateStrings = calendarMap[selectedDay] || [];
-  const activeDatesDisplay = dateStrings.length > 0 ? dateStrings.join(' & ') : 'Date TBD';
+  const toggleFavorite = (to) => {
+    setFavorites((prev) => {
+      const next = prev.includes(to) ? prev.filter((f) => f !== to) : [...prev, to];
+      saveFavorites(next);
+      return next;
+    });
+  };
 
-  if (loading) {
-    return <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Cargando Plan Diario...</div>;
-  }
+  const favoriteLinks = favorites
+    .map((to) => allLinks.find((l) => l.to === to))
+    .filter(Boolean);
+
+  const q = normalize(query.trim());
+  const searchResults = q
+    ? allLinks.filter((l) => normalize(`${l.label} ${l.section.title}`).includes(q))
+    : null;
 
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* X-RAY DIAGNOSTIC BAR */}
-        <div className="bg-neutral-900 border border-neutral-700 p-3 rounded-lg flex flex-wrap gap-4 text-[10px] font-mono uppercase tracking-widest text-neutral-400 items-center">
-          <span className="font-bold text-amber-500">Diagnostic X-Ray:</span>
-          <span>Gramática: {gramaticaS2.length}</span>
-          <span>Tareas: {tareasS2.length}</span>
-          <span>Evals: {evaluacionesS2.length}</span>
-          <span>Vocab Activo: {activeVocabBundles.length}</span>
-          <span>Destacados: {allDestacados.length}</span>
-          <span>Calentamientos (V/Voc): {allCalentamientos.length}/{allVocabWarmups.length}</span>
-          <span>Tarjetas de Práctica: {allPracticeCards.length}</span>
-          <span>Curiosidades: {allCuriosidades.length}</span>
-          <span>Conversaciones: {allConversaciones.length}</span>
+      <div className="max-w-7xl mx-auto space-y-8 text-left">
+
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-neutral-800 pb-6 gap-4">
+          <div role="heading" aria-level={1} className="text-3xl font-black tracking-tight text-white">
+            PANEL <span className="text-cyan-400">ADMIN</span>
+          </div>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setQuery('');
+            }}
+            placeholder="Buscar una página…"
+            autoFocus
+            className="w-full md:w-80 bg-neutral-900 border border-neutral-700 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-sm text-white placeholder-neutral-500 outline-none"
+          />
         </div>
 
-        {/* HEADER & CONTROLS */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-neutral-800 pb-6 gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              DAILY PLAN <span className="text-cyan-400">HUB</span>
-            </h1>
-            <p className="text-sm font-mono text-emerald-400 mt-2 font-bold bg-neutral-900 inline-block px-3 py-1 rounded border border-neutral-800">
-              📅 {activeDatesDisplay}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              <Link to="/admin-secret-portal-grades" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📊 Gradebook</Link>
-              <Link to="/admin-monthly-leaders" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📈 Líderes por Clase</Link>
-              <Link to="/admin-secret-portal-master" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🗄️ Master Dashboard</Link>
-              <Link to="/admin-lesson-plan" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📋 Plan de Lección</Link>
-              <Link to="/admin-question-pool" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🧠 Reserva de Preguntas</Link>
-              <Link to="/admin-arcade-tiles" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🕹️ Imágenes de El Recreo</Link>
-              <Link to="/admin-media-migration" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📤 Migración de Imágenes</Link>
-              <Link to="/admin-secret-portal-master?tipo=temas" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎨 Temas</Link>
-              <Link to="/admin-faq-editor" className="bg-neutral-800 hover:bg-neutral-700 text-amber-300 text-[10px] font-bold px-3 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">❓ Preguntas Frecuentes</Link>
+        {searchResults ? (
+          /* SEARCH RESULTS */
+          <section>
+            <div role="heading" aria-level={2} className="font-black text-sm uppercase tracking-widest text-neutral-400 mb-3">
+              Resultados ({searchResults.length})
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
-              <button
-                onClick={() => setActiveCourse('s2')}
-                className={`px-6 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all ${activeCourse === 's2' ? 'bg-neutral-800 text-white shadow' : 'text-neutral-500 hover:text-white'}`}
-              >
-                Spanish 2
-              </button>
-              <button
-                onClick={() => setActiveCourse('s4')}
-                className={`px-6 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all ${activeCourse === 's4' ? 'bg-cyan-400 text-black shadow' : 'text-neutral-500 hover:text-white'}`}
-              >
-                Spanish 4
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 bg-neutral-900 border border-neutral-800 p-2 rounded-xl">
-              <button
-                onClick={() => setSelectedDay(Math.max(1, selectedDay - 1))}
-                className="w-8 h-8 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-400 font-bold"
-              >
-                -
-              </button>
-              <select
-                value={selectedDay}
-                onChange={(e) => setSelectedDay(Number(e.target.value))}
-                className="bg-transparent text-white font-black text-lg outline-none cursor-pointer appearance-none text-center"
-              >
-                {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d} className="bg-neutral-900">Día {d}</option>
+            {searchResults.length === 0 ? (
+              <p className="text-neutral-500 text-sm italic">No hay páginas con ese nombre.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {searchResults.map((link) => (
+                  <HubLink
+                    key={link.to}
+                    link={{ ...link, label: `${link.label} · ${link.section.title}` }}
+                    colors={SECTION_COLORS[link.section.color] || SECTION_COLORS.neutral}
+                    isFavorite={favorites.includes(link.to)}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))}
-              </select>
-              <button
-                onClick={() => setSelectedDay(Math.min(MAX_DAYS, selectedDay + 1))}
-                className="w-8 h-8 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-400 font-bold"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* DASHBOARD GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* LEFT COLUMN */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <h2 className="font-black text-lg text-rose-400 flex items-center gap-2">🔥 Destacado Diario</h2>
-                <Link to="/admin-daily-plan-destacado" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
               </div>
-              <div className="space-y-4">
-                {activeDestacados.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin Destacado asignado.</p>
-                ) : (
-                  activeDestacados.map(dest => (
-                    <div key={dest.id} className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 group/item">
-                      <span className="text-[10px] font-black uppercase text-rose-500 bg-rose-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-2">
-                        {dest.type || 'Destacado'}
-                      </span>
-                      <h3 className="font-bold text-white text-lg">{dest.header}</h3>
-                      <p className="text-sm text-neutral-400 mt-1 opacity-0 group-hover/item:opacity-100 transition-opacity">{dest.location}</p>
+            )}
+          </section>
+        ) : (
+          <>
+            {/* FAVORITES */}
+            <section className="rounded-2xl border border-yellow-900/40 bg-yellow-950/10 p-5">
+              <div role="heading" aria-level={2} className="font-black text-lg text-yellow-400 mb-3">⭐ Favoritos</div>
+              {favoriteLinks.length === 0 ? (
+                <p className="text-neutral-500 text-sm italic">Toca la ☆ junto a cualquier enlace para fijarlo aquí.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {favoriteLinks.map((link) => (
+                    <HubLink
+                      key={link.to}
+                      link={link}
+                      colors={SECTION_COLORS[link.section.color] || SECTION_COLORS.neutral}
+                      isFavorite
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* SECTIONS */}
+            {ADMIN_SECTIONS.map((section) => {
+              const colors = SECTION_COLORS[section.color] || SECTION_COLORS.neutral;
+              const isOpen = openSections[section.id];
+              return (
+                <section key={section.id} className={`rounded-2xl border ${colors.border} ${colors.bg} p-5`}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
+                    className="w-full flex items-center justify-between text-left"
+                    aria-expanded={isOpen}
+                  >
+                    <div role="heading" aria-level={2} className={`font-black text-lg ${colors.title}`}>
+                      {section.emoji} {section.title}
+                      <span className="ml-2 text-xs font-bold text-neutral-500">{section.links.length}</span>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-pink-400 flex items-center gap-2">📸 Tarjetas de Imagen</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeImageCards.length}</span>
-                </div>
-                <Link to="/admin-image-cards" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Editar</Link>
-              </div>
-              <div className="space-y-3">
-                {activeImageCards.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin tarjetas de imagen asignadas.</p>
-                ) : (
-                  activeImageCards.map(card => (
-                    <div key={card.id} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex items-center gap-3">
-                      {card.images?.[0] && (
-                        <img src={card.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-bold text-white text-sm truncate">{card.caption || '(sin título)'}</p>
-                        <p className="text-xs text-neutral-500">{(card.images || []).length} imagen{(card.images || []).length === 1 ? '' : 'es'}</p>
-                      </div>
+                    <span className="text-neutral-500 text-sm">{isOpen ? '▾' : '▸'}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
+                      {section.links.map((link) => (
+                        <HubLink
+                          key={link.to}
+                          link={link}
+                          colors={colors}
+                          isFavorite={favorites.includes(link.to)}
+                          onToggleFavorite={toggleFavorite}
+                        />
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-orange-400 flex items-center gap-2">⏱️ Calentamiento</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">
-                    {activeCalentamientosVerbs.length + activeCalentamientosVocab.length}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/admin-secret-portal-calentamiento" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Verbos</Link>
-                  <Link to="/admin-secret-portal-verb-editor" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📖 Editor de Verbos</Link>
-                  <Link to="/admin-secret-portal-verbvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🗂️ Grupos de Verbos</Link>
-                  <Link to="/admin-secret-portal-verb-schoology-export" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📤 Exportar a Schoology</Link>
-                  <Link to="/admin-secret-portal-vocabvault" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Vocab</Link>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {activeCalentamientosVerbs.length === 0 && activeCalentamientosVocab.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin calentamiento asignado para hoy.</p>
-                ) : (
-                  <div className="bg-neutral-950 p-4 rounded-xl border border-orange-900/30 flex flex-col gap-4">
-                    {activeCalentamientosVerbs.map(cal => (
-                      <div key={`verb-${cal.id}`} className="flex justify-between items-center border-b border-neutral-800 pb-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-orange-500 bg-orange-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">Sección: Verbos</p>
-                          <h3 className="font-bold text-white text-md">{cal.title}</h3>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs font-mono text-neutral-500">{cal.bakedQuestions?.length || 0} Preguntas</span>
-                        </div>
-                      </div>
-                    ))}
-                    {activeCalentamientosVocab.map(voc => (
-                      <div key={`voc-${voc.id}`} className="flex justify-between items-center">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider block w-fit mb-1">Sección: Vocabulario</p>
-                          <h3 className="font-bold text-white text-md">{voc.name}</h3>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs font-mono text-neutral-500">{voc.sequence?.length || 0} Términos</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-violet-400 flex items-center gap-2">✏️ Práctica</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activePracticeCards.length}</span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/admin-secret-portal-practice-cards" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Editar</Link>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {activePracticeCards.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin práctica asignada para hoy.</p>
-                ) : (
-                  <div className="bg-neutral-950 p-4 rounded-xl border border-violet-900/30 flex flex-col gap-4">
-                    {activePracticeCards.map(card => (
-                      <div key={card.id} className="flex justify-between items-center">
-                        <h3 className="font-bold text-white text-md">{card.title}</h3>
-                        <span className="text-xs font-mono text-neutral-500">
-                          {card.questions?.length || 0} Preguntas &middot; {card.points || 1}pt &middot; Peso {card.gradeWeight || 1}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2">📖 Lectura</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeReadingCards.length}</span>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/admin-reading-cards-grading" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">📝 Calificar</Link>
-                  <Link to="/admin-reading-cards-sequencer" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">⚙️ Sequencer</Link>
-                  <Link to="/admin-reading-cards-upload" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold px-2 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">+ Importar</Link>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {activeReadingCards.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin lectura asignada para hoy.</p>
-                ) : (
-                  <div className="bg-neutral-950 p-4 rounded-xl border border-cyan-900/30 flex flex-col gap-4">
-                    {activeReadingCards.map(card => (
-                      <div key={card.id} className="flex justify-between items-center">
-                        <h3 className="font-bold text-white text-md">{card.title}</h3>
-                        <span className="text-xs font-mono text-neutral-500">
-                          {card.questions?.length || 0} Preguntas &middot; Peso {card.gradeWeight || 1}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm min-h-[150px] group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">📚 Gramática & Lección</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeGramatica.length}</span>
-                </div>
-                <Link to="/admin-daily-plan-gramatica" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
-              </div>
-              <div className="space-y-4">
-                {activeGramatica.length === 0 ? (
-                  <p className="text-neutral-500 text-sm italic">Sin lección de gramática asignada.</p>
-                ) : (
-                  activeGramatica.map((gram, idx) => (
-                    <div key={idx} className="bg-neutral-950 p-4 rounded-xl border border-emerald-900/30 flex flex-col gap-3 group/item">
-                      {gram.introText && (
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Introducir</span>
-                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{renderFormattedText(gram.introText)}</p>
-                        </div>
-                      )}
-                      {gram.repasoText && (
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-sky-500 bg-sky-950/50 px-2 py-0.5 rounded tracking-wider mb-1 inline-block">Repasar</span>
-                          <p className="text-sm text-white leading-relaxed opacity-0 group-hover/item:opacity-100 transition-opacity">{renderFormattedText(gram.repasoText)}</p>
-                        </div>
-                      )}
-                      {(gram.enlaces || gram.recursos) && (
-                        <div className="flex flex-wrap gap-4 mt-2 pt-3 border-t border-neutral-800">
-                          {gram.enlaces && <p className="text-xs font-mono text-indigo-400"><span className="text-neutral-500">Enlaces:</span> {gram.enlaces}</p>}
-                          {gram.recursos && <p className="text-xs font-mono text-emerald-400"><span className="text-neutral-500">Recursos:</span> {gram.recursos}</p>}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <h2 className="font-black text-lg text-purple-400 flex items-center gap-2">🎧 Música & Videos</h2>
-                <div className="flex gap-2">
-                  <Link to="/admin-daily-plan-musica" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎵 Música</Link>
-                  <Link to="/admin-daily-plan-videos" className="bg-neutral-800 hover:bg-neutral-700 text-purple-300 text-[10px] font-bold px-2.5 py-1.5 rounded border border-neutral-700 uppercase tracking-widest">🎬 Videos</Link>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {activeMusica.map(m => (
-                  <div key={m.id} className="bg-neutral-950 p-3 rounded-xl border border-purple-900/30 flex gap-3 items-center">
-                    <div className="w-12 h-12 bg-purple-900/20 rounded flex items-center justify-center shrink-0">🎵</div>
-                    <div>
-                      <p className="font-bold text-sm text-white">{m.titulo}</p>
-                      <p className="text-[10px] text-purple-400 uppercase tracking-widest">{m.artista}</p>
-                    </div>
-                  </div>
-                ))}
-                {activeVideos.map(v => (
-                  <div key={v.id} className="bg-neutral-950 p-3 rounded-xl border border-purple-900/30 flex gap-3 items-center">
-                    <div className="w-12 h-12 bg-purple-900/20 rounded flex items-center justify-center shrink-0 overflow-hidden">
-                      {v.thumbnail_url ? <img src={v.thumbnail_url} alt="thumb" className="w-full h-full object-cover" /> : '🎬'}
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm text-white truncate w-32">{v.titulo}</p>
-                      <p className="text-[10px] text-purple-400 uppercase tracking-widest">Video {v.is_short ? '(Short)' : ''}</p>
-                    </div>
-                  </div>
-                ))}
-                {activeMusica.length === 0 && activeVideos.length === 0 && (
-                  <p className="text-neutral-500 text-sm italic col-span-2">Sin multimedia asignada.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">🗣️ Conversación</h2>
-                  <span className="bg-neutral-900 text-teal-400 text-xs font-bold px-2 py-1 rounded border border-teal-900/50">
-                    {activeConversaciones.length}
-                  </span>
-                </div>
-                <Link to="/admin-daily-plan-conversaciones" className="bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-teal-700/50">⚙️ Editar</Link>
-              </div>
-              <div className="space-y-3">
-                {activeConversaciones.length === 0 ? (
-                  <p className="text-teal-900/50 text-xs italic font-bold">Sin conversación asignada para hoy.</p>
-                ) : (
-                  activeConversaciones.map(conv => (
-                    <div key={conv.id} className="bg-neutral-950 p-3 rounded-xl border border-teal-900/30 flex gap-3 items-center">
-                      <div className="w-12 h-12 bg-teal-900/20 rounded flex items-center justify-center shrink-0 overflow-hidden">
-                        {conv.imagen ? <img src={conv.imagen} alt={conv.titulo} className="w-full h-full object-cover" /> : '🗣️'}
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm text-white">{conv.titulo}</p>
-                        <p className="text-[10px] text-teal-400 uppercase tracking-widest">{conv.subtitulo || conv.tag}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            </div>
-          {/* RIGHT COLUMN */}
-          <div className="space-y-6">
-            
-            <div className="bg-amber-950/20 border border-amber-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-amber-900/50 pb-3 mb-4 flex justify-between items-center">
-                <h2 className="font-black text-lg text-amber-400 flex items-center gap-2">🎯 Evaluaciones</h2>
-                <Link to="/admin-daily-plan-evals" className="bg-amber-900/40 hover:bg-amber-900/80 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-700/50">⚙️ Sequencer</Link>
-              </div>
-              <div className="space-y-3">
-                {activeEvaluaciones.length === 0 ? (
-                  <p className="text-amber-900/50 text-xs italic font-bold">No hay evaluaciones programadas.</p>
-                ) : (
-                  activeEvaluaciones.map((evalItem, idx) => (
-                    <div key={idx} className="bg-amber-500 text-black p-3 rounded-xl flex items-center gap-3 font-bold shadow-md">
-                      <span className="text-xl">⚠️</span>
-                      <p className="text-sm leading-tight">{evalItem.label}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* NEW: Vocabulario Activo Card */}
-            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">🧠 Vocabulario Activo</h2>
-                  <span className="bg-neutral-900 text-indigo-400 text-xs font-bold px-2 py-1 rounded border border-indigo-900/50">
-                    {activeVocabBundles.length}
-                  </span>
-                </div>
-                {/* Adjust this Link path to match your App.jsx routing for the Sequencer! */}
-                <Link to="/admin-vocab-sequencer" className="bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-700/50">⚙️ Sequencer</Link>
-              </div>
-              <div className="space-y-3">
-                {activeVocabBundles.length === 0 ? (
-                  <p className="text-indigo-900/50 text-xs italic font-bold">No hay vocabulario asignado.</p>
-                ) : (
-                  activeVocabBundles.map((bundleId, idx) => (
-                    <div key={idx} className="bg-neutral-900 border border-indigo-900/50 p-3 rounded-xl flex items-center gap-3">
-                      <span className="text-lg">📚</span>
-                      <p className="text-sm font-bold text-indigo-300 font-mono">{bundleId}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-yellow-400 flex items-center gap-2">💡 Curiosidades</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeCuriosidades.length}</span>
-                </div>
-                <Link to="/admin-daily-plan-curiosidades" className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Manager</Link>
-              </div>
-              <div className="space-y-4">
-                {activeCuriosidades.length === 0 ? (
-                  <p className="text-neutral-500 text-xs italic">No hay curiosidades para este día.</p>
-                ) : (
-                  activeCuriosidades.map(cur => (
-                    <div key={cur.id} className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 flex gap-3 group/item">
-                      <div className="w-16 h-16 bg-neutral-900 rounded-lg overflow-hidden shrink-0">
-                        {cur.img ? <img src={cur.img} alt={cur.title} className="w-full h-full object-cover" /> : '💡'}
-                      </div>
-                      <div className="flex flex-col justify-center">
-                        <p className="text-sm font-bold text-white leading-tight">{cur.title}</p>
-                        {cur.teacher_notes && (
-                          <p className="text-[10px] text-yellow-500 font-mono mt-1 border-l-2 border-yellow-500 pl-1 opacity-0 group-hover/item:opacity-100 transition-opacity">{cur.teacher_notes}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* ✍️ ORACIONES DE PRÁCTICA CARD */}
-            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">
-                    <span>✍️</span> Oraciones de Práctica
-                  </h2>
-                </div>
-                <Link to="/admin-secret-portal-oraciones" className="bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-3 py-1.5 rounded border border-teal-700/50 uppercase tracking-widest">
-                  ⚙️ Editar
-                </Link>
-              </div>
-              <div className="text-center py-2">
-                <p className="text-teal-500/50 text-xs italic font-bold">
-                  Oraciones con espacios en blanco para practicar vocabulario y gramática.
-                </p>
-              </div>
-            </div>
-
-            {/* 📢 ANUNCIOS CARD */}
-            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
-                    <span>📢</span> Anuncios
-                  </h2>
-                </div>
-                <Link to="/admin-secret-portal-master?tipo=anuncios" className="bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-3 py-1.5 rounded border border-indigo-700/50 uppercase tracking-widest">
-                  ⚙️ Editar
-                </Link>
-              </div>
-              <div className="text-center py-2">
-                <p className="text-indigo-500/50 text-xs italic font-bold">
-                  Administra los anuncios del panel (rango de fechas, cursos, enlaces).
-                </p>
-              </div>
-            </div>
-
-{/* 📄 LECTURAS HUB CARD */}
-<div className="bg-cyan-950/20 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-cyan-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2"><span>📄</span> Lecturas IB</h2>
-                </div>
-                <div className="flex gap-2">
-                  <Link to="/admin-lecturas-editor" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">✍️ Editor</Link>
-                  <Link to="/admin-lecturas-sequencer" className="bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-1.5 rounded border border-cyan-700/50 uppercase tracking-widest">⚙️ Sequencer</Link>
-                </div>
-              </div>
-              <div className="text-center py-2">
-                <p className="text-cyan-500/50 text-xs italic font-bold">
-                  Gestiona textos de examen Paper 1 y prográmalos por día de calendario.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-neutral-950 border border-cyan-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-neutral-800 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-cyan-400 flex items-center gap-2">📝 Tareas Asignadas</h2>
-                  <span className="bg-neutral-900 text-neutral-400 text-xs font-bold px-2 py-1 rounded">{activeTareas.length}</span>
-                </div>
-                <Link to="/admin-daily-plan-tareas" className="bg-neutral-800 hover:bg-neutral-700 text-cyan-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-neutral-700">⚙️ Sequencer</Link>
-              </div>
-              <div className="space-y-3">
-                {activeTareas.length === 0 ? (
-                  <p className="text-neutral-500 text-xs italic">No hay tareas para este día.</p>
-                ) : (
-                  activeTareas.map(tarea => (
-                    <div key={tarea.id} className="bg-neutral-900 border border-neutral-800 p-3 rounded-xl flex flex-col gap-2">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-black uppercase tracking-wider bg-cyan-900/50 text-cyan-300 px-2 py-0.5 rounded">
-                          {tarea.tipo}
-                        </span>
-                        <span className="text-[10px] text-neutral-500 font-mono">Due: Día {tarea.day_due}</span>
-                      </div>
-                      <p className="text-sm font-bold text-white">{tarea.titulo}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            {/* 🧰 RESOURCE HUB CARD */}
-            <div className="bg-sky-950/20 border border-sky-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-sky-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-sky-400 flex items-center gap-2">
-                    <span>🧰</span> Resource Hub Links
-                  </h2>
-                </div>
-                <Link to="/admin-resource-hub" className="bg-sky-900/40 hover:bg-sky-900/80 text-sky-300 text-[10px] font-bold px-3 py-1.5 rounded border border-sky-700/50 uppercase tracking-widest">
-                  ⚙️ Manager
-                </Link>
-              </div>
-              <div className="text-center py-2">
-                <p className="text-sky-500/50 text-xs italic font-bold">
-                  Administra los enlaces del panel (viajes de Costa Rica, tutorías y recursos de IB).
-                </p>
-              </div>
-            </div>
-            {/* 🧩 LEARNING PATH & SENTENCE BANK */}
-            <div className="bg-indigo-950/20 border border-indigo-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-indigo-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-indigo-400 flex items-center gap-2">
-                    <span>🧩</span> Dominios (Learning Path)
-                  </h2>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Link to="/admin-secret-portal-learning-path" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
-                  🧱 Pod Creator
-                </Link>
-                <Link to="/admin-secret-portal-sentences" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
-                  ✍️ Sentence Manager
-                </Link>
-                <Link to="/admin-secret-portal-gamification" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
-                  🏆 Insignias
-                </Link>
-              </div>
-            </div>
-
-            {/* 🎯 PRACTICE HUB */}
-            <div className="bg-teal-950/20 border border-teal-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-teal-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-teal-400 flex items-center gap-2">
-                    <span>🎯</span> Practice Hub
-                  </h2>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Link to="/admin-secret-portal-practice-hub" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
-                  🎯 Practice Circle Builder
-                </Link>
-                <Link to="/admin-secret-portal-idioms" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
-                  💬 Modismos
-                </Link>
-              </div>
-            </div>
-
-            {/* Señordle & Arcade */}
-            <div className="bg-emerald-950/20 border border-emerald-900/30 rounded-2xl p-5 shadow-sm group">
-              <div className="border-b border-emerald-900/50 pb-3 mb-4 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-black text-lg text-emerald-400 flex items-center gap-2">
-                    <span>🎮</span> Arcade Diario
-                  </h2>
-                </div>
-                <Link to="/admin-secret-portal-senordle" className="bg-emerald-900/40 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded border border-emerald-700/50 uppercase tracking-widest">
-                  ⚙️ Señordle
-                </Link>
-              </div>
-              <div className="flex gap-2 mb-3">
-                <Link to="/admin-daily-plan-atandocabos" className="flex-1 text-center bg-fuchsia-900/40 hover:bg-fuchsia-900/80 text-fuchsia-300 text-[10px] font-bold px-2 py-2 rounded border border-fuchsia-700/50 uppercase tracking-widest">
-                  🧶 Atando Cabos
-                </Link>
-                <Link to="/admin-daily-plan-eslabones" className="flex-1 text-center bg-cyan-900/40 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-bold px-2 py-2 rounded border border-cyan-700/50 uppercase tracking-widest">
-                  🔗 Eslabones
-                </Link>
-                <Link to="/admin-secret-portal-impostor-themes" className="flex-1 text-center bg-indigo-900/40 hover:bg-indigo-900/80 text-indigo-300 text-[10px] font-bold px-2 py-2 rounded border border-indigo-700/50 uppercase tracking-widest">
-                  🎭 Impostor
-                </Link>
-                <Link to="/admin-secret-portal-silabas" className="flex-1 text-center bg-teal-900/40 hover:bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-2 rounded border border-teal-700/50 uppercase tracking-widest">
-                  🔤 Sílabas
-                </Link>
-              </div>
-              <div className="text-center py-2">
-                <p className="text-emerald-500/50 text-xs italic font-bold">
-                  Programa los juegos diarios por fecha de calendario.
-                </p>
-              </div>
-            </div>
-
-          </div>
-        </div>
+                  )}
+                </section>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );

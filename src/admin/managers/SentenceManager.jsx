@@ -155,7 +155,12 @@ export default function SentenceManager() {
   const [status, setStatus] = useState('');
 
   const [chapterFilter, setChapterFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('all');
+  // Empty string (not 'all') is the real default — at 1000+ sentences and
+  // growing, rendering the whole collection unfiltered on load is both
+  // slow and useless for finding anything. Nothing shows until a tag is
+  // picked or something's typed into search; chapter stays a secondary
+  // refinement on top of either.
+  const [tagFilter, setTagFilter] = useState('');
   const [search, setSearch] = useState('');
 
   const [editingId, setEditingId] = useState(null);
@@ -193,12 +198,15 @@ export default function SentenceManager() {
     [sentences]
   );
 
-  const filteredSentences = sentences.filter((s) => {
-    if (chapterFilter !== 'all' && s.chapterId !== chapterFilter) return false;
-    if (tagFilter !== 'all' && !(s.grammarTags || []).includes(tagFilter)) return false;
-    if (search && !s.spanish?.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const hasActiveFilter = !!tagFilter || !!search.trim();
+  const filteredSentences = !hasActiveFilter
+    ? []
+    : sentences.filter((s) => {
+        if (chapterFilter !== 'all' && s.chapterId !== chapterFilter) return false;
+        if (tagFilter && !(s.grammarTags || []).includes(tagFilter)) return false;
+        if (search && !s.spanish?.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      });
 
   const startNewSentence = () => {
     setBulkOpen(false);
@@ -394,6 +402,12 @@ export default function SentenceManager() {
               📋 Importar en Lote
             </button>
             <button
+              onClick={() => navigate('/admin-secret-portal-sentence-tag-migration')}
+              className="bg-amber-700 hover:bg-amber-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+            >
+              🏷️ Migrar Etiquetas
+            </button>
+            <button
               onClick={() => navigate('/admin-daily-plan-hub')}
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-700 cursor-pointer"
             >
@@ -421,7 +435,7 @@ export default function SentenceManager() {
                 onChange={(e) => setTagFilter(e.target.value)}
                 className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-bold text-cyan-400"
               >
-                <option value="all">Todas las Etiquetas</option>
+                <option value="">Elige una etiqueta...</option>
                 {availableTags.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -440,7 +454,9 @@ export default function SentenceManager() {
 
             <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
               {filteredSentences.length === 0 && (
-                <p className="text-slate-500 text-xs italic text-center py-8">No hay oraciones que coincidan.</p>
+                <p className="text-slate-500 text-xs italic text-center py-8">
+                  {hasActiveFilter ? 'No hay oraciones que coincidan.' : 'Elige una etiqueta o escribe algo para buscar.'}
+                </p>
               )}
               {filteredSentences.map((s) => (
                 <div

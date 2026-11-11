@@ -119,6 +119,7 @@ const VocabVault = () => {
   const [fullVocab, setFullVocab] = useState([]);
   const [savedPaths, setSavedPaths] = useState([]);
   const [savedWarmups, setSavedWarmups] = useState([]);
+  const [savedCourseFilter, setSavedCourseFilter] = useState('all'); // 'all' | 's2' | 's4', for the Saved Practices tab
   const [isLoading, setIsLoading] = useState(true);
   
   // --- UPLOADER STATES ---
@@ -140,7 +141,7 @@ const VocabVault = () => {
 
   // --- BAKING STATION STATES ---
   const [editingWarmupId, setEditingWarmupId] = useState(null);
-  const [diaNumber, setDiaNumber] = useState(1);
+  const [diaNumber, setDiaNumber] = useState(''); // empty = unassigned / banco, like the Practice Cards library
   const [warmupName, setWarmupName] = useState("");
   const [courseTag, setCourseTag] = useState("s2"); // 🚀 Added Course Stamping State
   const [sequence, setSequence] = useState([]);
@@ -180,7 +181,20 @@ const VocabVault = () => {
       ]);
       setFullVocab(vocab);
       setSavedPaths(paths);
-      setSavedWarmups([...warmups].sort((a, b) => a.dia - b.dia));
+      // Banco entries (no día, or legacy bad data that parsed to NaN) sort
+      // after every assigned día instead of corrupting the whole sort via
+      // NaN arithmetic (which silently produced the out-of-order cards and
+      // "DÍA NaN" labels reported in the Baking Station).
+      setSavedWarmups(
+        [...warmups].sort((a, b) => {
+          const da = Number.isFinite(a.dia) ? a.dia : null;
+          const db_ = Number.isFinite(b.dia) ? b.dia : null;
+          if (da == null && db_ == null) return 0;
+          if (da == null) return 1;
+          if (db_ == null) return -1;
+          return da - db_;
+        })
+      );
 
       setIsLoading(false);
     } catch (err) {
@@ -591,8 +605,14 @@ const VocabVault = () => {
     if (!warmupName || sequence.length === 0) return alert("Name missing or empty sequence.");
     
     try {
+      // An empty Día # field means "banco" — a saved practice with no día
+      // assigned yet, same concept as an unscheduled Practice Card — rather
+      // than silently storing parseInt('') as a literal NaN (what produced
+      // the "DÍA NaN" cards that used to show up here).
+      const parsedDia = parseInt(diaNumber, 10);
+      const dia = Number.isFinite(parsedDia) ? parsedDia : null;
       const warmupPayload = {
-        dia: parseInt(diaNumber),
+        dia,
         name: warmupName,
         course: courseTag,           // 🚀 Stamped Course ('s2' or 's4')
         pathId: selectedPathId || '', // 🚀 Stamped Associated Path
@@ -606,7 +626,7 @@ const VocabVault = () => {
       } else {
         warmupPayload.createdAt = serverTimestamp();
         await addDoc(collection(db, "dailyVocabWarmups"), warmupPayload);
-        alert(`Saved Día ${diaNumber} (${courseTag.toUpperCase()})!`);
+        alert(`Saved ${dia != null ? `Día ${dia}` : 'to Banco (sin día)'} (${courseTag.toUpperCase()})!`);
       }
       invalidateCollectionCache("dailyVocabWarmups");
       await fetchData();
@@ -618,7 +638,7 @@ const VocabVault = () => {
 
   const loadSavedPractice = (practice) => {
     setEditingWarmupId(practice.id);
-    setDiaNumber(practice.dia);
+    setDiaNumber(Number.isFinite(practice.dia) ? practice.dia : '');
     setWarmupName(practice.name);
     setCourseTag(practice.course || 's2');       // 🚀 Load stamped course
     setSelectedPathId(practice.pathId || '');  // 🚀 Load stamped path
@@ -810,7 +830,7 @@ const VocabVault = () => {
                 <option value="s4">S4</option>
               </select>
             </div>
-            <div style={s.inputBox}><label style={s.label}>Día #</label><input type="number" value={diaNumber} onChange={e => setDiaNumber(e.target.value)} style={s.inputSmall} /></div>
+            <div style={s.inputBox}><label style={s.label}>Día # (vacío = Banco)</label><input type="number" value={diaNumber} onChange={e => setDiaNumber(e.target.value)} placeholder="Banco" style={s.inputSmall} /></div>
             <div style={s.inputBox}><label style={s.label}>Practice Name</label><input type="text" value={warmupName} onChange={e => setWarmupName(e.target.value)} style={s.inputLarge} /></div>
             <button style={{...s.primaryBtn, marginLeft: 'auto'}} onClick={saveWarmupToFirestore}>{editingWarmupId ? "Update Practice" : "Save Practice"}</button>
           </div>
@@ -950,30 +970,75 @@ const VocabVault = () => {
       )}
 
       {/* --- TAB 5: SAVED PRACTICES --- */}
-      {activeTab === 'saved' && (
-        <div style={s.content}>
-          <h2 style={{color: '#ff9a40'}}>Saved Practices File Cabinet</h2>
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px'}}>
-            {savedWarmups.length === 0 ? <p style={{color: '#666'}}>No practices saved yet. Bake and save one in the Baking Station!</p> : null}
-            {savedWarmups.map((practice) => (
-              <div key={practice.id} style={{background: '#111', padding: '20px', borderRadius: '8px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s', position: 'relative'}} onClick={() => loadSavedPractice(practice)}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteSavedPractice(practice.id); }}
-                  title="Delete this saved practice"
-                  style={{position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', color: '#f44', fontSize: '16px', cursor: 'pointer', lineHeight: 1}}
-                >🗑️</button>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                  <div style={{color: '#ff9a40', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px'}}>DÍA {practice.dia}</div>
-                  <div style={{color: '#888', fontSize: '11px', textTransform: 'uppercase'}}>{practice.course || 's2'}</div>
-                </div>
-                <div style={{fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '10px'}}>{practice.name}</div>
-                <div style={{color: '#aaa', fontSize: '14px'}}>{practice.sequence?.length || 0} Words Total</div>
-                <div style={{marginTop: '15px', color: '#666', fontSize: '12px', fontStyle: 'italic'}}>Click to view or edit in Baking Station ➔</div>
+      {activeTab === 'saved' && (() => {
+        const filtered = savedWarmups.filter((p) => savedCourseFilter === 'all' || (p.course || 's2') === savedCourseFilter);
+        const assigned = filtered.filter((p) => Number.isFinite(p.dia));
+        const banco = filtered.filter((p) => !Number.isFinite(p.dia));
+
+        const renderCard = (practice) => (
+          <div
+            key={practice.id}
+            style={{background: '#111', padding: '10px 12px', borderRadius: '6px', border: '1px solid #333', cursor: 'pointer', transition: '0.2s', position: 'relative'}}
+            onClick={() => loadSavedPractice(practice)}
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); deleteSavedPractice(practice.id); }}
+              title="Delete this saved practice"
+              style={{position: 'absolute', top: '6px', right: '6px', background: 'none', border: 'none', color: '#f44', fontSize: '13px', cursor: 'pointer', lineHeight: 1}}
+            >🗑️</button>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <div style={{color: '#ff9a40', fontSize: '10px', fontWeight: 'bold'}}>
+                {Number.isFinite(practice.dia) ? `DÍA ${practice.dia}` : 'BANCO'}
               </div>
-            ))}
+              <div style={{color: '#888', fontSize: '10px', textTransform: 'uppercase'}}>{practice.course || 's2'}</div>
+            </div>
+            <div style={{fontSize: '15px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{practice.name}</div>
+            <div style={{color: '#aaa', fontSize: '12px'}}>{practice.sequence?.length || 0} Words Total</div>
           </div>
-        </div>
-      )}
+        );
+
+        return (
+          <div style={s.content}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
+              <div>
+                <h2 style={{color: '#ff9a40', margin: 0}}>Saved Practices File Cabinet</h2>
+                <p style={{color: '#666', fontSize: '12px', fontStyle: 'italic', margin: '4px 0 0'}}>Click a card to view or edit it in the Baking Station.</p>
+              </div>
+              <div style={{display: 'flex', gap: '8px'}}>
+                {['all', 's2', 's4'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setSavedCourseFilter(c)}
+                    style={savedCourseFilter === c ? s.tabActive : s.tab}
+                  >
+                    {c === 'all' ? 'Todos' : c.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filtered.length === 0 && <p style={{color: '#666'}}>No practices saved yet. Bake and save one in the Baking Station!</p>}
+
+            {assigned.length > 0 && (
+              <>
+                <h3 style={{color: '#aaa', marginTop: '20px', marginBottom: '10px'}}>📅 Asignadas por Día</h3>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px'}}>
+                  {assigned.map(renderCard)}
+                </div>
+              </>
+            )}
+
+            {banco.length > 0 && (
+              <>
+                <h3 style={{color: '#aaa', marginTop: '20px', marginBottom: '10px'}}>📦 Banco (Sin Día Asignado)</h3>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px'}}>
+                  {banco.map(renderCard)}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* OVERRIDE MODAL */}
       {isSearching !== null && (

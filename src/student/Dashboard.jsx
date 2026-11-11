@@ -53,16 +53,45 @@ const PLATFORM_TAREA_INFO = {
   },
 };
 
+// Scott's own three real sections worth previewing as — deliberately a
+// fixed short list, not every section in the roster (she has other
+// sections in there "for some other things" she doesn't need to preview).
+const PREVIEW_SECTIONS = [
+  { id: '1B', course: 's2', cycle: 'B' },
+  { id: '4A', course: 's4', cycle: 'A' },
+  { id: '4B', course: 's4', cycle: 'B' },
+];
+
 const Dashboard = () => {
   const { userData } = useAuth();
-  const { theme: todayTheme, loaded: themeLoaded, resolveThemeForDate, isPreviewing } = useActiveTheme() || {};
+  const {
+    theme: todayTheme,
+    loaded: themeLoaded,
+    resolveThemeForDate,
+    isPreviewing,
+    resolvedThemeId,
+    manualThemeId,
+    setManualTheme,
+  } = useActiveTheme() || {};
   const isAdmin = userData?.role === 'admin';
   const [activeCourse, setActiveCourse] = useState(isAdmin ? 's4' : (userData?.course || 's2'));
+  // Lets an admin see the Dashboard exactly as a real student in one of
+  // these three sections would (course + A/B cycle together) — admin-only,
+  // see PREVIEW_SECTIONS/onPreviewSection below and Header.jsx's toggle.
+  const [previewSectionId, setPreviewSectionId] = useState(null);
+  const previewSection = isAdmin ? PREVIEW_SECTIONS.find((p) => p.id === previewSectionId) : null;
+  const onPreviewSection = (id) => {
+    const next = id === previewSectionId ? null : id;
+    setPreviewSectionId(next);
+    const meta = PREVIEW_SECTIONS.find((p) => p.id === next);
+    if (meta) setActiveCourse(meta.course);
+  };
   // The student's own A/B block-schedule cycle (trailing letter of their
   // section, e.g. "4B" -> "B") — shared by useGymData's own "today's día"
   // calculation below and fechaByDia/maxAllowedDay further down, so all
-  // three agree on which cycle's calendar entries apply to this student.
-  const userCiclo = userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
+  // three agree on which cycle's calendar entries apply to this student. A
+  // picked preview section overrides this the same way it overrides course.
+  const userCiclo = previewSection ? previewSection.cycle : userData?.section ? userData.section.slice(-1).toUpperCase() : 'A';
   const { data, loading, liveDia, setLiveDia, course } = useGymData(activeCourse, userCiclo);
 
   // The day being viewed keeps ITS OWN calendar date's theme permanently —
@@ -388,9 +417,26 @@ const Dashboard = () => {
     return !r.course || r.course === course || (Array.isArray(r.course) && r.course.includes(course));
   });
 
-  const activePracticeCards = practiceCards.filter(
-    (pc) => pc.course === course && Number(pc.dia) === liveDia && !pc.excused
-  );
+  // A card can have scheduled occurrences beyond its own top-level
+  // course/día (see PracticeCardAdmin's "Asignaciones") — each becomes
+  // its own tile here, carrying its own assignmentId/sections so
+  // PracticeCard.jsx can link to just that occurrence and show only its
+  // questions' count. A card with none of these (the common case, and
+  // every card saved before this existed) surfaces exactly as it always
+  // has, under its own plain id.
+  const activePracticeCards = practiceCards.flatMap((pc) => {
+    if (pc.excused) return [];
+    const occurrences = [];
+    if (pc.course === course && Number(pc.dia) === liveDia) {
+      occurrences.push({ ...pc, assignmentId: null, sections: null });
+    }
+    (pc.assignments || []).forEach((a) => {
+      if (a.course === course && Number(a.dia) === liveDia) {
+        occurrences.push({ ...pc, dia: a.dia, course: a.course, assignmentId: a.id, sections: a.sections ?? null });
+      }
+    });
+    return occurrences;
+  });
 
   const activeReadingCards = readingCards.filter(
     (rc) => rc.course === course && Number(rc.dia) === liveDia && !rc.excused
@@ -415,8 +461,13 @@ const Dashboard = () => {
     // Estructura, Evaluacion, LecturaCard, GamesSidebar, ResourceHub,
     // LeaderboardCard, LearningPathTile, PracticeHubTile — all read
     // useActiveTheme() themselves) picks up the VIEWED DAY's theme instead
-    // of today's, with no prop drilling needed.
-    <ThemeContext.Provider value={{ theme, loaded: themeLoaded, resolveThemeForDate }}>
+    // of today's, with no prop drilling needed. resolvedThemeId/manualThemeId/
+    // setManualTheme/isPreviewing are passed straight through from the root
+    // provider (unrelated to which día is being viewed) so Header's theme
+    // toggle still works here instead of silently losing its setter.
+    <ThemeContext.Provider
+      value={{ theme, loaded: themeLoaded, resolveThemeForDate, isPreviewing, resolvedThemeId, manualThemeId, setManualTheme }}
+    >
       <ThemeStyleSync theme={theme} />
       <div
         className={`min-h-screen relative ${pageBgStyle ? '' : pageBgClass}`}
@@ -463,7 +514,18 @@ const Dashboard = () => {
                 👁️ Vista Previa de Tema — esto no es lo que ven los estudiantes ahora mismo
               </div>
             )}
-            <Header liveDia={liveDia} setLiveDia={setLiveDia} maxAllowedDay={maxAllowedDay} course={course} cal={data?.cal} isAdmin={isAdmin} onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))} />
+            <Header
+              liveDia={liveDia}
+              setLiveDia={setLiveDia}
+              maxAllowedDay={maxAllowedDay}
+              course={course}
+              cal={data?.cal}
+              isAdmin={isAdmin}
+              onToggleCourse={() => setActiveCourse((prev) => (prev === 's2' ? 's4' : 's2'))}
+              previewSections={PREVIEW_SECTIONS}
+              previewSectionId={previewSectionId}
+              onPreviewSection={onPreviewSection}
+            />
           </div>
   
           {/* 📢 ANUNCIOS */}
@@ -529,7 +591,7 @@ const Dashboard = () => {
 
               {/* ✏️ PRÁCTICA — SMALL GRADED ACTIVITIES (GUSTAR, ETC.) */}
               {activePracticeCards.map((card) => (
-                <PracticeCard key={card.id} card={card} />
+                <PracticeCard key={card.assignmentId ? `${card.id}_${card.assignmentId}` : card.id} card={card} />
               ))}
 
               {/* 📖 LECTURA — comprehension readings assigned for today */}

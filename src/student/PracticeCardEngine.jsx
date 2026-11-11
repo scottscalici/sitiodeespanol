@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs, getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,14 @@ export default function PracticeCardEngine({ onClose }) {
   // the note on the day+course query below for why it's no longer safe to
   // treat as a card's canonical address).
   const { cardId, courseId, targetDia } = useParams();
+  // ?assignment=<id> — set only when reached via a specific scheduled
+  // occurrence of a card that's been split into sections (see
+  // PracticeCardAdmin.jsx's "Asignaciones"). Absent (the common case,
+  // and every legacy link), the whole card is shown/scored exactly as
+  // it always has been — a query param rather than a path segment so it
+  // can't collide with the existing two route shapes above.
+  const [searchParams] = useSearchParams();
+  const assignmentId = searchParams.get('assignment');
   const { userData } = useAuth();
   const navigate = useNavigate();
 
@@ -107,7 +115,8 @@ export default function PracticeCardEngine({ onClose }) {
           // clears), so the UI never flashes question 1 before snapping to
           // a restored later question on a separate render.
           if (userData?.role !== 'admin') {
-            const inProgress = userData?.progress?.practiceCards?.[resolvedId]?.inProgress;
+            const resolvedProgressKey = assignmentId ? `${resolvedId}__${assignmentId}` : resolvedId;
+            const inProgress = userData?.progress?.practiceCards?.[resolvedProgressKey]?.inProgress;
             if (inProgress) {
               questionStatesRef.current = { ...(inProgress.questionStates || {}) };
               setSubmitted(!!inProgress.submitted);
@@ -127,9 +136,22 @@ export default function PracticeCardEngine({ onClose }) {
     };
     fetchCard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardId, targetDia, courseId]);
+  }, [cardId, targetDia, courseId, assignmentId]);
 
-  const questions = cardData?.questions || [];
+  // Composite key (cardId + assignmentId) so each scheduled occurrence of
+  // a sectioned card keeps its own completed/grade/inProgress record —
+  // without an assignment (the common case, and every legacy link) this
+  // is just the plain card id, identical to today's behavior.
+  const progressKey = cardData?.id ? (assignmentId ? `${cardData.id}__${assignmentId}` : cardData.id) : null;
+
+  const activeAssignment = assignmentId ? (cardData?.assignments || []).find((a) => a.id === assignmentId) : null;
+  const allQuestions = cardData?.questions || [];
+  // No assignment, or an assignment with no sections filter (sections:
+  // null means "the whole card") — show/score every question, exactly as
+  // today. Only an assignment with a real sections array narrows it.
+  const questions = activeAssignment?.sections
+    ? allQuestions.filter((q) => activeAssignment.sections.includes((q.section || '').trim()))
+    : allQuestions;
   const currentQ = questions[currentIndex];
   const totalItems = questions.reduce((sum, q) => sum + getItemCount(q), 0);
 
@@ -139,10 +161,10 @@ export default function PracticeCardEngine({ onClose }) {
   // card stays resumable indefinitely, same as the saved high score itself,
   // since the student may always come back to try for a better one.
   const saveProgress = (payload) => {
-    if (!cardData?.id || !userData?.uid || userData.role === 'admin') return;
+    if (!progressKey || !userData?.uid || userData.role === 'admin') return;
     setDoc(
       doc(db, 'users', userData.uid),
-      { progress: { practiceCards: { [cardData.id]: { inProgress: payload } } } },
+      { progress: { practiceCards: { [progressKey]: { inProgress: payload } } } },
       { merge: true }
     ).catch((err) => console.error('Error saving practice progress:', err));
   };
@@ -217,8 +239,8 @@ export default function PracticeCardEngine({ onClose }) {
     setSaveState('saving');
 
     try {
-      const alreadyCompleted = !!userData?.progress?.practiceCards?.[cardData.id]?.completed;
-      const existingGrade = userData?.progress?.practiceCards?.[cardData.id]?.grade ?? -1;
+      const alreadyCompleted = !!userData?.progress?.practiceCards?.[progressKey]?.completed;
+      const existingGrade = userData?.progress?.practiceCards?.[progressKey]?.grade ?? -1;
       const isNewHighScore = newGrade > existingGrade;
 
       if (userData?.uid && userData.role !== 'admin') {
@@ -228,7 +250,7 @@ export default function PracticeCardEngine({ onClose }) {
             {
               progress: {
                 practiceCards: {
-                  [cardData.id]: { completed: true, grade: newGrade, rawScore: `${newCorrectCount}/${totalItems}`, timestamp: new Date().toISOString() },
+                  [progressKey]: { completed: true, grade: newGrade, rawScore: `${newCorrectCount}/${totalItems}`, timestamp: new Date().toISOString() },
                 },
               },
             },

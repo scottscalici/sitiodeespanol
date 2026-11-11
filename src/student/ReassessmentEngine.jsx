@@ -17,6 +17,7 @@ import {
 import { fetchClassSchedule, fetchScheduleOverrideForDate, mergeScheduleBlocks, isReassessmentWindowOpen } from '../utils/classSchedule';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 import { generateSentenceRecallQuestions } from '../utils/reassessmentSentenceGenerator';
+import { generateVocabRecallQuestions } from '../utils/reassessmentVocabGenerator';
 
 // `hideNav` drops the "← Volver" link while an attempt is in_progress —
 // it would be a dead end anyway (ReassessmentLockGuard bounces any other
@@ -67,6 +68,7 @@ export default function ReassessmentEngine() {
   const [verbGroupsById, setVerbGroupsById] = useState({});
   const [masterVerbsMap, setMasterVerbsMap] = useState({});
   const [sentenceBank, setSentenceBank] = useState([]);
+  const [vocabulary, setVocabulary] = useState([]);
   const [attempt, setAttempt] = useState(null); // { questions, answers, expiresAt, ... }
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -80,7 +82,7 @@ export default function ReassessmentEngine() {
       if (!uid || !circleId) return;
       try {
         const todayStr = new Date().toLocaleDateString('en-CA');
-        const [recupDoc, configSnap, calSnap, scheduleBlocks, overrideBlocks, groups, verbsArray, sentences, existingAttempt] = await Promise.all([
+        const [recupDoc, configSnap, calSnap, scheduleBlocks, overrideBlocks, groups, verbsArray, sentences, vocabItems, existingAttempt] = await Promise.all([
           fetchRecuperacionDoc(uid, circleId),
           getDoc(doc(db, 'reassessment_configs', circleId)),
           getDoc(doc(db, 'config', 'academic_year_2026_2027')),
@@ -89,6 +91,7 @@ export default function ReassessmentEngine() {
           getCachedCollection('verbGroups'),
           getCachedBucketedCollection('verbs'),
           getCachedCollection('sentence_bank'),
+          getCachedCollection('vocabulary'),
           fetchReassessmentAttempt(uid, circleId),
         ]);
 
@@ -99,6 +102,7 @@ export default function ReassessmentEngine() {
         });
         setMasterVerbsMap(verbsMap);
         setSentenceBank(sentences);
+        setVocabulary(vocabItems);
 
         const cfg = configSnap.exists() ? configSnap.data() : null;
         setConfig(cfg);
@@ -190,12 +194,14 @@ export default function ReassessmentEngine() {
         };
       });
       const sentenceBlocks = (config.sentenceBlocks || []).map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
+      const vocabBlocks = (config.vocabBlocks || []).map((r) => ({ label: r.section, section: r.section, count: Number(r.count) || 0 }));
       const verbQuestions = generateVerbQuestions(blocks, masterVerbsMap, { withoutReplacement: true });
       const sentenceQuestions = generateSentenceRecallQuestions(sentenceBlocks, sentenceBank, { withoutReplacement: true });
-      // Shuffled together so sentence-discernment items aren't always
+      const vocabQuestions = generateVocabRecallQuestions(vocabBlocks, vocabulary, { withoutReplacement: true });
+      // Shuffled together so sentence-discernment/vocab items aren't always
       // clustered at the end — same inline shuffle convention used
       // elsewhere in the codebase (e.g. WorkoutEngine.jsx).
-      const generated = [...verbQuestions, ...sentenceQuestions].sort(() => Math.random() - 0.5);
+      const generated = [...verbQuestions, ...sentenceQuestions, ...vocabQuestions].sort(() => Math.random() - 0.5);
       if (generated.length === 0) {
         setErrorMessage('No se pudieron generar preguntas — avísale a tu profesor.');
         return;
@@ -352,7 +358,8 @@ export default function ReassessmentEngine() {
   if (phase === 'ready') {
     const totalQuestions =
       (config.groups || []).reduce((sum, r) => sum + (Number(r.count) || 0), 0) +
-      (config.sentenceBlocks || []).reduce((sum, r) => sum + (Number(r.count) || 0), 0);
+      (config.sentenceBlocks || []).reduce((sum, r) => sum + (Number(r.count) || 0), 0) +
+      (config.vocabBlocks || []).reduce((sum, r) => sum + (Number(r.count) || 0), 0);
     return (
       <Shell>
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 text-center space-y-4">
@@ -416,6 +423,10 @@ export default function ReassessmentEngine() {
                     // ________") — unlike the verb-group format below, it
                     // needs no extra badge appended.
                     q.subject
+                  ) : q.type === 'vocab_recall' ? (
+                    <>
+                      Traduce: <span className="text-sky-600 italic">{q.prompt}</span>
+                    </>
                   ) : (
                     <>
                       {q.sujeto} ({q.palabra}) — <span className="text-sky-600 italic">{q.tense}</span>
@@ -466,6 +477,8 @@ export default function ReassessmentEngine() {
               <p className="text-xs font-bold text-slate-300">
                 {q.type === 'sentence_recall' ? (
                   q.subject
+                ) : q.type === 'vocab_recall' ? (
+                  <>Traduce: {q.prompt}</>
                 ) : (
                   <>
                     {q.sujeto} ({q.palabra}, {q.tense})

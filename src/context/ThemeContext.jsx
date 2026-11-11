@@ -50,6 +50,33 @@ const resolveActiveTheme = (themes, targetMD) => {
 // "YYYY-MM-DD" -> "MM-DD", matching how theme start/end are authored.
 const toMD = (dateStr) => (typeof dateStr === 'string' ? dateStr.slice(5) : null);
 
+// A student's manually-chosen theme (e.g. unlocking "Calma" via points),
+// kept in localStorage only — never Firestore, never shared across devices.
+// Stored alongside the date-resolved theme id it was chosen under
+// (`forThemeId`) so a holiday theme starting or ending automatically
+// invalidates it: the student has to re-pick from the toggle if they still
+// want their manual choice once the date-based theme underneath it changes.
+const MANUAL_THEME_STORAGE_KEY = 'sde_theme_override';
+
+const readManualOverride = () => {
+  try {
+    const raw = localStorage.getItem(MANUAL_THEME_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeManualOverride = (value) => {
+  try {
+    if (value) localStorage.setItem(MANUAL_THEME_STORAGE_KEY, JSON.stringify(value));
+    else localStorage.removeItem(MANUAL_THEME_STORAGE_KEY);
+  } catch {
+    // Storage blocked (private mode, quota, etc.) — the toggle just won't
+    // persist across reloads; the rest of the site still works.
+  }
+};
+
 // A theme's optional `fontList` declares the weights a given family actually
 // needs (e.g. a display font used only at 900) — without this every font
 // loads at a generic 400;700, which may not even include the weight a bold
@@ -98,7 +125,10 @@ export function ThemeStyleSync({ theme }) {
       const family = (fontsField && theme?.styles?.fonts?.[fontsField]) || (legacyField && theme?.styles?.[legacyField]);
       if (!family) return;
       loadGoogleFont(family, weightsFor(fontList, family));
-      root.style.setProperty(cssVar, family.includes(',') ? family : `'${family}', ${fallbackStack}`);
+      // Flags-only font first so 🇪🇸 still renders as a flag on Windows under
+      // any theme font (see main.jsx).
+      const stack = family.includes(',') ? family : `'${family}', ${fallbackStack}`;
+      root.style.setProperty(cssVar, `'Twemoji Country Flags', ${stack}`);
     });
 
     const cleanupTextEffects = syncTextEffectPresets(theme?.styles?.textEffects?.presets);
@@ -142,11 +172,48 @@ export function ThemeProvider({ children }) {
     () => (previewThemeId ? themes.find((t) => t.id === previewThemeId) : null),
     [themes, previewThemeId]
   );
+
+  // The theme today's date alone resolves to — this is what "Clásico" means
+  // in the toggle (the site's normal current theme, holiday or not), and
+  // what a manual override is checked against to see if it's still valid.
+  const dateTheme = useMemo(
+    () => (loaded ? resolveActiveTheme(themes, todayMD) : null),
+    [themes, loaded, todayMD]
+  );
+
+  const [manualOverride, setManualOverrideState] = useState(readManualOverride);
+  const isOverrideStale = !!manualOverride && !!dateTheme && manualOverride.forThemeId !== dateTheme.id;
+
+  // A holiday theme starting or ending always "takes over" automatically —
+  // `manualTheme` below already treats a stale override as if it weren't
+  // there; this effect just tidies up localStorage to match (an external
+  // system, not React state, so no render loop needed to do it).
+  useEffect(() => {
+    if (isOverrideStale) writeManualOverride(null);
+  }, [isOverrideStale]);
+
+  const manualTheme = useMemo(() => {
+    if (!manualOverride || isOverrideStale) return null;
+    return themes.find((t) => t.id === manualOverride.themeId) || null;
+  }, [manualOverride, isOverrideStale, themes]);
+
+  // A Vista Previa override wins unconditionally (same as before); otherwise
+  // a still-valid manual choice wins; otherwise the plain date resolution.
   const theme = useMemo(
-    () => (loaded ? previewTheme || resolveActiveTheme(themes, todayMD) : null),
-    [themes, loaded, todayMD, previewTheme]
+    () => (loaded ? previewTheme || manualTheme || dateTheme : null),
+    [loaded, previewTheme, manualTheme, dateTheme]
   );
   const isPreviewing = !!previewTheme;
+
+  // Lets a student's theme toggle (see Header.jsx) switch to an unlocked
+  // theme by id, or back with themeId=null. Does nothing while themes
+  // haven't loaded yet — there'd be no dateTheme.id to anchor the choice to.
+  const setManualTheme = (themeId) => {
+    if (!dateTheme) return;
+    const next = themeId ? { themeId, forThemeId: dateTheme.id } : null;
+    setManualOverrideState(next);
+    writeManualOverride(next);
+  };
 
   // Lets a descendant resolve the theme active on ANY date, not just today —
   // e.g. a specific lesson day's own calendar date, so browsing an old day
@@ -167,7 +234,17 @@ export function ThemeProvider({ children }) {
   }, [themes, loaded, previewTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, loaded, resolveThemeForDate, isPreviewing }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        loaded,
+        resolveThemeForDate,
+        isPreviewing,
+        resolvedThemeId: dateTheme?.id || null,
+        manualThemeId: manualTheme?.id || null,
+        setManualTheme,
+      }}
+    >
       <ThemeStyleSync theme={theme} />
       {children}
     </ThemeContext.Provider>
