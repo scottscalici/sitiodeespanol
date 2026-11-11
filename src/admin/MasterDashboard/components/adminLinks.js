@@ -105,6 +105,7 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-reassessment-config', label: 'Recuperaciones', emoji: '🔁' },
       { to: '/admin-class-schedule', label: 'Horario de Clases', emoji: '🕐' },
       { to: '/admin-secret-portal-seating-chart', label: 'Asientos', emoji: '🪑' },
+      { to: '/admin-secret-portal-roster', label: 'Roster', emoji: '🗂️' },
     ],
   },
   {

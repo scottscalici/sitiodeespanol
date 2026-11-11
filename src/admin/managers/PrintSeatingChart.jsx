@@ -5,9 +5,7 @@ import { db } from '../../firebase';
 import { getCachedCollection } from '../../utils/firestoreCache';
 import RoomChrome from '../../components/RoomChrome';
 import { ROOM_PODS, ROOM_GRID_STYLE } from '../../utils/seatingLayout';
-
-const displayName = (s) =>
-  s?.firstName || s?.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : (s?.email || '').split('@')[0];
+import { getDisplayName as displayName } from '../../utils/studentDisplay';
 
 export default function PrintSeatingChart() {
   const { chartId } = useParams();

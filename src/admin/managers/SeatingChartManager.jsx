@@ -5,9 +5,7 @@ import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache, invalidateDocCache } from '../../utils/firestoreCache';
 import RoomChrome from '../../components/RoomChrome';
 import { ROOM_PODS, FRONT_POD_IDS, ROOM_GRID_STYLE, chartIdFor, emptyAssignments, podById } from '../../utils/seatingLayout';
-
-const displayName = (s) =>
-  s?.firstName || s?.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : (s?.email || '').split('@')[0];
+import { getDisplayName as displayName } from '../../utils/studentDisplay';
 
 export default function SeatingChartManager() {
   const [allUsers, setAllUsers] = useState([]);
@@ -18,6 +16,7 @@ export default function SeatingChartManager() {
   const [status, setStatus] = useState('');
   const [editingNoteFor, setEditingNoteFor] = useState(null);
   const [addingToPod, setAddingToPod] = useState(null);
+  const [editingNameFor, setEditingNameFor] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -166,6 +165,18 @@ export default function SeatingChartManager() {
     );
   };
 
+  const savePreferredName = async (studentId, preferredName) => {
+    try {
+      await updateDoc(doc(db, 'users', studentId), { preferredName: preferredName.trim() });
+      invalidateCollectionCache('users');
+      setAllUsers((prev) => prev.map((u) => (u.id === studentId ? { ...u, preferredName: preferredName.trim() } : u)));
+      setEditingNameFor(null);
+    } catch (err) {
+      console.error('Error saving preferred name:', err);
+      setStatus('❌ Error al guardar el nombre preferido.');
+    }
+  };
+
   const saveNote = async (studentId, data) => {
     try {
       await setDoc(doc(db, 'seating_notes', studentId), data);
@@ -301,17 +312,39 @@ export default function SeatingChartManager() {
                     </span>
                   </div>
                   <div className="flex-1 space-y-1 overflow-y-auto">
-                    {occupantIds.map((id) => (
-                      <div key={id} className="flex justify-between items-center bg-slate-900/70 rounded px-1.5 py-0.5">
-                        <span className="text-[11px] text-white truncate">
-                          {displayName(studentsById[id])}
-                          {notesById[id] && <span title={notesById[id].note || ''}> 📝</span>}
-                        </span>
-                        <button onClick={() => removeFromPod(pod.id, id)} className="text-rose-400 hover:text-rose-300 text-[10px] px-1">
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                    {occupantIds.map((id) =>
+                      editingNameFor === id ? (
+                        <input
+                          key={id}
+                          autoFocus
+                          type="text"
+                          defaultValue={displayName(studentsById[id])}
+                          placeholder="Nombre preferido"
+                          onBlur={(e) => savePreferredName(id, e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                          className="w-full bg-slate-700 text-white text-[11px] rounded px-1.5 py-0.5"
+                        />
+                      ) : (
+                        <div key={id} className="flex justify-between items-center bg-slate-900/70 rounded px-1.5 py-0.5">
+                          <span className="text-[11px] text-white truncate">
+                            {displayName(studentsById[id])}
+                            {notesById[id] && <span title={notesById[id].note || ''}> 📝</span>}
+                          </span>
+                          <span className="shrink-0 flex items-center gap-1">
+                            <button
+                              onClick={() => setEditingNameFor(id)}
+                              title="Editar nombre preferido"
+                              className="text-slate-400 hover:text-cyan-300 text-[10px] px-1"
+                            >
+                              ✏️
+                            </button>
+                            <button onClick={() => removeFromPod(pod.id, id)} className="text-rose-400 hover:text-rose-300 text-[10px] px-1">
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+                      )
+                    )}
                   </div>
                   {occupantIds.length < pod.capacity &&
                     (addingToPod === pod.id ? (

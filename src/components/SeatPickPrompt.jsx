@@ -3,10 +3,8 @@ import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getCachedCollection, getCachedDoc, invalidateDocCache, invalidateCollectionCache } from '../utils/firestoreCache';
 import { ROOM_PODS, ROOM_GRID_STYLE, podById } from '../utils/seatingLayout';
+import { getDisplayName as displayName } from '../utils/studentDisplay';
 import RoomChrome from './RoomChrome';
-
-const displayName = (s) =>
-  s?.firstName || s?.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : (s?.email || '').split('@')[0];
 
 // A one-time full-screen prompt for the student an admin just granted a seat
 // pick to (see SeatingChartManager.jsx's "Dejar elegir mesa" button). They

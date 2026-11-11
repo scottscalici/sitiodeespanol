@@ -81,6 +81,7 @@ import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import UnlockablesManager from './admin/managers/UnlockablesManager';
 import SeatingChartManager from './admin/managers/SeatingChartManager';
+import RosterManager from './admin/managers/RosterManager';
 import PrintSeatingChart from './admin/managers/PrintSeatingChart';
 import GamificationManager from './admin/managers/GamificationManager';
 import SampleSentencesManager from './admin/managers/SampleSentencesManager';
@@ -453,6 +454,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SeatingChartManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-roster"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <RosterManager />
                 </AdminRoute>
               }
             />
