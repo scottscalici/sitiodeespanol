@@ -148,5 +148,5 @@ export const DEFAULT_FAVORITES = [
   '/admin-daily-plan-curiosidades',
   '/admin-secret-portal-practice-cards',
   '/admin-grammar-notes',
-  '/admin-daily-plan-atandocabos',
+  '/admin-secret-portal-seating-chart',
 ];
