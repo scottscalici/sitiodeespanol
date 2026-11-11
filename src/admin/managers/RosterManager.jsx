@@ -12,10 +12,11 @@ import { getDisplayName } from '../../utils/studentDisplay';
 // signup, or the "I'm not in one of Sr. Scalici's classes" checkbox
 // ticked by mistake) is invisible everywhere else. This is the one place
 // to find and fix that without going into Firestore directly.
-const COURSE_SECTIONS = {
-  s2: ['1B'],
-  s4: ['4A', '4B'],
-};
+// Deliberately NOT keyed by course — this tool exists to fix a student
+// whose course and section don't match each other, so restricting the
+// section options to whatever the (possibly wrong) course currently says
+// would make the actual mismatch impossible to correct in one step.
+const ALL_SECTIONS = ['1B', '4A', '4B'];
 
 export default function RosterManager() {
   const [students, setStudents] = useState([]);
@@ -41,7 +42,13 @@ export default function RosterManager() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const list = q
-      ? students.filter((s) => getDisplayName(s).toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q))
+      ? students.filter(
+          (s) =>
+            getDisplayName(s).toLowerCase().includes(q) ||
+            (s.email || '').toLowerCase().includes(q) ||
+            (s.course || '').toLowerCase().includes(q) ||
+            (s.section || '').toLowerCase().includes(q)
+        )
       : students;
     return [...list].sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
   }, [students, search]);
@@ -121,7 +128,7 @@ export default function RosterManager() {
                 className="bg-slate-800 border border-slate-700 text-white rounded-md px-2 py-1.5 text-xs"
               >
                 <option value="">— sección —</option>
-                {(COURSE_SECTIONS[s.course] || ['1B', '4A', '4B']).map((sec) => (
+                {ALL_SECTIONS.map((sec) => (
                   <option key={sec} value={sec}>
                     {sec}
                   </option>
