@@ -725,6 +725,27 @@ export default function CalentamientoEngine({ onClose }) {
                       ? 'border-2 border-rose-500 bg-rose-950/30'
                       : 'border border-slate-700 bg-slate-900';
 
+                  // A negative tú command's "no" is pre-typed into the box
+                  // itself (not separate UI chrome) and protected from being
+                  // edited or deleted, so the student only ever types the
+                  // part after it — the grading in handleCheckVerbs already
+                  // compares the WHOLE typed string against `forma`, so
+                  // `forma` for these just needs to include "no" too (e.g.
+                  // "no lo toques"); nothing there needed to change.
+                  const isNegativeCommand = v.tense === 'imperativo_negativo';
+                  const negativePrefix = 'No ';
+                  const inputValue = verbInputs[globalIdx] ?? (isNegativeCommand ? negativePrefix : '');
+
+                  const clampCursorPastPrefix = (e) => {
+                    if (!isNegativeCommand) return;
+                    const el = e.target;
+                    const start = Math.max(el.selectionStart, negativePrefix.length);
+                    const end = Math.max(el.selectionEnd, negativePrefix.length);
+                    if (start !== el.selectionStart || end !== el.selectionEnd) {
+                      el.setSelectionRange(start, end);
+                    }
+                  };
+
                   return (
                     <div
                       key={globalIdx}
@@ -742,13 +763,30 @@ export default function CalentamientoEngine({ onClose }) {
                       <input
                         type="text"
                         placeholder="Escribe la forma conjugada..."
-                        value={verbInputs[globalIdx] || ''}
-                        onChange={(e) =>
+                        value={inputValue}
+                        onChange={(e) => {
+                          let next = e.target.value;
+                          if (isNegativeCommand && !next.startsWith(negativePrefix)) {
+                            next = negativePrefix + next.replace(/^no ?/i, '');
+                          }
                           setVerbInputs({
                             ...verbInputs,
-                            [globalIdx]: e.target.value,
-                          })
-                        }
+                            [globalIdx]: next,
+                          });
+                        }}
+                        onKeyDown={(e) => {
+                          if (
+                            isNegativeCommand &&
+                            e.key === 'Backspace' &&
+                            e.target.selectionStart <= negativePrefix.length &&
+                            e.target.selectionEnd <= negativePrefix.length
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onFocus={clampCursorPastPrefix}
+                        onClick={clampCursorPastPrefix}
+                        onSelect={clampCursorPastPrefix}
                         className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm font-bold text-white outline-none focus:ring-2 focus:ring-sky-400"
                       />
                     </div>
