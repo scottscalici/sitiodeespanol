@@ -86,6 +86,26 @@ const sentenceMatchesConcept = (sentence, concept, exactOnly = false) => {
   return answers.some((a) => allForms.some((f) => f && (a === f || a.includes(f) || f.includes(a))));
 };
 
+// A sentence written as a verb-conjugation drill (`[[forma|infinitivo]]`)
+// still needs BOTH sides for matching above — the infinitive is how it
+// gets linked to its vocab word in the first place (see
+// sentenceMatchesConcept). But once matched, pinning the full two-part
+// blank into a VOCAB pod makes WorkoutEngine treat it as a conjugation-
+// production task (`conjugate` / `sentence_builder_complex` — "derive the
+// right form of comer"), which is a grammar exercise, not vocab
+// recognition. Dropping the "|infinitivo" hint leaves the exact same,
+// still-grammatically-correct sentence but with a single-answer blank
+// (`[[forma]]`), which WorkoutEngine instead renders as a plain
+// recognition task (multiple choice / scrambled sentence) — same words,
+// no conjugating required. Only the copy embedded into the vocab pod is
+// touched; the original sentence_bank doc (and anything grammar pods read
+// from it) is untouched, since this only ever runs on pinned_sentences
+// built for a vocab intro pod.
+const stripConjugationHint = (sentence) => {
+  const strip = (text) => (text || '').replace(/\[\[([^\]|]+)\|[^\]]*\]\]/g, '[[$1]]');
+  return { ...sentence, label: strip(sentence.label), spanish: strip(sentence.spanish) };
+};
+
 // Assigns each already section-matched sentence to the ONE intro segment
 // that introduces its own word — never an earlier segment than the word
 // itself, since a segment only ever draws from its own introduced_concepts.
@@ -118,7 +138,10 @@ export const distributeSentencesToSegments = (introSegments, sentences) => {
 
   const matchedConceptIds = new Set(Object.keys(matchedSentenceByConceptId));
   const segments = introSegments.map((seg) => {
-    const pinned = seg.introduced_concepts.map((c) => matchedSentenceByConceptId[c.id]).filter(Boolean);
+    const pinned = seg.introduced_concepts
+      .map((c) => matchedSentenceByConceptId[c.id])
+      .filter(Boolean)
+      .map(stripConjugationHint);
     return { ...seg, pinned_sentences: pinned };
   });
   const unmatchedWordIds = introSegments

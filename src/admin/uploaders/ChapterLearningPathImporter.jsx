@@ -157,14 +157,24 @@ export default function ChapterLearningPathImporter() {
           const currentIds = new Set(currentSentences.map((p) => p.id));
           const correctIds = new Set(correctSentences.map((p) => p.id));
           const sentencesMatch = currentIds.size === correctIds.size && [...currentIds].every((id) => correctIds.has(id));
+          // Also flags a pod whose pinned sentences are the right SET but
+          // were pinned before stripConjugationHint existed — those still
+          // carry the old two-part "[[forma|infinitivo]]" blank, which
+          // reads to WorkoutEngine as a conjugation-production question
+          // rather than a plain vocab recognition one. A fresh
+          // distributeSentencesToSegments call (below, via "Corregir
+          // oraciones") re-pins with the hint already stripped, so this is
+          // the same repair path, just a second reason to surface it.
+          const unstrippedConjugationCount = currentSentences.filter((p) => /\[\[[^\]]*\|[^\]]*\]\]/.test(p.label || '')).length;
           sectionReports.push({
             status: 'skip',
             section: sec.section,
             podId,
             reason: 'Ya existe — no se toca.',
-            needsSentenceRepair: !!existingPod && !sentencesMatch,
+            needsSentenceRepair: !!existingPod && (!sentencesMatch || unstrippedConjugationCount > 0),
             currentSentenceCount: currentIds.size,
             correctSentenceCount: correctIds.size,
+            unstrippedConjugationCount,
             correctSentences,
           });
           continue;
@@ -476,7 +486,9 @@ export default function ChapterLearningPathImporter() {
               {s.needsSentenceRepair && (
                 <div className="mt-2 flex items-center gap-2">
                   <p className="text-amber-400 text-xs font-bold">
-                    ⚠️ Oraciones fijadas: {s.currentSentenceCount} (deberían ser {s.correctSentenceCount}).
+                    {s.currentSentenceCount !== s.correctSentenceCount
+                      ? `⚠️ Oraciones fijadas: ${s.currentSentenceCount} (deberían ser ${s.correctSentenceCount}).`
+                      : `⚠️ ${s.unstrippedConjugationCount} oración(es) todavía piden conjugar en vez de solo reconocer la palabra.`}
                   </p>
                   <button
                     type="button"
