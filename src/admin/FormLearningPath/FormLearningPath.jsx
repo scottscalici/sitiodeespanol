@@ -670,12 +670,14 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
           rawChapterData={rawChapterData}
           availableSections={availableSections}
           selectedChapter={selectedChapter}
+          selectedBook={selectedBook}
           course={course}
           pathId={pathId}
           evaluacionOptions={evaluacionOptions}
-          onDone={() => {
+          onDone={(generatedPathId) => {
             setShowCircleGenerator(false);
-            if (pathId) handleLoadPath(pathId);
+            handleLoadPath(generatedPathId);
+            fetchExistingPaths();
           }}
           onClose={() => setShowCircleGenerator(false)}
         />

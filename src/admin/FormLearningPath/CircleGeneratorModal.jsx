@@ -5,6 +5,18 @@ import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import { toConcept } from '../../utils/podGenerator';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
+// Same course_textbook_capN pattern already suggested as a pathId example
+// elsewhere (ChapterLearningPathImporter.jsx's own placeholder JSON uses
+// "s2_descubre2_cap2") — so a circle-only path auto-named here lines up
+// with what a hand-typed or chapter-imported pathId would already look
+// like, rather than inventing a different convention.
+const slugifyTextbook = (name) =>
+  (name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
 // Same deterministic id convention as ChapterLearningPathImporter.jsx, so
 // a circle created there and one created here never collide, and
 // re-running this generator for an already-circled section is a safe
@@ -59,12 +71,19 @@ const buildCirclePod = (podId, section, words) => {
 // later), since a circle without its reassessment config half-wired in
 // would leave the recuperación flow broken; generating and saving as one
 // atomic action avoids ever having one half without the other.
-export default function CircleGeneratorModal({ rawChapterData, availableSections, selectedChapter, course, pathId, evaluacionOptions, onDone, onClose }) {
+export default function CircleGeneratorModal({ rawChapterData, availableSections, selectedChapter, selectedBook, course, pathId, evaluacionOptions, onDone, onClose }) {
   const gradableSections = useMemo(() => availableSections.filter((s) => !isReferenceSection(s)), [availableSections]);
   const [checkedSections, setCheckedSections] = useState(() => new Set(gradableSections));
   const [evalInputs, setEvalInputs] = useState({}); // { [section]: { dia: '', label: '' } }
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState('');
+
+  // Uses whatever Path ID the form already has; only invents one (same
+  // course_textbook_capN pattern a hand-typed or chapter-imported id
+  // already follows) when the field was left blank, so this never
+  // requires setting one up first just to generate circles.
+  const autoPathId = `${course}_${slugifyTextbook(selectedBook)}_cap${selectedChapter}`;
+  const effectivePathId = pathId || autoPathId;
 
   const sectionInfo = useMemo(() => {
     return gradableSections.map((section) => {
@@ -90,10 +109,6 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
 
   const handleGenerate = async () => {
     setStatus('');
-    if (!pathId) {
-      setStatus('❌ Asigna un Path ID a este círculo antes de generar.');
-      return;
-    }
     if (chosen.length === 0) return;
 
     // Validate every chosen section's evaluación before writing anything —
@@ -119,7 +134,7 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
 
     setGenerating(true);
     try {
-      const snap = await getDoc(doc(db, 'practice_pods', pathId));
+      const snap = await getDoc(doc(db, 'practice_pods', effectivePathId));
       const existing = snap.exists() ? snap.data() : null;
       const existingPods = existing?.pods || [];
       const existingIds = new Set(existingPods.map((p) => p.id));
@@ -134,7 +149,7 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
         pod.evalLink = { dia: Number(input.dia), label: input.label.trim() };
         newPods.push(pod);
         newConfigs.push({
-          circleId: `${pathId}__${podId}`,
+          circleId: `${effectivePathId}__${podId}`,
           course,
           evalLabel: input.label.trim(),
           groups: [],
@@ -152,9 +167,9 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
       }
 
       await setDoc(
-        doc(db, 'practice_pods', pathId),
+        doc(db, 'practice_pods', effectivePathId),
         {
-          path_id: pathId,
+          path_id: effectivePathId,
           title: existing?.title || `Capítulo ${selectedChapter} — Círculos de Práctica`,
           course,
           contentType: 'vocab',
@@ -168,8 +183,8 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
       await Promise.all(newConfigs.map((cfg) => setDoc(doc(db, 'reassessment_configs', cfg.circleId), cfg, { merge: true })));
 
       invalidateCollectionCache('practice_pods');
-      setStatus(`✅ ${newPods.length} círculo(s) creado(s), con su recuperación ya configurada.`);
-      onDone?.();
+      setStatus(`✅ ${newPods.length} círculo(s) creado(s) en "${effectivePathId}", con su recuperación ya configurada.`);
+      onDone?.(effectivePathId);
     } catch (err) {
       console.error('Error generating circles:', err);
       setStatus(`❌ Error: ${err.message}`);
@@ -194,7 +209,10 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
             Un círculo por sección: todas las palabras, una vez cada una, puro escribir, sin límite de tiempo —
             más su recuperación ya configurada (90% de 50 preguntas en 300 segundos).
           </p>
-          {!pathId && <p className="text-xs font-bold text-rose-600">⚠️ Asigna un Path ID arriba antes de generar.</p>}
+          <p className="text-xs font-semibold text-slate-600">
+            Path ID: <span className="font-mono">{effectivePathId}</span>
+            {!pathId && <span className="text-slate-400 italic"> (nuevo, se crea al generar)</span>}
+          </p>
 
           {sectionInfo.length === 0 && (
             <p className="text-sm text-slate-400 italic text-center py-8">No hay secciones de vocabulario cargadas para este capítulo.</p>
@@ -243,7 +261,7 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
             </button>
             <button
               onClick={handleGenerate}
-              disabled={chosen.length === 0 || generating || !pathId}
+              disabled={chosen.length === 0 || generating}
               className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generating ? 'Generando...' : `Generar (${chosen.length})`}
