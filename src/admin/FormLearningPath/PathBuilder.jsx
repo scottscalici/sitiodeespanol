@@ -36,6 +36,7 @@ export default function PathBuilder({
   isPracticeHub = false,
   evaluacionOptions = [],
   onOpenPodGenerator,
+  onOpenCircleGenerator,
   onImportPods,
 }) {
   const podLabel = isPracticeHub ? 'Círculo' : 'Pod';
@@ -267,6 +268,16 @@ export default function PathBuilder({
                 title="Genera pares de niveles (introducción + batalla final) directamente desde las secciones de vocabulario del capítulo seleccionado."
               >
                 🪄 Generar desde Vocabulario
+              </button>
+            )}
+
+            {isPracticeHub && contentType === 'vocab' && onOpenCircleGenerator && (
+              <button
+                onClick={onOpenCircleGenerator}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow transition-all flex items-center gap-1.5"
+                title="Genera un círculo por sección (todas las palabras, escribir, sin límite) más su recuperación, directamente desde el vocabulario del capítulo."
+              >
+                🪄 Generar Círculos
               </button>
             )}
 

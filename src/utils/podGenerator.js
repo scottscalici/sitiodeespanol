@@ -129,7 +129,7 @@ export const distributeSentencesToSegments = (introSegments, sentences) => {
   return { segments, unmatchedWordIds, unmatchedSentenceIds };
 };
 
-const toConcept = (word, sectionLabel) => ({
+export const toConcept = (word, sectionLabel) => ({
   id: word.id || word.palabra,
   label: word.palabra,
   translation: word.traduccion,

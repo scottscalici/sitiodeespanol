@@ -3,6 +3,7 @@ import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
 import VocabPodGeneratorModal from './VocabPodGeneratorModal';
+import CircleGeneratorModal from './CircleGeneratorModal';
 import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
@@ -129,6 +130,12 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setPods(hasOnlyPlaceholderPod ? newPods : [...pods, ...newPods]);
     setShowPodGenerator(false);
   };
+
+  // Circles write straight to Firestore themselves (see CircleGeneratorModal)
+  // rather than handing pods back for this form's own Save button — so on
+  // success this just reloads the already-saved path instead of merging
+  // anything into local state.
+  const [showCircleGenerator, setShowCircleGenerator] = useState(false);
 
   // Pasted pods go through the same sanitizer as a loaded path, so a
   // hand-written/generated JSON doesn't need every optional field spelled
@@ -654,8 +661,25 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         badgeCatalog={badgeCatalog} onCreateBadge={handleCreateBadge}
         isPracticeHub={isPracticeHub} evaluacionOptions={evaluacionOptions}
         onOpenPodGenerator={() => setShowPodGenerator(true)}
+        onOpenCircleGenerator={() => setShowCircleGenerator(true)}
         onImportPods={handleImportPods}
       />
+
+      {showCircleGenerator && (
+        <CircleGeneratorModal
+          rawChapterData={rawChapterData}
+          availableSections={availableSections}
+          selectedChapter={selectedChapter}
+          course={course}
+          pathId={pathId}
+          evaluacionOptions={evaluacionOptions}
+          onDone={() => {
+            setShowCircleGenerator(false);
+            if (pathId) handleLoadPath(pathId);
+          }}
+          onClose={() => setShowCircleGenerator(false)}
+        />
+      )}
 
       {showPodGenerator && (
         <VocabPodGeneratorModal
