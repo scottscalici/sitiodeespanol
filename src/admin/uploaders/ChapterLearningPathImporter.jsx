@@ -4,21 +4,26 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
+import { generateSectionPods, distributeSentencesToSegments } from '../../utils/podGenerator';
 
 // One-pass chapter importer: given just a course/textbook/chapter and a list
 // of sections ({section, evalDia, evalLabel}), builds everything a vocab
-// chapter needs across four collections — a Learning Path pod (graded, fixed
-// 15-question mix) and a Practice Hub circle (all-escribir, full word
-// coverage, gate + evalLink) per section, plus one reassessment_configs doc
-// per circle — without the teacher re-entering any vocab or sentence
-// content. Vocab/sentences are pulled live from `vocabulary`
-// (metadata.secciones) and `sentence_bank` ("<Textbook> — Sección X.X"
-// grammarTags) —
+// chapter needs across four collections — a Learning Path intro+boss-battle
+// pod PAIR (same segmented ~5-words-per-segment pattern as the in-app
+// "🪄 Generar Pods" button, via podGenerator.js) and a Practice Hub circle
+// (all-escribir, full word coverage, gate + evalLink) per section, plus one
+// reassessment_configs doc per circle — without the teacher re-entering any
+// vocab or sentence content. Vocab/sentences are pulled live from
+// `vocabulary` (metadata.secciones) and `sentence_bank`
+// ("<Textbook> — Sección X.X" grammarTags) —
 // the exact same section tagging those collections already use elsewhere
 // (FormLearningPath's own vault picker, the vocab-sentences-bulk skill) —
 // and evaluaciones are only ever VALIDATED against
 // curriculum_tracks/evaluaciones_master, never created/overwritten there
-// (Scott's own Evaluaciones Sequencer already owns that data).
+// (Scott's own Evaluaciones Sequencer already owns that data). Each
+// section-matched sentence is further matched to the ONE word its own
+// blank was written for (podGenerator.js's distributeSentencesToSegments),
+// so a sentence lands in the same segment as its word, never earlier.
 //
 // Re-running this importer for the same pathId only ever APPENDS sections
 // that aren't already present (matched by a deterministic pod id derived
@@ -28,8 +33,6 @@ import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
 
 const slugSection = (section) => `circulo_${section.replace(/[^a-zA-Z0-9]+/g, '_')}`;
 
-const LEARNING_PATH_QUESTION_MIX = { recall: 5, mc: 3, matching: 2, listen: 0, speak: 0, sentence: 5 };
-const LEARNING_PATH_TOTAL = Object.values(LEARNING_PATH_QUESTION_MIX).reduce((a, b) => a + b, 0);
 const GATE_CONFIG_DEFAULT = { questionCount: 50, timeLimitSeconds: 300, passThreshold: 90 };
 const REASSESSMENT_VOCAB_COUNT = 10;
 const REASSESSMENT_TIME_LIMIT_SECONDS = 300;
@@ -126,6 +129,11 @@ export default function ChapterLearningPathImporter() {
       const existingPodIds = new Set([...existingLearningPods.map((p) => p.id), ...existingCirclePods.map((p) => p.id)]);
 
       const sectionReports = [];
+      // "Nivel N" numbering for newly-generated intro/boss pod pairs
+      // continues right after however many learning pods already exist —
+      // only advances for a section actually built below, never for one
+      // that errors or is skipped as already-imported.
+      let nextLevel = existingLearningPods.length + 1;
       for (const [idx, sec] of input.sections.entries()) {
         const tag = `Sección ${idx + 1}`;
         if (!isNonEmptyString(sec.section) || typeof sec.evalDia !== 'number' || !isNonEmptyString(sec.evalLabel)) {
@@ -141,7 +149,10 @@ export default function ChapterLearningPathImporter() {
           // textbook-scoping fix (or before real sentences existed yet) can
           // be repaired without re-importing the whole section.
           const existingPod = existingLearningPods.find((p) => p.id === podId);
-          const currentSentences = existingPod?.segments?.[0]?.pinned_sentences || [];
+          // Sentences are now spread across every intro segment (not dumped
+          // into segment 0 alone) — sum across all of them for the repair
+          // check, or a correctly-distributed pod would wrongly look short.
+          const currentSentences = (existingPod?.segments || []).flatMap((seg) => seg.pinned_sentences || []);
           const correctSentences = findPinnedSentences(sentenceBank, input.textbook, sec.section);
           const currentIds = new Set(currentSentences.map((p) => p.id));
           const correctIds = new Set(correctSentences.map((p) => p.id));
@@ -173,15 +184,29 @@ export default function ChapterLearningPathImporter() {
           continue;
         }
 
-        const conceptList = vocabulary
-          .filter((v) => (v.metadata?.secciones || []).includes(sec.section) && v.metadata?.textbook === input.textbook)
-          .map((v) => buildConcept(v, sec.section));
-        if (conceptList.length === 0) {
+        const sectionWords = vocabulary.filter(
+          (v) => (v.metadata?.secciones || []).includes(sec.section) && v.metadata?.textbook === input.textbook
+        );
+        if (sectionWords.length === 0) {
           sectionReports.push({ status: 'error', section: sec.section, reason: `Ninguna palabra en Vocabulario tiene metadata.secciones="${sec.section}" y metadata.textbook="${input.textbook}".` });
           continue;
         }
+        const conceptList = sectionWords.map((v) => buildConcept(v, sec.section));
 
         const sentenceList = findPinnedSentences(sentenceBank, input.textbook, sec.section);
+
+        // Real segmented intro pod (~5 new words/segment) + its boss-battle
+        // pair, same pattern as the in-app "🪄 Generar Pods" button — ids
+        // overridden to this importer's own deterministic scheme so the
+        // already-imported/skip check above and handleRepairSentences both
+        // keep working unchanged.
+        const [introPod, bossPod] = generateSectionPods(sec.section, sectionWords, nextLevel);
+        introPod.id = podId;
+        bossPod.id = `${podId}_boss`;
+        nextLevel += 2;
+
+        const { segments, unmatchedWordIds, unmatchedSentenceIds } = distributeSentencesToSegments(introPod.segments, sentenceList);
+        introPod.segments = segments;
 
         sectionReports.push({
           status: 'new',
@@ -190,8 +215,12 @@ export default function ChapterLearningPathImporter() {
           evalLink: { dia: evalEntry.dia, label: evalEntry.label },
           conceptList,
           sentenceList,
+          introPod,
+          bossPod,
           wordCount: conceptList.length,
           sentenceCount: sentenceList.length,
+          unmatchedWordCount: unmatchedWordIds.length,
+          unmatchedSentenceCount: unmatchedSentenceIds.length,
         });
       }
 
@@ -211,7 +240,9 @@ export default function ChapterLearningPathImporter() {
   // Overwrites ONLY one existing pod's pinned_sentences in learning_paths —
   // never touches concepts, questionMix, or anything else on the pod — so a
   // section imported before this fix (or before its real sentences existed
-  // yet) can be corrected without re-importing it from scratch.
+  // yet) can be corrected without re-importing it from scratch. Redistributes
+  // across the pod's EXISTING segments (same per-word matching as a fresh
+  // import), rather than dumping everything back into segment 0.
   const handleRepairSentences = async (sectionReport) => {
     if (!report) return;
     setImportStatus('');
@@ -222,7 +253,7 @@ export default function ChapterLearningPathImporter() {
       const data = snap.data();
       const pods = (data.pods || []).map((p) =>
         p.id === sectionReport.podId
-          ? { ...p, segments: p.segments.map((seg, i) => (i === 0 ? { ...seg, pinned_sentences: sectionReport.correctSentences } : seg)) }
+          ? { ...p, segments: distributeSentencesToSegments(p.segments, sectionReport.correctSentences).segments }
           : p
       );
       await setDoc(doc(db, 'learning_paths', pathId), { pods, updated_at: new Date().toISOString() }, { merge: true });
@@ -253,28 +284,10 @@ export default function ChapterLearningPathImporter() {
     try {
       const { input } = report;
 
-      const newLearningPods = newSections.map((s) => ({
-        id: s.podId,
-        title: `Sección ${s.section}`,
-        isExpanded: true,
-        badgeAward: null,
-        evalLink: null,
-        gateConfig: null,
-        isBonus: false,
-        segments: [
-          {
-            id: `seg_${s.podId}`,
-            total_questions: LEARNING_PATH_TOTAL,
-            questionMix: { ...LEARNING_PATH_QUESTION_MIX },
-            isSpeedRound: false,
-            timeLimit: 60,
-            introduced_concepts: s.conceptList,
-            pinned_sentences: s.sentenceList,
-            masteryThreshold: null,
-            speakingOnly: false,
-          },
-        ],
-      }));
+      // Already-built intro + boss-battle pod pair from the validation pass
+      // (generateSectionPods + distributeSentencesToSegments) — reused
+      // as-is so what Scott saw in the report is exactly what gets written.
+      const newLearningPods = newSections.flatMap((s) => [s.introPod, s.bossPod]);
 
       const newCirclePods = newSections.map((s) => ({
         id: s.podId,
@@ -446,9 +459,18 @@ export default function ChapterLearningPathImporter() {
                 {s.status === 'error' ? '❌' : s.status === 'skip' ? '⏭️' : '✅'} Sección {s.section}
               </p>
               {s.status === 'new' && (
-                <p className="text-xs text-slate-400 mt-1">
-                  {s.wordCount} palabras · {s.sentenceCount} oraciones · evaluación: {s.evalLink.label} (día {s.evalLink.dia})
-                </p>
+                <>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {s.wordCount} palabras · {s.sentenceCount} oraciones · {s.introPod.segments.length} segmentos · evaluación:{' '}
+                    {s.evalLink.label} (día {s.evalLink.dia})
+                  </p>
+                  {(s.unmatchedWordCount > 0 || s.unmatchedSentenceCount > 0) && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      ⚠️ {s.unmatchedWordCount} palabra(s) sin oración emparejada, {s.unmatchedSentenceCount} oración(es) sin palabra
+                      emparejada — revísalas en Sentence Manager, siguen siendo importadas pero sin asignar a un segmento.
+                    </p>
+                  )}
+                </>
               )}
               {s.reason && <p className="text-xs text-slate-400 mt-1">{s.reason}</p>}
               {s.needsSentenceRepair && (
