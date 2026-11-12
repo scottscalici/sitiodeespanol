@@ -6,6 +6,16 @@ import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import ImageUploadField from '../shared/ImageUploadField';
 import MusicaQuestionsModal from './MusicaQuestionsModal';
 
+// Normalizes a field that should be an array but, on an older/hand-entered
+// doc, might be a comma-separated string ("s2, s4"), a single bare value
+// (58), or missing entirely.
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined || value === '') return [];
+  if (typeof value === 'string') return value.split(',').map((v) => v.trim()).filter(Boolean);
+  return [value];
+};
+
 const MusicaEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,13 +47,19 @@ const MusicaEditor = () => {
           setSong({
             titulo: data.titulo || '',
             artista: data.artista || '',
-            course: data.course || [],
-            dias: data.dias || [],
+            // Older songs (entered before course/dias were standardized as
+            // arrays by MusicaManager) can have these stored as a bare
+            // string or number — .join/.includes on that throws and, with
+            // no error boundary anywhere in the app, renders as a fully
+            // blank screen instead of an error. Coercing here means this
+            // editor opens no matter how the field was originally saved.
+            course: toArray(data.course),
+            dias: toArray(data.dias).map((d) => Number(d)).filter((d) => !isNaN(d)),
             imagen: data.imagen || '',
             youtube_url: data.youtube_url || '',
             spotify_url: data.spotify_url || '',
             letras: data.letras || '',
-            questions: data.questions || [],
+            questions: Array.isArray(data.questions) ? data.questions : [],
             notas: data.notas || ''
           });
         }
@@ -75,14 +91,19 @@ const MusicaEditor = () => {
   };
 
   // --- URL EXTRACTORS ---
+  // Runs unconditionally on every render (unlike MusicaManager's list view,
+  // which never calls these), so a stored value that isn't actually a
+  // string — e.g. a bare number from a hand-entered doc — would throw on
+  // .match and, with no error boundary anywhere in the app, blank the
+  // whole page rather than just skip the preview.
   const getYouTubeId = (url) => {
-    if (!url) return null;
+    if (!url || typeof url !== 'string') return null;
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
     return match ? match[1] : null;
   };
 
   const getSpotifyId = (url) => {
-    if (!url) return null;
+    if (!url || typeof url !== 'string') return null;
     const match = url.match(/track\/([a-zA-Z0-9]+)/);
     return match ? match[1] : null;
   };
@@ -120,7 +141,7 @@ const MusicaEditor = () => {
 
   // --- LIVE PREVIEW GENERATOR ---
   const renderPreview = () => {
-    if (!song.letras) return <span className="text-slate-400 italic">No hay letras todavía...</span>;
+    if (!song.letras || typeof song.letras !== 'string') return <span className="text-slate-400 italic">No hay letras todavía...</span>;
     
     let counter = 1;
     // Replace [bracketed] words with numbered bold text
