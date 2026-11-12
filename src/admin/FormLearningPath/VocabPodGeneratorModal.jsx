@@ -1,7 +1,13 @@
 import { useState, useMemo } from 'react';
-import { wordIntroSegmentCount, generatePodsForSections } from '../../utils/podGenerator';
+import { wordIntroSegmentCount, generatePodsForSections, distributeSentencesToSegments } from '../../utils/podGenerator';
 import { QUESTION_TYPE_DEFAULTS, QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, sumMix } from '../../utils/questionTypes';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
+
+// Mirrors ChapterLearningPathImporter.jsx's own matchesSentenceSection —
+// a bare "Sección X.X" tag isn't unique on its own (section numbering
+// restarts per chapter regardless of textbook), so the vocab-sentences-bulk
+// skill folds the textbook name directly into the tag itself.
+const sentenceMatchesSection = (s, textbook, section) => (s.grammarTags || []).includes(`${textbook} — Sección ${section}`);
 
 // Builds a "Nivel N: word-intro" + "Nivel N+1: boss battle" pod pair for
 // each chosen vocab section in the currently-selected chapter — see
@@ -13,7 +19,7 @@ import { isReferenceSection } from '../../utils/vocabSectionLabel';
 // GRADED pods, so there's no "uncheck it" workflow to rely on; a teacher
 // who wants reference words in a path still can, by hand, via the
 // section picker in VaultSidebar instead.
-export default function VocabPodGeneratorModal({ rawChapterData, availableSections, selectedChapter, existingPodCount, onGenerate, onClose }) {
+export default function VocabPodGeneratorModal({ rawChapterData, availableSections, selectedChapter, existingPodCount, sentencePool, onGenerate, onClose }) {
   const gradableSections = useMemo(() => availableSections.filter((s) => !isReferenceSection(s)), [availableSections]);
   const [checkedSections, setCheckedSections] = useState(() => new Set(gradableSections));
   // Every intro segment gets this same mix; boss segments ignore the mix at
@@ -26,9 +32,11 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
   const sectionInfo = useMemo(() => {
     return gradableSections.map((section) => {
       const words = (rawChapterData?.words || []).filter((w) => w.metadata?.secciones?.includes(section));
-      return { section, words, segmentCount: wordIntroSegmentCount(words.length) };
+      const textbook = words[0]?.metadata?.textbook || '';
+      const sentences = (sentencePool || []).filter((s) => sentenceMatchesSection(s, textbook, section));
+      return { section, words, textbook, sentences, segmentCount: wordIntroSegmentCount(words.length) };
     });
-  }, [gradableSections, rawChapterData]);
+  }, [gradableSections, rawChapterData, sentencePool]);
 
   const toggleSection = (section) => {
     setCheckedSections((prev) => {
@@ -57,6 +65,15 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
       existingPodCount,
       { introQuestionMix: introMix, bossTotalQuestions }
     );
+    // Pins each section's matched sentences onto its own intro pod's
+    // segments (never the boss pod — a speed round's pure recall drill
+    // doesn't use pinned sentences at all) — generatePodsForSections
+    // itself never touches sentences, same as the in-app button always
+    // has; this is the one place that now does.
+    chosen.forEach((s, i) => {
+      const introPod = newPods[i * 2];
+      introPod.segments = distributeSentencesToSegments(introPod.segments, s.sentences).segments;
+    });
     onGenerate(newPods);
   };
 
@@ -113,7 +130,7 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
                 No hay secciones de vocabulario cargadas para este capítulo.
               </p>
             )}
-            {sectionInfo.map(({ section, words, segmentCount }) => (
+            {sectionInfo.map(({ section, words, sentences, segmentCount }) => (
               <label
                 key={section}
                 className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer"
@@ -127,10 +144,18 @@ export default function VocabPodGeneratorModal({ rawChapterData, availableSectio
                   />
                   <span className="font-bold text-slate-800">{isReferenceSection(section) ? 'Referencias' : `Sección ${section}`}</span>
                 </span>
-                <span className="text-xs text-slate-500 font-semibold">
+                <span className="text-xs text-slate-500 font-semibold text-right">
                   {words.length === 0
                     ? 'sin palabras'
                     : `${words.length} palabras → ${segmentCount} segmentos (${introTotal}p c/u) + 2 batallas (${bossTotalQuestions}p c/u)`}
+                  {words.length > 0 && (
+                    <>
+                      <br />
+                      <span className={sentences.length === 0 ? 'text-rose-500' : 'text-emerald-600'}>
+                        {sentences.length === 0 ? '⚠️ sin oraciones etiquetadas para esta sección' : `${sentences.length} oración(es) encontradas`}
+                      </span>
+                    </>
+                  )}
                 </span>
               </label>
             ))}

@@ -663,6 +663,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
           availableSections={availableSections}
           selectedChapter={selectedChapter}
           existingPodCount={hasOnlyPlaceholderPod ? 0 : pods.length}
+          sentencePool={allGrammarList}
           onGenerate={handleGeneratedPods}
           onClose={() => setShowPodGenerator(false)}
         />
