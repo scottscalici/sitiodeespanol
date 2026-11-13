@@ -64,18 +64,33 @@ across however many sub-activities made up that lesson, and it's the
 ONLY number that goes to Schoology — one combined score per lesson, not
 one per sub-activity. Ignore every other column in this file entirely.
 
-**The grading rule** (confirmed with the teacher, Nov 2026 — ask if it
-still applies before reusing this on a much later request, since grading
-policies can change): the Schoology score is the Lesson Grade percentage
-**plus 10, capped at 100**:
-```
-schoology_score = min(100, lesson_grade_percent + 10)
-```
-e.g. 90.6% → 100 (100.6 capped). 83.4% → 93.4. 0% stays 0 (not negative,
-never below the raw value — the +10 only ever helps).
+**Always ask which grading scale applies to THIS specific VHL file**
+before computing anything — don't silently assume the default carries
+over. The teacher's grading scale varies by assignment type on purpose:
+classwork-style activities get a boost so students aren't penalized for
+small imperfections, but tests and stricter assignments are graded as-is
+or on a different curve she'll specify. Confirmed scales so far:
 
-This produces exactly **one** output column. Ask the teacher what that
-assignment is actually titled in Schoology (it changes every
+- **Classwork default** (confirmed Nov 2026 — her usual approach for
+  regular VHL classwork/activities, "so they don't get too hung up on
+  perfection"): Schoology score = Lesson Grade percentage **plus 10,
+  capped at 100**:
+  ```
+  schoology_score = min(100, lesson_grade_percent + 10)
+  ```
+  e.g. 90.6% → 100 (100.6 capped). 83.4% → 93.4. 0% stays 0 (never below
+  the raw value — the +10 only ever helps).
+- **Tests and stricter assignments**: no standing rule — ask her for
+  this one each time, since she's explicitly said these get handled
+  differently and didn't give a fixed formula.
+
+If she doesn't say up front, ask directly: "Is this VHL file classwork
+(the usual +10%, capped at 100) or something stricter like a test — and
+if stricter, what's the actual scale?" Never default silently to the
+classwork rule for something she hasn't characterized.
+
+This produces exactly **one** output column. Also ask the teacher what
+that assignment is actually titled in Schoology (it changes every
 chapter/lesson — e.g. "Lección 1 Práctica", "Lección 2 Práctica") if they
 haven't already said, since the header must match that title exactly.
 
@@ -121,7 +136,9 @@ as text (`"91.67%"`, `"Not Attempted"`) or occasionally blank.
 ## Building the output
 
 1. Build the Name→ID lookup from every roster file attached.
-2. For each VHL file: compute the one derived score per matched student.
+2. For each VHL file: confirm its grading scale with the teacher first
+   (see above — never assume), then compute the one derived score per
+   matched student.
 3. For each KWL file: carry through every assignment column per matched
    student, applying the %-strip / blank-for-not-attempted rules.
 4. Union all the resulting assignment columns (VHL's derived column, if
