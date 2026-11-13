@@ -412,6 +412,45 @@ export default function TeacherGradebook() {
     )));
   };
 
+  // Directly moves a student's REAL position in a learning path — unlike
+  // applyPathOverride's forceCreditPercent (a cosmetic facade that leaves
+  // podIndex/segmentIndex untouched), this writes the actual pointer
+  // StudentLearningPath.jsx reads, so the student resumes from here too
+  // next time they open the path. getUnitSummary/computeGradedPercent
+  // both compute the grade purely from this position, so every segment
+  // before the new one is automatically "complete" for grading — no
+  // separate point value to invent. Ranking/leaderboard path_points are
+  // deliberately left untouched: those are earned per-attempt from actual
+  // performance, with no fixed "right" value to backfill for a segment
+  // the student never played.
+  const applyManualAdvance = async (uid, pathId, { podIndex, segmentIndex }) => {
+    const currentStudent = students.find((s) => s.uid === uid);
+    const fromPodIndex = currentStudent?.progress?.[pathId]?.podIndex || 0;
+    const fromSegmentIndex = currentStudent?.progress?.[pathId]?.segmentIndex || 0;
+    await setDoc(
+      doc(db, 'users', uid),
+      {
+        progress: {
+          [pathId]: {
+            podIndex,
+            segmentIndex,
+            lastManualAdvance: {
+              from: { podIndex: fromPodIndex, segmentIndex: fromSegmentIndex },
+              to: { podIndex, segmentIndex },
+              at: new Date().toISOString(),
+            },
+          },
+        },
+      },
+      { merge: true }
+    );
+    setStudents((prev) => prev.map((s) => (
+      s.uid === uid
+        ? { ...s, progress: { ...s.progress, [pathId]: { ...(s.progress?.[pathId] || {}), podIndex, segmentIndex } } }
+        : s
+    )));
+  };
+
   // Hoisted out of the gradebook table's render block so the CSV export
   // button (in the filter bar above the table) can build rows from exactly
   // what's on screen, instead of recomputing the same filter/sort twice.
@@ -1041,6 +1080,7 @@ const handleResetPassword = async () => {
                         {visibleUnitColumns.map((col) => {
                           const unitPercent = getUnitPercentForStudent(student, col);
                           const pathOverride = student.progress?.[col.path_id]?.teacherOverride;
+                          const lastAdvance = student.progress?.[col.path_id]?.lastManualAdvance;
                           return (
                             <td key={col.path_id} className="p-4">
                               {unitPercent == null ? (
@@ -1056,15 +1096,30 @@ const handleResetPassword = async () => {
                                     ) : !!pathOverride && (
                                       <span title="Vencimiento/penalización anulada para este estudiante" className="text-[10px]">🛡️</span>
                                     )}
+                                    {lastAdvance && (
+                                      <span
+                                        title={`Progreso movido a mano: Pod ${lastAdvance.to.podIndex + 1}, Segmento ${lastAdvance.to.segmentIndex + 1} (antes Pod ${lastAdvance.from.podIndex + 1}, Segmento ${lastAdvance.from.segmentIndex + 1})`}
+                                        className="text-[10px]"
+                                      >
+                                        🧭
+                                      </span>
+                                    )}
                                     <button
                                       type="button"
-                                      onClick={() => setPathOverrideModal({
-                                        student,
-                                        col,
-                                        extendDaysInput: String(pathOverride?.extendDays || ''),
-                                        waivePenalty: !!pathOverride?.waivePenalty,
-                                        forceCreditPercentInput: pathOverride?.forceCreditPercent != null ? String(pathOverride.forceCreditPercent) : '',
-                                      })}
+                                      onClick={() => {
+                                        const realProgress = student.progress?.[col.path_id] || {};
+                                        setPathOverrideModal({
+                                          student,
+                                          col,
+                                          extendDaysInput: String(pathOverride?.extendDays || ''),
+                                          waivePenalty: !!pathOverride?.waivePenalty,
+                                          forceCreditPercentInput: pathOverride?.forceCreditPercent != null ? String(pathOverride.forceCreditPercent) : '',
+                                          currentPodIndex: realProgress.podIndex || 0,
+                                          currentSegmentIndex: realProgress.segmentIndex || 0,
+                                          advancePodIndex: String(realProgress.podIndex || 0),
+                                          advanceSegmentIndex: String(realProgress.segmentIndex || 0),
+                                        });
+                                      }}
                                       className="text-[10px] text-slate-500 hover:text-white ml-auto"
                                       title="Excepción de vencimiento / crédito manual"
                                     >
@@ -1564,7 +1619,7 @@ const handleResetPassword = async () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex justify-between items-start mb-1">
-              <h3 className="text-lg font-black text-white uppercase tracking-wider">Excepción / Crédito Manual</h3>
+              <h3 className="text-lg font-black text-white uppercase tracking-wider">Excepción / Progreso Manual</h3>
               <button
                 onClick={() => setPathOverrideModal(null)}
                 className="text-slate-400 hover:text-white text-2xl font-bold leading-none"
@@ -1591,6 +1646,44 @@ const handleResetPassword = async () => {
             <p className="text-[10px] text-slate-500 mb-6">
               Reemplaza el progreso real de este estudiante en esta ruta por el porcentaje que pongas aquí — útil si lo hizo en papel, estuvo ausente, o cualquier otra excepción. Deja el campo vacío para seguir usando su progreso real.
             </p>
+
+            <div className="border-t border-slate-700 pt-4 mb-6">
+              <label className="block text-xs font-bold text-sky-400 uppercase tracking-widest mb-2">
+                🧭 Avanzar Progreso Real
+              </label>
+              <p className="text-[10px] text-slate-500 mb-2">
+                Progreso actual: Pod {pathOverrideModal.currentPodIndex + 1}, Segmento {pathOverrideModal.currentSegmentIndex + 1}.
+                Esto mueve dónde continúa el estudiante la próxima vez que entre — todo lo anterior cuenta automáticamente como completo para la nota. No toca sus puntos de clasificación (esos se ganan jugando, no hay un valor "correcto" que restaurar por un segmento que nunca hizo).
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={pathOverrideModal.advancePodIndex}
+                  onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, advancePodIndex: e.target.value, advanceSegmentIndex: '0' })}
+                  className="w-full bg-slate-900 border border-sky-700/50 text-white rounded-lg px-2 py-2 text-xs font-bold focus:outline-none focus:border-sky-500"
+                >
+                  {(unitMeta[pathOverrideModal.col.path_id]?.pods || []).map((p, i) => (
+                    <option key={i} value={String(i)}>
+                      Pod {i + 1}: {p.title}{p.isBonus ? ' (bono)' : ''}
+                    </option>
+                  ))}
+                  <option value="complete">✅ Todo el camino completo</option>
+                </select>
+                {pathOverrideModal.advancePodIndex !== 'complete' && (
+                  <select
+                    value={pathOverrideModal.advanceSegmentIndex}
+                    onChange={(e) => setPathOverrideModal({ ...pathOverrideModal, advanceSegmentIndex: e.target.value })}
+                    className="w-full bg-slate-900 border border-sky-700/50 text-white rounded-lg px-2 py-2 text-xs font-bold focus:outline-none focus:border-sky-500"
+                  >
+                    {Array.from(
+                      { length: unitMeta[pathOverrideModal.col.path_id]?.pods?.[Number(pathOverrideModal.advancePodIndex)]?.segmentCount || 1 },
+                      (_, i) => (
+                        <option key={i} value={String(i)}>Segmento {i + 1}</option>
+                      )
+                    )}
+                  </select>
+                )}
+              </div>
+            </div>
 
             {pathOverrideModal.col.enforceDueDate && (
               <>
@@ -1631,6 +1724,17 @@ const handleResetPassword = async () => {
                     }
                   : null;
                 await applyPathOverride(pathOverrideModal.student.uid, pathOverrideModal.col.path_id, patch);
+
+                const totalPods = unitMeta[pathOverrideModal.col.path_id]?.totalPods || 0;
+                const targetPodIndex = pathOverrideModal.advancePodIndex === 'complete' ? totalPods : Number(pathOverrideModal.advancePodIndex);
+                const targetSegmentIndex = pathOverrideModal.advancePodIndex === 'complete' ? 0 : Number(pathOverrideModal.advanceSegmentIndex);
+                if (targetPodIndex !== pathOverrideModal.currentPodIndex || targetSegmentIndex !== pathOverrideModal.currentSegmentIndex) {
+                  await applyManualAdvance(pathOverrideModal.student.uid, pathOverrideModal.col.path_id, {
+                    podIndex: targetPodIndex,
+                    segmentIndex: targetSegmentIndex,
+                  });
+                }
+
                 setPathOverrideModal(null);
               }}
               className="w-full px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest text-white bg-teal-600 hover:bg-teal-500 transition-colors mb-2"

@@ -25,7 +25,7 @@ export const fetchUnitProgressMeta = async (unitId) => {
   const data = await getCachedDoc('learning_paths', unitId);
   if (!data) return { isFlat: true, pods: [], totalPods: 0 };
   if (isFlatPath(data)) {
-    const pods = data.pods.map((p) => ({ segmentCount: p.segments?.length || 0, isBonus: !!p.isBonus }));
+    const pods = data.pods.map((p, i) => ({ title: p.title || `Pod ${i + 1}`, segmentCount: p.segments?.length || 0, isBonus: !!p.isBonus }));
     return { isFlat: true, pods, totalPods: pods.length };
   }
   const branches = data.branches || {};
