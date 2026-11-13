@@ -94,6 +94,17 @@ as text (`"91.67%"`, `"Not Attempted"`) or occasionally blank.
 - Strip the `%` and convert to a plain number (`"91.67%"` → `91.67`).
 - `"Not Attempted"` → blank cell in the output (ungraded, not a 0) —
   confirmed explicitly with the teacher.
+- `"-"` also → blank, but means something different from "Not
+  Attempted": it's KWL's way of saying this assignment wasn't even
+  given to this student's track at all (e.g. an HL student has "-" on
+  an SL-only activity, and vice versa, when HL and SL are exported
+  together in one combined "Student Summary Report"). Same output
+  (blank) either way, just don't confuse the two when explaining
+  anything back to the teacher.
+- KWL Hub CAN export HL and SL together in one "Student Summary Report"
+  — if the teacher provides one combined file, treat every row as its
+  own student same as always; don't assume HL/SL always arrive as
+  separate files.
 - **Drop the trailing "Average Assessment Score" row** (and any other
   row whose first/last name is blank or is itself a summary label) — that
   row is a class-wide average, not a student.
