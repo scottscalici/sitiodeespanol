@@ -58,7 +58,7 @@ const PLATFORM_TAREA_INFO = {
 // sections in there "for some other things" she doesn't need to preview).
 const PREVIEW_SECTIONS = [
   { id: '1B', course: 's2', cycle: 'B' },
-  { id: '4A', course: 's4', cycle: 'A' },
+  { id: '4A', course: 's2', cycle: 'A' },
   { id: '4B', course: 's4', cycle: 'B' },
 ];
 
