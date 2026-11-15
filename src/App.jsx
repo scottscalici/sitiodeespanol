@@ -80,6 +80,7 @@ import ReassessmentEngine from './student/ReassessmentEngine';
 import ConectoresManager from './admin/managers/ConectoresManager';
 import ImpostorThemesManager from './admin/managers/ImpostorThemesManager';
 import UnlockablesManager from './admin/managers/UnlockablesManager';
+import PathManager from './admin/managers/PathManager';
 import SeatingChartManager from './admin/managers/SeatingChartManager';
 import RosterManager from './admin/managers/RosterManager';
 import PrintSeatingChart from './admin/managers/PrintSeatingChart';
@@ -446,6 +447,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <UnlockablesManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-path-manager"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PathManager />
                 </AdminRoute>
               }
             />

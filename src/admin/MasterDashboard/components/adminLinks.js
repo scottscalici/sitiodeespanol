@@ -75,6 +75,7 @@ export const ADMIN_SECTIONS = [
     links: [
       { to: '/admin-secret-portal-learning-path', label: 'Pod Creator (Learning Path)', emoji: '🧱' },
       { to: '/admin-secret-portal-practice-hub', label: 'Practice Circle Builder', emoji: '🎯' },
+      { to: '/admin-secret-portal-path-manager', label: 'Gestor de Rutas y Círculos', emoji: '🗂️' },
       { to: '/admin-secret-portal-gamification', label: 'Insignias', emoji: '🏆' },
       { to: '/admin-secret-portal-unlockables', label: 'Desbloqueables', emoji: '🔓' },
     ],
