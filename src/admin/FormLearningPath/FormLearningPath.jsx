@@ -8,7 +8,7 @@ import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
-import { distributeSentencesToSegments } from '../../utils/podGenerator';
+import { distributeSentencesToSegments, sentenceTaggedForSection } from '../../utils/podGenerator';
 import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
@@ -582,8 +582,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       alert('Selecciona primero el libro de texto en la barra lateral (Master Vault) — se necesita para encontrar las oraciones correctas.');
       return;
     }
-    const matchTag = `${selectedBook} — Sección ${sectionLabel}`;
-    const matchedSentences = allGrammarList.filter((s) => (s.grammarTags || []).includes(matchTag));
+    const matchedSentences = allGrammarList.filter((s) => sentenceTaggedForSection(s, selectedBook, sectionLabel));
     const { segments, unmatchedWordIds, unmatchedSentenceIds } = distributeSentencesToSegments(pod.segments, matchedSentences);
     const newPods = pods.map((p) => (p.id === pod.id ? { ...p, segments } : p));
     setPods(newPods);

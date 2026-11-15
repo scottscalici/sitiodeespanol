@@ -1,13 +1,9 @@
 import { useState, useMemo } from 'react';
-import { wordIntroSegmentCount, generatePodsForSections, distributeSentencesToSegments } from '../../utils/podGenerator';
+import { wordIntroSegmentCount, generatePodsForSections, distributeSentencesToSegments, sentenceTaggedForSection } from '../../utils/podGenerator';
 import { QUESTION_TYPE_DEFAULTS, QUESTION_TYPE_LABELS, QUESTION_TYPE_ORDER, sumMix } from '../../utils/questionTypes';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
-// Mirrors ChapterLearningPathImporter.jsx's own matchesSentenceSection —
-// a bare "Sección X.X" tag isn't unique on its own (section numbering
-// restarts per chapter regardless of textbook), so the vocab-sentences-bulk
-// skill folds the textbook name directly into the tag itself.
-const sentenceMatchesSection = (s, textbook, section) => (s.grammarTags || []).includes(`${textbook} — Sección ${section}`);
+const sentenceMatchesSection = (s, textbook, section) => sentenceTaggedForSection(s, textbook, section);
 
 // Builds a "Nivel N: word-intro" + "Nivel N+1: boss battle" pod pair for
 // each chosen vocab section in the currently-selected chapter — see

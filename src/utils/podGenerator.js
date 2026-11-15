@@ -15,6 +15,23 @@ export const distributeEvenly = (wordCount, segmentCount) => {
 // pathologically small or empty section.
 export const wordIntroSegmentCount = (wordCount) => Math.max(1, Math.round(wordCount / 5));
 
+// A sentence's own "<Textbook> — Sección X.X" grammarTag has to line up
+// with a textbook name that lives separately — the vocabulary catalog's
+// own `metadata.textbook` / a path's own `selectedBook` — and those two
+// are sometimes typed slightly differently for the same real book (found
+// in practice: a catalog entry saved as "Reporteros4" while every
+// sentence for it was tagged "Reporteros 4", with a space). That's an
+// invisible, whole-textbook mismatch — every section silently fails to
+// match sentences, not just one. Collapsing whitespace before comparing
+// makes the match tolerant of exactly that gap without requiring a data
+// cleanup first.
+const normalizeTagText = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+
+export const sentenceTaggedForSection = (sentence, textbook, section) => {
+  const target = normalizeTagText(`${textbook} — Sección ${section}`);
+  return (sentence.grammarTags || []).some((t) => normalizeTagText(t) === target);
+};
+
 // ----------------------------------------------------------------------
 // Per-word sentence pinning
 // ----------------------------------------------------------------------

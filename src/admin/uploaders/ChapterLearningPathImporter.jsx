@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
-import { generateSectionPods, distributeSentencesToSegments } from '../../utils/podGenerator';
+import { generateSectionPods, distributeSentencesToSegments, sentenceTaggedForSection } from '../../utils/podGenerator';
 
 // One-pass chapter importer: given just a course/textbook/chapter and a list
 // of sections ({section, evalDia, evalLabel}), builds everything a vocab
@@ -76,11 +76,8 @@ const buildPinnedSentence = (s) => ({
 // the section tag itself (e.g. "Descubre 2 — Sección 2.1"), so a single
 // tag is self-describing and unambiguous — no second sibling tag needs
 // checking alongside it.
-const matchesSentenceSection = (s, textbook, section) =>
-  (s.grammarTags || []).includes(`${textbook} — Sección ${section}`);
-
 const findPinnedSentences = (sentenceBank, textbook, section) =>
-  sentenceBank.filter((s) => matchesSentenceSection(s, textbook, section)).map(buildPinnedSentence);
+  sentenceBank.filter((s) => sentenceTaggedForSection(s, textbook, section)).map(buildPinnedSentence);
 
 export default function ChapterLearningPathImporter() {
   const [jsonText, setJsonText] = useState('');
