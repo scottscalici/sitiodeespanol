@@ -38,6 +38,7 @@ export default function PathBuilder({
   onOpenPodGenerator,
   onOpenCircleGenerator,
   onImportPods,
+  onRepairPodSentences,
 }) {
   const podLabel = isPracticeHub ? 'Círculo' : 'Pod';
   const [podImportOpen, setPodImportOpen] = React.useState(false);
@@ -376,6 +377,15 @@ export default function PathBuilder({
                 <button onClick={() => handleAddSegment(podIndex)} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg font-bold transition-all">
                   + Add Segment ({pod.segments.length})
                 </button>
+                {!isPracticeHub && contentType === 'vocab' && pod.segments.some((s) => !s.isSpeedRound && (s.introduced_concepts || []).length > 0) && (
+                  <button
+                    onClick={() => onRepairPodSentences(pod)}
+                    title="Vuelve a emparejar las oraciones de este pod con su vocabulario, usando la versión simplificada (sin conjugación) — seguro de correr más de una vez"
+                    className="text-xs bg-sky-900/40 hover:bg-sky-700 text-sky-300 hover:text-white border border-sky-700/50 px-3 py-1.5 rounded-lg font-bold transition-all"
+                  >
+                    🔧 Reparar Oraciones
+                  </button>
+                )}
                 {pods.length > 1 && (
                   <button onClick={() => handleDeletePod(podIndex)} className="text-xs bg-red-900/40 hover:bg-red-600 text-red-300 hover:text-white border border-red-700/50 p-1.5 rounded-lg transition-all">🗑️</button>
                 )}

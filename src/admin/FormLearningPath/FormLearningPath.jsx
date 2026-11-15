@@ -8,6 +8,7 @@ import { collection, doc, setDoc, getDoc, addDoc, arrayUnion, deleteField } from
 import { getCachedCollection, getCachedBucketedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
 import { QUESTION_TYPE_DEFAULTS, sumMix } from '../../utils/questionTypes';
 import { fetchEvaluacionOptions } from '../../utils/evaluaciones';
+import { distributeSentencesToSegments } from '../../utils/podGenerator';
 import { KPRACTICE_SEED_CONTENT } from './kpracticeSeedData';
 import { isReferenceSection } from '../../utils/vocabSectionLabel';
 
@@ -562,6 +563,40 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     setIsSaving(false);
   };
 
+  // Re-pins sentences for ONE existing pod in place, writing straight to
+  // Firestore the same way ChapterLearningPathImporter.jsx's own "Corregir
+  // oraciones" button does — needed because that importer's repair only
+  // ever recognizes pods built under its own deterministic id scheme, so
+  // it's blind to a pod built via "Generar desde Vocabulario" (random
+  // ids). The vocab section this pod covers is read straight off its own
+  // already-stored concepts (toConcept's `tags` field — see
+  // podGenerator.js), so nothing needs to be retyped and this works
+  // regardless of how, or how long ago, the pod was originally built.
+  const handleRepairPod = async (pod) => {
+    const sectionLabel = pod.segments?.flatMap((s) => s.introduced_concepts || [])?.[0]?.tags;
+    if (!sectionLabel) {
+      alert('Este pod no tiene palabras de vocabulario asignadas todavía — nada que reparar.');
+      return;
+    }
+    if (!selectedBook) {
+      alert('Selecciona primero el libro de texto en la barra lateral (Master Vault) — se necesita para encontrar las oraciones correctas.');
+      return;
+    }
+    const matchTag = `${selectedBook} — Sección ${sectionLabel}`;
+    const matchedSentences = allGrammarList.filter((s) => (s.grammarTags || []).includes(matchTag));
+    const { segments, unmatchedWordIds, unmatchedSentenceIds } = distributeSentencesToSegments(pod.segments, matchedSentences);
+    const newPods = pods.map((p) => (p.id === pod.id ? { ...p, segments } : p));
+    setPods(newPods);
+    try {
+      await setDoc(doc(db, collectionName, pathId), { pods: newPods, updated_at: new Date().toISOString() }, { merge: true });
+      invalidateCollectionCache(collectionName);
+      alert(`✅ Oraciones reparadas para "${pod.title}".\n${matchedSentences.length} oración(es) encontradas para Sección ${sectionLabel} — ${unmatchedWordIds.length} palabra(s) sin oración emparejada, ${unmatchedSentenceIds.length} oración(es) sin palabra emparejada.`);
+    } catch (err) {
+      console.error('Error repairing pod sentences:', err);
+      alert('❌ Error al guardar la reparación. Tus cambios en pantalla se mantienen, pero no se guardaron — intenta de nuevo.');
+    }
+  };
+
   // One-click seed/merge of the K-Practice pool from a JSON payload shaped
   // like kpracticeSeedData.js's KPRACTICE_SEED_CONTENT (vocab_bundle, verbs,
   // sentences) — pre-filled with the teacher's dictated content below, but
@@ -663,6 +698,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
         onOpenPodGenerator={() => setShowPodGenerator(true)}
         onOpenCircleGenerator={() => setShowCircleGenerator(true)}
         onImportPods={handleImportPods}
+        onRepairPodSentences={handleRepairPod}
       />
 
       {showCircleGenerator && (
