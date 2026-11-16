@@ -143,7 +143,14 @@ expected shape.
   re-fetches that verb live from Firestore and uses *its* `tenses` data;
   whatever `fullData` you hand-author is only a fallback. If the targeted
   tense/subject cell is empty on the live doc, that verb silently
-  contributes zero questions — no error shown. `targetTense` (verb-only,
+  contributes zero questions — no error shown. **`vocab` concepts do the
+  same live re-fetch** (`WorkoutEngine.jsx:313-315`,
+  `getCachedDoc('vocabulary', c.id)`) — editing a word's `palabra`,
+  `traduccion`, or `metadata` (e.g. a textbook-name retag) after a path is
+  already built and assigned is safe and transparent to students, as long
+  as the word's doc id doesn't change; the pod never replays a frozen
+  snapshot. (`grammar`'s `pinned_sentences` are the one real exception —
+  those are genuinely frozen snapshots, never live-linked.) `targetTense` (verb-only,
   single value, not a list — e.g. `imperativo_afirmativo`,
   `imperativo_negativo`, `presente`, `ALL`) picks which tense a `verb`
   segment draws from; there's no way to mix two tenses in one segment, so
