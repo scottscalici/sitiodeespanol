@@ -125,6 +125,36 @@ const TareasSequencer = () => {
     else setTareasS4(updated);
   };
 
+  // One-time backfill for Dominio tareas created before enforceDueDate
+  // existed (handleCreateTask only sets it on NEW tasks going forward —
+  // see that function's comment). Without this, those older tareas never
+  // archive and never get late-grading treatment no matter how overdue,
+  // since isPastEffectiveDueDate() short-circuits on a missing flag.
+  // Stages the change in local state only, same as every other edit here
+  // — still requires clicking "Guardar Cambios" to actually persist.
+  const handleMigrateOldTareas = () => {
+    const needsMigration = (t) => t.tipo === 'Dominio' && t.enforceDueDate === undefined;
+    const count = tareasS2.filter(needsMigration).length + tareasS4.filter(needsMigration).length;
+
+    if (count === 0) {
+      alert('Todas las tareas de Dominio ya tienen Vencimiento configurado. Nada que migrar.');
+      return;
+    }
+
+    if (!window.confirm(
+      `¿Activar Vencimiento con Penalización en ${count} tarea(s) de Dominio antigua(s) (Spanish 2 y 4 combinados)?\n\n` +
+      `Esto hará que esas rutas se archiven automáticamente al pasar su fecha de vencimiento, Y activará la penalización ` +
+      `por calificación tardía para cualquiera que ya esté vencida. Revisa el Gradebook después de guardar por si acaso.`
+    )) return;
+
+    const migrate = (tasks) => tasks.map((t) => (
+      needsMigration(t) ? { ...t, enforceDueDate: true, latePenaltyPerDay: t.latePenaltyPerDay ?? 10 } : t
+    ));
+    setTareasS2(migrate(tareasS2));
+    setTareasS4(migrate(tareasS4));
+    alert(`✅ ${count} tarea(s) actualizada(s) localmente. Haz clic en "Guardar Cambios" para persistir.`);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -177,7 +207,15 @@ const TareasSequencer = () => {
               </button>
             </div>
             
-            <button 
+            <button
+              onClick={handleMigrateOldTareas}
+              className="bg-amber-900/40 hover:bg-amber-700 text-amber-300 hover:text-white border border-amber-700/50 px-4 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-colors shadow"
+              title="Activa Vencimiento con Penalización en las tareas de Dominio antiguas que todavía no lo tienen"
+            >
+              🔄 Migrar Tareas Antiguas
+            </button>
+
+            <button
               onClick={handleSave}
               disabled={isSaving}
               className="bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-colors disabled:opacity-50 shadow"
