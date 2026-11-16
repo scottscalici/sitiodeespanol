@@ -239,7 +239,10 @@ expected shape.
   canvas-based): each species is `{ char, color, direction, speed, count,
   sizeRange }` for an emoji, or `{ url, direction, speed, count,
   sizeRange }` to float an uploaded image instead — `url` wins if both
-  are set. A single-species fallback lives at `effectConfig` on the tema
+  are set. `direction` is `'down'` (default), `'up'`, `'left'`, or
+  `'right'` — whichever pair ISN'T a species' main axis gets the small
+  per-particle wobble on the other axis (up/down wobble horizontally,
+  left/right wobble vertically). A single-species fallback lives at `effectConfig` on the tema
   doc (editable via plain admin controls, including an image-upload
   field, in `FormTemas.jsx`'s "Efecto de Partículas"); multiple species
   at once is `styles.animatedLayer.particles` (an array of the same
