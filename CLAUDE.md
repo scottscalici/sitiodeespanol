@@ -254,7 +254,15 @@ expected shape.
   registers next to the size term. `fixedSpeed: true` on a species opts
   it out of that boost so `speed` is taken literally; exposed in
   `FormTemas.jsx` as the "Velocidad exacta (ignora tamaño)" checkbox next
-  to Velocidad, and settable per-species in the JSON paste-box too.
+  to Velocidad (its number input is `step="any"`, not `"0.1"`, so it
+  actually accepts sub-0.1 values like 0.001), and settable per-species
+  in the JSON paste-box too. The per-particle cross-axis wobble is
+  scaled to `min(speed, 1)` for the same reason — it's a fixed ±1/tick
+  accent meant to be small next to the main-axis speed, which used to
+  always be true thanks to the old size floor; at a `fixedSpeed` value
+  well below 1, an unscaled wobble would swamp the set direction
+  entirely (a "left" species visibly just drifting up/down with no real
+  leftward motion).
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
