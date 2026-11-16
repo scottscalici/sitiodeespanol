@@ -550,8 +550,8 @@ export default function FormTemas({ actividad, setActividad }) {
           {/* Particle Effect — a single species (one emoji-or-image/color/speed)
               via these controls. A theme that wants several at once (bats AND
               ghosts, say) sets `styles.animatedLayer.particles` — an array of
-              these same fields plus an optional `sizeRange` — via the
-              paste-box above instead; this section's effectConfig still
+              these same fields plus optional `sizeRange`/`fixedSpeed` — via
+              the paste-box above instead; this section's effectConfig still
               works as the simple single-species fallback either way. */}
           <div className="bg-gray-50 p-3 rounded border">
             <h3 className="font-bold mb-2 text-sm">Efecto de Partículas</h3>
@@ -589,6 +589,12 @@ export default function FormTemas({ actividad, setActividad }) {
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Velocidad</label>
                 <input type="number" step="0.1" min="0" value={effectConfig.speed ?? 1} onChange={(e) => handleEffectChange('speed', parseFloat(e.target.value) || 0)} className="p-1 border rounded text-sm" />
+              </div>
+              <div className="flex flex-col justify-end">
+                <label className="text-xs font-semibold flex items-center gap-1" title="Normalmente el tamaño se suma a la velocidad (las partículas grandes van más rápido). Marca esto para que la Velocidad sea exacta, sin importar el tamaño — así una partícula grande puede ir mucho más lenta de lo normal.">
+                  <input type="checkbox" checked={!!effectConfig.fixedSpeed} onChange={(e) => handleEffectChange('fixedSpeed', e.target.checked)} />
+                  Velocidad exacta (ignora tamaño)
+                </label>
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Tamaño mínimo (px)</label>

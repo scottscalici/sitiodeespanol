@@ -248,7 +248,13 @@ expected shape.
   at once is `styles.animatedLayer.particles` (an array of the same
   shape), JSON-paste-box only, no dedicated UI. An image species skips
   drawing for a frame rather than falling back to the emoji while it's
-  still loading — never a flash-then-swap.
+  still loading — never a flash-then-swap. Size normally adds to speed
+  (`speed + size/20`, a cheap depth cue) — this puts a floor under how
+  slow a large particle can ever look, since a low `speed` barely
+  registers next to the size term. `fixedSpeed: true` on a species opts
+  it out of that boost so `speed` is taken literally; exposed in
+  `FormTemas.jsx` as the "Velocidad exacta (ignora tamaño)" checkbox next
+  to Velocidad, and settable per-species in the JSON paste-box too.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation

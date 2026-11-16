@@ -74,7 +74,11 @@ export default function ThemeParticles({ particles: speciesList }) {
           ctx.fillText(species.char || '✨', p.x, p.y);
         }
 
-        const speed = (species.speed || 1) + p.size / 20;
+        // Size normally adds to speed (a bigger particle drifts faster, for
+        // a cheap depth cue) — species.fixedSpeed opts a species OUT of
+        // that boost, so `speed` is taken literally even for a big image,
+        // letting it crawl far slower than the boost would otherwise allow.
+        const speed = species.fixedSpeed ? (species.speed || 1) : (species.speed || 1) + p.size / 20;
         const direction = species.direction || 'down';
         if (direction === 'up') {
           p.y -= speed;

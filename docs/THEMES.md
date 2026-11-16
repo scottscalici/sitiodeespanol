@@ -125,6 +125,13 @@ animation (see `calma.json`). The older single-species `effectConfig`
 not just the JSON box) keeps working as the fallback when a theme doesn't
 set `animatedLayer`.
 
+By default a particle's size adds to its speed (bigger drifts faster, a
+cheap depth cue), which puts a floor under how slow a large particle can
+ever look — even a very low `speed` barely registers next to that size
+boost. Set `fixedSpeed: true` on a species to opt it out of that boost
+entirely, so `speed` is taken literally regardless of size — the only way
+to get a big, slow-crawling particle.
+
 ## Using the theme-importer skill
 
 There's a Claude Skill (`theme-importer`) that takes a screenshot or
