@@ -84,6 +84,51 @@ expected shape.
   "idioma") can lose its own exact-matching sentence to a longer phrase
   that merely contains it ("idioma oficial") if fuzzy matching runs before
   every word has had a shot at an exact match.
+- **Learning Path / Practice Circle content types** (`contentType`:
+  `vocab`/`grammar`/`verb`, set at the path level): segment shape is
+  identical across all three (`id, total_questions, questionMix,
+  isSpeedRound, timeLimit, targetTense, introduced_concepts,
+  pinned_sentences, reviewMode, masteryThreshold, speakingOnly` —
+  `FormLearningPath.jsx`'s `makeDefaultSegment`/`sanitizeSegment`); only
+  what goes *into* `introduced_concepts` differs. `grammar` segments
+  always have `introduced_concepts: []` and drive everything off
+  `pinned_sentences` (self-contained snapshot sentences with `[[blank]]`
+  markup, never live-linked to `sentence_bank`). `vocab` segments'
+  `introduced_concepts` carry `{id, label, tags, fullData:{palabra,
+  traduccion, metadata,...}}`. `verb` segments carry `{id, label, tags,
+  tenses:[...], isGroup, verbIds?, fullData}` where `id` **must match a
+  real doc id in the `verbs` collection** — at runtime `WorkoutEngine.jsx`
+  re-fetches that verb live from Firestore and uses *its* `tenses` data;
+  whatever `fullData` you hand-author is only a fallback. If the targeted
+  tense/subject cell is empty on the live doc, that verb silently
+  contributes zero questions — no error shown. `targetTense` (verb-only,
+  single value, not a list — e.g. `imperativo_afirmativo`,
+  `imperativo_negativo`, `presente`, `ALL`) picks which tense a `verb`
+  segment draws from; there's no way to mix two tenses in one segment, so
+  "affirmative + negative commands mixed" needs two segments in one pod.
+  `questionMix.recall` is the typed-answer "conjugate" count (same feel
+  as Calentamiento, but graded by `checkAnswerLeniently` in
+  `src/utils/checkAnswer.js` — accent-insensitive, unlike Calentamiento's
+  strict `handleCheckVerbs`); `questionMix.sentence` is the oraciones
+  (pinned_sentences, MC-or-reconstruction) count instead — don't conflate
+  the two when a request is "type the answer" (`recall`) vs. "sentence/MC"
+  (`sentence`).
+- **Informal (tú) commands in verb data**: `imperativo_afirmativo` /
+  `imperativo_negativo` are real tense slots on a verb doc
+  (`src/utils/verbTenses.js`), each a per-subject map including `tú`, and
+  `VerbEditor.jsx` already has editable cells for them — but **there's no
+  auto-deriver for the informal ones** (only formal usted/ustedes, via
+  `VerbAudit.jsx`'s `deriveFormalCommands`, and only on manual run). If a
+  verb's `tú` command cells look empty, they were never hand-entered —
+  that's expected, not a bug.
+- **Binary-contrast grammar pods** (por/para, ser/estar, etc.): mix both
+  sides of the contrast into *every* segment's `pinned_sentences` pool,
+  never "all-por in pod 1, all-para in pod 2" — a segment that's 100% one
+  answer lets a student ace it by picking the same option every time
+  without discriminating anything. Learned the hard way building the
+  por/para Learning Path; fixed by pairing each rule with its natural
+  contrast (movement-por ↔ destination-para, duration-por ↔ deadline-para,
+  etc.) within the same segment.
 - **Practice Circle generator** (`src/admin/FormLearningPath/CircleGeneratorModal.jsx`)
   writes straight to Firestore (pod + its `reassessment_configs` doc,
   atomically) — unlike `VocabPodGeneratorModal.jsx`, which only returns
@@ -128,3 +173,5 @@ expected shape.
 | `users` | uid | `course`, `section`, `independent`, `preferredName` |
 | `calentamientos` | doc id | verb warm-ups, see schema above |
 | `sentence_bank` | doc id | grammar/vocab-in-context sentences, tagged for Learning Path distractor pools |
+| `verbs` | bucketed (`items.<verbId>`) | conjugation tables; `tenses.<tense>.<subject>.{target,english}`; informal tú commands often empty (no auto-deriver, see above) |
+| `verbGroups` | doc id | named verb groups (e.g. "ar stem-changers") a Learning Path `verb` segment can assign as a whole via `verbIds` |
