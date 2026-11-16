@@ -588,7 +588,7 @@ export default function FormTemas({ actividad, setActividad }) {
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Velocidad</label>
-                <input type="number" step="0.1" min="0" value={effectConfig.speed ?? 1} onChange={(e) => handleEffectChange('speed', parseFloat(e.target.value) || 0)} className="p-1 border rounded text-sm" />
+                <input type="number" step="any" min="0" value={effectConfig.speed ?? 1} onChange={(e) => handleEffectChange('speed', parseFloat(e.target.value) || 0)} className="p-1 border rounded text-sm" />
               </div>
               <div className="flex flex-col justify-end">
                 <label className="text-xs font-semibold flex items-center gap-1" title="Normalmente el tamaño se suma a la velocidad (las partículas grandes van más rápido). Marca esto para que la Velocidad sea exacta, sin importar el tamaño — así una partícula grande puede ir mucho más lenta de lo normal.">
