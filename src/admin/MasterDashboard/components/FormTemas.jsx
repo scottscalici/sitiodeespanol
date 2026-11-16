@@ -19,6 +19,22 @@ const IMPORTABLE_STYLE_KEYS = [
   'cornerDecorations', 'cardOverlays',
 ];
 
+// Mirrors ThemeParticles.jsx's own speed math (30ms tick, size boost unless
+// fixedSpeed) using the sizeRange midpoint as a stand-in for "a typical
+// particle," purely so a teacher can tell 0.1 from 0.001 without having to
+// preview and squint — those look identical for several real seconds.
+const SCREEN_WIDTH_ESTIMATE = 1200;
+function crossScreenEstimate(effectConfig) {
+  const avgSize = ((effectConfig.sizeRange?.[0] ?? 12) + (effectConfig.sizeRange?.[1] ?? 27)) / 2;
+  const speed = effectConfig.fixedSpeed ? (effectConfig.speed ?? 1) : (effectConfig.speed ?? 1) + avgSize / 20;
+  if (speed <= 0) return 'Velocidad 0 — no se mueve.';
+  const pxPerSec = speed * (1000 / 30);
+  const secs = SCREEN_WIDTH_ESTIMATE / pxPerSec;
+  if (secs < 60) return `Tarda ~${secs < 10 ? secs.toFixed(1) : Math.round(secs)}s en cruzar la pantalla.`;
+  const mins = secs / 60;
+  return `Tarda ~${mins < 10 ? mins.toFixed(1) : Math.round(mins)} min en cruzar la pantalla — muy lento.`;
+}
+
 // Every card key the live Dashboard actually reads a theme color for.
 // Destacado normally picks its own color from real information (the
 // featured item's region) — checking its box here opts that one card out
@@ -589,6 +605,7 @@ export default function FormTemas({ actividad, setActividad }) {
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Velocidad</label>
                 <input type="number" step="any" min="0" value={effectConfig.speed ?? 1} onChange={(e) => handleEffectChange('speed', parseFloat(e.target.value) || 0)} className="p-1 border rounded text-sm" />
+                <span className="text-[10px] text-gray-400 mt-0.5">{crossScreenEstimate(effectConfig)}</span>
               </div>
               <div className="flex flex-col justify-end">
                 <label className="text-xs font-semibold flex items-center gap-1" title="Normalmente el tamaño se suma a la velocidad (las partículas grandes van más rápido). Marca esto para que la Velocidad sea exacta, sin importar el tamaño — así una partícula grande puede ir mucho más lenta de lo normal.">
