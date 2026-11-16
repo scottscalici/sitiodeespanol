@@ -189,6 +189,19 @@ expected shape.
   looks wrong or duplicated somewhere, it is almost always a data-entry
   mistake (a practice circle linked to the wrong quiz) — check the actual
   `evalLink` on the pod before assuming a caching or matching bug.
+- **Reassessment Config verb-group subject targeting**
+  (`src/admin/MasterDashboard/components/ReassessmentConfigManager.jsx`,
+  `src/utils/verbQuestionGenerator.js`'s `getRandomSubject`): each verb
+  group row has a `targetSubject` ('any' or one grammatical person —
+  `tú`, `nosotros`, `él_ella_ud`, `ellos_ellas_uds`, `vosotros`, `yo`),
+  now exposed as a dropdown next to the tense selector — added because a
+  tense like `imperativo_afirmativo` has both `tú` and `nosotros`/formal
+  forms populated per verb, and "any" draws from all of them. This is
+  **separate from, and more capable than, `WorkoutEngine.jsx`'s Learning
+  Path verb-segment draw** (see `targetTense` above), which has no
+  subject-level targeting at all — if a Learning Path/Circle genuinely
+  needs pure-tú (or any single-subject) practice instead of reassessment,
+  that's a real gap in `WorkoutEngine.jsx`, not just a missing UI control.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
