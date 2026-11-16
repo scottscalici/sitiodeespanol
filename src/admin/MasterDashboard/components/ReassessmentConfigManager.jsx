@@ -117,7 +117,7 @@ export default function ReassessmentConfigManager() {
     }
   };
 
-  const addGroupRow = () => setGroupRows([...groupRows, { groupId: '', tense: 'presente', count: 3 }]);
+  const addGroupRow = () => setGroupRows([...groupRows, { groupId: '', tense: 'presente', count: 3, targetSubject: 'any' }]);
   const updateGroupRow = (idx, patch) => setGroupRows(groupRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const removeGroupRow = (idx) => setGroupRows(groupRows.filter((_, i) => i !== idx));
 
@@ -160,7 +160,7 @@ export default function ReassessmentConfigManager() {
         allowedVerbs: group?.verbIds || [],
         count: Number(r.count) || 0,
         specificVerb: 'any',
-        targetSubject: 'any',
+        targetSubject: r.targetSubject || 'any',
       };
     });
 
@@ -303,6 +303,20 @@ export default function ReassessmentConfigManager() {
                         {t.label}
                       </option>
                     ))}
+                  </select>
+                  <select
+                    value={row.targetSubject || 'any'}
+                    onChange={(e) => updateGroupRow(idx, { targetSubject: e.target.value })}
+                    className="bg-slate-800 border border-slate-700 rounded-md p-2 text-xs"
+                    title="Restringe a una sola persona gramatical (ej. solo tú, para mandatos informales) en vez de cualquiera disponible en este tiempo"
+                  >
+                    <option value="any">Cualquiera</option>
+                    <option value="yo">yo</option>
+                    <option value="tú">tú</option>
+                    <option value="él_ella_ud">él/ella/Ud.</option>
+                    <option value="nosotros">nosotros</option>
+                    <option value="vosotros">vosotros</option>
+                    <option value="ellos_ellas_uds">ellos/ellas/Uds.</option>
                   </select>
                   <input
                     type="number"
