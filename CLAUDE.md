@@ -84,6 +84,48 @@ expected shape.
   "idioma") can lose its own exact-matching sentence to a longer phrase
   that merely contains it ("idioma oficial") if fuzzy matching runs before
   every word has had a shot at an exact match.
+- **Vocab Vault bulk import** (`src/admin/MasterDashboard/components/VocabVault.jsx`,
+  route `/admin-secret-portal-vocabvault`): the Importer tab takes a
+  **pasted JSON array**, not pipe-delimited lines like Sentence Manager.
+  One object per word:
+  ```json
+  {
+    "palabra": "brindar", "traduccion": "to toast (drink)",
+    "definiciones": { "nivel1": [...], "nivel2": [...], "nivel3": [...] },
+    "usage_tags": ["tema:celebraciones"],
+    "alt_answers": [],
+    "metadata": { "textbook": "Descubre 1", "secciones": ["9.1"],
+      "tipo": "verbo", "evaluacion": true, "ib_tags": [...] }
+  }
+  ```
+  `secciones` is an array of `"<chapter>.<subsection>"` strings (e.g.
+  `"9.1"`); `"<chapter>.referencias"` marks a non-quizzed reference
+  section. Omit `id`/`lastUpdated` (auto-generated). **No validation on
+  bulk import** — a missing `palabra`/`textbook` still silently writes a
+  malformed-id doc, and re-pasting an existing `textbook`+`palabra` pair
+  **silently overwrites it** (`setDoc`, no existence check — unlike the
+  single-word editor, which asks to confirm). The legacy
+  `/admin-secret-portal-vocab` "Vocab Uploader" writes the same
+  `vocabulary` collection but expects an entirely different
+  nested-by-section wrapper shape and is stale/unmaintained — always use
+  Vocab Vault, not that one.
+- **Vocab Vault → Learning Path requires a manual sync step**: Learning
+  Path's vocab lookup reads the *published* `vocab_bundles` collection,
+  not `vocabulary` live — after bulk-importing new words, click Vocab
+  Vault's "🚀 Sync Chapter Bundles" button (`publishChapters`) or the new
+  words won't show up in the Pod Builder/Generator at all.
+- **Textbook name must match exactly, not just whitespace-tolerantly**:
+  canonical names live in `src/utils/textbookAccess.js`'s
+  `TEXTBOOK_ORDER` (`['Descubre 1', 'Descubre 2', 'Descubre 3',
+  'Reporteros 4']`). Only a few call sites (`podGenerator.js`'s
+  `sentenceTaggedForSection`, `textbookAccess.js`'s own helpers) are
+  whitespace/case-tolerant — `FormLearningPath.jsx`'s book dropdown,
+  Baking Station's bake logic, and `publishChapters`'s bundle grouping
+  all do **exact or only-trim string matching**. Typing a new spelling of
+  an existing book (e.g. "Reporteros4" instead of "Reporteros 4") creates
+  an invisible second "book" in several of those places — always copy the
+  existing name from `TEXTBOOK_ORDER` or Vocab Vault's own Library tab
+  dropdown, never retype it from memory.
 - **Learning Path / Practice Circle content types** (`contentType`:
   `vocab`/`grammar`/`verb`, set at the path level): segment shape is
   identical across all three (`id, total_questions, questionMix,
