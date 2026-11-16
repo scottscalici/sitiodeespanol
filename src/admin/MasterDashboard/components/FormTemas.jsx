@@ -588,6 +588,34 @@ export default function FormTemas({ actividad, setActividad }) {
                 <label className="text-xs font-semibold">Velocidad</label>
                 <input type="number" step="0.1" min="0" value={effectConfig.speed ?? 1} onChange={(e) => handleEffectChange('speed', parseFloat(e.target.value) || 0)} className="p-1 border rounded text-sm" />
               </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold">Tamaño mínimo (px)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={effectConfig.sizeRange?.[0] ?? 12}
+                  onChange={(e) => {
+                    const min = parseInt(e.target.value, 10) || 1;
+                    const max = effectConfig.sizeRange?.[1] ?? 27;
+                    handleEffectChange('sizeRange', [min, Math.max(min, max)]);
+                  }}
+                  className="p-1 border rounded text-sm"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold">Tamaño máximo (px)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={effectConfig.sizeRange?.[1] ?? 27}
+                  onChange={(e) => {
+                    const max = parseInt(e.target.value, 10) || 1;
+                    const min = effectConfig.sizeRange?.[0] ?? 12;
+                    handleEffectChange('sizeRange', [Math.min(min, max), max]);
+                  }}
+                  className="p-1 border rounded text-sm"
+                />
+              </div>
               <div className="flex flex-col col-span-2">
                 <label className="text-xs font-semibold">Cantidad (0 = sin efecto)</label>
                 <input type="number" min="0" max="200" value={effectConfig.count ?? 0} onChange={(e) => handleEffectChange('count', parseInt(e.target.value, 10) || 0)} className="p-1 border rounded text-sm" />
