@@ -235,6 +235,17 @@ expected shape.
   all) — a path beyond that is still graded correctly and still
   reachable by its direct link, it just drops off the dashboard so the
   list doesn't grow forever.
+- **Theme floating-particle species** (`src/components/ThemeParticles.jsx`,
+  canvas-based): each species is `{ char, color, direction, speed, count,
+  sizeRange }` for an emoji, or `{ url, direction, speed, count,
+  sizeRange }` to float an uploaded image instead — `url` wins if both
+  are set. A single-species fallback lives at `effectConfig` on the tema
+  doc (editable via plain admin controls, including an image-upload
+  field, in `FormTemas.jsx`'s "Efecto de Partículas"); multiple species
+  at once is `styles.animatedLayer.particles` (an array of the same
+  shape), JSON-paste-box only, no dedicated UI. An image species skips
+  drawing for a frame rather than falling back to the emoji while it's
+  still loading — never a flash-then-swap.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
