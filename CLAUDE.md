@@ -228,7 +228,13 @@ expected shape.
   (`TeacherGradebook.jsx`, `StudentLearningPath.jsx`), not just
   archiving — turning it on for an already-overdue tarea can
   retroactively start penalizing it, worth a gradebook glance after a
-  migration.
+  migration. The "📦 Rutas Archivadas" dashboard card only shows paths
+  overdue **30 days or less** (`isArchivedAndVisible` in
+  `learningPathProgress.js`, the single source of truth also used by
+  `Dashboard.jsx`'s check for whether to render that card's header at
+  all) — a path beyond that is still graded correctly and still
+  reachable by its direct link, it just drops off the dashboard so the
+  list doesn't grow forever.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
