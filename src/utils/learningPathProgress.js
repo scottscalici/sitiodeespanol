@@ -169,6 +169,28 @@ export const isPastEffectiveDueDate = (task, fechaByDia, teacherOverride) => {
   return !!effective && Date.now() > effective.getTime();
 };
 
+// Read-only helper — how many (calendar) days past its possibly-extended
+// due date a task currently is, or null if it isn't enforced or isn't past
+// due at all.
+export const getDaysPastDue = (task, fechaByDia, teacherOverride) => {
+  if (!isPastEffectiveDueDate(task, fechaByDia, teacherOverride)) return null;
+  const dueDateTime = getDueDateTime(task.day_due, fechaByDia);
+  const effective = getEffectiveDueDateTime(dueDateTime, teacherOverride);
+  return daysLateFor(effective);
+};
+
+// How long a past-due task keeps showing in a dashboard's "Rutas
+// Archivadas" list before it's just dropped entirely — it stays graded and
+// reachable by its direct link either way, this only caps the clutter.
+// Single source of truth for both LearningPathTile's own filter and
+// Dashboard.jsx's check for whether to render the archived section at all,
+// so the two can't drift out of sync with each other.
+const ARCHIVE_VISIBLE_DAYS = 30;
+export const isArchivedAndVisible = (task, fechaByDia, teacherOverride) => {
+  const daysPastDue = getDaysPastDue(task, fechaByDia, teacherOverride);
+  return daysPastDue != null && daysPastDue <= ARCHIVE_VISIBLE_DAYS;
+};
+
 // Write-time helper — called right before saving a student's new
 // podIndex/segmentIndex. Returns just the progress-node fields this feature
 // owns; the caller merges in path_points etc. For an un-enforced task, or a

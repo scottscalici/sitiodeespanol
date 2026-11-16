@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks, computeGradedPercent, isPastEffectiveDueDate } from '../utils/learningPathProgress';
+import { fetchUnitProgressMeta, getUnitSummary, getAssignedDominioTasks, computeGradedPercent, isPastEffectiveDueDate, isArchivedAndVisible } from '../utils/learningPathProgress';
 import { getPathCardTheme } from '../utils/pathThemes';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
@@ -28,8 +28,8 @@ const LearningPathTile = ({ liveDia, course, courseTasks = [], fechaByDia = {}, 
   const allAssignedTasks = [...getAssignedDominioTasks(courseTasks, liveDia)].reverse();
   const assignedTasks = allAssignedTasks.filter((task) => {
     const teacherOverride = userData?.progress?.[task.path_id]?.teacherOverride;
-    const isPastDue = isPastEffectiveDueDate(task, fechaByDia, teacherOverride);
-    return variant === 'archived' ? isPastDue : !isPastDue;
+    if (variant === 'archived') return isArchivedAndVisible(task, fechaByDia, teacherOverride);
+    return !isPastEffectiveDueDate(task, fechaByDia, teacherOverride);
   });
 
   // The per-unit color rotation (cardTheme below) exists to tell multiple

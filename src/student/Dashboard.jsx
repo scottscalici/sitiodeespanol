@@ -9,7 +9,7 @@ import { useActiveTheme, ThemeContext, ThemeStyleSync } from '../context/ThemeCo
 import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { getAssignedWarmups, getAssignedCuriosidades, buildWarmupBreakdown, weightedAverageFromBreakdown } from '../utils/warmupBreakdown';
-import { getAssignedDominioTasks, isPastEffectiveDueDate } from '../utils/learningPathProgress';
+import { getAssignedDominioTasks, isArchivedAndVisible } from '../utils/learningPathProgress';
 import { getVocabUnitWord } from '../utils/vocabUnitLabel';
 import { getCanonicalTextbookName } from '../utils/textbookAccess';
 import { isImageUrl } from '../utils/isImageUrl';
@@ -977,7 +977,7 @@ const Dashboard = () => {
 
               <LearningPathTile liveDia={liveDia} course={course} courseTasks={safeTareas} fechaByDia={fechaByDia} variant="active" />
               {getAssignedDominioTasks(safeTareas, liveDia).some(
-                (task) => isPastEffectiveDueDate(task, fechaByDia, userData?.progress?.[task.path_id]?.teacherOverride)
+                (task) => isArchivedAndVisible(task, fechaByDia, userData?.progress?.[task.path_id]?.teacherOverride)
               ) && (
                 <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
                   <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">📦 Rutas Archivadas</h3>
