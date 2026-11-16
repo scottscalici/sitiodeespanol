@@ -745,6 +745,20 @@ export default function PathBuilder({
                             <option value="imperativo_negativo">Mandatos (-)</option>
                             <option value="subjuntivo_presente">Subjuntivo</option>
                           </select>
+                          <label className="block text-[10px] font-black text-emerald-600 uppercase mb-1 mt-3">Subject (optional — leave as "Any" unless you need e.g. pure tú commands)</label>
+                          <select
+                            value={seg.targetSubject || 'any'}
+                            onChange={(e) => updateSegmentField(podIndex, segIndex, 'targetSubject', e.target.value)}
+                            className="w-full max-w-xs border border-emerald-200 rounded-lg p-2 text-sm font-semibold bg-emerald-50 text-emerald-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                          >
+                            <option value="any">Any Subject</option>
+                            <option value="yo">yo</option>
+                            <option value="tú">tú</option>
+                            <option value="él_ella_ud">él/ella/Ud.</option>
+                            <option value="nosotros">nosotros</option>
+                            <option value="vosotros">vosotros</option>
+                            <option value="ellos_ellas_uds">ellos/ellas/Uds.</option>
+                          </select>
                         </div>
                       )}
 

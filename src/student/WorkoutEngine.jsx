@@ -181,6 +181,7 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
       const grammar = segment.pinned_sentences || [];
       const grammarHistoryPool = sentenceHistory || [];
       const targetTense = segment.targetTense || 'ALL';
+      const targetSubject = segment.targetSubject || 'any';
       const historyChance = segment.reviewMode ? (HISTORY_CHANCE_BY_MODE[segment.reviewMode] ?? LEGACY_HISTORY_CHANCE) : LEGACY_HISTORY_CHANCE;
       // Speaking-only mode: every vocab/verb question in this segment becomes
       // a production speak exercise (English/subject+tense shown, student
@@ -687,7 +688,16 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
               const displaySubjects = { 'yo': 'yo', 'tú': 'tú', 'él_ella_ud': 'él/ella/Ud.', 'nosotros': 'nosotros', 'ellos_ellas_uds': 'ellos/ellas/Uds.', 'vosotros': 'vosotros' };
 
               let availableSubjects = Object.keys(tenseData).filter(k => displaySubjects[k] && tenseData[k]?.target);
-              if (Math.random() > 0.03) availableSubjects = availableSubjects.filter(s => s !== 'vosotros');
+              if (targetSubject !== 'any') {
+                // A strict single-subject request (e.g. pure tú commands):
+                // only that subject, or none at all for this verb+tense if
+                // it isn't populated — falls through to the same silent
+                // zero-questions-for-this-pick path as an empty tense already does,
+                // never a crash or a wrong-subject substitute.
+                availableSubjects = availableSubjects.includes(targetSubject) ? [targetSubject] : [];
+              } else if (Math.random() > 0.03) {
+                availableSubjects = availableSubjects.filter(s => s !== 'vosotros');
+              }
 
               if (availableSubjects.length > 0) {
                 const randomSubject = availableSubjects[Math.floor(Math.random() * availableSubjects.length)];

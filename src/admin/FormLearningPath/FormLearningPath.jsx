@@ -83,6 +83,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
       isSpeedRound: false,
       timeLimit: isPracticeHub ? 120 : 60,
       targetTense: 'ALL',
+      targetSubject: 'any',
       introduced_concepts: [],
       pinned_sentences: [],
     };
@@ -205,6 +206,7 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
     isSpeedRound: s.isSpeedRound ?? (s.preset === 'speed_round'),
     timeLimit: s.timeLimit || 60,
     targetTense: s.targetTense || 'ALL',
+    targetSubject: s.targetSubject || 'any',
     introduced_concepts: s.introduced_concepts || [],
     pinned_sentences: s.pinned_sentences || [],
   });
