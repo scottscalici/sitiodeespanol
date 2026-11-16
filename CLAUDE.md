@@ -208,6 +208,27 @@ expected shape.
   `getRandomSubject` vs. Learning Path's inline filter) — if this drifts
   or needs a third subject-aware spot, keep both in sync by hand, there's
   no shared helper between them yet.
+- **Learning Path archiving is gated behind a per-tarea opt-in flag,
+  not automatic**: `src/utils/learningPathProgress.js`'s
+  `isPastEffectiveDueDate(task, ...)` checks `task.enforceDueDate` FIRST
+  and returns `false` immediately if it's missing/falsy — the due date
+  (`task.day_due`, resolved through the academic calendar) is never even
+  looked at. `task` here is a Dominio entry in
+  `curriculum_tracks/tareas_master.s2`/`.s4` (edited in
+  `TareasSequencer.jsx`), a different doc from `learning_paths` entirely
+  — `learning_paths`/`path_id`/pods play no role in archiving at all.
+  `TareasSequencer.jsx`'s `handleCreateTask` only sets
+  `enforceDueDate: true` on tasks created after that feature shipped;
+  older tareas were never migrated, so they silently never archive no
+  matter how overdue. A "🔄 Migrar Tareas Antiguas" button now exists in
+  Tareas Sequencer to backfill the flag (+ a default
+  `latePenaltyPerDay: 10`) onto any Dominio tarea missing it, staged in
+  local state same as every other edit there — still needs "Guardar
+  Cambios" after. **This flag also gates late-grading penalties**
+  (`TeacherGradebook.jsx`, `StudentLearningPath.jsx`), not just
+  archiving — turning it on for an already-overdue tarea can
+  retroactively start penalizing it, worth a gradebook glance after a
+  migration.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
