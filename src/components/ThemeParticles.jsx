@@ -79,6 +79,14 @@ export default function ThemeParticles({ particles: speciesList }) {
         // that boost, so `speed` is taken literally even for a big image,
         // letting it crawl far slower than the boost would otherwise allow.
         const speed = species.fixedSpeed ? (species.speed ?? 1) : (species.speed ?? 1) + p.size / 20;
+        // The cross-axis wobble is a fixed amount (up to ±1/tick) meant to be
+        // a SMALL accent on top of the main-axis motion — at normal speeds
+        // (>=1, the old floor) it always was. But a fixedSpeed species can
+        // now go far below 1, and an uncapped wobble would swamp a truly
+        // slow speed, making the particle look like it's only wobbling
+        // instead of crawling in its set direction. Scaling it down to match
+        // keeps it proportional without changing anything for speed >= 1.
+        const wobble = p.drift * Math.min(Math.abs(speed), 1);
         const direction = species.direction || 'down';
         if (direction === 'up') {
           p.y -= speed;
@@ -86,28 +94,28 @@ export default function ThemeParticles({ particles: speciesList }) {
             p.y = canvas.height + 20;
             p.x = Math.random() * canvas.width;
           }
-          p.x += p.drift;
+          p.x += wobble;
         } else if (direction === 'left') {
           p.x -= speed;
           if (p.x < -30) {
             p.x = canvas.width + 20;
             p.y = Math.random() * canvas.height;
           }
-          p.y += p.drift;
+          p.y += wobble;
         } else if (direction === 'right') {
           p.x += speed;
           if (p.x > canvas.width + 30) {
             p.x = -30;
             p.y = Math.random() * canvas.height;
           }
-          p.y += p.drift;
+          p.y += wobble;
         } else {
           p.y += speed;
           if (p.y > canvas.height + 30) {
             p.y = -30;
             p.x = Math.random() * canvas.width;
           }
-          p.x += p.drift;
+          p.x += wobble;
         }
       });
     };
