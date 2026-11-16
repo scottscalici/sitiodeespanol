@@ -1,11 +1,15 @@
 import { useEffect, useRef } from 'react';
 
-// Full-screen falling/rising emoji particle overlay, driven by a theme's
+// Full-screen drifting emoji particle overlay, driven by a theme's
 // `particles` array — each entry is its own independent species
 // ({ char, color, direction, speed, count, sizeRange } or
 // { url, direction, speed, count, sizeRange } for an uploaded image
 // instead of an emoji), so a theme can float bats AND ghosts at once
-// instead of being limited to one character. Kept on the same ~30ms tick
+// instead of being limited to one character. `direction` is one of
+// 'down' (default), 'up', 'left', 'right' — the two not driving a
+// species' main axis get the small per-particle `drift` wobble on the
+// OTHER axis (so e.g. 'left'/'right' wobble vertically, matching how
+// 'up'/'down' already wobbled horizontally). Kept on the same ~30ms tick
 // as the original single-species version so already-tuned speed values
 // still look the same.
 export default function ThemeParticles({ particles: speciesList }) {
@@ -71,20 +75,36 @@ export default function ThemeParticles({ particles: speciesList }) {
         }
 
         const speed = (species.speed || 1) + p.size / 20;
-        if (species.direction === 'up') {
+        const direction = species.direction || 'down';
+        if (direction === 'up') {
           p.y -= speed;
           if (p.y < -30) {
             p.y = canvas.height + 20;
             p.x = Math.random() * canvas.width;
           }
+          p.x += p.drift;
+        } else if (direction === 'left') {
+          p.x -= speed;
+          if (p.x < -30) {
+            p.x = canvas.width + 20;
+            p.y = Math.random() * canvas.height;
+          }
+          p.y += p.drift;
+        } else if (direction === 'right') {
+          p.x += speed;
+          if (p.x > canvas.width + 30) {
+            p.x = -30;
+            p.y = Math.random() * canvas.height;
+          }
+          p.y += p.drift;
         } else {
           p.y += speed;
           if (p.y > canvas.height + 30) {
             p.y = -30;
             p.x = Math.random() * canvas.width;
           }
+          p.x += p.drift;
         }
-        p.x += p.drift;
       });
     };
 

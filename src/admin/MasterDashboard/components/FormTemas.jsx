@@ -580,8 +580,10 @@ export default function FormTemas({ actividad, setActividad }) {
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Dirección</label>
                 <select value={effectConfig.direction || 'down'} onChange={(e) => handleEffectChange('direction', e.target.value)} className="p-1 border rounded text-sm">
-                  <option value="down">Cayendo</option>
-                  <option value="up">Subiendo</option>
+                  <option value="down">Cayendo (abajo)</option>
+                  <option value="up">Subiendo (arriba)</option>
+                  <option value="left">Hacia la izquierda</option>
+                  <option value="right">Hacia la derecha</option>
                 </select>
               </div>
               <div className="flex flex-col">
