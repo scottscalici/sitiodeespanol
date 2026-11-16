@@ -2,10 +2,12 @@ import { useEffect, useRef } from 'react';
 
 // Full-screen falling/rising emoji particle overlay, driven by a theme's
 // `particles` array — each entry is its own independent species
-// ({ char, color, direction, speed, count, sizeRange }), so a theme can float
-// bats AND ghosts at once instead of being limited to one character. Kept on
-// the same ~30ms tick as the original single-species version so already-tuned
-// speed values still look the same.
+// ({ char, color, direction, speed, count, sizeRange } or
+// { url, direction, speed, count, sizeRange } for an uploaded image
+// instead of an emoji), so a theme can float bats AND ghosts at once
+// instead of being limited to one character. Kept on the same ~30ms tick
+// as the original single-species version so already-tuned speed values
+// still look the same.
 export default function ThemeParticles({ particles: speciesList }) {
   const canvasRef = useRef(null);
 
@@ -38,14 +40,35 @@ export default function ThemeParticles({ particles: speciesList }) {
       Array.from({ length: species.count }, () => makeParticle(species))
     );
 
+    // Preload any image-based species once, keyed by url so species that
+    // share an image don't each fetch/decode their own copy. A particle
+    // whose image hasn't finished loading (or failed) just skips drawing
+    // for a frame rather than flashing the emoji fallback first — avoids
+    // a flash-then-swap look once it does load.
+    const imagesByUrl = {};
+    activeSpecies.forEach((species) => {
+      if (species.url && !imagesByUrl[species.url]) {
+        const img = new Image();
+        img.src = species.url;
+        imagesByUrl[species.url] = img;
+      }
+    });
+
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach((p) => {
         const { species } = p;
         ctx.globalAlpha = p.opacity;
-        ctx.fillStyle = species.color || 'white';
-        ctx.font = `${p.size}px serif`;
-        ctx.fillText(species.char || '✨', p.x, p.y);
+        const img = species.url ? imagesByUrl[species.url] : null;
+        if (img) {
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+          }
+        } else {
+          ctx.fillStyle = species.color || 'white';
+          ctx.font = `${p.size}px serif`;
+          ctx.fillText(species.char || '✨', p.x, p.y);
+        }
 
         const speed = (species.speed || 1) + p.size / 20;
         if (species.direction === 'up') {

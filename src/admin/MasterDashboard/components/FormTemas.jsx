@@ -266,7 +266,9 @@ export default function FormTemas({ actividad, setActividad }) {
               imágenes. También es la única forma de configurar <code className="bg-white px-1 rounded">fontList</code> (pesos
               de fuente), <code className="bg-white px-1 rounded">textEffects</code> (animaciones con nombre, como un
               parpadeo de vela), <code className="bg-white px-1 rounded">animatedLayer</code> (varias partículas a la
-              vez), <code className="bg-white px-1 rounded">cardStyles</code>/<code className="bg-white px-1 rounded">cardBorderDefault</code> (estilos
+              vez — cada partícula acepta <code className="bg-white px-1 rounded">url</code> para una imagen propia en
+              vez de <code className="bg-white px-1 rounded">char</code>, igual que el control de imagen de "Efecto de
+              Partículas" abajo), <code className="bg-white px-1 rounded">cardStyles</code>/<code className="bg-white px-1 rounded">cardBorderDefault</code> (estilos
               con nombre y bordes), y <code className="bg-white px-1 rounded">cornerDecorations</code>/<code className="bg-white px-1 rounded">cardOverlays</code> (decoraciones
               e imágenes grandes tipo telaraña) — ninguno de estos tiene controles propios todavía. Para estos dos
               últimos, usa solo emojis o URLs de imágenes que tú misma hayas subido — una herramienta de IA no puede
@@ -545,8 +547,8 @@ export default function FormTemas({ actividad, setActividad }) {
             </div>
           </div>
 
-          {/* Particle Effect — a single species (one emoji/color/speed) via
-              these controls. A theme that wants several at once (bats AND
+          {/* Particle Effect — a single species (one emoji-or-image/color/speed)
+              via these controls. A theme that wants several at once (bats AND
               ghosts, say) sets `styles.animatedLayer.particles` — an array of
               these same fields plus an optional `sizeRange` — via the
               paste-box above instead; this section's effectConfig still
@@ -557,14 +559,23 @@ export default function FormTemas({ actividad, setActividad }) {
               Un solo tipo de partícula. Para varios a la vez (murciélagos Y fantasmas), usa el JSON de arriba con
               <code className="bg-white px-1 rounded mx-1">styles.animatedLayer.particles</code> (una lista).
             </p>
+            <div className="flex flex-col mb-3">
+              <label className="text-xs font-semibold">Imagen (opcional — reemplaza el emoji si se sube una)</label>
+              <ImageUploadField
+                value={effectConfig.url || ''}
+                onChange={(url) => handleEffectChange('url', url)}
+                folder="temas"
+                inputClassName="p-1 border rounded text-sm w-full"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col">
-                <label className="text-xs font-semibold">Emoji / Carácter</label>
-                <input type="text" value={effectConfig.char || ''} onChange={(e) => handleEffectChange('char', e.target.value)} placeholder="🎃" className="p-1 border rounded text-sm" />
+                <label className="text-xs font-semibold">Emoji / Carácter{effectConfig.url ? ' (ignorado mientras haya una imagen)' : ''}</label>
+                <input type="text" value={effectConfig.char || ''} onChange={(e) => handleEffectChange('char', e.target.value)} placeholder="🎃" className="p-1 border rounded text-sm" disabled={!!effectConfig.url} />
               </div>
               <div className="flex flex-col">
-                <label className="text-xs font-semibold">Color</label>
-                <input type="color" value={effectConfig.color || '#ffffff'} onChange={(e) => handleEffectChange('color', e.target.value)} className="w-8 h-8 cursor-pointer rounded border-0 p-0 bg-transparent" />
+                <label className="text-xs font-semibold">Color{effectConfig.url ? ' (solo para el emoji)' : ''}</label>
+                <input type="color" value={effectConfig.color || '#ffffff'} onChange={(e) => handleEffectChange('color', e.target.value)} className="w-8 h-8 cursor-pointer rounded border-0 p-0 bg-transparent" disabled={!!effectConfig.url} />
               </div>
               <div className="flex flex-col">
                 <label className="text-xs font-semibold">Dirección</label>

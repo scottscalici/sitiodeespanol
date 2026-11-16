@@ -115,12 +115,15 @@ the same style). A named style's `background` wins over a flat
 ## The animated floating layer
 
 `animatedLayer.particles` is a list — each entry is its own independent
-species (its own emoji, color, speed, direction, size range, count), all
-sharing one canvas, so a theme can float bats and ghosts at once instead
-of being stuck with one. Leave it out entirely for a theme with no
+species (its own emoji-or-image, color, speed, direction, size range,
+count), all sharing one canvas, so a theme can float bats and ghosts at
+once instead of being stuck with one. A species floats an uploaded image
+instead of an emoji by setting `url` instead of `char` — `url` wins if
+both are present. Leave the list out entirely for a theme with no
 animation (see `calma.json`). The older single-species `effectConfig`
-(still editable via the simple admin controls, not the JSON box) keeps
-working as the fallback when a theme doesn't set `animatedLayer`.
+(editable via the simple admin controls, including an image-upload field,
+not just the JSON box) keeps working as the fallback when a theme doesn't
+set `animatedLayer`.
 
 ## Using the theme-importer skill
 
