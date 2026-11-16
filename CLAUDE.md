@@ -196,12 +196,18 @@ expected shape.
   `tú`, `nosotros`, `él_ella_ud`, `ellos_ellas_uds`, `vosotros`, `yo`),
   now exposed as a dropdown next to the tense selector — added because a
   tense like `imperativo_afirmativo` has both `tú` and `nosotros`/formal
-  forms populated per verb, and "any" draws from all of them. This is
-  **separate from, and more capable than, `WorkoutEngine.jsx`'s Learning
-  Path verb-segment draw** (see `targetTense` above), which has no
-  subject-level targeting at all — if a Learning Path/Circle genuinely
-  needs pure-tú (or any single-subject) practice instead of reassessment,
-  that's a real gap in `WorkoutEngine.jsx`, not just a missing UI control.
+  forms populated per verb, and "any" draws from all of them.
+  **`WorkoutEngine.jsx`'s Learning Path/Circle verb segments got the same
+  capability right after**: `segment.targetSubject` ('any' or one
+  person), a matching dropdown in `PathBuilder.jsx` next to Verb Tense,
+  and the actual filter in the subject-draw step
+  (`WorkoutEngine.jsx`, right where `availableSubjects` is computed) — a
+  verb missing the requested subject for that tense just contributes no
+  question for that pick, same silent-skip as an empty tense. Two
+  independent implementations of the same idea (reassessment's
+  `getRandomSubject` vs. Learning Path's inline filter) — if this drifts
+  or needs a third subject-aware spot, keep both in sync by hand, there's
+  no shared helper between them yet.
 - **Calentamiento grading** (`src/student/CalentamientoEngine.jsx`,
   `handleCheckVerbs`): plain `.trim().toLowerCase()` string match against
   `forma`, with `/|;,` as alternate-answer separators. No cross-validation
