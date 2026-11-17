@@ -190,7 +190,7 @@ export default function ReassessmentEngine() {
           allowedVerbs: group?.verbIds || [],
           count: Number(r.count) || 0,
           specificVerb: 'any',
-          targetSubject: 'any',
+          targetSubject: r.targetSubject || 'any',
         };
       });
       const sentenceBlocks = (config.sentenceBlocks || []).map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
