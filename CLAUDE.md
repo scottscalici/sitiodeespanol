@@ -137,7 +137,6 @@ expected shape.
   fixes it by matching old→new ids with underscores stripped (so a rename
   that only changed spacing still resolves) and re-saving those days.
 - **Learning Path / Practice Circle content types** (`contentType`:
-- **Learning Path / Practice Circle content types** (`contentType`:
   `vocab`/`grammar`/`verb`, set at the path level): segment shape is
   identical across all three (`id, total_questions, questionMix,
   isSpeedRound, timeLimit, targetTense, introduced_concepts,
