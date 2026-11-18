@@ -263,18 +263,20 @@ const VocabVault = () => {
       // "Reporteros 4" -> "reporteros_4_ch1") — renaming a book (the
       // Reporteros4 -> Reporteros 4 retag) changes that id, and setDoc only
       // ever writes the NEW id, leaving the old-slug doc sitting in
-      // Firestore forever as an orphaned duplicate chapter. Since every
-      // bundle is recomputed from fullVocab from scratch on every publish
-      // anyway, wiping the whole collection first guarantees no orphan from
-      // a past rename can survive a resync.
-      const existingBundles = await getDocs(collection(db, "vocab_bundles"));
-      await Promise.all(existingBundles.docs.map((d) => deleteDoc(d.ref)));
-
+      // Firestore forever as an orphaned duplicate chapter.
+      //
+      // Fix is to rewrite every current chapter FIRST, track which ids that
+      // produced, and only delete whatever's left in Firestore afterward —
+      // never delete-then-rebuild. Deleting first would leave a window (or,
+      // worse, a permanent gap if any single write below throws) where the
+      // whole collection is empty and every chapter 404s for a student who
+      // clicks in before the rebuild finishes.
+      const desiredIds = new Set();
       const textbooks = [...new Set(fullVocab.map(v => v?.metadata?.textbook))].filter(Boolean);
 
       for (const book of textbooks) {
         const bookWords = fullVocab.filter(v => v?.metadata?.textbook === book);
-        
+
         const chapters = new Set();
         bookWords.forEach(w => {
           const sections = getSafeSectionsArray(w.metadata);
@@ -291,16 +293,25 @@ const VocabVault = () => {
           });
 
           const docId = `${book.replace(/\s+/g, '_').toLowerCase()}_ch${chap}`;
-          
+          desiredIds.add(docId);
+
           await setDoc(doc(db, "vocab_bundles", docId), {
             textbook: book,
             chapter: chap,
             wordCount: chapterWords.length,
-            words: chapterWords, 
+            words: chapterWords,
             lastUpdated: serverTimestamp()
           });
         }
       }
+
+      // Now that every current chapter is confirmed (re)written, remove
+      // whatever's left that isn't one of today's ids — the real orphans,
+      // like a pre-rename "reporteros4_ch1" doc.
+      const existingBundles = await getDocs(collection(db, "vocab_bundles"));
+      const orphaned = existingBundles.docs.filter((d) => !desiredIds.has(d.id));
+      await Promise.all(orphaned.map((d) => deleteDoc(d.ref)));
+
       invalidateCollectionCache("vocab_bundles");
       alert("✅ Chapter Bundles successfully published!");
       setUploadStatus('');
