@@ -58,7 +58,62 @@ const VocabSequencer = () => {
     fetchData();
   }, []);
 
-  // 2. Handle Checkbox Toggles
+  // 2. Repair day entries pointing at a bundle id that no longer exists —
+  // happens whenever a textbook gets retagged (e.g. "Reporteros4" ->
+  // "Reporteros 4") and Sync Chapter Bundles republishes under the new
+  // slug: a day scheduled BEFORE the rename still has the OLD id string
+  // saved here, and nothing else in the app ever revisits that string, so
+  // it 404s forever until someone re-saves that day's range by hand.
+  // Matches purely by stripping underscores (reporteros4_ch1 ->
+  // reporteros4ch1, reporteros_4_ch1 -> reporteros4ch1) so a rename that
+  // only added/removed spacing resolves to the same bundle; anything that
+  // still doesn't match a live bundle id after that is left alone rather
+  // than guessed at.
+  const handleRepairStaleIds = async () => {
+    const normalize = (id) => id.replace(/_/g, '');
+    const normalizedToId = new Map();
+    availableBundles.forEach((b) => normalizedToId.set(normalize(b.id), b.id));
+    const liveIds = new Set(availableBundles.map((b) => b.id));
+
+    const fixes = []; // { course, day, oldId, newId }
+    const updatedMaster = { s2: { ...masterSchedule.s2 }, s4: { ...masterSchedule.s4 } };
+
+    ['s2', 's4'].forEach((c) => {
+      Object.entries(updatedMaster[c]).forEach(([day, bundleIds]) => {
+        const replaced = bundleIds.map((id) => {
+          if (liveIds.has(id)) return id;
+          const match = normalizedToId.get(normalize(id));
+          if (match) {
+            fixes.push({ course: c, day, oldId: id, newId: match });
+            return match;
+          }
+          return id; // no confident match — leave it, surfaces in the X-Ray view instead
+        });
+        updatedMaster[c][day] = replaced;
+      });
+    });
+
+    if (fixes.length === 0) {
+      setStatus('No se encontraron IDs obsoletos — todo está al día.');
+      return;
+    }
+
+    const summary = fixes.map((f) => `${f.course.toUpperCase()} día ${f.day}: ${f.oldId} → ${f.newId}`).join('\n');
+    if (!window.confirm(`Se repararán ${fixes.length} referencia(s):\n\n${summary}\n\n¿Continuar?`)) return;
+
+    try {
+      setStatus('Reparando...');
+      const masterRef = doc(db, 'curriculum_tracks', 'vocab_master');
+      await setDoc(masterRef, updatedMaster, { merge: true });
+      setMasterSchedule(updatedMaster);
+      setStatus(`¡Éxito! Se repararon ${fixes.length} referencia(s).`);
+    } catch (error) {
+      console.error('Error repairing stale vocab bundle ids:', error);
+      setStatus('Error al reparar.');
+    }
+  };
+
+  // 3. Handle Checkbox Toggles
   const handleToggleBundle = (bundleId) => {
     setSelectedBundles(prev => {
       if (prev.includes(bundleId)) {
@@ -69,7 +124,7 @@ const VocabSequencer = () => {
     });
   };
 
-  // 3. Save to Firebase
+  // 4. Save to Firebase
   const handleSave = async (e) => {
     e.preventDefault();
     setStatus('');
@@ -131,6 +186,15 @@ const VocabSequencer = () => {
         <h2 className="text-2xl font-black uppercase tracking-widest text-indigo-400 mb-6 flex items-center gap-3">
           <span>⚙️</span> Vocab Sequencer
         </h2>
+
+        <button
+          type="button"
+          onClick={handleRepairStaleIds}
+          className="w-full mb-6 bg-slate-900 hover:bg-slate-950 border border-amber-500/40 text-amber-400 font-bold uppercase tracking-widest text-xs py-3 rounded-xl transition-all active:scale-95"
+          title="Busca días cuyo capítulo guardado ya no existe (por ejemplo, tras renombrar un libro) y lo actualiza al bundle actual con el mismo contenido."
+        >
+          🔧 Reparar IDs Obsoletos
+        </button>
 
         <form onSubmit={handleSave} className="space-y-6">
           {/* Course Toggle */}

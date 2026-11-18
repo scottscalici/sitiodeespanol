@@ -125,7 +125,18 @@ expected shape.
   an existing book (e.g. "Reporteros4" instead of "Reporteros 4") creates
   an invisible second "book" in several of those places — always copy the
   existing name from `TEXTBOOK_ORDER` or Vocab Vault's own Library tab
-  dropdown, never retype it from memory.
+  dropdown, never retype it from memory. **A rename also breaks every
+  `vocab_bundles` doc id already built from the old spelling**:
+  `publishChapters`'s doc id is `${book.replace(/\s+/g,'_').toLowerCase()}_ch${chap}`,
+  so a retag changes the id on the next Sync, orphaning the old one (fixed
+  to rewrite-then-prune so a failed/slow sync never leaves the collection
+  empty — see `VocabVault.jsx`'s `publishChapters`) AND leaving any day
+  already scheduled in `curriculum_tracks/vocab_master` (via Vocab
+  Sequencer) pointing at the now-dead old id — nothing re-syncs that
+  independently. `VocabSequencer.jsx`'s "🔧 Reparar IDs Obsoletos" button
+  fixes it by matching old→new ids with underscores stripped (so a rename
+  that only changed spacing still resolves) and re-saving those days.
+- **Learning Path / Practice Circle content types** (`contentType`:
 - **Learning Path / Practice Circle content types** (`contentType`:
   `vocab`/`grammar`/`verb`, set at the path level): segment shape is
   identical across all three (`id, total_questions, questionMix,
