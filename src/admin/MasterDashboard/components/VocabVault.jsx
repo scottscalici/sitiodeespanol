@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../../firebase.js';
-import { collection, doc, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getCachedCollection, invalidateCollectionCache } from '../../../utils/firestoreCache';
 import { isReferenceSection, formatVocabSectionLabel } from '../../../utils/vocabSectionLabel';
 
@@ -259,6 +259,17 @@ const VocabVault = () => {
     
     setUploadStatus('⏳ Publishing Bundles...');
     try {
+      // The doc id is built from the book's current spelling (e.g.
+      // "Reporteros 4" -> "reporteros_4_ch1") — renaming a book (the
+      // Reporteros4 -> Reporteros 4 retag) changes that id, and setDoc only
+      // ever writes the NEW id, leaving the old-slug doc sitting in
+      // Firestore forever as an orphaned duplicate chapter. Since every
+      // bundle is recomputed from fullVocab from scratch on every publish
+      // anyway, wiping the whole collection first guarantees no orphan from
+      // a past rename can survive a resync.
+      const existingBundles = await getDocs(collection(db, "vocab_bundles"));
+      await Promise.all(existingBundles.docs.map((d) => deleteDoc(d.ref)));
+
       const textbooks = [...new Set(fullVocab.map(v => v?.metadata?.textbook))].filter(Boolean);
 
       for (const book of textbooks) {
