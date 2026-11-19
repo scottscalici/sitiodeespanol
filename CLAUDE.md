@@ -169,9 +169,23 @@ expected shape.
   as Calentamiento, but graded by `checkAnswerLeniently` in
   `src/utils/checkAnswer.js` — accent-insensitive, unlike Calentamiento's
   strict `handleCheckVerbs`); `questionMix.sentence` is the oraciones
-  (pinned_sentences, MC-or-reconstruction) count instead — don't conflate
-  the two when a request is "type the answer" (`recall`) vs. "sentence/MC"
-  (`sentence`).
+  count instead — don't conflate the two when a request is "type the
+  answer" (`recall`) vs. "sentence" (`sentence`). **`questionMix.recall`
+  is dead weight on a `grammar` segment specifically** — `introduced_concepts`
+  is always `[]` there, so `WorkoutEngine.jsx`'s `isGrammarTurn` check
+  (`concepts.length === 0`) is always true and every draw becomes a
+  grammar turn regardless of what the mix asked for; only
+  `questionMix.sentence`/`total_questions` actually matter. A
+  `pinned_sentences` entry's markup also picks a genuinely different
+  question mechanic, not just cosmetic: `[[respuesta]]` (single blank)
+  is a 50/50 coin-flip between click-an-option MC and
+  drag-the-word-tiles reconstruction — the student never types anything
+  either way. `[[forma|infinitivo]]` (verb blank) is a **build-then-type
+  hybrid** instead — arrange word tiles (including the bare infinitive
+  as one tile) into the sentence, THEN type the actual conjugated answer
+  as free text, graded leniently. Reach for `[[forma|infinitivo]]`
+  whenever the point is drilling a specific conjugation (as every
+  subjuntivo/mandatos/por-para sentence pod does), not `[[respuesta]]`.
 - **Informal (tú) commands in verb data**: `imperativo_afirmativo` /
   `imperativo_negativo` are real tense slots on a verb doc
   (`src/utils/verbTenses.js`), each a per-subject map including `tú`, and
@@ -188,6 +202,25 @@ expected shape.
   por/para Learning Path; fixed by pairing each rule with its natural
   contrast (movement-por ↔ destination-para, duration-por ↔ deadline-para,
   etc.) within the same segment.
+- **A `grammar` segment's `pinned_sentences` pool can and often should be
+  bigger than its `total_questions`, but know what that actually buys
+  you**: `WorkoutEngine.jsx` draws each question independently at
+  random from the pool every single attempt — there's no `vocab`-style
+  `fullCoverage` guarantee here (that only kicks in for vocab/verb
+  concepts when `total_questions === concepts.length`), and no "show
+  unseen ones first" or "don't repeat a passed one" memory across
+  attempts. A pool of 18 with `total_questions: 10` just lowers the odds
+  of seeing an identical set twice in a row — it's probabilistic
+  variety, not deterministic rotation. Separately, "spiral review" in
+  this engine means `sentenceHistory`/`reviewMode` pulling sentences in
+  from **earlier pods already completed in the same path**
+  (`StudentLearningPath.jsx`, right where it builds `sentenceHistory` by
+  walking every prior segment) — it has nothing to do with the leftover,
+  unused sentences in a segment's own pool. Built the subjuntivo-de-cláusulas-sustantivas
+  path on this basis: several segments in the same pod (e.g. 3 segments
+  of "Emoción") deliberately share the exact same pinned_sentences pool
+  verbatim rather than each needing fresh content — repeated exposure
+  with variation, no extra authoring.
 - **Practice Circle generator** (`src/admin/FormLearningPath/CircleGeneratorModal.jsx`)
   writes straight to Firestore (pod + its `reassessment_configs` doc,
   atomically) — unlike `VocabPodGeneratorModal.jsx`, which only returns
@@ -217,7 +250,13 @@ expected shape.
   independent implementations of the same idea (reassessment's
   `getRandomSubject` vs. Learning Path's inline filter) — if this drifts
   or needs a third subject-aware spot, keep both in sync by hand, there's
-  no shared helper between them yet.
+  no shared helper between them yet. That third spot already bit once:
+  `ReassessmentEngine.jsx`'s `handleStart` rebuilds its own blocks from
+  the saved config and had `targetSubject` hardcoded to `'any'` instead
+  of reading `r.targetSubject` — so a teacher's "restrict to tú" choice
+  saved correctly and even showed right in the admin's own Preview, but
+  silently never applied to the actual student-facing reevaluación.
+  Fixed, but a reminder this config is read from more than one place.
 - **Learning Path archiving is gated behind a per-tarea opt-in flag,
   not automatic**: `src/utils/learningPathProgress.js`'s
   `isPastEffectiveDueDate(task, ...)` checks `task.enforceDueDate` FIRST
@@ -245,6 +284,19 @@ expected shape.
   all) — a path beyond that is still graded correctly and still
   reachable by its direct link, it just drops off the dashboard so the
   list doesn't grow forever.
+- **A `learning_paths`/`practice_pods` doc's own `course` field is
+  informational, never an access filter — assigning across courses is
+  supported by design, not a loophole.** `TareasSequencer.jsx`'s Dominio
+  path-picker explicitly groups the dropdown into "Esta clase" and "Otra
+  clase" optgroups (with a code comment calling out "assigning S2
+  content as an S4 tarea on purpose") and only shows a non-blocking
+  warning when you pick a cross-course one. `StudentLearningPath.jsx`
+  fetches a path by `path_id` alone with no comparison to the student's
+  own course at all — once a `path_id` is in a student's assigned list,
+  the path's own `course` tag plays no role in whether it loads. Safe to
+  build one shared path (no course suffix in the title) and assign it to
+  tareas in both s2 and s4 sections, same as the subjuntivo-de-cláusulas-sustantivas
+  path.
 - **Theme floating-particle species** (`src/components/ThemeParticles.jsx`,
   canvas-based): each species is `{ char, color, direction, speed, count,
   sizeRange }` for an emoji, or `{ url, direction, speed, count,
