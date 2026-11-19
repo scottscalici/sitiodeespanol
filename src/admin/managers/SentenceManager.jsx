@@ -408,6 +408,12 @@ export default function SentenceManager() {
               🏷️ Migrar Etiquetas
             </button>
             <button
+              onClick={() => navigate('/admin-secret-portal-sentence-duplicate-finder')}
+              className="bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+            >
+              🔍 Buscar Duplicados
+            </button>
+            <button
               onClick={() => navigate('/admin-daily-plan-hub')}
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-700 cursor-pointer"
             >

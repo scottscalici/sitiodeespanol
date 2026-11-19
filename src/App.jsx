@@ -117,6 +117,7 @@ import FormLearningPath from './admin/FormLearningPath/FormLearningPath';
 import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
 import SentenceTagMigration from './admin/uploaders/SentenceTagMigration';
+import SentenceDuplicateFinder from './admin/uploaders/SentenceDuplicateFinder';
 // 📦 LEGACY ADMIN UPLOADERS
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
@@ -591,6 +592,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <SentenceTagMigration />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-sentence-duplicate-finder"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <SentenceDuplicateFinder />
                 </AdminRoute>
               }
             />
