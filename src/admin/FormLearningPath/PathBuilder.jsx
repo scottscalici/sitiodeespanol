@@ -44,6 +44,25 @@ export default function PathBuilder({
   const [podImportOpen, setPodImportOpen] = React.useState(false);
   const [podImportText, setPodImportText] = React.useState('');
   const [podImportStatus, setPodImportStatus] = React.useState('');
+  const [podExportOpen, setPodExportOpen] = React.useState(false);
+  const [podExportCopied, setPodExportCopied] = React.useState(false);
+
+  // Every pod exactly as currently loaded/edited (not yet re-fetched from
+  // Firestore if unsaved changes are pending) — same "copy and share for
+  // context" purpose as FormTemas.jsx's theme export, since there was
+  // previously no way to get an existing path's pods back out as JSON
+  // (e.g. to reuse an existing grammar path's sentences as standalone
+  // practice circles).
+  const podExportJson = JSON.stringify(pods, null, 2);
+  const handleCopyPodExport = async () => {
+    try {
+      await navigator.clipboard.writeText(podExportJson);
+      setPodExportCopied(true);
+      setTimeout(() => setPodExportCopied(false), 2000);
+    } catch {
+      setPodExportCopied(false);
+    }
+  };
 
   // The native <select> used to list every badge as "{icon} {name}" — fine
   // for an emoji icon, but a badge with an uploaded image icon is a full
@@ -292,6 +311,13 @@ export default function PathBuilder({
             )}
 
             <button
+              onClick={() => setPodExportOpen((v) => !v)}
+              className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all"
+            >
+              📤 Exportar Pods (JSON)
+            </button>
+
+            <button
               onClick={handleSavePathToFirestore}
               disabled={isSaving}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
@@ -330,6 +356,30 @@ export default function PathBuilder({
               </button>
               {podImportStatus && <p className="text-xs text-rose-600 font-bold">{podImportStatus}</p>}
             </div>
+          </div>
+        )}
+
+        {podExportOpen && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mt-2">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">
+                Todos los {podLabel.toLowerCase()}s de este path, tal como están ahora mismo (incluyendo cambios sin guardar).
+              </p>
+              <button
+                type="button"
+                onClick={handleCopyPodExport}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded shrink-0"
+              >
+                {podExportCopied ? '¡Copiado!' : '📋 Copiar JSON'}
+              </button>
+            </div>
+            <textarea
+              readOnly
+              value={podExportJson}
+              rows={6}
+              onFocus={(e) => e.target.select()}
+              className="w-full border border-emerald-300 rounded-lg p-2 text-xs font-mono bg-white"
+            />
           </div>
         )}
 
