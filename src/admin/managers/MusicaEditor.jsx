@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { invalidateCollectionCache } from '../../utils/firestoreCache';
 import ImageUploadField from '../shared/ImageUploadField';
@@ -22,6 +22,7 @@ const MusicaEditor = () => {
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [questionsModalOpen, setQuestionsModalOpen] = useState(false);
 
   const [song, setSong] = useState({
@@ -126,6 +127,28 @@ const MusicaEditor = () => {
     }
   };
 
+  // Clones every field (including questions/letras) into a brand-new doc,
+  // same addDoc()-to-musica + navigate pattern MusicaManager's own
+  // "+ Nueva Canción" uses — so e.g. an s2 song can be copied for s4 and
+  // given its own course/días without touching the original.
+  const handleDuplicate = async () => {
+    setIsDuplicating(true);
+    try {
+      const newDoc = await addDoc(collection(db, 'musica'), {
+        ...JSON.parse(JSON.stringify(song)),
+        titulo: song.titulo ? `${song.titulo} (copia)` : 'Nueva Canción',
+        createdAt: new Date().toISOString()
+      });
+      invalidateCollectionCache('musica');
+      navigate(`/admin-musica-editor/${newDoc.id}`);
+    } catch (error) {
+      console.error("Error duplicating song:", error);
+      alert('Error al duplicar la canción.');
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   // Writes straight to Firestore instead of only updating local `song`
   // state — the modal's "Guardar Preguntas" button reads as a complete
   // save, but used to just patch this page's in-memory state, relying on a
@@ -179,7 +202,15 @@ const MusicaEditor = () => {
             >
               <span>🖨️</span> Imprimir
             </Link>
-            <button 
+            <button
+              onClick={handleDuplicate}
+              disabled={isDuplicating}
+              title="Crea una copia independiente de esta canción (con sus preguntas) para asignarle otro curso/días"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs transition-colors disabled:opacity-50 shadow-sm flex items-center gap-2"
+            >
+              <span>📄</span> {isDuplicating ? 'Duplicando...' : 'Duplicar Canción'}
+            </button>
+            <button
               onClick={handleSave}
               disabled={isSaving}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs transition-colors disabled:opacity-50 shadow-sm"
