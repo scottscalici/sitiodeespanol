@@ -226,6 +226,25 @@ const RecreoHub = () => {
             </div>
           </Link>
 
+          {/* 9. PALABRAS CAYENDO — Game 1 of the El Recreo reward-games plan.
+              Temporarily taken offline (not an unlock-by-points lock, just
+              "not ready yet" while it's being tuned) — no link, padlock
+              overlay, greyed out. Swap back to the <Link> version (see git
+              history) once it's ready to reopen. */}
+          <div className="relative bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 overflow-hidden opacity-60 cursor-not-allowed select-none">
+            <div className="absolute inset-0 z-20 bg-slate-950/50 flex items-center justify-center">
+              <span className="text-5xl">🔒</span>
+            </div>
+            <div className="w-full h-48 mb-6 flex items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-7xl grayscale">
+              🧺
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-2 text-slate-400">Palabras Cayendo</h2>
+            <p className="text-slate-500 text-sm font-medium mb-8">Atrapa la palabra en español correcta antes de que caiga. ¡Evita las incorrectas!</p>
+            <div className="text-slate-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+              Próximamente
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
