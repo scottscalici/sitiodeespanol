@@ -85,10 +85,28 @@ export default function PathBuilder({
         setPodImportStatus('❌ El JSON debe ser un arreglo de pods, o un objeto { "pods": [...] }.');
         return;
       }
-      onImportPods(newPods);
+      // A pod id already present (e.g. pasting the same JSON twice by
+      // accident) used to just get appended again with no warning —
+      // duplicate ids then collide as React keys below, which made some
+      // pods' delete buttons silently hit the wrong pod or do nothing.
+      // Skip those instead and say so, rather than importing a dupe.
+      const existingIds = new Set(pods.map((p) => p.id));
+      const deduped = newPods.filter((p) => !existingIds.has(p.id));
+      const skipped = newPods.length - deduped.length;
+      if (deduped.length === 0) {
+        setPodImportStatus(`❌ Los ${newPods.length} pod(s) ya existen en este path — nada que importar.`);
+        return;
+      }
+      onImportPods(deduped);
       setPodImportText('');
-      setPodImportOpen(false);
-      setPodImportStatus('');
+      if (skipped > 0) {
+        // Leave the box open so the warning is actually visible — closing
+        // it (the normal success path) hides podImportStatus along with it.
+        setPodImportStatus(`⚠️ Se importaron ${deduped.length}; se omitieron ${skipped} ya existentes (mismo id).`);
+      } else {
+        setPodImportOpen(false);
+        setPodImportStatus('');
+      }
     } catch (err) {
       setPodImportStatus('❌ JSON inválido — revisa la consola.');
       console.error('Error importing pods JSON:', err);
@@ -354,7 +372,9 @@ export default function PathBuilder({
               >
                 Cancelar
               </button>
-              {podImportStatus && <p className="text-xs text-rose-600 font-bold">{podImportStatus}</p>}
+              {podImportStatus && (
+                <p className={`text-xs font-bold ${podImportStatus.startsWith('⚠️') ? 'text-amber-600' : 'text-rose-600'}`}>{podImportStatus}</p>
+              )}
             </div>
           </div>
         )}
@@ -388,7 +408,13 @@ export default function PathBuilder({
       {/* Pods List */}
       <div className="space-y-6 pb-20">
         {pods.map((pod, podIndex) => (
-          <div key={pod.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          // Keyed by position, not pod.id — handleDeletePod/handleMovePod
+          // already address pods by index, and a duplicate-id import (e.g.
+          // pasting the same pods twice) makes id-based keys collide, which
+          // leaves React's reconciliation matching the wrong DOM node to the
+          // wrong pod after any delete — exactly what caused some pods'
+          // delete buttons to silently do nothing or hit the wrong pod.
+          <div key={podIndex} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
             {/* Pod Header Bar */}
             <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
@@ -625,8 +651,12 @@ export default function PathBuilder({
                 )}
                 {pod.segments.map((seg, segIndex) => {
                   const isActive = activeSegmentId === seg.id;
+                  // Same reasoning as the pod key above — handleDeleteSegment
+                  // takes (podIndex, segIndex), so position is this list's
+                  // real identity, not seg.id (which collides the same way
+                  // on a duplicate-id import).
                   return (
-                    <div key={seg.id} onClick={() => setActiveSegmentId(seg.id)} className={`bg-white border-2 rounded-xl p-5 shadow-sm transition-all cursor-pointer relative ${isActive ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <div key={`${podIndex}_${segIndex}`} onClick={() => setActiveSegmentId(seg.id)} className={`bg-white border-2 rounded-xl p-5 shadow-sm transition-all cursor-pointer relative ${isActive ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300'}`}>
 
                       <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
