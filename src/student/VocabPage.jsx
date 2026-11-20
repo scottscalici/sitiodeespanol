@@ -695,7 +695,7 @@ function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
 
   const checkAnswer = () => {
     if (!value.trim() || result) return;
-    let correct, correctAnswer;
+    let correct, correctAnswer, missedAccent;
     if (direction === 'es-en') {
       // Prompted with Spanish, typing the English translation. No alt_answers
       // stored for this side, but "to ___" is accepted with or without the
@@ -703,18 +703,22 @@ function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
       const translation = word.traduccion || '';
       const noTo = stripLeadingTo(translation);
       const accepted = noTo ? `${translation}, ${noTo}` : translation;
-      correct = checkAnswerLeniently(value, accepted, false).correct;
+      ({ correct, missedAccent } = checkAnswerLeniently(value, accepted, false));
       correctAnswer = translation;
     } else {
       // Prompted with English, typing Spanish — alt_answers (synonyms, e.g.
       // "sano" for "saludable") widen what's accepted, same as everywhere
       // else a typed Spanish answer is graded (see utils/checkAnswer.js).
+      // isVerb=false means an accent-only miss (café -> cafe) still counts
+      // as correct — checkAnswerLeniently already flags it as missedAccent
+      // regardless, so a student is told to watch their accents even though
+      // it didn't cost them the point.
       const altAnswers = (word.alt_answers || []).map((a) => (a || '').trim()).filter(Boolean);
       const accepted = [word.palabra, ...altAnswers].filter(Boolean).join(', ');
-      correct = checkAnswerLeniently(value, accepted, false).correct;
+      ({ correct, missedAccent } = checkAnswerLeniently(value, accepted, false));
       correctAnswer = word.palabra;
     }
-    setResult({ correct, correctAnswer });
+    setResult({ correct, correctAnswer, missedAccent });
     if (correct) onCorrectAnswer?.();
   };
 
@@ -753,7 +757,9 @@ function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
           className={`w-full text-center text-lg font-bold px-4 py-3 rounded-xl border-2 outline-none transition-colors ${
             result
               ? result.correct
-                ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                ? result.missedAccent
+                  ? 'border-amber-400 bg-amber-50 text-amber-700'
+                  : 'border-emerald-400 bg-emerald-50 text-emerald-700'
                 : 'border-rose-400 bg-rose-50 text-rose-700'
               : 'border-slate-200 focus:border-indigo-400 text-slate-800'
           }`}
@@ -768,8 +774,12 @@ function TypeCard({ word, direction, onCorrectAnswer, onNext }) {
           </button>
         ) : (
           <>
-            <p className={`text-sm font-bold ${result.correct ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {result.correct ? '¡Correcto! ✓' : `Respuesta: ${result.correctAnswer}`}
+            <p className={`text-sm font-bold ${result.correct ? (result.missedAccent ? 'text-amber-600' : 'text-emerald-600') : 'text-rose-600'}`}>
+              {result.correct
+                ? result.missedAccent
+                  ? `¡Correcto! ⚠️ Cuidado con los acentos — se escribe: ${result.correctAnswer}`
+                  : '¡Correcto! ✓'
+                : `Respuesta: ${result.correctAnswer}`}
             </p>
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
               Presiona Enter para continuar →
