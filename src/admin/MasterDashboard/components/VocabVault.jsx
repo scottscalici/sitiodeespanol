@@ -107,7 +107,16 @@ const compareSectionKeys = (a, b) => {
 
 const isWordUpToSection = (word, maxSection) => {
   if (!maxSection || maxSection === 'all') return true;
-  const wordSections = getSafeSectionsArray(word?.metadata);
+  // Excluding referencias here isn't redundant with parseSectionKey sorting
+  // it as Infinity — that only protects a cutoff WITHIN the reference
+  // section's own chapter (e.g. "3.referencias" correctly fails a "3.5"
+  // cutoff). A bare chapter cutoff like "3" parses as chap=3, sub=Infinity
+  // too, so a PRIOR chapter's reference section (e.g. "1.referencias",
+  // chap=1) still passed — its chapter number alone (1 < 3) was enough to
+  // satisfy the cutoff regardless of the Infinity subsection. That's what
+  // let old chapters' referencias words leak into a Baking Station bake
+  // targeting a later "up to chapter" cutoff.
+  const wordSections = getSafeSectionsArray(word?.metadata).filter(s => !isReferenceSection(s));
   if (wordSections.length === 0) return false;
   return wordSections.some(s => compareSectionKeys(s, maxSection) <= 0);
 };
@@ -542,6 +551,16 @@ const VocabVault = () => {
       // this doesn't silently empty out content tagged before this flag did
       // anything.
       eligible = eligible.filter(v => v?.metadata?.evaluacion !== false);
+      // Belt-and-suspenders on top of the evaluacion check above: a word
+      // whose ONLY section(s) are referencias never bakes in, even if it
+      // was never (or incorrectly) tagged evaluacion:false — this is what
+      // actually closes the "referencias words show up in the bake" report,
+      // since relying on that flag alone silently fails for any reference
+      // word someone forgot to tag.
+      eligible = eligible.filter(v => {
+        const sections = getSafeSectionsArray(v?.metadata);
+        return sections.length === 0 || sections.some(sec => !isReferenceSection(sec));
+      });
       if (eligible.length === 0) continue;
       const shuffled = shuffleArray(eligible);
       const selected = shuffled.slice(0, block.count);
