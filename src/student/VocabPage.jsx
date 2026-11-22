@@ -131,22 +131,35 @@ export default function VocabPage() {
     // Filter out words without sections
     const validWords = bundleData.words.filter(w => w.metadata?.secciones && w.metadata.secciones.length > 0);
 
-    // Sort chronologically by section tag
+    // A word tagged with more than one section (e.g. ["9.1", "9.2"]) used to
+    // only ever count toward its FIRST section everywhere below — invisible
+    // under any other section's checkbox/filter/projector view no matter how
+    // many sections its own doc actually listed. "Earliest" section (for
+    // sorting) is the lowest-sorting value across ALL of a word's sections,
+    // not just whichever happened to be first in the array.
+    const earliestSection = (word) =>
+      [...word.metadata.secciones].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))[0];
+
+    // Sort chronologically by (earliest) section tag
     const sorted = validWords.sort((a, b) => {
-      const secA = a.metadata.secciones[0];
-      const secB = b.metadata.secciones[0];
+      const secA = earliestSection(a);
+      const secB = earliestSection(b);
       return secA.localeCompare(secB, undefined, { numeric: true, sensitivity: 'base' });
     });
 
-    // Extract unique sections
-    const sectionsSet = new Set(validWords.map(w => w.metadata.secciones[0]));
+    // Extract unique sections — every section any word lists, not just each
+    // word's first one.
+    const sectionsSet = new Set(validWords.flatMap(w => w.metadata.secciones));
     const uniqueSections = Array.from(sectionsSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    // Group for the List View
+    // Group for the List View — a multi-section word appears under EACH of
+    // its sections (same "appears under every group it belongs to" pattern
+    // as the Referencias grouping above), not just the first.
     const grouped = sorted.reduce((acc, word) => {
-      const sec = word.metadata.secciones[0];
-      if (!acc[sec]) acc[sec] = [];
-      acc[sec].push(word);
+      word.metadata.secciones.forEach((sec) => {
+        if (!acc[sec]) acc[sec] = [];
+        acc[sec].push(word);
+      });
       return acc;
     }, {});
 
@@ -216,10 +229,12 @@ export default function VocabPage() {
   const shuffleAndSetDeck = useCallback((sectionsToInclude) => {
     if (!bundleData || !bundleData.words) return;
     
-    // Filter words based on the active checkboxes
+    // Filter words based on the active checkboxes — a word counts as "in"
+    // if ANY of its sections is checked, not just its first one (see the
+    // same fix in the grouping logic above for why this matters).
     const filtered = bundleData.words.filter(w => {
-      const sec = w.metadata?.secciones?.[0];
-      return sec && sectionsToInclude.includes(sec);
+      const secs = w.metadata?.secciones || [];
+      return secs.some((sec) => sectionsToInclude.includes(sec));
     });
 
     // Fisher-Yates Shuffle for true randomness
