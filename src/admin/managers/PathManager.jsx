@@ -201,7 +201,7 @@ export default function PathManager() {
   const actionButtons = (row) => (
     <div className="flex gap-2">
       <Link
-        to={row._type === 'learning_path' ? '/admin-secret-portal-learning-path' : '/admin-secret-portal-practice-hub'}
+        to={`${row._type === 'learning_path' ? '/admin-secret-portal-learning-path' : '/admin-secret-portal-practice-hub'}?path=${encodeURIComponent(row.path_id)}`}
         className="text-[10px] font-black uppercase bg-sky-900/40 hover:bg-sky-700 text-sky-300 hover:text-white border border-sky-700/50 px-2.5 py-1.5 rounded-lg transition-all"
       >
         ✏️ Abrir

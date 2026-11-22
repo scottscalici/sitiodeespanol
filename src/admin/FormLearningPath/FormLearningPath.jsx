@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { db } from '../../firebase.js';
 import VaultSidebar from './VaultSidebar';
 import PathBuilder from './PathBuilder';
@@ -21,6 +22,7 @@ import { isReferenceSection } from '../../utils/vocabSectionLabel';
 export default function FormLearningPath({ mode = 'learningPath' }) {
   const isPracticeHub = mode === 'practiceHub';
   const collectionName = isPracticeHub ? 'practice_pods' : 'learning_paths';
+  const [searchParams] = useSearchParams();
 
   // A path is now one content type from the start — no more vocab/verbs/
   // practical branches bundled into one document. "practical" is gone
@@ -507,6 +509,17 @@ export default function FormLearningPath({ mode = 'learningPath' }) {
   };
 
   useEffect(() => { fetchExistingPaths(); }, []);
+  // "Abrir" from the Path/Circle Manager links here with ?path=<id> — this
+  // page otherwise only ever loads a path through its own in-page "Load
+  // Path" dropdown, so without this, following that link just landed on the
+  // blank default Pod Builder with no indication anything had failed.
+  // handleLoadPath fetches the doc directly by id, so this doesn't need to
+  // wait on fetchExistingPaths() above.
+  useEffect(() => {
+    const requestedId = searchParams.get('path');
+    if (requestedId) handleLoadPath(requestedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { fetchVerbsAndGrammar(); }, [vaultSource]);
   useEffect(() => { fetchAllChapters(); }, [selectedBook, vaultSource]);
   useEffect(() => { fetchVocabVault(); }, [selectedChapter, selectedBook, vaultSource]);
