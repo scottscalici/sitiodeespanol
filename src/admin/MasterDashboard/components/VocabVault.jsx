@@ -317,7 +317,11 @@ const VocabVault = () => {
       setUploadStatus('');
     } catch (err) {
       console.error("Publish failed:", err);
-      setUploadStatus('❌ Error publishing bundles.');
+      // The generic string this used to show gave no way to tell a
+      // transient blip from a real failure without already having DevTools
+      // open — surfacing err.message means a retry-and-it-worked case still
+      // leaves something copyable on screen if it happens again.
+      setUploadStatus(`❌ Error publishing bundles: ${err.message || err}`);
     }
   };
 
