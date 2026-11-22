@@ -136,12 +136,20 @@ export default function PathManager() {
           <h2 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2">
             <span>🗂️</span> Gestor de Rutas y Círculos
           </h2>
-          <Link
-            to="/admin-daily-plan-hub"
-            className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"
-          >
-            ← Volver
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/admin-secret-portal-circle-field-backfill"
+              className="bg-amber-700 hover:bg-amber-600 text-white border border-amber-600 px-3 py-1.5 rounded-lg text-xs font-bold"
+            >
+              🔧 Reparar Textbook/Capítulo
+            </Link>
+            <Link
+              to="/admin-daily-plan-hub"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"
+            >
+              ← Volver
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3 bg-slate-800 border border-slate-700 rounded-xl p-4">

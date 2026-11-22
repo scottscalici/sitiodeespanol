@@ -173,6 +173,17 @@ export default function CircleGeneratorModal({ rawChapterData, availableSections
           title: existing?.title || `Capítulo ${selectedChapter} — Círculos de Práctica`,
           course,
           contentType: 'vocab',
+          // textbook/chapter were never saved here before — PracticeHub's
+          // student-facing sequence view groups circles by textbook then
+          // sorts chapters numerically off these exact fields, so a circle
+          // generated here always fell into "Sin libro"/sortKey 0 and threw
+          // off the ordering relative to circles saved through
+          // FormLearningPath's own save or ChapterLearningPathImporter
+          // (both of which did set these). See PathManager.jsx's own note
+          // on this same gap, and PracticeCircleFieldBackfill.jsx for
+          // backfilling circles already written without them.
+          textbook: existing?.textbook || selectedBook,
+          chapter: existing?.chapter || selectedChapter,
           total_pods: existingPods.length + newPods.length,
           updated_at: new Date().toISOString(),
           pods: [...existingPods, ...newPods],

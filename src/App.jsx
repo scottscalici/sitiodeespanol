@@ -118,6 +118,7 @@ import VocabSequencer from './admin/sequencers/VocabSequencer';
 import SentenceManager from './admin/managers/SentenceManager';
 import SentenceTagMigration from './admin/uploaders/SentenceTagMigration';
 import SentenceDuplicateFinder from './admin/uploaders/SentenceDuplicateFinder';
+import PracticeCircleFieldBackfill from './admin/uploaders/PracticeCircleFieldBackfill';
 // 📦 LEGACY ADMIN UPLOADERS
 import CulturaUploader from './admin/uploaders/CulturaUploader';
 import CuriosidadesUploader from './admin/uploaders/CuriosidadesUploader';
@@ -456,6 +457,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <PathManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-secret-portal-circle-field-backfill"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <PracticeCircleFieldBackfill />
                 </AdminRoute>
               }
             />
