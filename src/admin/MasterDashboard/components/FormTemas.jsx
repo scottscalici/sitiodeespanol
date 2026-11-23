@@ -59,6 +59,7 @@ const CARD_KEYS = [
   { key: 'countdown', label: 'Cuenta Regresiva', texture: true },
   { key: 'recursos', label: 'Panel de Recursos', texture: true },
   { key: 'practicaCard', label: 'Práctica (Gustar, etc.)', texture: true },
+  { key: 'oraciones', label: 'Oraciones de Práctica', texture: true },
   { key: 'destacado', label: 'Destacado Diario (anula el color por región)' },
   { key: 'curiosidad', label: 'Curiosidad' },
   { key: 'estructura', label: 'Estructura' },
@@ -75,7 +76,7 @@ const CARD_KEYS = [
 // cards get wired up — but won't visibly change anything yet).
 const IMAGE_WIRED_KEYS = new Set([
   'calentamiento', 'conversacion', 'vocabulario', 'tareas', 'evaluacion',
-  'video', 'musica', 'anuncios', 'lectura', 'recursos', 'practicaCard', 'estructura',
+  'video', 'musica', 'anuncios', 'lectura', 'recursos', 'practicaCard', 'estructura', 'oraciones',
 ]);
 
 const MASCOT_KEYS = [
