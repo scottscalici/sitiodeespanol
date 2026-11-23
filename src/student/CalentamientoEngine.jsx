@@ -753,8 +753,15 @@ export default function CalentamientoEngine({ onClose }) {
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-black uppercase text-slate-300">
-                          {globalIdx + 1}. {v.sujeto} ({v.palabra}) —{' '}
-                          <span className="text-sky-400 italic">{v.tense}</span>
+                          {globalIdx + 1}. {v.sujeto} ({v.palabra})
+                          {/* A bare past participle (adjective use, Set 1-style
+                              bakedQuestions) has no real conjugated tense behind
+                              it — showing the raw "participio_pasado" id here
+                              would be both ugly and misleading, so this is the
+                              one tense value that renders with no label at all. */}
+                          {v.tense !== 'participio_pasado' && (
+                            <> —{' '}<span className="text-sky-400 italic">{v.tense}</span></>
+                          )}
                         </span>
                         <span className="text-xs text-slate-400 font-medium">
                           {v.traducción}

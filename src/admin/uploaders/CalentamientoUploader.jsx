@@ -14,7 +14,16 @@ import { VERB_TENSES, VERB_SUBJECTS } from '../../utils/verbTenses';
 // intentional simplification: Practice Circles now cover "keep practicing
 // this," so the calentamiento itself only needs its curated, first-attempt
 // `bakedQuestions`.
-const TENSE_IDS = new Set(VERB_TENSES.map((t) => t.id));
+// 'participio_pasado' is NOT in the shared VERB_TENSES list on purpose —
+// that list means "a real 6-subject conjugation paradigm," which backs
+// VerbEditor's per-tense table, VerbAudit's coverage checks, and
+// CalentamientoAdmin's live verbData.tenses[...] lookups. A past participle
+// used as an adjective has no subject variation at all and no stored
+// per-verb data to look up, so it would show six always-empty cells in
+// VerbEditor and a permanent coverage gap in VerbAudit for every verb.
+// It's accepted here only, purely for bulk-imported bare-participle
+// bakedQuestions, and rendered without a tense label by CalentamientoEngine.
+const TENSE_IDS = new Set([...VERB_TENSES.map((t) => t.id), 'participio_pasado']);
 const SUBJECT_IDS = new Set(VERB_SUBJECTS.map((s) => s.id));
 const COURSE_IDS = new Set(['s2', 's4']);
 
