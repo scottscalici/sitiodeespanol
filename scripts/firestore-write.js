@@ -18,6 +18,14 @@
 // uploaders, e.g. CalentamientoUploader.jsx) the item is written verbatim,
 // `id` included, as the document body. Writes use `{ merge: true }`, so an
 // existing document's fields not present in the new item are left alone.
+//
+// Credentials: reads the service account from the FIRESTORE_SERVICE_ACCOUNT
+// environment variable (the whole key file's JSON, pasted as one value —
+// this is how a cloud/remote session without local file access gets it: add
+// it as an environment variable or Network secret in the session's
+// environment settings, never paste it into chat) if set, otherwise falls
+// back to a local ./serviceAccountKey.json file (both are equally valid;
+// the env var just doesn't require a file on disk).
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { createInterface } from 'readline/promises';
@@ -94,19 +102,32 @@ const validateItems = (items) => {
 
 const truncate = (str, max = 600) => (str.length > max ? `${str.slice(0, max)}\n  ...(truncated)` : str);
 
+const loadServiceAccount = () => {
+  const fromEnv = process.env.FIRESTORE_SERVICE_ACCOUNT;
+  if (fromEnv) {
+    try {
+      return JSON.parse(fromEnv);
+    } catch (err) {
+      fail(`FIRESTORE_SERVICE_ACCOUNT is set but isn't valid JSON: ${err.message}`);
+    }
+  }
+  if (existsSync(SERVICE_ACCOUNT_PATH)) {
+    try {
+      return JSON.parse(readFileSync(SERVICE_ACCOUNT_PATH, 'utf-8'));
+    } catch (err) {
+      fail(`Could not parse serviceAccountKey.json: ${err.message}`);
+    }
+  }
+  fail(
+    `No service account credentials found.\n` +
+    `Either set the FIRESTORE_SERVICE_ACCOUNT environment variable to the full key JSON\n` +
+    `(add it in this environment's settings, never in chat), or place the key file at\n` +
+    `${SERVICE_ACCOUNT_PATH} (gitignored).`
+  );
+};
+
 const initFirestore = () => {
-  if (!existsSync(SERVICE_ACCOUNT_PATH)) {
-    fail(
-      `Service account key not found at ${SERVICE_ACCOUNT_PATH}.\n` +
-      `Place your Firebase Admin SDK service account JSON there (it's gitignored) before running this script.`
-    );
-  }
-  let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(readFileSync(SERVICE_ACCOUNT_PATH, 'utf-8'));
-  } catch (err) {
-    fail(`Could not parse serviceAccountKey.json: ${err.message}`);
-  }
+  const serviceAccount = loadServiceAccount();
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   return admin.firestore();
 };
