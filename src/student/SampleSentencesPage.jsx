@@ -5,9 +5,6 @@ import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { parseBlankSentence } from '../utils/sentenceBlanks';
 
-const normalize = (str) =>
-  (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-
 const SampleSentencesPage = () => {
   const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
@@ -16,9 +13,12 @@ const SampleSentencesPage = () => {
   const [sentences, setSentences] = useState([]);
   const [title, setTitle] = useState('Oraciones');
   const [loading, setLoading] = useState(true);
-  const [inputs, setInputs] = useState({});
-  const [results, setResults] = useState({});
-  const [showKey, setShowKey] = useState(false);
+  // Students write these out on paper — there's no input/grading here by
+  // design (too many valid phrasings to ever reduce to one exact-match
+  // answer, e.g. "quiero estudiar" vs "quiero que tú estudies"). Only the
+  // teacher can reveal an example answer, one sentence at a time, while
+  // going over it with the class.
+  const [revealed, setRevealed] = useState({});
 
   useEffect(() => {
     const fetchSentences = async () => {
@@ -50,11 +50,7 @@ const SampleSentencesPage = () => {
     fetchSentences();
   }, [courseId, targetDia]);
 
-  const handleCheck = (index) => {
-    const sentence = sentences[index];
-    const isCorrect = normalize(inputs[index]) === normalize(sentence.answer);
-    setResults((prev) => ({ ...prev, [index]: isCorrect ? 'correct' : 'incorrect' }));
-  };
+  const toggleReveal = (index) => setRevealed((prev) => ({ ...prev, [index]: !prev[index] }));
 
   if (loading) {
     return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-400 font-bold uppercase tracking-widest animate-pulse">Cargando...</div>;
@@ -65,14 +61,6 @@ const SampleSentencesPage = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <Link to="/" className="text-slate-400 hover:text-white text-sm font-bold flex items-center gap-2">← Volver</Link>
-          {isAdmin && (
-            <button
-              onClick={() => setShowKey((prev) => !prev)}
-              className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-colors ${showKey ? 'bg-amber-500 text-black border-amber-400' : 'bg-slate-800 text-amber-400 border-slate-700'}`}
-            >
-              👁️ {showKey ? 'Ocultar Respuestas' : 'Ver Respuestas'}
-            </button>
-          )}
         </div>
 
         <div className="text-center">
@@ -96,38 +84,30 @@ const SampleSentencesPage = () => {
               }
 
               const [before, after] = sentence.display.split('_____');
-              const result = results[index];
+              const isRevealed = revealed[index];
 
               return (
                 <div key={index} className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
                   <p className="text-slate-200 leading-relaxed">
                     {before}
-                    <input
-                      type="text"
-                      value={inputs[index] || ''}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, [index]: e.target.value }))}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCheck(index)}
-                      className={`mx-1 w-32 sm:w-40 bg-slate-950 border-b-2 text-center font-bold text-white px-2 py-1 outline-none transition-colors ${
-                        result === 'correct' ? 'border-emerald-500' : result === 'incorrect' ? 'border-rose-500' : 'border-slate-600 focus:border-teal-400'
-                      }`}
-                    />
+                    <span className="mx-1 inline-block w-32 sm:w-40 border-b-2 border-slate-600 align-bottom">&nbsp;</span>
                     {after}
                   </p>
 
-                  {showKey && (
-                    <p className="text-amber-400 text-xs font-bold mt-2">Respuesta: {sentence.answer}</p>
+                  {isAdmin && (
+                    <div className="mt-3 pt-3 border-t border-slate-700/60">
+                      <button
+                        onClick={() => toggleReveal(index)}
+                        className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <span className={`transition-transform ${isRevealed ? 'rotate-90' : ''}`}>▶</span>
+                        {isRevealed ? 'Ocultar respuesta' : 'Ver respuesta'}
+                      </button>
+                      {isRevealed && (
+                        <p className="text-amber-400 text-xs font-bold mt-2">Respuesta: {sentence.answer}</p>
+                      )}
+                    </div>
                   )}
-
-                  <div className="flex justify-between items-center mt-3">
-                    <button
-                      onClick={() => handleCheck(index)}
-                      className="bg-teal-600 hover:bg-teal-500 text-white font-black text-[11px] px-4 py-2 rounded-lg uppercase tracking-wider transition-colors"
-                    >
-                      Revisar
-                    </button>
-                    {result === 'correct' && <span className="text-emerald-400 font-black text-sm">✓ Correcto</span>}
-                    {result === 'incorrect' && <span className="text-rose-400 font-black text-sm">✗ Intenta de nuevo</span>}
-                  </div>
                 </div>
               );
             })}
