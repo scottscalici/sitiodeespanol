@@ -455,8 +455,8 @@ export default function CalentamientoAdmin() {
     <div className="max-w-6xl mx-auto p-6 font-sans pb-20">
       
       {/* NEW: TOP BAR FILE CABINET */}
-      <div className="bg-slate-900 p-4 rounded-2xl mb-6 shadow-sm border border-slate-700 flex justify-between items-center">
-        <div className="flex items-center gap-3 w-full max-w-lg">
+      <div className="bg-slate-900 p-4 rounded-2xl mb-6 shadow-sm border border-slate-700 flex flex-wrap justify-between items-center gap-3">
+        <div className="flex items-center gap-3 max-w-lg">
           <span className="text-white font-bold text-sm tracking-wider uppercase">Cargar Práctica:</span>
           <select 
             onChange={(e) => loadPractice(e.target.value)} 
