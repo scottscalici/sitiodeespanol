@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Firebase Admin SDK service account key — never commit this
+serviceAccountKey.json
+
+# Firestore collection backups made by scripts/firestore-write.js
+/backups
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
