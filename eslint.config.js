@@ -18,4 +18,13 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Node CLI scripts (e.g. scripts/firestore-write.js) — not browser code,
+    // so they need Node's globals (process, console, etc.) instead.
+    files: ['scripts/**/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])
