@@ -3,12 +3,17 @@ import { Link, useParams } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { useActiveTheme } from '../context/ThemeContext';
+import { parseHeaderGradientStyle } from '../utils/parseHeaderGradient';
 import { parseBlankSentence } from '../utils/sentenceBlanks';
 
 const SampleSentencesPage = () => {
   const { courseId, targetDia } = useParams();
   const { userData } = useAuth();
   const isAdmin = userData?.role === 'admin';
+  const { theme } = useActiveTheme();
+  const pageBgClass = theme?.styles?.pageBackground || 'bg-slate-900';
+  const pageBgStyle = parseHeaderGradientStyle(pageBgClass);
 
   const [sentences, setSentences] = useState([]);
   const [title, setTitle] = useState('Oraciones');
@@ -57,8 +62,39 @@ const SampleSentencesPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-4 sm:p-8 font-sans">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div
+      className={`min-h-screen text-white p-4 sm:p-8 font-sans relative overflow-hidden ${pageBgStyle ? '' : pageBgClass}`}
+      style={pageBgStyle || undefined}
+    >
+      {/* Optional full-page photo background, with a dark overlay so text
+          stays readable over it — same theme field RecreoHub/Dashboard use. */}
+      {theme?.styles?.pageBackgroundImage?.url && (
+        <div
+          className="fixed inset-0 z-0"
+          style={{
+            backgroundImage: `url("${theme.styles.pageBackgroundImage.url}")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundColor: theme.styles.pageBackgroundImage.overlayColor || '#000000',
+              opacity: theme.styles.pageBackgroundImage.overlayOpacity ?? 0.5,
+            }}
+          />
+        </div>
+      )}
+      {/* Site-wide decorative texture — same theme field as Dashboard.jsx's. */}
+      {theme?.styles?.bgTexture && (
+        <div
+          className="fixed inset-0 pointer-events-none z-[1]"
+          style={{ backgroundImage: `url("${theme.styles.bgTexture}")`, backgroundRepeat: 'repeat', opacity: 0.06 }}
+        />
+      )}
+
+      <div className="max-w-2xl mx-auto space-y-6 relative z-10">
         <div className="flex justify-between items-center">
           <Link to="/" className="text-slate-400 hover:text-white text-sm font-bold flex items-center gap-2">← Volver</Link>
         </div>
@@ -98,13 +134,14 @@ const SampleSentencesPage = () => {
                     <div className="mt-3 pt-3 border-t border-slate-700/60">
                       <button
                         onClick={() => toggleReveal(index)}
-                        className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 text-[10px] font-black uppercase tracking-widest"
+                        className="flex items-center gap-1.5 hover:opacity-80 text-[10px] font-black uppercase tracking-widest transition-opacity"
+                        style={{ color: 'var(--accent, #fbbf24)' }}
                       >
                         <span className={`transition-transform ${isRevealed ? 'rotate-90' : ''}`}>▶</span>
                         {isRevealed ? 'Ocultar respuesta' : 'Ver respuesta'}
                       </button>
                       {isRevealed && (
-                        <p className="text-amber-400 text-xs font-bold mt-2">Respuesta: {sentence.answer}</p>
+                        <p className="text-xs font-bold mt-2" style={{ color: 'var(--accent, #fbbf24)' }}>Respuesta: {sentence.answer}</p>
                       )}
                     </div>
                   )}
