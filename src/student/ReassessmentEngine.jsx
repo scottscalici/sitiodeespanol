@@ -18,6 +18,7 @@ import { fetchClassSchedule, fetchScheduleOverrideForDate, mergeScheduleBlocks, 
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 import { generateSentenceRecallQuestions } from '../utils/reassessmentSentenceGenerator';
 import { generateVocabRecallQuestions } from '../utils/reassessmentVocabGenerator';
+import { getAllowedTextbooks } from '../utils/textbookAccess';
 
 // `hideNav` drops the "← Volver" link while an attempt is in_progress —
 // it would be a dead end anyway (ReassessmentLockGuard bounces any other
@@ -194,7 +195,18 @@ export default function ReassessmentEngine() {
         };
       });
       const sentenceBlocks = (config.sentenceBlocks || []).map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
-      const vocabBlocks = (config.vocabBlocks || []).map((r) => ({ label: r.section, section: r.section, count: Number(r.count) || 0 }));
+      // allowedTextbooks is always derived fresh from config.course (never
+      // just trusted off the saved row) so this fix applies immediately to
+      // every already-saved reassessment_configs doc, not only ones an
+      // admin re-saves after this fix shipped — see reassessmentVocabGenerator.js.
+      const allowedTextbooks = getAllowedTextbooks(config.course);
+      const vocabBlocks = (config.vocabBlocks || []).map((r) => ({
+        label: r.section,
+        section: r.section,
+        count: Number(r.count) || 0,
+        textbook: r.textbook || null,
+        allowedTextbooks,
+      }));
       const verbQuestions = generateVerbQuestions(blocks, masterVerbsMap, { withoutReplacement: true });
       const sentenceQuestions = generateSentenceRecallQuestions(sentenceBlocks, sentenceBank, { withoutReplacement: true });
       const vocabQuestions = generateVocabRecallQuestions(vocabBlocks, vocabulary, { withoutReplacement: true });

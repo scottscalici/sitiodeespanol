@@ -8,6 +8,7 @@ import { generateVerbQuestions } from '../../../utils/verbQuestionGenerator';
 import { generateSentenceRecallQuestions } from '../../../utils/reassessmentSentenceGenerator';
 import { generateVocabRecallQuestions } from '../../../utils/reassessmentVocabGenerator';
 import { VERB_TENSES } from '../../../utils/verbTenses';
+import { getAllowedTextbooks, textbookMatches } from '../../../utils/textbookAccess';
 
 // Phase A of Reassessments: define, per gate-enabled Practice Hub circle
 // (the same circleId `${path_id}__${pod.id}` the recuperación gate already
@@ -64,6 +65,12 @@ export default function ReassessmentConfigManager() {
                 title: pod.title,
                 evalLabel: pod.evalLink.label,
                 evalDia: resolveCurrentEvalDia(evalOptionsByCourse[d.course] || [], pod.evalLink),
+                // May be '' for grammar/verb-content pods (FormLearningPath
+                // only sets it for contentType==='vocab') — not every
+                // gated circle is about a single specific book, so this is
+                // a best-effort narrowing on top of the course-level
+                // allowedTextbooks filter below, not a required field.
+                textbook: d.textbook || '',
               });
             });
           });
@@ -133,11 +140,27 @@ export default function ReassessmentConfigManager() {
   const updateSentenceRow = (idx, patch) => setSentenceRows(sentenceRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const removeSentenceRow = (idx) => setSentenceRows(sentenceRows.filter((_, i) => i !== idx));
 
+  // A section label like "2.1" is free text per textbook, not course-unique
+  // — S2's Descubre book and S4's Reporteros 4 book can each use "2.1" in
+  // their own numbering. Scope the pool to the selected circle's own book
+  // when known, else fall back to every book that course is allowed to pull
+  // from (textbookAccess.js) — this is what actually stops the dropdown
+  // from ever offering a section that would silently draw the other
+  // course's vocab at quiz time (see reassessmentVocabGenerator.js).
+  const allowedTextbooksForCircle = selectedCircle ? getAllowedTextbooks(selectedCircle.course) : [];
+  const vocabPoolForCircle = selectedCircle
+    ? vocabulary.filter((v) =>
+        selectedCircle.textbook
+          ? textbookMatches(v.metadata?.textbook, selectedCircle.textbook)
+          : allowedTextbooksForCircle.some((t) => textbookMatches(v.metadata?.textbook, t))
+      )
+    : vocabulary;
+
   // Only sections that actually have at least one vocabulary word are
   // offered — matches the section tagging convention vocab docs already use
   // (metadata.secciones), same way availableSentenceTags only lists tags
   // that have real [[forma|infinitivo]] content behind them.
-  const availableVocabSections = [...new Set(vocabulary.flatMap((v) => v.metadata?.secciones || []))].sort();
+  const availableVocabSections = [...new Set(vocabPoolForCircle.flatMap((v) => v.metadata?.secciones || []))].sort();
 
   const addVocabRow = () => setVocabRows([...vocabRows, { section: '', count: 10 }]);
   const updateVocabRow = (idx, patch) => setVocabRows(vocabRows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -168,12 +191,22 @@ export default function ReassessmentConfigManager() {
     validSentenceRows.map((r) => ({ label: r.tag, tag: r.tag, count: Number(r.count) || 0 }));
 
   const vocabBlocksFromRows = () =>
-    validVocabRows.map((r) => ({ label: r.section, section: r.section, count: Number(r.count) || 0 }));
+    validVocabRows.map((r) => ({
+      label: r.section,
+      section: r.section,
+      count: Number(r.count) || 0,
+      // Saved so a book-level-known circle stays precisely scoped even if a
+      // course's allowed-textbook list changes later — ReassessmentEngine.jsx
+      // still re-derives allowedTextbooks fresh from config.course at quiz
+      // time regardless, so this is a refinement on top, not the only guard.
+      textbook: selectedCircle?.textbook || null,
+    }));
 
   const handlePreview = () => {
     const verbQuestions = generateVerbQuestions(blocksFromRows(), masterVerbsMap, { withoutReplacement: true });
     const sentenceQuestions = generateSentenceRecallQuestions(sentenceBlocksFromRows(), sentenceBank, { withoutReplacement: true });
-    const vocabQuestions = generateVocabRecallQuestions(vocabBlocksFromRows(), vocabulary, { withoutReplacement: true });
+    const vocabBlocks = vocabBlocksFromRows().map((b) => ({ ...b, allowedTextbooks: allowedTextbooksForCircle }));
+    const vocabQuestions = generateVocabRecallQuestions(vocabBlocks, vocabulary, { withoutReplacement: true });
     setPreviewQuestions([...verbQuestions, ...sentenceQuestions, ...vocabQuestions]);
   };
 
@@ -188,7 +221,7 @@ export default function ReassessmentConfigManager() {
         evalLabel: selectedCircle.evalLabel,
         groups: validRows,
         sentenceBlocks: validSentenceRows,
-        vocabBlocks: validVocabRows,
+        vocabBlocks: vocabBlocksFromRows(),
         // The 60-second floor must apply to the final SECONDS value, not to
         // the minutes input — applying it before multiplying (the old
         // `Math.max(60, minutes) * 60`) silently forced anything under 60
