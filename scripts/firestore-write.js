@@ -6,12 +6,18 @@
 // generating a JSON file to feed this.
 //
 // Usage:
-//   node scripts/firestore-write.js <file.json> <collectionName> [--dry-run] [--test]
+//   node scripts/firestore-write.js <file.json> <collectionName> [--dry-run] [--test] [--yes]
 //
 // --dry-run   Validate and preview only. Nothing is read for backup and
 //             nothing is written. No confirmation prompt.
 // --test      Writes to `<collectionName>_test` instead of the real
 //             collection, so new content can be checked safely first.
+// --yes       Skips the interactive "type yes" prompt. Only for a context
+//             with no real terminal for a human to type into — the actual
+//             approval still has to happen somewhere real (e.g. a chat
+//             UI's own explicit yes/no decision, reviewing this exact
+//             preview) before this flag gets passed; it is not a way to
+//             rubber-stamp a write that was just asked for in passing.
 //
 // Every item in the JSON array must have a non-empty string `id` field —
 // that becomes the Firestore document id, and (matching this repo's own
@@ -65,7 +71,7 @@ const parseArgs = (argv) => {
     else positional.push(arg);
   }
   const [filePath, collectionName] = positional;
-  return { filePath, collectionName, dryRun: flags.has('dry-run'), test: flags.has('test') };
+  return { filePath, collectionName, dryRun: flags.has('dry-run'), test: flags.has('test'), yes: flags.has('yes') };
 };
 
 const loadItems = (filePath) => {
@@ -205,8 +211,8 @@ const askYesNo = (question) =>
   });
 
 const main = async () => {
-  const { filePath, collectionName, dryRun, test } = parseArgs(process.argv.slice(2));
-  if (!collectionName) fail('Usage: node scripts/firestore-write.js <file.json> <collectionName> [--dry-run] [--test]');
+  const { filePath, collectionName, dryRun, test, yes } = parseArgs(process.argv.slice(2));
+  if (!collectionName) fail('Usage: node scripts/firestore-write.js <file.json> <collectionName> [--dry-run] [--test] [--yes]');
 
   const items = loadItems(filePath);
   validateItems(items);
@@ -238,7 +244,18 @@ const main = async () => {
   const updateCount = existingIds.size;
   console.log(`\nWill create: ${createCount}  |  Will update (merge): ${updateCount}`);
 
-  const confirmed = await askYesNo(`\nType "yes" to write ${items.length} document(s) to "${targetCollection}": `);
+  // --yes skips the interactive prompt entirely — for a session with no
+  // real terminal to type "yes" into. Deliberately NOT a substitute for the
+  // prompt in normal use: it only exists so a human's actual approval,
+  // given through some other real decision point (e.g. a chat UI's explicit
+  // yes/no prompt reviewing this exact preview), can be acted on — never
+  // passed because a request merely asked for the write in passing.
+  let confirmed = yes;
+  if (!confirmed) {
+    confirmed = await askYesNo(`\nType "yes" to write ${items.length} document(s) to "${targetCollection}": `);
+  } else {
+    console.log('\n--yes passed — skipping the interactive prompt.');
+  }
   if (!confirmed) {
     console.log('\nAborted — no changes made.\n');
     return;
