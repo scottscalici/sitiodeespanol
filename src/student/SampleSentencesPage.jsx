@@ -119,7 +119,7 @@ const SampleSentencesPage = () => {
                 if (!sentence.answer) {
                   return (
                     <p key={index} className="text-slate-300 text-sm italic leading-snug">
-                      &ldquo;{sentence.display}&rdquo;
+                      {sentence.display}
                     </p>
                   );
                 }
@@ -130,17 +130,18 @@ const SampleSentencesPage = () => {
                 return (
                   <div key={index} className="flex items-start justify-between gap-3">
                     <p className="text-slate-300 text-sm italic leading-snug flex-1">
-                      &ldquo;{before}
+                      {before}
                       <span className="mx-1 inline-block w-16 sm:w-24 border-b-2 border-slate-600 align-bottom">&nbsp;</span>
-                      {after}&rdquo;
+                      {after}
                     </p>
                     {isAdmin && (
                       <button
                         onClick={() => toggleReveal(index)}
-                        className="shrink-0 text-xs font-black hover:opacity-80 transition-opacity not-italic"
+                        className="shrink-0 flex items-center gap-1 text-xs font-black hover:opacity-80 transition-opacity not-italic"
                         style={{ color: 'var(--accent, #fbbf24)' }}
                       >
-                        {isRevealed ? sentence.answer : '👁️'}
+                        <span className={`inline-block transition-transform ${isRevealed ? 'rotate-90' : ''}`}>▶</span>
+                        {isRevealed && sentence.answer}
                       </button>
                     )}
                   </div>
