@@ -68,6 +68,7 @@ import * as ordering from './ordering';
 import * as hotspot from './hotspot';
 import * as trueFalse from './trueFalse';
 import * as openEnded from './openEnded';
+import * as speedBlanks from './speedBlanks';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -83,6 +84,7 @@ export const QUESTION_TYPES = {
   [hotspot.TYPE_KEY]: hotspot,
   [trueFalse.TYPE_KEY]: trueFalse,
   [openEnded.TYPE_KEY]: openEnded,
+  [speedBlanks.TYPE_KEY]: speedBlanks,
 };
 
 export const TYPE_LABELS = Object.fromEntries(
