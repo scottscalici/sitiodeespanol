@@ -643,14 +643,27 @@ const Dashboard = () => {
                 </Link>
               )}
   
-              {/* 🗣️ CONVERSACIÓN — WIDGET STYLE */}
+              {/* 🗣️ CONVERSACIÓN — WIDGET STYLE, chat-bubble tail */}
               {activeConversaciones.map((conv) => (
-                <Link
-                  key={conv.id}
-                  to={`/actividad/conversacion/${conv.id}`}
-                  className="group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all hover:shadow-2xl hover:-translate-y-1"
-                  style={cardTheme('conversacion').style}
-                >
+                <div key={conv.id} className="group relative">
+                  {/* Tail: same bg classes/style as the card, so it always
+                      matches (including any theme color override) without
+                      needing to compute a color. Rendered BEFORE the card in
+                      DOM order so it stacks underneath by default — only the
+                      sliver poking past the card's rounded bottom edge shows,
+                      the rest is covered by the card's own opaque background.
+                      It has to live outside the card's own overflow-hidden
+                      box (a child there would just get clipped away). */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -bottom-1.5 left-6 w-4 h-4 rotate-45 rounded-sm bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 transition-transform group-hover:-translate-y-1 pointer-events-none"
+                    style={cardTheme('conversacion').style}
+                  />
+                  <Link
+                    to={`/actividad/conversacion/${conv.id}`}
+                    className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
+                    style={cardTheme('conversacion').style}
+                  >
                   <CardOverlay overlay={cardTheme('conversacion').overlay} />
                   <CardCornerDecoration decoration={cardTheme('conversacion').cornerDecoration} />
                   <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -681,9 +694,10 @@ const Dashboard = () => {
                       Practicar <span>→</span>
                     </span>
                   </div>
-                </Link>
+                  </Link>
+                </div>
               ))}
-  
+
               {/* 📺 VIDEO — TV WIDGET STYLE */}
               {activeVideos.map((vid) => (
                 <Link
