@@ -173,7 +173,10 @@ export const computeLessonPlanDay = (raw, course, selectedDay) => {
 // an admin view covering both. Returns null (never 1) while nothing has
 // happened yet, so a caller can tell "no calendar data" apart from "today
 // really is day 1" and leave its own default alone in the former case.
-const resolveTodayDia = (rawDatesMap) => {
+// Exported so a consumer that only holds `raw` (e.g. via useRawLessonPlanData
+// directly, like DailyControlPanel) can compute it too, not just the two
+// wrapper hooks below that already return it as `todayDia`.
+export const resolveTodayDia = (rawDatesMap) => {
   const todayStr = new Date().toLocaleDateString('en-CA');
   let best = null;
   Object.entries(rawDatesMap).forEach(([dayNum, fechas]) => {

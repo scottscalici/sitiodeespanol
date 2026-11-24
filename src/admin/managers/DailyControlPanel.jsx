@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useActiveTheme } from '../../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../../utils/parseHeaderGradient';
-import { useRawLessonPlanData, computeLessonPlanDay } from '../../hooks/useLessonPlanData';
+import { useRawLessonPlanData, computeLessonPlanDay, resolveTodayDia } from '../../hooks/useLessonPlanData';
 import { reconstructQuestion } from '../../shared/questionTypes';
 import PracticeCardPreviewModal from './PracticeCardPreviewModal';
 import {
@@ -42,9 +42,22 @@ const useSectionStatus = () => {
 const StatusLine = ({ text }) =>
   text ? <p className={`text-xs font-bold mt-2 ${text.startsWith('❌') ? 'text-rose-500' : 'text-emerald-500'}`}>{text}</p> : null;
 
-const SectionCard = ({ title, children }) => (
+// `toolLink` is the small "open the real sequencer/manager for this" link
+// every card needs per spec — this panel is a quick control surface, not a
+// replacement for the in-depth tools, so every section points back to its
+// own full tool for anything beyond a quick swap/edit.
+const ToolLink = ({ to, label }) => (
+  <Link to={to} className="text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-700 whitespace-nowrap">
+    🔗 {label}
+  </Link>
+);
+
+const SectionCard = ({ title, toolLink, children }) => (
   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
-    <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{title}</h2>
+    <div className="flex items-center justify-between gap-2">
+      <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{title}</h2>
+      {toolLink && <ToolLink {...toolLink} />}
+    </div>
     {children}
   </div>
 );
@@ -69,7 +82,7 @@ const SimpleListPreviewModal = ({ title, rows, onClose }) => (
 // nothing else in this file changes.
 const makeFlexibleTypes = (raw) => [
   {
-    key: 'conversacion', label: 'Conversación',
+    key: 'conversacion', label: 'Conversación', toolPath: '/admin-daily-plan-conversaciones',
     getAssigned: (pd) => pd.actividades.conversaciones,
     listAll: (course) => raw.conversaciones.filter((c) => (c.courses || []).includes(course)),
     titleOf: (c) => c.titulo || 'Sin título',
@@ -77,7 +90,7 @@ const makeFlexibleTypes = (raw) => [
     unassign: (id, course, dia) => setConversacionAssignment(id, { course, dia }, false),
   },
   {
-    key: 'lectura', label: 'Lectura',
+    key: 'lectura', label: 'Lectura', toolPath: '/admin-lecturas-sequencer',
     getAssigned: (pd) => pd.actividades.lecturas,
     listAll: () => Object.values(raw.lecturasById || {}),
     titleOf: (l) => l.subtitulo || 'Sin título',
@@ -85,7 +98,7 @@ const makeFlexibleTypes = (raw) => [
     unassign: (id, course, dia) => setLecturaAssignment(course, dia, id, false),
   },
   {
-    key: 'musica', label: 'Música',
+    key: 'musica', label: 'Música', toolPath: '/admin-daily-plan-musica',
     getAssigned: (pd) => pd.actividades.musica,
     listAll: (course) => raw.musica.filter((m) => (Array.isArray(m.course) ? m.course : [m.course].filter(Boolean)).includes(course)),
     titleOf: (m) => m.titulo || 'Sin título',
@@ -93,7 +106,7 @@ const makeFlexibleTypes = (raw) => [
     unassign: (id, course, dia) => setMusicaAssignment(id, { course, dia }, false),
   },
   {
-    key: 'oraciones', label: 'Oraciones',
+    key: 'oraciones', label: 'Oraciones', toolPath: '/admin-secret-portal-oraciones',
     getAssigned: (pd) => pd.oraciones,
     listAll: (course) => raw.sentenceSets.filter((s) => (s.assignments || []).some((a) => a.course === course)),
     titleOf: (s) => s.title || 'Sin título',
@@ -101,7 +114,7 @@ const makeFlexibleTypes = (raw) => [
     unassign: (id, course, dia) => setOracionesAssignment(id, { course, dia }, false),
   },
   {
-    key: 'practica', label: 'Práctica',
+    key: 'practica', label: 'Práctica', toolPath: '/admin-practice-cards-sequencer',
     getAssigned: (pd) => pd.practica,
     listAll: (course) => raw.practiceCards.filter((p) => p.course === course || (p.assignments || []).some((a) => a.course === course)),
     titleOf: (p) => p.title || 'Sin título',
@@ -119,7 +132,7 @@ const makeFlexibleTypes = (raw) => [
     ),
   },
   {
-    key: 'video', label: 'Video',
+    key: 'video', label: 'Video', toolPath: '/admin-daily-plan-videos',
     getAssigned: (pd) => pd.actividades.videos,
     listAll: (course) => raw.videos.filter((v) => (v.tags || []).includes(course)),
     titleOf: (v) => v.title || v.titulo || 'Sin título',
@@ -127,7 +140,7 @@ const makeFlexibleTypes = (raw) => [
     unassign: (id, course, dia) => setVideoAssignment(id, { course, dia }, false),
   },
   {
-    key: 'audio', label: 'Audio',
+    key: 'audio', label: 'Audio', toolPath: '/admin-daily-plan-audio',
     getAssigned: (pd) => pd.actividades.audio,
     listAll: (course) => (raw.audioClips || []).filter((a) => (a.tags || []).includes(course)),
     titleOf: (a) => a.title || 'Sin título',
@@ -154,7 +167,20 @@ const DailyControlPanel = () => {
   const [newLabel, setNewLabel] = useState('');
   const [newTarea, setNewTarea] = useState(null);
 
-  React.useEffect(() => {
+  const hasInitializedDay = useRef(false);
+  useEffect(() => {
+    if (hasInitializedDay.current || !raw) return;
+    const today = resolveTodayDia(raw.rawDatesMap);
+    if (today) {
+      // One-time snap to today's día once the async calendar fetch resolves —
+      // same pattern LessonPlanPage.jsx already uses for the same purpose.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedDay(today);
+      hasInitializedDay.current = true;
+    }
+  }, [raw]);
+
+  useEffect(() => {
     if (grammarPages !== null) return;
     getDocs(collection(db, 'grammar_pages')).then((snap) => {
       setGrammarPages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -270,7 +296,7 @@ const DailyControlPanel = () => {
 
         {/* ===== Section 1: Fixed Core ===== */}
 
-        <SectionCard title="🎯 Evaluación">
+        <SectionCard title="🎯 Evaluación" toolLink={{ to: '/admin-daily-plan-evals', label: 'Evaluaciones Sequencer' }}>
           <p className="text-sm text-slate-700">{currentEval || <em className="text-slate-400">Nada asignada</em>}</p>
           <div className="flex gap-2 flex-wrap">
             <select
@@ -305,6 +331,7 @@ const DailyControlPanel = () => {
         <SectionCard title="⏱️ Calentamiento">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-slate-500 uppercase w-20">Verbos</span>
+            <ToolLink to="/admin-secret-portal-calentamiento" label="Calentamiento Admin" />
             <select
               value={currentCal?.id || ''}
               onChange={async (e) => {
@@ -329,6 +356,7 @@ const DailyControlPanel = () => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-slate-500 uppercase w-20">Vocab</span>
+            <ToolLink to="/admin-secret-portal-vocabvault" label="Vocab Vault" />
             <select
               value={currentVocab?.id || ''}
               onChange={async (e) => {
@@ -355,7 +383,7 @@ const DailyControlPanel = () => {
           <StatusLine text={status.vocab} />
         </SectionCard>
 
-        <SectionCard title="💡 Curiosidad">
+        <SectionCard title="💡 Curiosidad" toolLink={{ to: '/admin-daily-plan-curiosidades', label: 'Curiosidades Manager' }}>
           {planData.curiosidad.length === 0 && <p className="text-sm text-slate-400 italic">Nada asignada</p>}
           {planData.curiosidad.map((c) => (
             <div key={c.id} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2">
@@ -382,7 +410,7 @@ const DailyControlPanel = () => {
           <StatusLine text={status.curiosidad} />
         </SectionCard>
 
-        <SectionCard title="📚 Gramática">
+        <SectionCard title="📚 Gramática" toolLink={{ to: '/admin-daily-plan-gramatica', label: 'Gramática Sequencer' }}>
           <textarea
             value={draft.introText}
             onChange={(e) => setGrammarDraft({ ...draft, introText: e.target.value })}
@@ -429,7 +457,7 @@ const DailyControlPanel = () => {
           <StatusLine text={status.gramatica} />
         </SectionCard>
 
-        <SectionCard title="📝 Tareas">
+        <SectionCard title="📝 Tareas" toolLink={{ to: '/admin-daily-plan-tareas', label: 'Tareas Sequencer' }}>
           {activeTareas.length === 0 && <p className="text-sm text-slate-400 italic">Nada activo hoy</p>}
           {activeTareas.map((t) => (
             <div key={t.id} className="bg-slate-50 rounded-lg p-2 space-y-1">
@@ -494,7 +522,7 @@ const DailyControlPanel = () => {
 
         <div className="space-y-3">
           {assignedRows.map(({ t, assigned }) => (
-            <SectionCard key={t.key} title={t.label}>
+            <SectionCard key={t.key} title={t.label} toolLink={t.toolPath ? { to: t.toolPath, label: `${t.label} Manager` } : null}>
               {assigned.map((item) => (
                 <div key={item.id} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2 flex-wrap">
                   <span className="flex-1 text-sm font-bold text-slate-700 min-w-[120px]">{t.titleOf(item)}</span>
@@ -529,6 +557,7 @@ const DailyControlPanel = () => {
           {emptyRows.map(({ t }) => (
             <div key={t.key} className="bg-slate-800/40 rounded-xl p-3 flex items-center gap-2 opacity-60">
               <span className="flex-1 text-xs font-bold text-slate-400 uppercase">{t.label} — nada asignado</span>
+              {t.toolPath && <ToolLink to={t.toolPath} label={`${t.label} Manager`} />}
               <select
                 value=""
                 onChange={async (e) => {
