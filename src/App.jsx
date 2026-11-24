@@ -107,6 +107,7 @@ import MusicaEditor from './admin/managers/MusicaEditor';
 import MusicaManager from './admin/managers/MusicaManager';
 import PrintMusica from './admin/managers/PrintMusica';
 import VideosManager from './admin/managers/VideosManager';
+import AudioManager from './admin/managers/AudioManager';
 
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
@@ -401,6 +402,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <VideosManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-daily-plan-audio"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <AudioManager />
                 </AdminRoute>
               }
             />

@@ -23,6 +23,7 @@ export const ADMIN_SECTIONS = [
       { to: '/admin-vocab-sequencer', label: 'Vocabulario Activo', emoji: '🧠' },
       { to: '/admin-daily-plan-musica', label: 'Música', emoji: '🎵' },
       { to: '/admin-daily-plan-videos', label: 'Videos', emoji: '🎬' },
+      { to: '/admin-daily-plan-audio', label: 'Audio', emoji: '🎧' },
       { to: '/admin-daily-plan-conversaciones', label: 'Conversación', emoji: '🗣️' },
     ],
   },

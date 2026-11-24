@@ -1000,6 +1000,15 @@ A lightweight "share a photo" card, distinct from Curiosidades (interactive ques
 { "title": "Short: El subjuntivo en 60 segundos", "dia": "", "tags": ["subjuntivo"], "video_url": "https://youtube.com/shorts/...", "thumbnail_url": "", "page_url": "", "is_short": true, "description": "", "internal_notes": "" }
 ```
 
+### `audio_clips`
+**Keyed by:** admin-chosen id via `AudioManager.jsx`'s grid (`writeBatch`/`batch.set(ref, data, {merge:true})` per row — same pattern as `videos`, new collection added alongside it as a sibling day-sequencer, not a rewrite of any existing tool).
+**Required fields:** `title` (string), `audio_url` (string — via the existing-but-previously-unused `AudioUploadField`/`AudioPickerModal` shared components, `src/admin/shared/`)
+**Optional fields:** `dia` (number|null), `tags` (string[] — course scoping, `'s2'`/`'s4'`/etc., identical convention to `videos.tags`), `description` (string), `thumbnail_url` (string, via `ImageUploadField`), `questions` (array — shared question-type engine, same optional pattern as `musica.questions`, managed via its own `AudioQuestionsModal.jsx`, default `[]`)
+**Example:**
+```json
+{ "title": "Entrevista: un día típico", "audio_url": "https://.../entrevista.mp3", "dia": 14, "tags": ["s2"], "description": "Escucha y responde.", "thumbnail_url": "", "questions": [{ "type": "multiple_choice", "prompt": "¿A qué hora se despierta?", "options": ["6:00", "7:00", "8:00"], "answer": "7:00" }] }
+```
+
 ### `culture` *(Firestore collection name — rendered on-site as "Cultura")*
 **Keyed by:** admin-chosen id via the generic MasterDashboard save.
 **Required fields:** `titulo` (string, generic base field), `mainText` (string)
