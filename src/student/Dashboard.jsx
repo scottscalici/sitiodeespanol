@@ -645,14 +645,17 @@ const Dashboard = () => {
   
               {/* 🗣️ CONVERSACIÓN — WIDGET STYLE, chat-bubble tail */}
               {activeConversaciones.map((conv) => {
-                // A second gradient box here, even an identical one, never
-                // lines up pixel-for-pixel with the card's own gradient (the
-                // tail is a separate, much smaller element) and reads as a
-                // visible seam — a flat color blends in far better. Default
-                // case: a solid tone approximating the default gradient at
-                // the tail's position (bottom-left). Themed-override case:
-                // reuse that override's own base color (not its gradient),
-                // pulled out of the CSS string getThemedCardStyle builds.
+                // A gradient card + a separately-positioned tail can never
+                // line up (the tail is a tiny box, the gradient is painted
+                // across the whole card, so sampling "the same" gradient on
+                // the tail always lands on a different point of it than
+                // whatever's actually behind that spot on the card) — the
+                // only way to make them read as one piece is to drop the
+                // gradient for this card and give both the card and the
+                // tail the exact same flat color. Themed-override case:
+                // reuse that override's own base color, pulled out of the
+                // CSS string getThemedCardStyle builds (not its gradient —
+                // the accent second stop is dropped here on purpose).
                 const convStyle = cardTheme('conversacion').style || {};
                 const overrideColorMatch = typeof convStyle.background === 'string'
                   ? convStyle.background.match(/linear-gradient\([^,]+,\s*([^,]+),/)
@@ -661,12 +664,19 @@ const Dashboard = () => {
                 // A malformed override color (bad theme data — this is how a
                 // "##f1f5f9" double-# typo was actually found) would silently
                 // vanish if passed straight through: an invalid CSS color is
-                // just dropped by the browser rather than erroring, so the
-                // tail would render with no visible fill at all. Only trust
-                // it if it's a well-formed hex/rgb/hsl/named-ish token;
-                // anything else falls back to the default solid class.
+                // just dropped by the browser rather than erroring. Only
+                // trust it if it's a well-formed hex/rgb/hsl/named-ish
+                // token; anything else falls back to the default flat color.
                 const looksLikeValidColor = overrideColor && /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\(|[a-z]+)$/i.test(overrideColor);
-                const tailBgStyle = looksLikeValidColor ? { backgroundColor: overrideColor } : undefined;
+                const flatColor = looksLikeValidColor ? overrideColor : '#0e7490'; // cyan-700, matches the default (no-override) look
+                const cardBorderStyle = {
+                  borderStyle: convStyle.borderStyle,
+                  borderColor: convStyle.borderColor,
+                  borderWidth: convStyle.borderWidth,
+                  borderLeftWidth: convStyle.borderLeftWidth,
+                  borderRadius: convStyle.borderRadius,
+                  boxShadow: convStyle.boxShadow,
+                };
                 return (
                 <div key={conv.id} className="group relative">
                   {/* Clip-path triangle, positioned flush against the card's
@@ -674,16 +684,17 @@ const Dashboard = () => {
                       so it reads as a single attached speech-bubble point
                       rather than a floating shape. Lives outside the card's
                       overflow-hidden box — a child there would just get
-                      clipped away. */}
+                      clipped away. Same exact flatColor as the card below,
+                      not an approximation of it, so there's no seam. */}
                   <div
                     aria-hidden="true"
-                    className={`absolute -bottom-5 left-8 w-6 h-5 transition-transform group-hover:-translate-y-1 pointer-events-none ${tailBgStyle ? '' : 'bg-cyan-800'}`}
-                    style={{ ...tailBgStyle, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
+                    className="absolute -bottom-5 left-8 w-6 h-5 transition-transform group-hover:-translate-y-1 pointer-events-none"
+                    style={{ backgroundColor: flatColor, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
                   />
                   <Link
                     to={`/actividad/conversacion/${conv.id}`}
-                    className="relative block h-full overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
-                    style={cardTheme('conversacion').style}
+                    className="relative block h-full overflow-hidden rounded-2xl p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
+                    style={{ ...cardBorderStyle, backgroundColor: flatColor }}
                   >
                   <CardOverlay overlay={cardTheme('conversacion').overlay} />
                   <CardCornerDecoration decoration={cardTheme('conversacion').cornerDecoration} />
