@@ -110,8 +110,8 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
     return (
       <div className="space-y-4 text-center">
         <PromptImage src={question.promptImage} />
-        {!hidePrompt && question.prompt && <h2 className="text-lg font-bold text-slate-800">{question.prompt}</h2>}
-        <p className="text-sm text-slate-600">
+        {!hidePrompt && question.prompt && <h2 className="text-lg font-bold text-slate-200">{question.prompt}</h2>}
+        <p className="text-sm text-slate-300">
           Tienes <span className="font-black">{formatClock(timeLimit)}</span> para escribir{' '}
           <span className="font-black">{items.length}</span> respuestas.
         </p>
@@ -128,7 +128,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
   return (
     <div className="space-y-4">
       <PromptImage src={question.promptImage} />
-      {!hidePrompt && question.prompt && <h2 className="text-lg font-bold text-slate-800 text-center">{question.prompt}</h2>}
+      {!hidePrompt && question.prompt && <h2 className="text-lg font-bold text-slate-200 text-center">{question.prompt}</h2>}
 
       {!locked && (
         <p
@@ -148,7 +148,7 @@ const RetryRenderer = ({ question, onItemFirstAttempt, onAllCorrect, initialStat
           const isCorrect = correctness ? correctness[i] : null;
           return (
             <div key={i} className="flex items-center gap-3">
-              <span className="flex-1 text-sm font-bold text-slate-700">{item.clue}</span>
+              <span className="flex-1 text-sm font-bold text-slate-200">{item.clue}</span>
               <div className="flex-1 min-w-0">
                 <input
                   type="text"
