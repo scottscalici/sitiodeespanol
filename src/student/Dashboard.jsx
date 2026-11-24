@@ -673,7 +673,7 @@ const Dashboard = () => {
                   />
                   <Link
                     to={`/actividad/conversacion/${conv.id}`}
-                    className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
+                    className="relative block h-full overflow-hidden rounded-2xl bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
                     style={cardTheme('conversacion').style}
                   >
                   <CardOverlay overlay={cardTheme('conversacion').overlay} />
