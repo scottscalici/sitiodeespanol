@@ -47,6 +47,7 @@ export const useRawLessonPlanData = (refreshKey) => {
           curiosidades, tareasDoc, evaluacionesDoc, gramaticaDoc, anuncios,
           destacados, videos, conversaciones, musica, cultura,
           lecturasMasterDoc, lecturas, audioClips,
+          senordle, atandoCabos, eslabones,
         ] = await Promise.all([
           getCachedCollection('calentamientos'),
           getCachedCollection('dailyVocabWarmups'),
@@ -65,6 +66,14 @@ export const useRawLessonPlanData = (refreshKey) => {
           getCachedDoc('curriculum_tracks', 'lecturas_master'),
           getCachedCollection('lecturas'),
           getCachedCollection('audio_clips'),
+          // Recreo (Señordle/Atando Cabos/Eslabones) — these games key by real
+          // calendar date, not día number, so nothing here feeds
+          // computeLessonPlanDay; a consumer that wants "what would a student
+          // see today" looks these up itself via rawDatesMap's real date(s)
+          // for the selected día. Only DailyControlPanel does this today.
+          getCachedBucketedCollection('juego_senordle'),
+          getCachedCollection('juego_atandocabos'),
+          getCachedCollection('juego_eslabones'),
         ]);
 
         if (cancelled) return;
@@ -78,6 +87,7 @@ export const useRawLessonPlanData = (refreshKey) => {
           gramatica: { s2: gramaticaDoc?.s2 || [], s4: gramaticaDoc?.s4 || [] },
           anuncios, destacados, videos, conversaciones, musica, cultura,
           lecturasMaster: lecturasMasterDoc || {}, lecturasById, audioClips,
+          senordle, atandoCabos, eslabones,
         });
       } catch (err) {
         console.error('Error loading lesson plan data:', err);

@@ -6,6 +6,7 @@ import { useActiveTheme } from '../../context/ThemeContext';
 import { parseHeaderGradientStyle } from '../../utils/parseHeaderGradient';
 import { useRawLessonPlanData, computeLessonPlanDay, resolveTodayDia } from '../../hooks/useLessonPlanData';
 import { reconstructQuestion } from '../../shared/questionTypes';
+import { decodeWord } from '../../utils/wordCipher';
 import PracticeCardPreviewModal from './PracticeCardPreviewModal';
 import {
   parseIds, joinIds, tareasActiveOnDay,
@@ -160,6 +161,8 @@ const DailyControlPanel = () => {
   const [previewVocab, setPreviewVocab] = useState(null);
   const [previewCuriosidad, setPreviewCuriosidad] = useState(null);
   const [flexPreview, setFlexPreview] = useState(null); // { typeKey, item }
+  const [previewAtandoCabos, setPreviewAtandoCabos] = useState(null);
+  const [previewEslabones, setPreviewEslabones] = useState(null);
 
   const [grammarPages, setGrammarPages] = useState(null);
   const [grammarDraft, setGrammarDraft] = useState(null); // { introText, repasoText, enlaces, recursos }
@@ -260,6 +263,21 @@ const DailyControlPanel = () => {
   const withAssigned = flexibleTypes.map((t) => ({ t, assigned: t.getAssigned(planData) || [] }));
   const assignedRows = withAssigned.filter((x) => x.assigned.length > 0).sort((a, b) => a.t.label.localeCompare(b.t.label));
   const emptyRows = withAssigned.filter((x) => x.assigned.length === 0).sort((a, b) => a.t.label.localeCompare(b.t.label));
+
+  // ---- Recreo preview (read-only) ----
+  // Señordle/Atando Cabos/Eslabones key by real calendar date, not día — a
+  // día can resolve to two real dates (one per A/B ciclo), so show one row
+  // per real date rather than picking just one.
+  const recreoDates = raw.rawDatesMap[selectedDay] || [];
+  const recreoByDate = recreoDates.map((fecha) => ({
+    fecha,
+    senordleWord: (() => {
+      const entry = raw.senordle.find((s) => s.id === `${course}_${fecha}`);
+      return entry?.word ? decodeWord(entry.word) : null;
+    })(),
+    atandoCabos: raw.atandoCabos.find((a) => a.id === `ac-${course}-${fecha}`) || null,
+    eslabones: raw.eslabones.find((e) => e.id === `es-${course}-${fecha}`) || null,
+  }));
 
   return (
     <div className={`min-h-screen text-white font-sans relative overflow-hidden ${pageBgStyle ? '' : pageBgClass}`} style={pageBgStyle || undefined}>
@@ -574,6 +592,50 @@ const DailyControlPanel = () => {
             </div>
           ))}
         </div>
+
+        {/* ===== Recreo (read-only preview — side-quest games, keyed by real date, not día) ===== */}
+        <SectionCard title="🎮 Recreo (vista previa)">
+          <p className="text-xs text-slate-400 italic">
+            Señordle, Atando Cabos y Eslabones se asignan por fecha real, no por día de clase — esto muestra lo que un
+            estudiante vería hoy, para revisar rápido. Para editarlos, usa su propio manager.
+          </p>
+          {recreoByDate.length === 0 && <p className="text-sm text-slate-400 italic">Sin fecha definida para este día.</p>}
+          {recreoByDate.map(({ fecha, senordleWord, atandoCabos, eslabones }) => (
+            <div key={fecha} className="bg-slate-50 rounded-lg p-3 space-y-2">
+              <p className="text-[10px] font-mono font-bold text-slate-400">{fecha}</p>
+
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-bold text-slate-600 w-28">Señordle</span>
+                <ToolLink to="/admin-secret-portal-senordle" label="Señordle Admin" />
+                <span className="font-mono text-slate-700">
+                  {senordleWord || <em className="text-slate-400 font-sans">Sin asignar</em>}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-bold text-slate-600 w-28">Atando Cabos</span>
+                <ToolLink to="/admin-daily-plan-atandocabos" label="Atando Cabos Manager" />
+                {atandoCabos ? (
+                  <>
+                    <span className="text-slate-500 text-xs">{(atandoCabos.categories || []).length} categorías</span>
+                    <button onClick={() => setPreviewAtandoCabos(atandoCabos)} className="text-[10px] font-black uppercase bg-slate-200 text-slate-700 px-2 py-1.5 rounded">👁️ Ver</button>
+                  </>
+                ) : <em className="text-slate-400">Sin asignar</em>}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-bold text-slate-600 w-28">Eslabones</span>
+                <ToolLink to="/admin-daily-plan-eslabones" label="Eslabones Manager" />
+                {eslabones ? (
+                  <>
+                    <span className="text-slate-500 text-xs">{(eslabones.chain || []).length} eslabones</span>
+                    <button onClick={() => setPreviewEslabones(eslabones)} className="text-[10px] font-black uppercase bg-slate-200 text-slate-700 px-2 py-1.5 rounded">👁️ Ver</button>
+                  </>
+                ) : <em className="text-slate-400">Sin asignar</em>}
+              </div>
+            </div>
+          ))}
+        </SectionCard>
       </div>
 
       {previewVerb && (
@@ -602,6 +664,20 @@ const DailyControlPanel = () => {
         const Preview = t?.Preview;
         return Preview ? <Preview item={flexPreview.item} onClose={() => setFlexPreview(null)} /> : null;
       })()}
+      {previewAtandoCabos && (
+        <SimpleListPreviewModal
+          title={`Atando Cabos — ${previewAtandoCabos.fecha}`}
+          rows={(previewAtandoCabos.categories || []).map((c) => `${c.title}: ${(c.items || []).join(', ')}`)}
+          onClose={() => setPreviewAtandoCabos(null)}
+        />
+      )}
+      {previewEslabones && (
+        <SimpleListPreviewModal
+          title={`Eslabones — ${previewEslabones.fecha}`}
+          rows={previewEslabones.chain || []}
+          onClose={() => setPreviewEslabones(null)}
+        />
+      )}
     </div>
   );
 };
