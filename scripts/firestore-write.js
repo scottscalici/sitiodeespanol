@@ -28,7 +28,7 @@
 // the env var just doesn't require a file on disk).
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
-import { createInterface } from 'readline/promises';
+import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 // firebase-admin v12+ moved to the modular API (initializeApp/cert from
@@ -45,9 +45,16 @@ const SERVICE_ACCOUNT_PATH = join(REPO_ROOT, 'serviceAccountKey.json');
 const BACKUPS_DIR = join(REPO_ROOT, 'backups');
 const PREVIEW_COUNT = 3;
 
+// Sets the exit code and unwinds via a throw rather than calling
+// process.exit() directly — when stdout is redirected to a file/pipe
+// (non-TTY), an immediate process.exit() can truncate output that hasn't
+// finished flushing yet, silently dropping the very message meant to
+// explain what went wrong. Letting the process exit naturally once main()
+// settles avoids that.
+class FailError extends Error {}
 const fail = (message) => {
   console.error(`\n❌ ${message}\n`);
-  process.exit(1);
+  throw new FailError(message);
 };
 
 const parseArgs = (argv) => {
@@ -177,12 +184,25 @@ const writeItems = async (db, collectionName, items) => {
   }
 };
 
-const askYesNo = async (question) => {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question(question);
-  rl.close();
-  return answer.trim() === 'yes';
-};
+// readline/promises' rl.question() waits for a 'line' event and never
+// resolves if the input stream ends first without one (stdin closed/empty,
+// e.g. piped from /dev/null or a non-interactive context) — the script
+// would hang indefinitely instead of safely treating "no input" as "no".
+// The plain callback-style readline plus an explicit 'close' listener below
+// guarantees a resolution either way.
+const askYesNo = (question) =>
+  new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    let answered = false;
+    rl.question(question, (answer) => {
+      answered = true;
+      rl.close();
+      resolve(answer.trim() === 'yes');
+    });
+    rl.on('close', () => {
+      if (!answered) resolve(false);
+    });
+  });
 
 const main = async () => {
   const { filePath, collectionName, dryRun, test } = parseArgs(process.argv.slice(2));
@@ -209,7 +229,7 @@ const main = async () => {
     // needed, no network call — so a JSON file can be sanity-checked before
     // credentials are even in place.
     console.log('\n✅ Dry run complete — no Firestore connection made, no backup taken, nothing written.\n');
-    process.exit(0);
+    return;
   }
 
   const db = initFirestore();
@@ -221,7 +241,7 @@ const main = async () => {
   const confirmed = await askYesNo(`\nType "yes" to write ${items.length} document(s) to "${targetCollection}": `);
   if (!confirmed) {
     console.log('\nAborted — no changes made.\n');
-    process.exit(0);
+    return;
   }
 
   console.log(`\nBacking up current "${targetCollection}" before writing...`);
@@ -233,10 +253,11 @@ const main = async () => {
 
   console.log(`\n✅ Done. Created: ${createCount}  |  Updated: ${updateCount}  |  Total written: ${items.length}`);
   console.log(`Backup of the pre-write state: ${backupPath}\n`);
-  process.exit(0);
 };
 
 main().catch((err) => {
-  console.error('\n❌ Unexpected error:', err);
-  process.exit(1);
+  if (!(err instanceof FailError)) {
+    console.error('\n❌ Unexpected error:', err);
+  }
+  process.exitCode = 1;
 });
