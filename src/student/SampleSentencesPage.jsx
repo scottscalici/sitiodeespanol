@@ -94,62 +94,61 @@ const SampleSentencesPage = () => {
         />
       )}
 
-      <div className="max-w-2xl mx-auto space-y-6 relative z-10">
+      <div className="max-w-2xl mx-auto space-y-3 relative z-10">
         <div className="flex justify-between items-center">
           <Link to="/" className="text-slate-400 hover:text-white text-sm font-bold flex items-center gap-2">← Volver</Link>
         </div>
 
-        <div className="text-center">
-          <h1 className="text-3xl font-black uppercase tracking-tight">{title}</h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">
+        <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 sm:p-6">
+          <span
+            className="inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mb-2"
+            style={{ color: 'var(--accent, #fbbf24)', backgroundColor: 'rgba(251,191,36,0.12)' }}
+          >
+            Actividad
+          </span>
+          <h1 className="text-xl font-black uppercase tracking-tight">{title}</h1>
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1 mb-4">
             {courseId?.toUpperCase()} · Día {targetDia}
           </p>
-        </div>
 
-        {sentences.length === 0 ? (
-          <p className="text-center text-slate-500 font-bold">No hay oraciones disponibles para hoy.</p>
-        ) : (
-          <div className="space-y-4">
-            {sentences.map((sentence, index) => {
-              if (!sentence.answer) {
+          {sentences.length === 0 ? (
+            <p className="text-slate-500 font-bold text-sm">No hay oraciones disponibles para hoy.</p>
+          ) : (
+            <div className="space-y-2">
+              {sentences.map((sentence, index) => {
+                if (!sentence.answer) {
+                  return (
+                    <p key={index} className="text-slate-300 text-sm italic leading-snug">
+                      &ldquo;{sentence.display}&rdquo;
+                    </p>
+                  );
+                }
+
+                const [before, after] = sentence.display.split('_____');
+                const isRevealed = revealed[index];
+
                 return (
-                  <div key={index} className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5">
-                    <p className="text-slate-300 leading-relaxed italic">{sentence.display}</p>
-                  </div>
-                );
-              }
-
-              const [before, after] = sentence.display.split('_____');
-              const isRevealed = revealed[index];
-
-              return (
-                <div key={index} className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                  <p className="text-slate-200 leading-relaxed">
-                    {before}
-                    <span className="mx-1 inline-block w-32 sm:w-40 border-b-2 border-slate-600 align-bottom">&nbsp;</span>
-                    {after}
-                  </p>
-
-                  {isAdmin && (
-                    <div className="mt-3 pt-3 border-t border-slate-700/60">
+                  <div key={index} className="flex items-start justify-between gap-3">
+                    <p className="text-slate-300 text-sm italic leading-snug flex-1">
+                      &ldquo;{before}
+                      <span className="mx-1 inline-block w-16 sm:w-24 border-b-2 border-slate-600 align-bottom">&nbsp;</span>
+                      {after}&rdquo;
+                    </p>
+                    {isAdmin && (
                       <button
                         onClick={() => toggleReveal(index)}
-                        className="flex items-center gap-1.5 hover:opacity-80 text-[10px] font-black uppercase tracking-widest transition-opacity"
+                        className="shrink-0 text-xs font-black hover:opacity-80 transition-opacity not-italic"
                         style={{ color: 'var(--accent, #fbbf24)' }}
                       >
-                        <span className={`transition-transform ${isRevealed ? 'rotate-90' : ''}`}>▶</span>
-                        {isRevealed ? 'Ocultar respuesta' : 'Ver respuesta'}
+                        {isRevealed ? sentence.answer : '👁️'}
                       </button>
-                      {isRevealed && (
-                        <p className="text-xs font-bold mt-2" style={{ color: 'var(--accent, #fbbf24)' }}>Respuesta: {sentence.answer}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
