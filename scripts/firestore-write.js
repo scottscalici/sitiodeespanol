@@ -31,7 +31,13 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { createInterface } from 'readline/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import admin from 'firebase-admin';
+// firebase-admin v12+ moved to the modular API (initializeApp/cert from
+// 'firebase-admin/app', getFirestore from 'firebase-admin/firestore') — the
+// old namespaced `admin.credential.cert(...)`/`admin.firestore()` pattern
+// from a default `import admin from 'firebase-admin'` no longer exists on
+// the installed v14.
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
@@ -128,8 +134,8 @@ const loadServiceAccount = () => {
 
 const initFirestore = () => {
   const serviceAccount = loadServiceAccount();
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  return admin.firestore();
+  const app = initializeApp({ credential: cert(serviceAccount) });
+  return getFirestore(app);
 };
 
 // Reads which of the incoming ids already exist in the target collection,
