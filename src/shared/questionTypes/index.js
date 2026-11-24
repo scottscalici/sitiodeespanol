@@ -69,6 +69,7 @@ import * as hotspot from './hotspot';
 import * as trueFalse from './trueFalse';
 import * as openEnded from './openEnded';
 import * as speedBlanks from './speedBlanks';
+import * as progressiveReveal from './progressiveReveal';
 
 export const QUESTION_TYPES = {
   [matching.TYPE_KEY]: matching,
@@ -85,6 +86,7 @@ export const QUESTION_TYPES = {
   [trueFalse.TYPE_KEY]: trueFalse,
   [openEnded.TYPE_KEY]: openEnded,
   [speedBlanks.TYPE_KEY]: speedBlanks,
+  [progressiveReveal.TYPE_KEY]: progressiveReveal,
 };
 
 export const TYPE_LABELS = Object.fromEntries(
