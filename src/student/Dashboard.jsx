@@ -28,7 +28,7 @@ import Estructura from '../components/Estructura';
 import UtilityCard from '../components/UtilityCard';
 import Destacado from '../components/Destacado';
 import Curiosidad from '../components/Curiosidad';
-import { CardCornerDecoration, CardOverlay } from '../components/CardDecorations';
+import { CardCornerDecoration, CardOverlay, TypingDots } from '../components/CardDecorations';
 import ImageCards from '../components/ImageCards';
 import LecturaCard from '../components/LecturaCard';
 import ResourceHub from '../components/ResourceHub';
@@ -672,8 +672,11 @@ const Dashboard = () => {
                       )}
                     </div>
                   </div>
-  
-                  <div className="mt-5 flex justify-end">
+
+                  <div className="mt-5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-teal-100/70 text-xs italic">
+                      escribiendo <TypingDots dotClassName="bg-teal-100/70" />
+                    </span>
                     <span className="bg-white/15 group-hover:bg-white text-white group-hover:text-teal-700 font-black text-sm px-6 py-2.5 rounded-lg text-center uppercase tracking-wider transition-colors shadow-sm inline-flex items-center gap-2">
                       Practicar <span>→</span>
                     </span>

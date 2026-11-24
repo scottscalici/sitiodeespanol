@@ -134,3 +134,21 @@ export function CardOverlay({ overlay }) {
     </div>
   );
 }
+
+// Three staggered-bounce dots mimicking a live chat "someone's typing..."
+// indicator — purely decorative (no real presence/typing behind it), used
+// on cards whose content is itself a conversation, to hint at that
+// interactivity before the student even opens it.
+export function TypingDots({ className = '', dotClassName = 'bg-current' }) {
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`} aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full ${dotClassName} animate-bounce`}
+          style={{ animationDelay: `${i * 150}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
