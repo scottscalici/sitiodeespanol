@@ -8,7 +8,11 @@ import { getCachedCollection, getCachedDoc, getCachedBucketedCollection } from '
 // the multi-day overview printout). Uses the shared Firestore cache
 // (getCachedCollection/getCachedDoc) so mounting several of these in the
 // same session only pays the read cost once.
-const useRawLessonPlanData = () => {
+// Exported (unlike before) so a consumer that needs the full, un-filtered
+// collections themselves — e.g. to build a "pick any item" dropdown, or to
+// write back to one — can get them from the same shared fetch/cache this
+// hook already uses, instead of issuing its own parallel queries.
+export const useRawLessonPlanData = () => {
   const [loading, setLoading] = useState(true);
   const [raw, setRaw] = useState(null);
 
@@ -37,7 +41,7 @@ const useRawLessonPlanData = () => {
           calentamientos, vocabWarmups, practiceCards, sentenceSets,
           curiosidades, tareasDoc, evaluacionesDoc, gramaticaDoc, anuncios,
           destacados, videos, conversaciones, musica, cultura,
-          lecturasMasterDoc, lecturas,
+          lecturasMasterDoc, lecturas, audioClips,
         ] = await Promise.all([
           getCachedCollection('calentamientos'),
           getCachedCollection('dailyVocabWarmups'),
@@ -55,6 +59,7 @@ const useRawLessonPlanData = () => {
           getCachedCollection('culture'),
           getCachedDoc('curriculum_tracks', 'lecturas_master'),
           getCachedCollection('lecturas'),
+          getCachedCollection('audio_clips'),
         ]);
 
         if (cancelled) return;
@@ -67,7 +72,7 @@ const useRawLessonPlanData = () => {
           evaluaciones: { s2: evaluacionesDoc?.s2 || [], s4: evaluacionesDoc?.s4 || [] },
           gramatica: { s2: gramaticaDoc?.s2 || [], s4: gramaticaDoc?.s4 || [] },
           anuncios, destacados, videos, conversaciones, musica, cultura,
-          lecturasMaster: lecturasMasterDoc || {}, lecturasById,
+          lecturasMaster: lecturasMasterDoc || {}, lecturasById, audioClips,
         });
       } catch (err) {
         console.error('Error loading lesson plan data:', err);
@@ -134,6 +139,7 @@ export const computeLessonPlanDay = (raw, course, selectedDay) => {
   const activeMusica = raw.musica.filter(byCourseDay);
   const activeCultura = raw.cultura.filter(byCourseDay);
   const activeVideos = raw.videos.filter((v) => (v.tags || []).includes(course) && Number(v.dia) === selectedDay);
+  const activeAudio = (raw.audioClips || []).filter((a) => (a.tags || []).includes(course) && Number(a.dia) === selectedDay);
 
   const lecturaIdsToday = raw.lecturasMaster?.[course]?.[String(selectedDay)] || [];
   const activeLecturas = lecturaIdsToday.map((id) => ({ id, ...(raw.lecturasById[id] || {}) }));
@@ -150,7 +156,7 @@ export const computeLessonPlanDay = (raw, course, selectedDay) => {
     tarea: { dueToday: tareasDueToday, assignedTodayDueLater: tareasAssignedTodayDueLater, materialesHoy },
     anuncios: activeAnuncios,
     destacado: activeDestacados,
-    actividades: { videos: activeVideos, conversaciones: activeConversaciones, musica: activeMusica, cultura: activeCultura, lecturas: activeLecturas },
+    actividades: { videos: activeVideos, conversaciones: activeConversaciones, musica: activeMusica, cultura: activeCultura, lecturas: activeLecturas, audio: activeAudio },
   };
 };
 
