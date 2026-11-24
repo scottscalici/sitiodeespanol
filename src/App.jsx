@@ -108,6 +108,7 @@ import MusicaManager from './admin/managers/MusicaManager';
 import PrintMusica from './admin/managers/PrintMusica';
 import VideosManager from './admin/managers/VideosManager';
 import AudioManager from './admin/managers/AudioManager';
+import DailyControlPanel from './admin/managers/DailyControlPanel';
 
 // 📈 ADMIN SEQUENCERS & LEARNING PATHS
 import EvaluacionesSequencer from './admin/sequencers/EvaluacionesSequencer';
@@ -410,6 +411,14 @@ function App() {
               element={
                 <AdminRoute user={user} role={role}>
                   <AudioManager />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin-control-diario"
+              element={
+                <AdminRoute user={user} role={role}>
+                  <DailyControlPanel />
                 </AdminRoute>
               }
             />

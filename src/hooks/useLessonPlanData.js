@@ -12,7 +12,12 @@ import { getCachedCollection, getCachedDoc, getCachedBucketedCollection } from '
 // collections themselves — e.g. to build a "pick any item" dropdown, or to
 // write back to one — can get them from the same shared fetch/cache this
 // hook already uses, instead of issuing its own parallel queries.
-export const useRawLessonPlanData = () => {
+// `refreshKey` (optional) lets a caller force a fresh refetch after writing
+// — bump it (e.g. a counter state incremented post-write) once the write's
+// own cache-invalidation call has cleared the stale entry. Existing callers
+// that never pass one are unaffected: `undefined` never changes, so the
+// effect still only runs once, exactly as before.
+export const useRawLessonPlanData = (refreshKey) => {
   const [loading, setLoading] = useState(true);
   const [raw, setRaw] = useState(null);
 
@@ -82,7 +87,7 @@ export const useRawLessonPlanData = () => {
     };
     fetchAll();
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]);
 
   return { loading: loading || !raw, raw };
 };

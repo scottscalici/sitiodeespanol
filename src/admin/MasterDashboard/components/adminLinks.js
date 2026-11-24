@@ -12,6 +12,7 @@ export const ADMIN_SECTIONS = [
     emoji: '📅',
     color: 'orange',
     links: [
+      { to: '/admin-control-diario', label: 'Centro de Control Diario', emoji: '🎛️' },
       { to: '/admin-lesson-plan', label: 'Plan de Lección', emoji: '📋' },
       { to: '/admin-lesson-plan-overview', label: 'Resumen de Planes', emoji: '🗓️' },
       { to: '/admin-daily-plan-destacado', label: 'Destacado Diario', emoji: '🔥' },
