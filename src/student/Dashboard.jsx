@@ -644,20 +644,33 @@ const Dashboard = () => {
               )}
   
               {/* 🗣️ CONVERSACIÓN — WIDGET STYLE, chat-bubble tail */}
-              {activeConversaciones.map((conv) => (
+              {activeConversaciones.map((conv) => {
+                // Same bg as the card (only the bg-related keys
+                // getThemedCardStyle can produce — not its border props,
+                // which would otherwise draw a little rectangle around the
+                // clipped triangle) so the tail always matches, including
+                // any theme color override, without hardcoding a color.
+                const convStyle = cardTheme('conversacion').style || {};
+                const convBgStyle = {
+                  background: convStyle.background,
+                  backgroundImage: convStyle.backgroundImage,
+                  backgroundRepeat: convStyle.backgroundRepeat,
+                  backgroundPosition: convStyle.backgroundPosition,
+                  backgroundSize: convStyle.backgroundSize,
+                  backgroundBlendMode: convStyle.backgroundBlendMode,
+                };
+                return (
                 <div key={conv.id} className="group relative">
-                  {/* Tail: same bg classes/style as the card, so it always
-                      matches (including any theme color override) without
-                      needing to compute a color. Rendered BEFORE the card in
-                      DOM order so it stacks underneath by default — only the
-                      sliver poking past the card's rounded bottom edge shows,
-                      the rest is covered by the card's own opaque background.
-                      It has to live outside the card's own overflow-hidden
-                      box (a child there would just get clipped away). */}
+                  {/* Clip-path triangle, positioned flush against the card's
+                      own bottom edge (own full height as the bottom offset)
+                      so it reads as a single attached speech-bubble point
+                      rather than a floating shape. Lives outside the card's
+                      overflow-hidden box — a child there would just get
+                      clipped away. */}
                   <div
                     aria-hidden="true"
-                    className="absolute -bottom-1.5 left-6 w-4 h-4 rotate-45 rounded-sm bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 transition-transform group-hover:-translate-y-1 pointer-events-none"
-                    style={cardTheme('conversacion').style}
+                    className="absolute -bottom-5 left-8 w-6 h-5 bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 transition-transform group-hover:-translate-y-1 pointer-events-none"
+                    style={{ ...convBgStyle, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
                   />
                   <Link
                     to={`/actividad/conversacion/${conv.id}`}
@@ -696,7 +709,8 @@ const Dashboard = () => {
                   </div>
                   </Link>
                 </div>
-              ))}
+                );
+              })}
 
               {/* 📺 VIDEO — TV WIDGET STYLE */}
               {activeVideos.map((vid) => (
