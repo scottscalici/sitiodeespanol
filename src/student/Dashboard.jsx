@@ -645,20 +645,19 @@ const Dashboard = () => {
   
               {/* 🗣️ CONVERSACIÓN — WIDGET STYLE, chat-bubble tail */}
               {activeConversaciones.map((conv) => {
-                // Same bg as the card (only the bg-related keys
-                // getThemedCardStyle can produce — not its border props,
-                // which would otherwise draw a little rectangle around the
-                // clipped triangle) so the tail always matches, including
-                // any theme color override, without hardcoding a color.
+                // A second gradient box here, even an identical one, never
+                // lines up pixel-for-pixel with the card's own gradient (the
+                // tail is a separate, much smaller element) and reads as a
+                // visible seam — a flat color blends in far better. Default
+                // case: a solid tone approximating the default gradient at
+                // the tail's position (bottom-left). Themed-override case:
+                // reuse that override's own base color (not its gradient),
+                // pulled out of the CSS string getThemedCardStyle builds.
                 const convStyle = cardTheme('conversacion').style || {};
-                const convBgStyle = {
-                  background: convStyle.background,
-                  backgroundImage: convStyle.backgroundImage,
-                  backgroundRepeat: convStyle.backgroundRepeat,
-                  backgroundPosition: convStyle.backgroundPosition,
-                  backgroundSize: convStyle.backgroundSize,
-                  backgroundBlendMode: convStyle.backgroundBlendMode,
-                };
+                const overrideColorMatch = typeof convStyle.background === 'string'
+                  ? convStyle.background.match(/linear-gradient\([^,]+,\s*([^,]+),/)
+                  : null;
+                const tailBgStyle = overrideColorMatch ? { backgroundColor: overrideColorMatch[1].trim() } : undefined;
                 return (
                 <div key={conv.id} className="group relative">
                   {/* Clip-path triangle, positioned flush against the card's
@@ -669,8 +668,8 @@ const Dashboard = () => {
                       clipped away. */}
                   <div
                     aria-hidden="true"
-                    className="absolute -bottom-5 left-8 w-6 h-5 bg-gradient-to-br from-teal-600 via-cyan-700 to-slate-900 transition-transform group-hover:-translate-y-1 pointer-events-none"
-                    style={{ ...convBgStyle, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
+                    className={`absolute -bottom-5 left-8 w-6 h-5 transition-transform group-hover:-translate-y-1 pointer-events-none ${tailBgStyle ? '' : 'bg-cyan-800'}`}
+                    style={{ ...tailBgStyle, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
                   />
                   <Link
                     to={`/actividad/conversacion/${conv.id}`}
