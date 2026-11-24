@@ -679,18 +679,6 @@ const Dashboard = () => {
                 };
                 return (
                 <div key={conv.id} className="group relative">
-                  {/* Clip-path triangle, positioned flush against the card's
-                      own bottom edge (own full height as the bottom offset)
-                      so it reads as a single attached speech-bubble point
-                      rather than a floating shape. Lives outside the card's
-                      overflow-hidden box — a child there would just get
-                      clipped away. Same exact flatColor as the card below,
-                      not an approximation of it, so there's no seam. */}
-                  <div
-                    aria-hidden="true"
-                    className="absolute -bottom-5 left-8 w-6 h-5 transition-transform group-hover:-translate-y-1 pointer-events-none"
-                    style={{ backgroundColor: flatColor, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
-                  />
                   <Link
                     to={`/actividad/conversacion/${conv.id}`}
                     className="relative block h-full overflow-hidden rounded-2xl p-6 shadow-xl transition-all group-hover:shadow-2xl group-hover:-translate-y-1"
@@ -727,6 +715,19 @@ const Dashboard = () => {
                     </span>
                   </div>
                   </Link>
+                  {/* Clip-path triangle, positioned flush against the card's
+                      own bottom edge (own full height as the bottom offset)
+                      so it reads as a single attached speech-bubble point
+                      rather than a floating shape. Rendered AFTER the card
+                      (not before) so it paints on top of the card's own
+                      drop shadow instead of having that shadow bleed over
+                      it — same exact flatColor as the card, not an
+                      approximation of it, so there's no seam either way. */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -bottom-5 left-8 w-6 h-5 transition-transform group-hover:-translate-y-1 pointer-events-none"
+                    style={{ backgroundColor: flatColor, clipPath: 'polygon(0 0, 100% 0, 15% 100%)' }}
+                  />
                 </div>
                 );
               })}
