@@ -657,7 +657,16 @@ const Dashboard = () => {
                 const overrideColorMatch = typeof convStyle.background === 'string'
                   ? convStyle.background.match(/linear-gradient\([^,]+,\s*([^,]+),/)
                   : null;
-                const tailBgStyle = overrideColorMatch ? { backgroundColor: overrideColorMatch[1].trim() } : undefined;
+                const overrideColor = overrideColorMatch?.[1].trim();
+                // A malformed override color (bad theme data — this is how a
+                // "##f1f5f9" double-# typo was actually found) would silently
+                // vanish if passed straight through: an invalid CSS color is
+                // just dropped by the browser rather than erroring, so the
+                // tail would render with no visible fill at all. Only trust
+                // it if it's a well-formed hex/rgb/hsl/named-ish token;
+                // anything else falls back to the default solid class.
+                const looksLikeValidColor = overrideColor && /^(#[0-9a-f]{3,8}|rgba?\(|hsla?\(|[a-z]+)$/i.test(overrideColor);
+                const tailBgStyle = looksLikeValidColor ? { backgroundColor: overrideColor } : undefined;
                 return (
                 <div key={conv.id} className="group relative">
                   {/* Clip-path triangle, positioned flush against the card's
