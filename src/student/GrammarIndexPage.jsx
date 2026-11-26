@@ -86,22 +86,33 @@ export default function GrammarIndexPage() {
   }, [pages]);
 
   const categoriesByName = useMemo(() => new Map(categories.map((c) => [c.name, c])), [categories]);
+  const pagesById = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages]);
 
-  // The sequence is categories, not individual notes — a category's bar
-  // leads wherever its tile already leads on the alphabetical index (its
+  // The sequence is usually categories, not individual notes — a category's
+  // bar leads wherever its tile already leads on the alphabetical index (its
   // landing note's Rolodex, or the plain fallback category page), so a
   // category with zero notes yet is still a safe, clickable "coming soon"
-  // rather than a broken link.
+  // rather than a broken link. An entry whose id doesn't match any category
+  // but does match an exact grammar_pages id instead links straight to that
+  // one note — for a category a teacher wants bundled for color grouping
+  // (e.g. Reflexivos) but only ONE of whose subtopics actually belongs at
+  // this point in their own sequence (e.g. reflexivos:reciprocos).
   const sequenceRows = useMemo(
     () => mySequence.map((entry) => {
       const cat = categoriesByName.get(entry.id);
+      const directPage = !cat ? pagesById.get(entry.id) : null;
+      const href = cat
+        ? (cat.landing ? `/gramatica/${encodeURIComponent(cat.landing.id)}` : `/gramatica/categoria/${encodeURIComponent(entry.id)}`)
+        : directPage
+        ? `/gramatica/${encodeURIComponent(directPage.id)}`
+        : `/gramatica/categoria/${encodeURIComponent(entry.id)}`;
       return {
         name: entry.id,
-        title: entry.label || entry.id,
-        href: cat?.landing ? `/gramatica/${encodeURIComponent(cat.landing.id)}` : `/gramatica/categoria/${encodeURIComponent(entry.id)}`,
+        title: entry.label || directPage?.title || entry.id,
+        href,
       };
     }),
-    [mySequence, categoriesByName]
+    [mySequence, categoriesByName, pagesById]
   );
 
   const searchResults = useMemo(() => {
