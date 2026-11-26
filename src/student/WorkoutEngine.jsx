@@ -617,10 +617,18 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
               }
           } else if (onePartMatch && !isSpeedRound) {
               const answer = onePartMatch[1];
-              // Same authored [[blank]] sentence, two possible presentations
-              // — a coin flip each time it's drawn, so one sentence gives
-              // real variety instead of always being the same question type.
-              if (Math.random() < 0.5) {
+              // Same authored [[blank]] sentence, two possible presentations.
+              // A segment whose questionMix explicitly asks for 'mc' or
+              // 'sentence' on this draw gets exactly that — this is what
+              // lets a grammar segment's mc/sentence split actually mean
+              // something, instead of always being dead weight next to
+              // total_questions. Any other requested slot (recall, the
+              // padding 'recall' used when the mix doesn't fill
+              // total_questions, etc.) falls back to the original 50/50
+              // coin flip, so every pre-existing segment that never set
+              // mc/sentence on purpose keeps behaving exactly as before.
+              const useMC = requestedType === 'mc' ? true : requestedType === 'sentence' ? false : Math.random() < 0.5;
+              if (useMC) {
                   // --- MULTIPLE CHOICE: pick the right word/phrase for the blank ---
                   // Prefer other authored answers (same grammarTag first) over
                   // generic vocab words — a phrase blank like "a lo mejor" needs
