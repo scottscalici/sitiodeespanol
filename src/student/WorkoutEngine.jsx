@@ -117,6 +117,19 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
     const meta = target.fullData || {};
     const mode = meta.distractorMode;
 
+    // Hand-authored options, verbatim — e.g. the same verb's infinitive,
+    // present indicative, present subjunctive and preterite forms laid out
+    // side by side, so a student picks the form that actually fits the
+    // sentence rather than just recognizing a word. Checked before every
+    // other distractor mode: an author who already knows exactly which 4
+    // forms to show doesn't need the live-verb-lookup machinery below, and
+    // isn't limited by whatever that verb's own Verb Vault doc happens to
+    // have filled in for a given tense/subject.
+    if (Array.isArray(meta.mcOptions) && meta.mcOptions.length >= 2) {
+      const options = meta.mcOptions.includes(answer) ? meta.mcOptions : [answer, ...meta.mcOptions];
+      return shuffle(options);
+    }
+
     if ((mode === 'binary_verb' || mode === 'quad_verb') && meta.targetLemma && meta.targetTense && meta.targetSubject) {
       const pair = PAIR_MAP[meta.pairTag];
       if (pair) {
