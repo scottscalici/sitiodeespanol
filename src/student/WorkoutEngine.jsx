@@ -490,7 +490,30 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
           const useGrammarHistory = grammarHistoryPool.length > 0 &&
             (grammar.length === 0 || Math.random() < historyChance);
           const grammarSourcePool = useGrammarHistory ? grammarHistoryPool : grammar;
-          const target = grammarSourcePool[Math.floor(Math.random() * grammarSourcePool.length)];
+
+          // requestedType only shapes how an ALREADY-DRAWN sentence renders
+          // (see the onePartMatch mc/sentence fork below) — on its own it
+          // never affects which sentence gets drawn in the first place, so a
+          // pool that deliberately mixes both markup styles (some sentences
+          // [[respuesta]]-marked for MC, others [[forma|infinitivo]]-marked
+          // for build-then-conjugate) would otherwise give a 'sentence' slot
+          // only even odds of landing on a build-then-conjugate sentence at
+          // all, wasting the rest. Narrow the draw to markup-compatible
+          // candidates when the mix actually contains both styles; fall back
+          // to the untouched full pool whenever that would leave nothing to
+          // draw from, so a pool using only one style (every pre-existing
+          // segment) draws exactly as it always has.
+          const isTwoPartMarked = (s) => /\[\[(.*?)\|(.*?)\]\]/.test(s.label || '');
+          const isOnePartMarked = (s) => !isTwoPartMarked(s) && /\[\[(.*?)\]\]/.test(s.label || '');
+          let grammarDrawPool = grammarSourcePool;
+          if (requestedType === 'mc') {
+            const onlyMC = grammarSourcePool.filter(isOnePartMarked);
+            if (onlyMC.length > 0) grammarDrawPool = onlyMC;
+          } else if (requestedType === 'sentence') {
+            const onlyBuildConjugate = grammarSourcePool.filter(isTwoPartMarked);
+            if (onlyBuildConjugate.length > 0) grammarDrawPool = onlyBuildConjugate;
+          }
+          const target = grammarDrawPool[Math.floor(Math.random() * grammarDrawPool.length)];
           const spaSentence = target.label;
           const engTrans = getEnglishTrans(target) || "⚠️ Agrega la traducción en la base de datos";
           const targetTags = getDistractorTags(target);
