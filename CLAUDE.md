@@ -1231,6 +1231,7 @@ e.g. `config/academic_year_2026_2027`. **Shape:** `{ map: [{ fecha: "YYYY-MM-DD"
 - `featuredBadgeId` (string)
 - `rewardsSeen` (object) — `{ title: string, badges: object }`
 - `seatPickGrant` (object, deleted via `deleteField` once used)
+- `avatarConfig` (object|null) — `{ style: 'adventurer', options: {...}, accessoryId: string|null, accessoryImageUrl: string|null }`, written by `src/student/AvatarBuilderPage.jsx` (route `/mi-avatar`). `style`/`options` drive `src/utils/avatarCatalog.js`'s self-hosted DiceBear generation (`@dicebear/core` + `@dicebear/adventurer`, no hosted-API calls); `options` is a flat `{hair, hairColor, eyebrows, eyes, mouth, skinColor, glasses, earrings, features}` map — every DiceBear built-in part is free/ungated for all students (curating "which of the 45 hair variants are free" wasn't worth the admin busywork). `accessoryImageUrl` is a **denormalized snapshot** of an `unlockables` doc's `imageUrl` at save time (see below) — not live-linked, so replacing that image later doesn't retroactively update students who already saved with the old one. A student with no `avatarConfig` yet (or missing `.options`) renders `DEFAULT_AVATAR_OPTIONS` seeded off their own `uid`, so nobody ever shows a broken avatar. Rendered via the shared `src/components/StudentAvatar.jsx` in Header.jsx and LeaderboardCard.jsx (LeaderboardCard's `rows.map` must carry `avatarConfig` through explicitly — it doesn't flow through automatically, see its row-shape code).
 **Example:**
 ```json
 {
@@ -1252,8 +1253,13 @@ e.g. `config/academic_year_2026_2027`. **Shape:** `{ map: [{ fecha: "YYYY-MM-DD"
 
 ### `unlockables`
 **Keyed by:** auto-id.
-**Required fields:** `label` (string), `type` (string — currently only `'theme'` is used), `targetId` (string — e.g. a theme's unlock-toggle target), `unlockPoints` (number)
-**Example:** `{ "label": "Tema Calma", "type": "theme", "targetId": "calma", "unlockPoints": 10000 }`
+**Required fields:** `label` (string), `type` (string — `'theme'` or `'avatar_accessory'`), `targetId` (string — e.g. a theme's unlock-toggle target; for `avatar_accessory` just a human-chosen slug, not read by anything), `unlockPoints` (number)
+**Optional fields:** `imageUrl` (string) — only meaningful for `type: 'avatar_accessory'`; the overlay art a student's avatar renders on top of the DiceBear base once unlocked (see `users.avatarConfig` above), uploaded via `ImageUploadField` in `UnlockablesManager.jsx`. Unlock is a live `totalPoints >= unlockPoints` check (same pattern as the Calma theme toggle) — there's no per-student "ownership" write, so raising/lowering `unlockPoints` later instantly re-locks or unlocks it for everyone, there's no "grandfathering" a student who already had it unlocked at a lower threshold.
+**Examples:**
+```json
+{ "label": "Tema Calma", "type": "theme", "targetId": "calma", "unlockPoints": 10000 }
+{ "label": "Corona Dorada", "type": "avatar_accessory", "targetId": "corona_dorada", "imageUrl": "https://.../corona.png", "unlockPoints": 5000 }
+```
 
 ### `leaderboard_history`
 **Keyed by:** `${period}-${key}-${course}` (e.g. `weekly-2026-09-21-s2`, `monthly-2026-09-s2`). Written automatically (never by hand) the first time anyone in a course earns points in the FOLLOWING period — a one-time snapshot, never re-written once it exists.

@@ -3,14 +3,19 @@ import { Link } from 'react-router-dom';
 import { collection, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getCachedCollection, invalidateCollectionCache } from '../../utils/firestoreCache';
+import ImageUploadField from '../shared/ImageUploadField';
 
-// Generic points-gated rewards (currently just the Calma theme toggle in
-// Header.jsx, via ThemeUnlockToggle.jsx) — kept as one small collection so a
-// future unlockable (another theme, a badge, whatever) is just a new row
-// here, with no new admin page or code needed.
-const TYPE_OPTIONS = [{ value: 'theme', label: 'Tema (Clásico/Calma toggle)' }];
+// Generic points-gated rewards (the Calma theme toggle in Header.jsx via
+// ThemeUnlockToggle.jsx, and avatar accessories in AvatarBuilderPage.jsx) —
+// kept as one small collection so a future unlockable (another theme, a
+// badge, whatever) is just a new row here, with no new admin page or code
+// needed. `imageUrl` only applies to the `avatar_accessory` type.
+const TYPE_OPTIONS = [
+  { value: 'theme', label: 'Tema (Clásico/Calma toggle)' },
+  { value: 'avatar_accessory', label: 'Accesorio de Avatar (imagen personalizada)' },
+];
 
-const BLANK_DRAFT = { label: '', type: 'theme', targetId: '', unlockPoints: 10000 };
+const BLANK_DRAFT = { label: '', type: 'theme', targetId: '', unlockPoints: 10000, imageUrl: '' };
 
 export default function UnlockablesManager() {
   const [items, setItems] = useState([]);
@@ -39,6 +44,10 @@ export default function UnlockablesManager() {
       setStatus('❌ Completa etiqueta, id y puntos.');
       return;
     }
+    if (draft.type === 'avatar_accessory' && !draft.imageUrl.trim()) {
+      setStatus('❌ Un accesorio de avatar necesita una imagen.');
+      return;
+    }
     setSaving(true);
     setStatus('');
     try {
@@ -47,6 +56,7 @@ export default function UnlockablesManager() {
         type: draft.type,
         targetId: draft.targetId.trim(),
         unlockPoints: Number(draft.unlockPoints),
+        imageUrl: draft.imageUrl.trim(),
       });
       invalidateCollectionCache('unlockables');
       setDraft(BLANK_DRAFT);
@@ -118,6 +128,9 @@ export default function UnlockablesManager() {
               key={item.id}
               className="flex flex-wrap items-center gap-3 bg-slate-900 border border-slate-700 rounded-lg p-3"
             >
+              {item.imageUrl && (
+                <img src={item.imageUrl} alt="" className="w-10 h-10 object-contain rounded-md bg-slate-950 shrink-0" />
+              )}
               <div className="flex-1 min-w-[140px]">
                 <p className="text-white font-bold text-sm">{item.label}</p>
                 <p className="text-slate-500 text-[10px] font-mono uppercase">
@@ -178,6 +191,17 @@ export default function UnlockablesManager() {
               placeholder="Puntos para desbloquear"
               className="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
             />
+            {draft.type === 'avatar_accessory' && (
+              <div className="sm:col-span-2">
+                <ImageUploadField
+                  value={draft.imageUrl}
+                  onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
+                  folder="avatar_accessories"
+                  placeholder="https://... (imagen del accesorio)"
+                  inputClassName="flex-1 bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            )}
           </div>
 
           {status && (

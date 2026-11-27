@@ -7,6 +7,7 @@ import { getWeekKey, getMonthKey } from '../utils/pointsHelper';
 import { useActiveTheme } from '../context/ThemeContext';
 import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
+import StudentAvatar from './StudentAvatar';
 
 const TABS = [
   { key: 'total', label: 'Todo' },
@@ -62,6 +63,7 @@ const LeaderboardCard = ({ course }) => {
               monthly: d.monthKey === monthKey ? (d.monthly_points || 0) : 0,
               weekly: d.weekKey === weekKey ? (d.weekly_points || 0) : 0,
               streak: d.streak_count || 0,
+              avatarConfig: d.avatarConfig || null,
             };
           });
 
@@ -146,6 +148,7 @@ const LeaderboardCard = ({ course }) => {
                   <span className="w-6 text-center text-sm font-black text-slate-400 shrink-0">
                     {MEDALS[idx] || `#${idx + 1}`}
                   </span>
+                  <StudentAvatar avatarConfig={student.avatarConfig} uid={student.uid} size={24} />
                   <span className={`flex-1 min-w-0 truncate text-xs font-bold ${isMe ? 'text-amber-300' : 'text-slate-200'}`}>
                     {student.name}{isMe && ' (Tú)'}
                   </span>
@@ -187,6 +190,7 @@ const LeaderboardCard = ({ course }) => {
                   <span className="w-6 text-center text-sm font-black text-slate-400 shrink-0">
                     {MEDALS[idx] || `#${idx + 1}`}
                   </span>
+                  <StudentAvatar avatarConfig={student.avatarConfig} uid={student.uid} size={24} />
                   <span className={`flex-1 min-w-0 truncate text-xs font-bold ${isMe ? 'text-amber-300' : 'text-slate-200'}`}>
                     {student.name}{isMe && ' (Tú)'}
                   </span>

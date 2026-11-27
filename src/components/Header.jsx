@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { getCachedCollection, getCachedDoc } from '../utils/firestoreCache';
 import { getTitleForPoints, getAllEarnedBadges, isBadgeUpgrade, DEFAULT_TITLE_TIERS } from '../utils/gamification';
 import BadgeIcon from './BadgeIcon';
+import StudentAvatar from './StudentAvatar';
 import TrophyCase from './TrophyCase';
 import RewardCelebration from './RewardCelebration';
 import ThemeUnlockToggle from './ThemeUnlockToggle';
@@ -272,6 +273,15 @@ const Header = ({
             <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mt-0.5">Puntos Totales</p>
           </div>
         </div>
+
+        {/* AVATAR — links to the Avatar Builder, separate from the trophy case */}
+        <Link
+          to="/mi-avatar"
+          title="Personalizar mi avatar"
+          className="shrink-0 rounded-full ring-2 ring-white/20 hover:ring-white/50 transition-all"
+        >
+          <StudentAvatar avatarConfig={userData?.avatarConfig} uid={currentUser?.uid} size={40} />
+        </Link>
 
         {/* TITLE PILL + FEATURED BADGE — click opens the full trophy case */}
         <button
