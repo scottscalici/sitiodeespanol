@@ -184,27 +184,45 @@ export default function PracticeHub() {
     return groups;
   }, [circles]);
 
-  // --- HABLAR VIEW: vocab-only speaking circles (contentType/mode is a plain
-  // data distinction here, not a student toggle — a circle is either the
-  // typing twin or the speaking twin, never both at once), grouped by book
-  // then chapter the same way the typing vocab circles already are. Verb/
-  // idiom/grammar speaking twins don't exist yet — this starts vocab-only.
+  // --- HABLAR VIEW: speaking-twin circles (contentType/mode is a plain data
+  // distinction here, not a student toggle — a circle is either the typing
+  // twin or the speaking twin, never both at once), grouped exactly like the
+  // typing "Por Capítulo" view (vocabBooks/verbGroups/idiomCircles) so the
+  // same book→chapter and tense groupings a student already knows carry
+  // straight over. Grammar speaking twins don't exist yet — pinned_sentences
+  // content needs a real production-speak rendering built first (today's
+  // only "speak" option there is dictation-repeat, not produce-from-English)
+  // — so grammar circles are deliberately left out of this view for now.
   const hablarGroups = useMemo(() => {
     const vocabByBook = new Map();
-    circles.filter((c) => c.mode === 'speaking' && c.contentType === 'vocab').forEach((c) => {
-      const bookKey = c.textbook || 'Sin libro';
-      if (!vocabByBook.has(bookKey)) vocabByBook.set(bookKey, new Map());
-      const chapterMap = vocabByBook.get(bookKey);
-      const chapterKey = `Cap. ${c.chapter || '?'}`;
-      if (!chapterMap.has(chapterKey)) chapterMap.set(chapterKey, { key: chapterKey, sortKey: Number(c.chapter) || 0, circles: [] });
-      chapterMap.get(chapterKey).circles.push(c);
+    const verbByTense = new Map();
+    const idiomCircles = [];
+
+    circles.filter((c) => c.mode === 'speaking').forEach((c) => {
+      if (c.contentType === 'vocab') {
+        const bookKey = c.textbook || 'Sin libro';
+        if (!vocabByBook.has(bookKey)) vocabByBook.set(bookKey, new Map());
+        const chapterMap = vocabByBook.get(bookKey);
+        const chapterKey = `Cap. ${c.chapter || '?'}`;
+        if (!chapterMap.has(chapterKey)) chapterMap.set(chapterKey, { key: chapterKey, sortKey: Number(c.chapter) || 0, circles: [] });
+        chapterMap.get(chapterKey).circles.push(c);
+      } else if (c.contentType === 'idiom') {
+        idiomCircles.push(c);
+      } else if (c.contentType === 'verb') {
+        const key = TENSE_LABELS[c.targetTense] || c.targetTense;
+        if (!verbByTense.has(key)) verbByTense.set(key, { key, sortKey: Object.keys(TENSE_LABELS).indexOf(c.targetTense), circles: [] });
+        verbByTense.get(key).circles.push(c);
+      }
     });
-    return Array.from(vocabByBook.entries())
+
+    const vocabBooks = Array.from(vocabByBook.entries())
       .map(([book, chapterMap]) => ({
         book,
         chapterGroups: Array.from(chapterMap.values()).sort((a, b) => a.sortKey - b.sortKey),
       }))
       .sort((a, b) => a.book.localeCompare(b.book));
+    const verbGroups = Array.from(verbByTense.values()).sort((a, b) => a.sortKey - b.sortKey);
+    return { vocabBooks, verbGroups, idiomCircles };
   }, [circles]);
 
   const hablarUnlocked = (userData?.total_points || 0) >= hablarUnlockPoints;
@@ -360,22 +378,38 @@ export default function PracticeHub() {
         {view === 'quiz' && quizGroups.map(renderGroup)}
 
         {view === 'hablar' && (
-          hablarGroups.length === 0 ? (
+          hablarGroups.vocabBooks.length === 0 && hablarGroups.verbGroups.length === 0 && hablarGroups.idiomCircles.length === 0 ? (
             <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">
               Todavía no hay círculos para hablar disponibles.
             </div>
           ) : (
-            <div>
-              <h2 className="text-lg font-black text-indigo-700 mb-2">📖 Vocabulario (Hablado)</h2>
-              {hablarGroups.map(({ book, chapterGroups }) => (
-                <div key={book} className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5">
-                  <h3 className="text-base font-black text-indigo-900 mb-4 flex items-center gap-2">
-                    <span>📗</span> {book}
-                  </h3>
-                  {chapterGroups.map(renderGroup)}
+            <>
+              {hablarGroups.vocabBooks.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-lg font-black text-indigo-700 mb-2">📖 Vocabulario</h2>
+                  {hablarGroups.vocabBooks.map(({ book, chapterGroups }) => (
+                    <div key={book} className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5">
+                      <h3 className="text-base font-black text-indigo-900 mb-4 flex items-center gap-2">
+                        <span>📗</span> {book}
+                      </h3>
+                      {chapterGroups.map(renderGroup)}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+              {hablarGroups.verbGroups.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-lg font-black text-emerald-700 mb-2">⚡ Verbos</h2>
+                  {hablarGroups.verbGroups.map(renderGroup)}
+                </div>
+              )}
+              {hablarGroups.idiomCircles.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-black text-amber-700 mb-2">💬 Modismos</h2>
+                  {renderGroup({ key: 'Expresiones Idiomáticas', circles: hablarGroups.idiomCircles })}
+                </div>
+              )}
+            </>
           )
         )}
       </div>
