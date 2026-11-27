@@ -613,12 +613,20 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
               let cleanDisplay = spaSentence.replace(twoPartMatch[0], infinitive).replace(/[.,!?¿¡]/g, '').replace(/\s+/g, ' ');
               let cleanCorrect = spaSentence.replace(twoPartMatch[0], targetVerb).replace(/[.,!?¿¡]/g, '').replace(/\s+/g, ' ');
 
-              if (isSpeedRound) {
+              // conjugateOnly is the same plain-type rendering a speed round
+              // uses, without opting the segment into the speed round's
+              // actual countdown timer — for a sentence bank where word-order
+              // reconstruction isn't wanted at all (a si-clause can
+              // legitimately come before or after its result clause, so
+              // asking a student to rebuild "the" order is ambiguous rather
+              // than instructive), just typing the conjugated form is the
+              // whole point.
+              if (isSpeedRound || segment.conjugateOnly) {
                   generatedQueue.push({
                       id: `q_${i}`, type: 'conjugate',
                       subject: cleanDisplay.replace(infinitive, '________'),
                       infinitive: infinitive, tense: 'Gramática', engTrans: engTrans,
-                      correctAnswer: targetVerb, topic: 'Gramática (Velocidad)', isVerb: true,
+                      correctAnswer: targetVerb, altAnswers: targetAltAnswers, topic: 'Gramática (Velocidad)', isVerb: true,
                       _pointCategory: 'sentence'
                   });
               } else {
@@ -819,7 +827,19 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
                        generatedQueue.push({ id: `q_${i}`, type: 'speak', prompt: spaTarget, engTrans: engTrans, correctAnswer: spaTarget, topic: `Pronunciación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, infinitive: target.fullData.palabra, infinitiveEnglish, _pointCategory: 'regular' });
                      }
                 } else {
-                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
+                     // Imperfect subjunctive is the one tense pair where
+                     // Spanish genuinely accepts two different endings as
+                     // equally correct (hiciera/hiciese) — stored as two
+                     // separate tense paradigms on the verb doc rather than
+                     // one cell with both spellings, so a student typing
+                     // either one needs the OTHER paradigm's form offered as
+                     // an alt answer, not just whatever the random draw
+                     // happened to pick as the "primary" tense.
+                     const imperfectSubjPair = { subjuntivo_imperfecto_ra: 'subjuntivo_imperfecto_se', subjuntivo_imperfecto_se: 'subjuntivo_imperfecto_ra' };
+                     const siblingTenseKey = imperfectSubjPair[randomTenseKey];
+                     const siblingForm = siblingTenseKey && target.fullData.tenses[siblingTenseKey]?.[randomSubject]?.target;
+                     const altAnswers = siblingForm && siblingForm !== spaTarget ? [siblingForm] : undefined;
+                     generatedQueue.push({ id: `q_${i}`, type: 'conjugate', subject: displaySubjects[randomSubject], infinitive: target.fullData.palabra, infinitiveEnglish, tense: randomTenseKey.replace(/_/g, ' '), engTrans: engTrans, correctAnswer: spaTarget, altAnswers, topic: `Conjugación: ${randomTenseKey.replace(/_/g, ' ')}`, isVerb: true, _pointCategory: 'regular' });
                 }
                 continue;
               }
