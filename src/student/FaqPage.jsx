@@ -195,6 +195,20 @@ const FaqPage = () => {
             ))}
           </div>
         )}
+
+        {/* Required attribution for third-party open-source art used in
+            Mi Avatar's accessory stickers (CC BY / CC BY-SA licenses) */}
+        <p className="text-center text-[11px] text-slate-400 pt-4">
+          Algunos stickers de avatar usan iconos de{' '}
+          <a href="https://game-icons.net/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">
+            game-icons.net
+          </a>{' '}
+          (Lorc, Delapouite — CC BY 3.0) y{' '}
+          <a href="https://openmoji.org/" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">
+            OpenMoji
+          </a>{' '}
+          (CC BY-SA 4.0).
+        </p>
       </div>
     </div>
   );
