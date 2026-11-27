@@ -6,8 +6,67 @@ import { resolveCardTheme } from '../utils/resolveCardTheme';
 import { CardCornerDecoration, CardOverlay } from './CardDecorations';
 import { renderFormattedText } from '../utils/formattedText';
 import { isImageUrl } from '../utils/isImageUrl';
+import { loadGoogleFont } from '../utils/loadGoogleFont';
 
 const normalizeGrammarId = (raw) => raw.trim().toLowerCase().replace(/\s+/g, '_');
+
+// A small "live red-pen markup" hook — a fixed, always-the-same example (not
+// tied to today's actual lesson) that turns on hover/tap: the mistake fades,
+// a red line strikes through it at a hand-drawn angle, a caret and the
+// handwritten correction pop up above. Purely decorative — it's a preview of
+// "what grammar notes feel like," not a real note, so one good example beats
+// a rotating pool that would need its own content-authoring upkeep.
+const RedPenExample = () => {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    loadGoogleFont('Caveat', [600, 700]);
+  }, []);
+
+  return (
+    <div
+      className="inline-block select-none cursor-pointer"
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onClick={() => setActive((a) => !a)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActive((a) => !a); }}
+    >
+      <p className="font-serif text-lg sm:text-xl text-stone-700 leading-relaxed">
+        Yo{' '}
+        <span className="relative inline-block">
+          <span
+            aria-hidden="true"
+            className={`absolute -top-7 left-0 whitespace-nowrap text-red-600 transition-all duration-300 ${
+              active ? 'opacity-100 -translate-y-0.5' : 'opacity-0 translate-y-1'
+            }`}
+            style={{ fontFamily: "'Caveat', cursive", fontSize: '1.5rem', lineHeight: 1 }}
+          >
+            tengo
+          </span>
+          <span
+            aria-hidden="true"
+            className={`absolute -top-2.5 left-2 text-red-600 font-black transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-0'}`}
+            style={{ fontSize: '0.85rem' }}
+          >
+            ^
+          </span>
+          <span className={`transition-colors duration-300 ${active ? 'text-stone-400' : 'text-stone-700'}`}>tiene</span>
+          <span
+            aria-hidden="true"
+            className={`absolute left-0 top-1/2 h-[2px] bg-red-600 transition-all duration-500 ease-out ${active ? 'w-full' : 'w-0'}`}
+            style={{ transform: 'translateY(-50%) rotate(-3deg)' }}
+          />
+        </span>{' '}
+        que estudiar más.
+      </p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mt-1">
+        {active ? '¡Corregido!' : 'Pasa el cursor o toca para corregir →'}
+      </p>
+    </div>
+  );
+};
 
 const Estructura = ({ estructura = [], liveDia, course }) => {
   const { theme } = useActiveTheme() || {};
@@ -54,29 +113,49 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
   // two whenever nothing new is introduced.
   const hasLessonsToday = todaysLessons.length > 0;
 
+  // "Index card" look: cream paper, a red margin rule, faint ruled lines —
+  // default (non-themed) colors only. A seasonal theme's own cardStyle/
+  // cardOverrides (via cardTheme.style/headingColor/textColor below) still
+  // wins exactly as it did before this rework; nothing here removes that.
+  const paperStyle = {
+    backgroundColor: '#fdfaf3',
+    backgroundImage:
+      'repeating-linear-gradient(to bottom, transparent, transparent 27px, rgba(185,28,28,0.07) 28px)',
+    backgroundPosition: '0 8px',
+  };
+
   return (
     <div
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-700 to-slate-900 p-6 sm:p-8 shadow-xl space-y-6"
-      style={cardTheme.style}
+      className="relative overflow-hidden rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 border border-stone-200"
+      style={{ ...paperStyle, ...cardTheme.style }}
     >
       <CardOverlay overlay={cardTheme.overlay} />
       <CardCornerDecoration decoration={cardTheme.cornerDecoration} />
-      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Notebook margin rule */}
+      <div className="absolute top-0 bottom-0 left-10 w-px bg-red-300/70 pointer-events-none" />
 
-      <div className="flex justify-between items-center gap-3">
-        <h3 className="font-black text-2xl text-white flex items-center gap-3" style={{ color: cardTheme.headingColor }}>
-          <span className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-xl shrink-0 overflow-hidden">
-            {isImageUrl(theme?.styles?.imageOverrides?.estructura) ? (
-              <img src={theme.styles.imageOverrides.estructura} alt="" className="w-full h-full object-cover" />
-            ) : (
-              theme?.styles?.imageOverrides?.estructura || '📚'
-            )}
-          </span>
-          Estructura y Gramática
-        </h3>
+      <div className="relative flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <h3
+            className="font-serif font-black text-2xl text-stone-800 flex items-center gap-3"
+            style={{ color: cardTheme.headingColor }}
+          >
+            <span className="w-11 h-11 rounded-xl bg-stone-900/5 border border-stone-200 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+              {isImageUrl(theme?.styles?.imageOverrides?.estructura) ? (
+                <img src={theme.styles.imageOverrides.estructura} alt="" className="w-full h-full object-cover" />
+              ) : (
+                theme?.styles?.imageOverrides?.estructura || '📚'
+              )}
+            </span>
+            Estructura y Gramática
+          </h3>
+          <div className="mt-4 pl-1">
+            <RedPenExample />
+          </div>
+        </div>
         <Link
           to={`/gramatica${course ? `?course=${course}` : ''}`}
-          className="shrink-0 text-xs font-black uppercase tracking-widest text-white bg-white/15 hover:bg-white/25 px-3 py-2 rounded-lg transition-colors"
+          className="shrink-0 text-xs font-black uppercase tracking-widest text-red-700 bg-white hover:bg-red-50 border-2 border-red-600 px-3 py-2 rounded-lg transition-colors"
           title="Buscar cualquier tema de gramática"
         >
           Índice
@@ -84,12 +163,12 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
       </div>
 
       {!hasLessonsToday && (
-        <p className="text-sm text-indigo-100/80 italic">
+        <p className="relative text-sm text-stone-500 italic">
           No hay notas nuevas asignadas hoy — usa el índice para repasar cualquier tema ya visto.
         </p>
       )}
 
-      <div className="space-y-6">
+      <div className="relative space-y-6">
         {todaysLessons.map((lesson, idx) => {
           const enlacesArr = lesson.enlaces ? lesson.enlaces.split(',').map(s => s.trim()) : [];
           const recursosArr = lesson.recursos ? lesson.recursos.split(',').map(s => s.trim()) : [];
@@ -98,33 +177,33 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
             <div key={idx} className="flex flex-col gap-4">
 
               {lesson.introText && (
-                <div className="bg-white/10 border border-white/15 rounded-xl p-5">
-                  <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
+                <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+                  <span className="text-[10px] font-black uppercase text-red-600 tracking-widest block mb-2">
                     Introducir
                   </span>
-                  <p className="text-lg text-white leading-relaxed">
+                  <p className="text-lg text-stone-800 leading-relaxed font-serif">
                     {renderFormattedText(lesson.introText)}
                   </p>
                 </div>
               )}
 
               {lesson.repasoText && (
-                <div className="bg-white/10 border border-white/15 rounded-xl p-5">
-                  <span className="text-[10px] font-black uppercase text-indigo-200 tracking-widest block mb-2">
+                <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+                  <span className="text-[10px] font-black uppercase text-red-600 tracking-widest block mb-2">
                     Repasar
                   </span>
-                  <p className="text-lg text-white leading-relaxed">
+                  <p className="text-lg text-stone-800 leading-relaxed font-serif">
                     {renderFormattedText(lesson.repasoText)}
                   </p>
                 </div>
               )}
 
               {(enlacesArr.length > 0 || recursosArr.length > 0) && (
-                <div className="pt-4 border-t border-white/15 space-y-3">
+                <div className="pt-4 border-t border-stone-200 space-y-3">
 
                   {enlacesArr.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-indigo-200 font-bold uppercase tracking-widest text-[10px] mr-1">
+                      <span className="text-stone-400 font-bold uppercase tracking-widest text-[10px] mr-1">
                         Enlaces
                       </span>
                       {enlacesArr.map((enlace, i) => {
@@ -136,7 +215,7 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
                           <Link
                             key={i}
                             to={`/gramatica/${encodeURIComponent(docId)}`}
-                            className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                            className="bg-white hover:bg-red-50 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
                           >
                             {linkTitles[enlace] || enlace}
                           </Link>
@@ -147,7 +226,7 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
 
                   {recursosArr.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-indigo-200 font-bold uppercase tracking-widest text-[10px] mr-1">
+                      <span className="text-stone-400 font-bold uppercase tracking-widest text-[10px] mr-1">
                         Recursos
                       </span>
                       {recursosArr.map((recurso, i) => (
@@ -155,7 +234,7 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
                           key={i}
                           type="button"
                           onClick={() => setActiveCategory(recurso)}
-                          className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+                          className="bg-white hover:bg-red-50 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
                         >
                           {recurso}
                         </button>
@@ -175,19 +254,19 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
       {activeCategory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="bg-slate-900 p-5 flex justify-between items-center">
+            <div className="bg-stone-900 p-5 flex justify-between items-center">
               <h2 className="text-white font-black uppercase tracking-widest text-sm">
                 {activeCategory}
               </h2>
               <button
                 onClick={() => setActiveCategory(null)}
-                className="text-slate-400 hover:text-white text-3xl font-bold leading-none p-2 -mr-2"
+                className="text-stone-400 hover:text-white text-3xl font-bold leading-none p-2 -mr-2"
               >
                 ×
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-2 bg-slate-50">
+            <div className="p-6 overflow-y-auto flex-1 space-y-2 bg-stone-50">
               {(() => {
                 const pagesInCategory = allPages.filter(
                   (page) => (page.category || '').toLowerCase() === activeCategory.toLowerCase()
@@ -195,7 +274,7 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
 
                 if (pagesInCategory.length === 0) {
                   return (
-                    <p className="text-center text-slate-400 italic font-bold py-8">
+                    <p className="text-center text-stone-400 italic font-bold py-8">
                       No hay páginas en esta categoría todavía.
                     </p>
                   );
@@ -206,7 +285,7 @@ const Estructura = ({ estructura = [], liveDia, course }) => {
                     key={page.id}
                     to={`/gramatica/${encodeURIComponent(page.id)}`}
                     onClick={() => setActiveCategory(null)}
-                    className="block bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 p-4 rounded-xl shadow-sm transition-colors font-bold text-slate-800 text-sm"
+                    className="block bg-white hover:bg-red-50 border border-stone-200 hover:border-red-200 p-4 rounded-xl shadow-sm transition-colors font-bold text-stone-800 text-sm"
                   >
                     {page.title || page.id}
                   </Link>
