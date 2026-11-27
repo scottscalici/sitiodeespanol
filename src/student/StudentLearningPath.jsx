@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
-import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { getWeekKey, getMonthKey, getTodayDateKey, bumpStreak } from '../utils/pointsHelper';
 import { computeChestAward } from '../utils/chests';
 import { getAssignedDominioTasks, buildGradedProgressNode } from '../utils/learningPathProgress';
 
@@ -516,6 +516,7 @@ export default function StudentLearningPath() {
 
                 const weekKey = getWeekKey();
                 const monthKey = getMonthKey();
+                const dayKey = getTodayDateKey();
 
                 let newTotal = totalPointsEarned;
                 let newMonthly = totalPointsEarned;
@@ -531,7 +532,7 @@ export default function StudentLearningPath() {
                    newTotal += (data.total_points || data.current_path_points || 0);
                    if (data.monthKey === monthKey) newMonthly += (data.monthly_points || 0);
                    if (data.weekKey === weekKey) newWeekly += (data.weekly_points || 0);
-                   newDaily += (data.daily_points || 0);
+                   if (data.dayKey === dayKey) newDaily += (data.daily_points || 0);
                    existingPathProgress = data.progress?.[selectedPathId];
                    newPathPoints += (legacyBranchKey
                      ? existingPathProgress?.[legacyBranchKey]?.path_points
@@ -565,6 +566,7 @@ export default function StudentLearningPath() {
                   daily_points: newDaily,
                   weekKey,
                   monthKey,
+                  dayKey,
                   ...streakFields,
                   ...computeChestAward(existingData, totalPointsEarned, streakFields.streak_count),
                   progress: {

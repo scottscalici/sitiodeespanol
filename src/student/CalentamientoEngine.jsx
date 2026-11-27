@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
-import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { getWeekKey, getMonthKey, getTodayDateKey, bumpStreak } from '../utils/pointsHelper';
 import { computeChestAward } from '../utils/chests';
 import { getCachedBucketedCollection } from '../utils/firestoreCache';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
@@ -525,6 +525,7 @@ export default function CalentamientoEngine({ onClose }) {
 
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
+        const dayKey = getTodayDateKey();
 
         let newTotal = pointsEarnedThisSession;
         let newMonthly = pointsEarnedThisSession;
@@ -539,7 +540,7 @@ export default function CalentamientoEngine({ onClose }) {
           newTotal += data.total_points || data.current_path_points || 0;
           if (data.monthKey === monthKey) newMonthly += data.monthly_points || 0;
           if (data.weekKey === weekKey) newWeekly += data.weekly_points || 0;
-          newDaily += data.daily_points || 0;
+          if (data.dayKey === dayKey) newDaily += data.daily_points || 0;
 
           // Safely grab the previous best grade, if it exists
           if (data.progress?.warmups?.[warmupData.docId]) {
@@ -565,6 +566,7 @@ export default function CalentamientoEngine({ onClose }) {
           daily_points: newDaily,
           weekKey,
           monthKey,
+          dayKey,
           ...streakFields,
           ...computeChestAward(existingData, pointsEarnedThisSession, streakFields.streak_count),
         };

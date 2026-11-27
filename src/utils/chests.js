@@ -4,15 +4,14 @@
 // when it's opened. Rare chance is `streak_count × 1%`, capped at 50% so
 // even a very long streak still has a real chance of common chests.
 //
-// Deliberately NOT built on the existing `daily_points` field — that field
-// has never actually reset daily anywhere in this codebase (every writer
-// just accumulates it forever, same as total_points; see every call site
-// below), so reusing it here would mean a long-tenured student instantly
-// "crosses" hundreds of 100-point thresholds the moment this ships. A
-// separate `chestPoints`/`chestDayKey` pair, reset correctly from day one,
-// avoids inheriting that bug rather than silently fixing daily_points
-// (which nobody asked for and which several engines read as a lifetime
-// "Hoy" stat today, however misleadingly).
+// Deliberately NOT built on `daily_points` (shown to students as "📅 Hoy" in
+// StudentLearningPath.jsx) even though that field also now resets daily —
+// it did NOT when this was first written (every writer just accumulated it
+// forever, same as total_points; fixed afterward, see pointsHelper.js's own
+// comment on awardPoints). Keeping a separate chestPoints/chestDayKey pair
+// means the chest threshold stays decoupled from a field whose job is
+// purely display — if daily_points' reset logic or purpose ever changes
+// again, chests aren't along for the ride.
 import { arrayUnion } from 'firebase/firestore';
 
 // Duplicated from pointsHelper.js's own getTodayDateKey (not imported, to

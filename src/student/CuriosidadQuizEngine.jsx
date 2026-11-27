@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
-import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { getWeekKey, getMonthKey, getTodayDateKey, bumpStreak } from '../utils/pointsHelper';
 import { computeChestAward } from '../utils/chests';
 import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
 
@@ -200,10 +200,11 @@ export default function CuriosidadQuizEngine() {
       if (pointsEarned > 0) {
         const weekKey = getWeekKey();
         const monthKey = getMonthKey();
+        const dayKey = getTodayDateKey();
         let newTotal = pointsEarned + (data.total_points || data.current_path_points || 0);
         let newMonthly = pointsEarned + (data.monthKey === monthKey ? data.monthly_points || 0 : 0);
         let newWeekly = pointsEarned + (data.weekKey === weekKey ? data.weekly_points || 0 : 0);
-        let newDaily = pointsEarned + (data.daily_points || 0);
+        let newDaily = pointsEarned + (data.dayKey === dayKey ? data.daily_points || 0 : 0);
 
         updatePayload.total_points = newTotal;
         updatePayload.current_path_points = newTotal;
@@ -212,6 +213,7 @@ export default function CuriosidadQuizEngine() {
         updatePayload.daily_points = newDaily;
         updatePayload.weekKey = weekKey;
         updatePayload.monthKey = monthKey;
+        updatePayload.dayKey = dayKey;
         const streakFields = bumpStreak(data);
         Object.assign(updatePayload, streakFields);
         Object.assign(updatePayload, computeChestAward(data, pointsEarned, streakFields.streak_count));

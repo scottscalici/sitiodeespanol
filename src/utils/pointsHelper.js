@@ -103,9 +103,19 @@ export const formatMonthLabel = (monthKey) => {
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
-// Awards points to a user's own doc. total_points/daily_points always
-// accumulate; weekly_points/monthly_points reset to just this award when
-// the stored weekKey/monthKey doesn't match the current one.
+// Awards points to a user's own doc. total_points always accumulates;
+// weekly_points/monthly_points/daily_points all reset to just this award
+// when their stored weekKey/monthKey/dayKey doesn't match the current one.
+//
+// `daily_points` used to just accumulate forever like total_points, despite
+// being shown to students as "📅 Hoy" (today) in StudentLearningPath.jsx —
+// the dayKey gate below is the fix, mirroring the exact weekKey/monthKey
+// pattern already used for the other two periods. Fixed here and in the 2
+// other inline writers (CalentamientoEngine.jsx, CuriosidadQuizEngine.jsx,
+// StudentLearningPath.jsx's own direct-write path) — see chests.js for why
+// a 4th writer (the chest system) deliberately does NOT read/write this
+// field at all, instead keeping its own always-correct chestPoints/
+// chestDayKey pair.
 //
 // This is one of the most frequently-called functions in the app (every
 // point-earning action, across every activity type, for every student), so
@@ -119,6 +129,7 @@ export const awardPoints = async (uid, points) => {
   const userRef = doc(db, 'users', uid);
   const weekKey = getWeekKey();
   const monthKey = getMonthKey();
+  const dayKey = getTodayDateKey();
 
   let rollover = null;
 
@@ -145,16 +156,18 @@ export const awardPoints = async (uid, points) => {
 
     const weeklyPoints = data.weekKey === weekKey ? (data.weekly_points || 0) + points : points;
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
+    const dailyPoints = data.dayKey === dayKey ? (data.daily_points || 0) + points : points;
     const streakFields = bumpStreak(data);
 
     tx.set(userRef, {
       total_points: increment(points),
       current_path_points: increment(points),
-      daily_points: increment(points),
+      daily_points: dailyPoints,
       weekly_points: weeklyPoints,
       monthly_points: monthlyPoints,
       weekKey,
       monthKey,
+      dayKey,
       ...streakFields,
       ...computeChestAward(data, points, streakFields.streak_count),
     }, { merge: true });
