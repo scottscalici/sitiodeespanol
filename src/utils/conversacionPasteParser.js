@@ -19,6 +19,9 @@ const FIELD_DEFS = [
   { headers: ['instrucciones', 'esquema'], field: 'instrucciones', type: 'lines-fixed2' },
   { headers: ['modelo', 'modelo de respuesta', 'frase de presentacion', 'frase de presentacion inicial', 'presentacion ejemplar'], field: 'modelo', type: 'string' },
   { headers: ['extracto', 'extracto de la obra'], field: 'extracto', type: 'string' },
+  { headers: ['pdf', 'pdf url', 'enlace pdf'], field: 'pdf_url', type: 'string' },
+  { headers: ['traduccion del extracto', 'traduccion', 'traduccion ingles'], field: 'extracto_traduccion', type: 'string' },
+  { headers: ['preguntas de apoyo'], field: 'preguntas_apoyo', type: 'qa-pairs' },
   { headers: ['preguntas nivel 1', 'preguntas 1', 'preguntas seccion 1', 'nivel 1'], field: 'preguntas.1', type: 'lines' },
   { headers: ['preguntas nivel 2', 'preguntas 2', 'preguntas seccion 2', 'nivel 2'], field: 'preguntas.2', type: 'lines' },
   { headers: ['preguntas nivel 3', 'preguntas 3', 'preguntas seccion 3', 'nivel 3'], field: 'preguntas.3', type: 'lines' },
@@ -77,6 +80,19 @@ function buildValue(type, lines) {
   }
   if (type === 'csv') {
     return trimmedLines.join(',').split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (type === 'qa-pairs') {
+    // "pregunta | respuesta" per line, same " | " convention as the
+    // Sentence Manager bulk importer — respuesta is optional (a
+    // question-only line is still valid, just with no answer key yet).
+    return trimmedLines
+      .filter((l) => l !== '')
+      .map((l) => {
+        const idx = l.indexOf('|');
+        return idx === -1
+          ? { pregunta: l.trim(), respuesta: '' }
+          : { pregunta: l.slice(0, idx).trim(), respuesta: l.slice(idx + 1).trim() };
+      });
   }
   return trimmedLines;
 }

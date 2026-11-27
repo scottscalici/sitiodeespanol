@@ -539,6 +539,27 @@ const ConversacionLayout = ({ activity }) => {
           <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-6">
             <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-3">Extracto</h4>
             <p className="text-slate-700 leading-relaxed whitespace-pre-wrap font-serif">{raw.extracto}</p>
+            {raw.pdf_url && (
+              <div className="mt-4 text-right">
+                <a
+                  href={raw.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-full transition-colors"
+                >
+                  📄 Ver PDF Original ↗
+                </a>
+              </div>
+            )}
+            {raw.extracto_traduccion && canSee('extracto_traduccion') && (
+              <div className="mt-4 pt-4 border-t border-amber-200">
+                <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-2 flex items-center">
+                  Traducción (Inglés)
+                  {isAdmin && !raw.visibilidad?.extracto_traduccion && <TeacherOnlyBadge />}
+                </h5>
+                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap italic">{raw.extracto_traduccion}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -933,6 +954,33 @@ const ConversacionLayout = ({ activity }) => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Preguntas de Apoyo — a FIXED full list (unlike the random-draw
+            preguntas pool above), shown together once the presentation ends,
+            each with its own answer key visible only to the teacher. Matches
+            the IO literary-passage prep pages (pasaje + 15 support
+            questions + "Punto fácil" key) this was built to carry over. */}
+        {phase === 'end' && (raw.preguntas_apoyo || []).length > 0 && (
+          <div className="bg-violet-50 border border-violet-100 rounded-xl p-6">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-violet-700 mb-4 flex items-center">
+              Preguntas de Apoyo
+              {isAdmin && !raw.visibilidad?.preguntas_apoyo && <TeacherOnlyBadge />}
+            </h4>
+            <ol className="grid md:grid-cols-2 gap-x-8 gap-y-4 list-decimal list-inside">
+              {raw.preguntas_apoyo.map((qa, i) => (
+                <li key={i} className="text-slate-800 font-bold leading-relaxed">
+                  {qa.pregunta}
+                  {canSee('preguntas_apoyo') && qa.respuesta && (
+                    <p className="mt-1 ml-5 text-violet-700 font-medium text-sm not-italic flex items-start gap-1">
+                      <span className="shrink-0">💡</span>
+                      <span>{qa.respuesta}</span>
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
       </div>

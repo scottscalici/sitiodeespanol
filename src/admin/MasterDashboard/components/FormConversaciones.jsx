@@ -113,6 +113,20 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
     setActividad({ ...actividad, expresiones_idiomaticas: (actividad.expresiones_idiomaticas || []).filter((_, i) => i !== index) });
   };
 
+  // Helper for 'preguntas_apoyo' (repeatable {pregunta, respuesta} — the
+  // IO literary-passage fixed question list, each with its own answer key)
+  const handlePreguntaApoyoChange = (index, field, value) => {
+    const newPreguntas = [...(actividad.preguntas_apoyo || [])];
+    newPreguntas[index] = { ...newPreguntas[index], [field]: value };
+    setActividad({ ...actividad, preguntas_apoyo: newPreguntas });
+  };
+  const handleAddPreguntaApoyo = () => {
+    setActividad({ ...actividad, preguntas_apoyo: [...(actividad.preguntas_apoyo || []), { pregunta: "", respuesta: "" }] });
+  };
+  const handleRemovePreguntaApoyo = (index) => {
+    setActividad({ ...actividad, preguntas_apoyo: (actividad.preguntas_apoyo || []).filter((_, i) => i !== index) });
+  };
+
   // Helper for 'pasos_estudiante' (repeatable {titulo, prompt})
   const handlePasoChange = (index, field, value) => {
     const newPasos = [...(actividad.pasos_estudiante || [])];
@@ -275,12 +289,23 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
         <p style={{ fontSize: '12px', color: '#856404', marginTop: '-10px' }}>Solo necesario para actividades de IA prep o lecturas orales.</p>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <label>Extracto de la Obra</label>
-          <textarea 
-            value={actividad.extracto || ""} 
-            onChange={(e) => setActividad({...actividad, extracto: e.target.value})} 
+          <textarea
+            value={actividad.extracto || ""}
+            onChange={(e) => setActividad({...actividad, extracto: e.target.value})}
             placeholder="Pega aquí el pasaje literario..."
-            style={{ padding: '10px', minHeight: '200px', fontFamily: 'serif', lineHeight: '1.5' }} 
+            style={{ padding: '10px', minHeight: '200px', fontFamily: 'serif', lineHeight: '1.5' }}
           />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px' }}>
+          <label>PDF del Pasaje Original (URL, visible para el estudiante)</label>
+          <input value={actividad.pdf_url || ""} onChange={(e) => setActividad({ ...actividad, pdf_url: e.target.value })} placeholder="https://..." style={{ padding: '8px' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label>Traducción del Extracto (Inglés)</label>
+            <VisibilidadCheckbox field="extracto_traduccion" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+          </div>
+          <textarea value={actividad.extracto_traduccion || ""} onChange={(e) => setActividad({ ...actividad, extracto_traduccion: e.target.value })} placeholder="English translation..." style={{ padding: '10px', minHeight: '120px', fontStyle: 'italic', lineHeight: '1.5' }} />
         </div>
       </div>
 
@@ -322,6 +347,28 @@ export default function FormConversaciones({ actividad, setActividad, handleChan
             </div>
           ))}
         </div>
+      </div>
+
+      {/* --- PREGUNTAS DE APOYO (lista fija, cada una con su propia respuesta) --- */}
+      <div style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '6px', backgroundColor: '#f5f3ff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <h4 style={{ margin: 0 }}>Preguntas de Apoyo (IO: pasaje literario)</h4>
+          <VisibilidadCheckbox field="preguntas_apoyo" visibilidad={actividad.visibilidad} onToggle={toggleVisibilidad} />
+        </div>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: 0, marginBottom: '15px' }}>
+          A diferencia de las Secciones 1/2/3 de arriba (una pregunta al azar), esta lista se muestra COMPLETA al
+          terminar la presentación — cada pregunta con su propia respuesta clave. La casilla de arriba solo controla
+          si el estudiante ve las respuestas; las preguntas en sí siempre se muestran.
+        </p>
+        {(actividad.preguntas_apoyo || []).map((qa, i) => (
+          <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'flex-start' }}>
+            <span style={{ padding: '8px 0', fontSize: '12px', color: '#666', width: '20px' }}>{i + 1}.</span>
+            <input value={qa.pregunta || ""} onChange={(e) => handlePreguntaApoyoChange(i, 'pregunta', e.target.value)} placeholder="¿Pregunta?" style={{ padding: '8px', flex: 2 }} />
+            <input value={qa.respuesta || ""} onChange={(e) => handlePreguntaApoyoChange(i, 'respuesta', e.target.value)} placeholder="Punto fácil / respuesta clave" style={{ padding: '8px', flex: 2 }} />
+            <button type="button" onClick={() => handleRemovePreguntaApoyo(i)} style={{ padding: '8px', cursor: 'pointer' }}>✕</button>
+          </div>
+        ))}
+        <button type="button" onClick={handleAddPreguntaApoyo} style={{ padding: '6px 12px', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Añadir Pregunta</button>
       </div>
 
       {/* --- CONTENIDO EXTENDIDO DEL PROFESOR --- */}
