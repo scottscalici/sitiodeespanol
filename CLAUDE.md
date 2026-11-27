@@ -627,6 +627,7 @@ Bulk-import format (Sentence Manager's paste box) is pipe-delimited, NOT this JS
 - `questionMix` (object) — `{ recall, mc, matching, listen, speak, sentence }` (all numbers; default `{5,3,1,1,0,0}`). `recall` = typed-answer "conjugate"/write count (graded leniently via `checkAnswerLeniently`); `sentence` = oraciones count. **`questionMix.recall` is dead weight on a `grammar` segment** — grammar segments always have `introduced_concepts: []`, which makes `WorkoutEngine.jsx` treat every draw as a grammar turn regardless of the mix; only `sentence`/`total_questions` matter there.
 - `isSpeedRound` (bool), `timeLimit` (number, seconds)
 - `targetTense` (string) — verb segments only; one of `VERB_TENSES` ids or `'ALL'` — single value, not a list
+- `targetTenses` (string[], optional) — verb segments only; checked FIRST, before `targetTense`. Lets a segment mix a FIXED SET of two+ specific tense ids (e.g. `['imperativo_afirmativo', 'imperativo_negativo']` for a combined affirmative+negative commands segment) instead of being locked to one tense or `'ALL'`. Purely additive — a segment that omits it falls through to the `targetTense`/`'ALL'` logic exactly as before. Built for the Nosotros/Vosotros commands content, where one segment is meant to draw from both command polarities at once.
 - `targetSubject` (string) — one of `VERB_SUBJECTS` ids or `'any'`
 - `introduced_concepts` (array) — shape depends on `contentType`:
   - `vocab`: `{ id, label, tags, fullData: { palabra, traduccion, metadata, ... } }` — `id` must be a real `vocabulary` doc id (live re-fetched every attempt, so editing the word later is safe/transparent)
@@ -939,6 +940,10 @@ A lightweight "share a photo" card, distinct from Curiosidades (interactive ques
 - `descripcion` (string), `relacion_tema` (string)
 - `conexion_cultural` (string[]), `preguntas_interpretativas` (string[]), `preguntas_personales` (string[]), `conexion_personal` (string[]), `expansion_tema` (string[]), `banco_palabras` (string[]), `autoevaluacion` (string[])
 - Legacy "oral_ia" variant (older MasterDashboard path) also used: `etiquetas`, `enlaces`, `prep_seconds` (number, default 600), `presentation_segments`, `notas: {type, bullets, pregunta}`, `activity_type: "oral_ia"`
+- **"oral_ia" literary-passage (IO) fields** (added for the Marina/Como Agua Individual Oral migration, rendered by `ActivityPage.jsx`'s `ConversacionLayout`, parsed by `conversacionPasteParser.js`'s `pdf`/`traduccion del extracto`/`preguntas de apoyo` headers):
+  - `pdf_url` (string) — link to the original literary-passage PDF (e.g. hosted on `raw.githubusercontent.com`); rendered as a "📄 Ver PDF Original" button under the `extracto`.
+  - `extracto_traduccion` (string) — English translation/summary of `extracto`, teacher-only by default (gated by `visibilidad.extracto_traduccion`, same convention as every other teacher-only field). **Prefix with `"[Resumen, no traducción literal]"` when the source material only gives a paraphrase/summary, not a literal line-by-line translation** — don't let that distinction get silently lost.
+  - `preguntas_apoyo` (array) — `{ pregunta: string, respuesta: string }` pairs, a FIXED list shown after the prep timer ends (distinct from the random-draw `preguntas` levels) — the paste-parser's `qa-pairs` type splits each line on the first `|` (pregunta before, respuesta after; respuesta optional). `respuesta` is teacher-only, gated by `visibilidad.preguntas_apoyo`.
 **Example:**
 ```json
 {
