@@ -194,6 +194,11 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
       const grammar = segment.pinned_sentences || [];
       const grammarHistoryPool = sentenceHistory || [];
       const targetTense = segment.targetTense || 'ALL';
+      // Optional: restrict a verb segment to a FIXED SET of tenses (e.g.
+      // affirmative + negative nosotros commands mixed in one segment),
+      // rather than the single tense targetTense allows. Only ever narrows
+      // — a segment that doesn't set this keeps today's exact behavior.
+      const targetTenses = Array.isArray(segment.targetTenses) && segment.targetTenses.length > 0 ? segment.targetTenses : null;
       const targetSubject = segment.targetSubject || 'any';
       const historyChance = segment.reviewMode ? (HISTORY_CHANCE_BY_MODE[segment.reviewMode] ?? LEGACY_HISTORY_CHANCE) : LEGACY_HISTORY_CHANCE;
       // Speaking-only mode: every vocab/verb question in this segment becomes
@@ -730,7 +735,9 @@ export default function WorkoutEngine({ segment, history = [], sentenceHistory =
           if (target.fullData && target.fullData.tenses) {
             let availableTenses = Object.keys(target.fullData.tenses).filter(t => typeof target.fullData.tenses[t] === 'object');
 
-            if (targetTense !== 'ALL' && availableTenses.includes(targetTense)) {
+            if (targetTenses) {
+              availableTenses = availableTenses.filter((t) => targetTenses.includes(t));
+            } else if (targetTense !== 'ALL' && availableTenses.includes(targetTense)) {
               availableTenses = [targetTense];
             }
 
