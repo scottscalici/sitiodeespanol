@@ -158,6 +158,7 @@ export const awardPoints = async (uid, points) => {
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
     const dailyPoints = data.dayKey === dayKey ? (data.daily_points || 0) + points : points;
     const streakFields = bumpStreak(data);
+    const chestFields = await computeChestAward(data, points, streakFields.streak_count);
 
     tx.set(userRef, {
       total_points: increment(points),
@@ -169,7 +170,7 @@ export const awardPoints = async (uid, points) => {
       monthKey,
       dayKey,
       ...streakFields,
-      ...computeChestAward(data, points, streakFields.streak_count),
+      ...chestFields,
     }, { merge: true });
   });
 

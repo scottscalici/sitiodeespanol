@@ -216,7 +216,7 @@ export default function CuriosidadQuizEngine() {
         updatePayload.dayKey = dayKey;
         const streakFields = bumpStreak(data);
         Object.assign(updatePayload, streakFields);
-        Object.assign(updatePayload, computeChestAward(data, pointsEarned, streakFields.streak_count));
+        Object.assign(updatePayload, await computeChestAward(data, pointsEarned, streakFields.streak_count));
       }
 
       await setDoc(userRef, updatePayload, { merge: true });

@@ -558,6 +558,7 @@ export default function CalentamientoEngine({ onClose }) {
 
         // 1. ALWAYS award the XP Points for playing
         const streakFields = bumpStreak(existingData);
+        const chestFields = await computeChestAward(existingData, pointsEarnedThisSession, streakFields.streak_count);
         const updatePayload = {
           total_points: newTotal,
           current_path_points: newTotal,
@@ -568,7 +569,7 @@ export default function CalentamientoEngine({ onClose }) {
           monthKey,
           dayKey,
           ...streakFields,
-          ...computeChestAward(existingData, pointsEarnedThisSession, streakFields.streak_count),
+          ...chestFields,
         };
 
         // 2. Keep a snapshot of the submitted answers (marked `submitted`)

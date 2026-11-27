@@ -1,11 +1,10 @@
 // Daily-points-driven chest awards. Every full 100 points a student earns
 // on a single calendar day grants one chest (so a 350-point day earns 3,
-// not 1) — each chest's rarity is rolled at the moment it's earned, not
-// when it's opened. Rare chance is `streak_count × 1%`, capped at 50% so
-// even a very long streak still has a real chance of common chests.
+// not 1) — each chest's tier is rolled at the moment it's earned, not when
+// it's opened.
 //
 // Deliberately NOT built on `daily_points` (shown to students as "📅 Hoy" in
-// StudentLearningPath.jsx) even though that field also now resets daily —
+// StudentLearningPath.jsx) even though that field also resets daily now —
 // it did NOT when this was first written (every writer just accumulated it
 // forever, same as total_points; fixed afterward, see pointsHelper.js's own
 // comment on awardPoints). Keeping a separate chestPoints/chestDayKey pair
@@ -13,6 +12,7 @@
 // purely display — if daily_points' reset logic or purpose ever changes
 // again, chests aren't along for the ride.
 import { arrayUnion } from 'firebase/firestore';
+import { getCachedDoc } from './firestoreCache';
 
 // Duplicated from pointsHelper.js's own getTodayDateKey (not imported, to
 // avoid a circular import — pointsHelper.js itself calls into this file).
@@ -20,12 +20,48 @@ import { arrayUnion } from 'firebase/firestore';
 const getTodayDateKey = (d = new Date()) => new Date(d).toLocaleDateString('en-CA');
 
 export const CHEST_POINTS_THRESHOLD = 100;
-export const RARE_CHANCE_PER_STREAK_DAY = 0.01;
-export const RARE_CHANCE_CAP = 0.5;
 
-export function rollChestRarity(streakCount) {
-  const rareChance = Math.min(RARE_CHANCE_CAP, Math.max(0, streakCount || 0) * RARE_CHANCE_PER_STREAK_DAY);
-  return Math.random() < rareChance ? 'rare' : 'common';
+// Falls back to this if `config/chests` is missing entirely (not yet
+// configured, or someone deleted it) — same "still works, just at a
+// sensible default" posture as ThemeUnlockToggle's DEFAULT_CALMA_UNLOCK_POINTS.
+// Order matters: rolled rarest-first (see rollChestTier below), so this
+// array is sorted epic → rare → common. The LAST tier is the guaranteed
+// fallback and doesn't need `ratePerStreakDay`/`cap` — it's just whatever's
+// left once nothing rarer hit.
+export const DEFAULT_CHEST_CONFIG = {
+  tiers: [
+    { id: 'epic', label: 'Épico', ratePerStreakDay: 0.001, cap: 0.1, points: 250 },
+    { id: 'rare', label: 'Rara', ratePerStreakDay: 0.01, cap: 0.5, points: 75 },
+    { id: 'common', label: 'Común', points: 25 },
+  ],
+  dupeMultiplier: 2,
+};
+
+// Admin-editable via UnlockablesManager.jsx's "Configuración de Cofres"
+// section — a teacher can add/remove/reorder tiers (e.g. a future
+// "legendary") with zero code changes, since every reader of this config
+// (chest rolling here, the accessory-rarity dropdown, MisCofresPage's
+// reveal UI) treats the tier list as fully dynamic, not a fixed enum.
+export async function getChestConfig() {
+  const stored = await getCachedDoc('config', 'chests');
+  if (!stored?.tiers?.length) return DEFAULT_CHEST_CONFIG;
+  return { tiers: stored.tiers, dupeMultiplier: stored.dupeMultiplier ?? DEFAULT_CHEST_CONFIG.dupeMultiplier };
+}
+
+// Cascades through `tiers` rarest-first: each tier's chance is
+// `min(cap, streak × ratePerStreakDay)`, independently rolled (not a single
+// cumulative draw) — the first one that hits wins. The LAST tier in the
+// array is the guaranteed fallback if nothing rarer hit, so it's returned
+// even with no chance fields of its own (a tier list of length 1 always
+// just returns that one tier).
+export function rollChestTier(tiers, streakCount) {
+  const streak = Math.max(0, streakCount || 0);
+  for (let i = 0; i < tiers.length - 1; i++) {
+    const tier = tiers[i];
+    const chance = Math.min(tier.cap ?? 1, streak * (tier.ratePerStreakDay || 0));
+    if (Math.random() < chance) return tier.id;
+  }
+  return tiers[tiers.length - 1].id;
 }
 
 // `existingData` is the user doc as read just before this save (same `data`
@@ -38,7 +74,11 @@ export function rollChestRarity(streakCount) {
 // payload every caller already builds for weekly/monthly/daily points —
 // `pendingChests` is only present at all when at least one new chest was
 // actually earned, since `arrayUnion()` with zero items isn't valid.
-export function computeChestAward(existingData = {}, pointsEarned, streakCount) {
+//
+// Async (reads `config/chests`, cached) — every one of the 4 call sites is
+// already inside an async function, so this just needs an `await` added at
+// each one.
+export async function computeChestAward(existingData = {}, pointsEarned, streakCount) {
   const today = getTodayDateKey();
   const priorToday = existingData.chestDayKey === today ? (existingData.chestPoints || 0) : 0;
   const newToday = priorToday + Math.max(0, pointsEarned || 0);
@@ -49,9 +89,10 @@ export function computeChestAward(existingData = {}, pointsEarned, streakCount) 
 
   const fields = { chestPoints: newToday, chestDayKey: today };
   if (chestsToGrant > 0) {
+    const { tiers } = await getChestConfig();
     const newChests = Array.from({ length: chestsToGrant }, (_, i) => ({
       id: `chest_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
-      rarity: rollChestRarity(streakCount),
+      rarity: rollChestTier(tiers, streakCount),
       earnedAt: new Date().toISOString(),
     }));
     fields.pendingChests = arrayUnion(...newChests);
@@ -68,8 +109,3 @@ export function computeChestAward(existingData = {}, pointsEarned, streakCount) 
 export function pickRandomItem(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
-
-// A dupe pull (the rolled accessory is already owned) converts to bonus
-// points instead of nothing happening — rare dupes pay out more, so a rare
-// pull always feels like the better outcome even on a repeat.
-export const DUPE_BONUS_POINTS = { common: 50, rare: 150 };

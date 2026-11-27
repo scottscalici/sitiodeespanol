@@ -557,6 +557,7 @@ export default function StudentLearningPath() {
 
                 const newProgressNode = { path_points: newPathPoints, ...gradedFields };
                 const streakFields = bumpStreak(existingData);
+                const chestFields = await computeChestAward(existingData, totalPointsEarned, streakFields.streak_count);
 
                 await setDoc(userRef, {
                   total_points: newTotal,
@@ -568,7 +569,7 @@ export default function StudentLearningPath() {
                   monthKey,
                   dayKey,
                   ...streakFields,
-                  ...computeChestAward(existingData, totalPointsEarned, streakFields.streak_count),
+                  ...chestFields,
                   progress: {
                     [selectedPathId]: legacyBranchKey ? { [legacyBranchKey]: newProgressNode } : newProgressNode,
                   }
