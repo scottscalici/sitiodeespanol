@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { computeChestAward } from '../utils/chests';
 import { QUESTION_TYPES, getItemCount } from '../shared/questionTypes';
 
 export default function CuriosidadQuizEngine() {
@@ -211,7 +212,9 @@ export default function CuriosidadQuizEngine() {
         updatePayload.daily_points = newDaily;
         updatePayload.weekKey = weekKey;
         updatePayload.monthKey = monthKey;
-        Object.assign(updatePayload, bumpStreak(data));
+        const streakFields = bumpStreak(data);
+        Object.assign(updatePayload, streakFields);
+        Object.assign(updatePayload, computeChestAward(data, pointsEarned, streakFields.streak_count));
       }
 
       await setDoc(userRef, updatePayload, { merge: true });

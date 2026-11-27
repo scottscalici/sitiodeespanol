@@ -283,6 +283,19 @@ const Header = ({
           <StudentAvatar avatarConfig={userData?.avatarConfig} uid={currentUser?.uid} size={40} />
         </Link>
 
+        {/* CHESTS — only shown once there's at least one unopened chest, so
+            it never crowds the header for a student with none pending */}
+        {(userData?.pendingChests || []).length > 0 && (
+          <Link
+            to="/mis-cofres"
+            className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 rounded-xl px-3 py-2 transition-colors animate-pulse"
+            title="Abrir mis cofres"
+          >
+            <span className="text-xl leading-none">📦</span>
+            <span className="text-xs font-black">{userData.pendingChests.length}</span>
+          </Link>
+        )}
+
         {/* TITLE PILL + FEATURED BADGE — click opens the full trophy case */}
         <button
           onClick={() => setShowTrophyCase(true)}

@@ -1,5 +1,6 @@
 import { doc, runTransaction, increment, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { computeChestAward } from './chests';
 
 // Monday of the current week, as YYYY-MM-DD — changes once per week. Uses the
 // LOCAL calendar date (like getTodayDateKey below), not toISOString(), which
@@ -144,6 +145,7 @@ export const awardPoints = async (uid, points) => {
 
     const weeklyPoints = data.weekKey === weekKey ? (data.weekly_points || 0) + points : points;
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
+    const streakFields = bumpStreak(data);
 
     tx.set(userRef, {
       total_points: increment(points),
@@ -153,7 +155,8 @@ export const awardPoints = async (uid, points) => {
       monthly_points: monthlyPoints,
       weekKey,
       monthKey,
-      ...bumpStreak(data),
+      ...streakFields,
+      ...computeChestAward(data, points, streakFields.streak_count),
     }, { merge: true });
   });
 

@@ -15,7 +15,16 @@ const TYPE_OPTIONS = [
   { value: 'avatar_accessory', label: 'Accesorio de Avatar (imagen personalizada)' },
 ];
 
-const BLANK_DRAFT = { label: '', type: 'theme', targetId: '', unlockPoints: 10000, imageUrl: '' };
+// Only meaningful for avatar_accessory — which chest rarity's loot pool
+// (see src/utils/chests.js) this accessory can be pulled from. A chest
+// never looks at unlockPoints at all; the two systems are independent
+// paths to the same item (see AvatarBuilderPage.jsx's `unlocked` check).
+const RARITY_OPTIONS = [
+  { value: 'common', label: 'Común' },
+  { value: 'rare', label: 'Rara' },
+];
+
+const BLANK_DRAFT = { label: '', type: 'theme', targetId: '', unlockPoints: 10000, imageUrl: '', rarity: 'common' };
 
 export default function UnlockablesManager() {
   const [items, setItems] = useState([]);
@@ -57,6 +66,7 @@ export default function UnlockablesManager() {
         targetId: draft.targetId.trim(),
         unlockPoints: Number(draft.unlockPoints),
         imageUrl: draft.imageUrl.trim(),
+        ...(draft.type === 'avatar_accessory' ? { rarity: draft.rarity } : {}),
       });
       invalidateCollectionCache('unlockables');
       setDraft(BLANK_DRAFT);
@@ -134,7 +144,7 @@ export default function UnlockablesManager() {
               <div className="flex-1 min-w-[140px]">
                 <p className="text-white font-bold text-sm">{item.label}</p>
                 <p className="text-slate-500 text-[10px] font-mono uppercase">
-                  {item.type} · {item.targetId}
+                  {item.type} · {item.targetId}{item.rarity && ` · ${item.rarity === 'rare' ? '✨ rara' : 'común'}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -192,15 +202,28 @@ export default function UnlockablesManager() {
               className="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
             />
             {draft.type === 'avatar_accessory' && (
-              <div className="sm:col-span-2">
-                <ImageUploadField
-                  value={draft.imageUrl}
-                  onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
-                  folder="avatar_accessories"
-                  placeholder="https://... (imagen del accesorio)"
-                  inputClassName="flex-1 bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+              <>
+                <div className="sm:col-span-2">
+                  <ImageUploadField
+                    value={draft.imageUrl}
+                    onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
+                    folder="avatar_accessories"
+                    placeholder="https://... (imagen del accesorio)"
+                    inputClassName="flex-1 bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <select
+                  value={draft.rarity}
+                  onChange={(e) => setDraft((d) => ({ ...d, rarity: e.target.value }))}
+                  className="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  {RARITY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      Rareza (cofres): {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
           </div>
 

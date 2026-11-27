@@ -50,6 +50,7 @@ import SampleSentencesPage from './student/SampleSentencesPage';
 import SilabasPage from './student/SilabasPage';
 import HallOfFamePage from './student/HallOfFamePage';
 import AvatarBuilderPage from './student/AvatarBuilderPage';
+import MisCofresPage from './student/MisCofresPage';
 
 
 // ⚙️ GLOBAL UI COMPONENTS
@@ -219,6 +220,7 @@ function App() {
             <Route path="/actividad/:type/:id" element={<ActivityPage />} />
             <Route path="/recreo" element={<RecreoHub />} />
             <Route path="/mi-avatar" element={<AvatarBuilderPage />} />
+            <Route path="/mis-cofres" element={<MisCofresPage />} />
             <Route path="/preguntas-frecuentes" element={<FaqPage />} />
             <Route path="/recreo/ticotalk" element={<TicoTalk />} />
             <Route path="/juegos/atandocabos" element={<AtandoCabosPage />} />

@@ -5,6 +5,7 @@ import { db } from '../firebase.js';
 import WorkoutEngine from './WorkoutEngine';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { computeChestAward } from '../utils/chests';
 import { getAssignedDominioTasks, buildGradedProgressNode } from '../utils/learningPathProgress';
 
 // A path is one content type from creation now — no more vocab/verbs/practical
@@ -554,6 +555,7 @@ export default function StudentLearningPath() {
                   : { podIndex: newPodIdx, segmentIndex: newSegIdx };
 
                 const newProgressNode = { path_points: newPathPoints, ...gradedFields };
+                const streakFields = bumpStreak(existingData);
 
                 await setDoc(userRef, {
                   total_points: newTotal,
@@ -563,7 +565,8 @@ export default function StudentLearningPath() {
                   daily_points: newDaily,
                   weekKey,
                   monthKey,
-                  ...bumpStreak(existingData),
+                  ...streakFields,
+                  ...computeChestAward(existingData, totalPointsEarned, streakFields.streak_count),
                   progress: {
                     [selectedPathId]: legacyBranchKey ? { [legacyBranchKey]: newProgressNode } : newProgressNode,
                   }

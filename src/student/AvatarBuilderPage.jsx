@@ -22,6 +22,7 @@ export default function AvatarBuilderPage() {
   const [status, setStatus] = useState('');
 
   const totalPoints = userData?.total_points || userData?.current_path_points || 0;
+  const ownedAccessoryIds = userData?.ownedAccessoryIds || [];
 
   // Seed the draft from whatever's already saved, once userData arrives —
   // never re-seed after that, so a student's in-progress edits aren't
@@ -173,7 +174,7 @@ export default function AvatarBuilderPage() {
               Ninguno
             </button>
             {accessories.map((item) => {
-              const unlocked = totalPoints >= (item.unlockPoints || 0);
+              const unlocked = totalPoints >= (item.unlockPoints || 0) || ownedAccessoryIds.includes(item.id);
               const selected = accessory?.id === item.id;
               return (
                 <button

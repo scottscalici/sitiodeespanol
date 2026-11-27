@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase.js';
 import { useAuth } from '../context/AuthContext';
 import { getWeekKey, getMonthKey, bumpStreak } from '../utils/pointsHelper';
+import { computeChestAward } from '../utils/chests';
 import { getCachedBucketedCollection } from '../utils/firestoreCache';
 import { generateVerbQuestions } from '../utils/verbQuestionGenerator';
 
@@ -555,6 +556,7 @@ export default function CalentamientoEngine({ onClose }) {
         console.log("Is New High Score?:", isNewHighScore);
 
         // 1. ALWAYS award the XP Points for playing
+        const streakFields = bumpStreak(existingData);
         const updatePayload = {
           total_points: newTotal,
           current_path_points: newTotal,
@@ -563,7 +565,8 @@ export default function CalentamientoEngine({ onClose }) {
           daily_points: newDaily,
           weekKey,
           monthKey,
-          ...bumpStreak(existingData),
+          ...streakFields,
+          ...computeChestAward(existingData, pointsEarnedThisSession, streakFields.streak_count),
         };
 
         // 2. Keep a snapshot of the submitted answers (marked `submitted`)
