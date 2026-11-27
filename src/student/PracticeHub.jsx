@@ -58,7 +58,13 @@ export default function PracticeHub() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [circles, setCircles] = useState([]);
-  const [view, setView] = useState('sequence'); // 'sequence' | 'quiz'
+  const [view, setView] = useState('sequence'); // 'sequence' | 'quiz' | 'hablar'
+  // Same points-gated unlock pattern as the Calma theme toggle in the header
+  // (an `unlockables` doc, never a hardcoded number) — so the threshold is
+  // adjustable later from wherever unlockables get managed, with no code
+  // change, same as that theme's own threshold already is.
+  const DEFAULT_HABLAR_UNLOCK_POINTS = 15000;
+  const [hablarUnlockPoints, setHablarUnlockPoints] = useState(DEFAULT_HABLAR_UNLOCK_POINTS);
 
   const [activeCircle, setActiveCircle] = useState(null);
   const [sessionNonce, setSessionNonce] = useState(0);
@@ -68,10 +74,13 @@ export default function PracticeHub() {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [docs, currentEvalOptions] = await Promise.all([
+        const [docs, currentEvalOptions, unlockables] = await Promise.all([
           getCachedCollection('practice_pods'),
           fetchEvaluacionOptions(course),
+          getCachedCollection('unlockables'),
         ]);
+        const hablarUnlock = unlockables.find((u) => u.type === 'practice_tab' && u.targetId === 'hablar');
+        if (hablarUnlock?.unlockPoints) setHablarUnlockPoints(hablarUnlock.unlockPoints);
         const flattened = [];
         docs
           // 'all' is for content that isn't tied to one course's textbook
@@ -94,6 +103,7 @@ export default function PracticeHub() {
                 id: `${d.path_id}__${pod.id}`,
                 title: pod.title,
                 contentType: d.contentType === 'verb' ? 'verb' : d.contentType === 'idiom' ? 'idiom' : d.contentType === 'grammar' ? 'grammar' : 'vocab',
+                mode: d.mode === 'speaking' ? 'speaking' : 'typing',
                 textbook: d.textbook || '',
                 chapter: d.chapter || '',
                 targetTense: segment.targetTense || 'ALL',
@@ -126,7 +136,7 @@ export default function PracticeHub() {
     const idiomCircles = [];
     const grammarCircles = [];
 
-    circles.forEach((c) => {
+    circles.filter((c) => c.mode !== 'speaking').forEach((c) => {
       if (c.contentType === 'vocab') {
         const bookKey = c.textbook || 'Sin libro';
         if (!vocabByBook.has(bookKey)) vocabByBook.set(bookKey, new Map());
@@ -158,8 +168,9 @@ export default function PracticeHub() {
   // --- QUIZ-ORDER VIEW: every linked circle sorted by its evaluación día,
   // unlinked circles bucketed at the end as general practice ---
   const quizGroups = useMemo(() => {
-    const linked = circles.filter((c) => c.evalLink);
-    const unlinked = circles.filter((c) => !c.evalLink);
+    const typingCircles = circles.filter((c) => c.mode !== 'speaking');
+    const linked = typingCircles.filter((c) => c.evalLink);
+    const unlinked = typingCircles.filter((c) => !c.evalLink);
 
     const byDia = new Map();
     linked.forEach((c) => {
@@ -172,6 +183,31 @@ export default function PracticeHub() {
     if (unlinked.length > 0) groups.push({ key: 'Práctica General', sortKey: Infinity, circles: unlinked });
     return groups;
   }, [circles]);
+
+  // --- HABLAR VIEW: vocab-only speaking circles (contentType/mode is a plain
+  // data distinction here, not a student toggle — a circle is either the
+  // typing twin or the speaking twin, never both at once), grouped by book
+  // then chapter the same way the typing vocab circles already are. Verb/
+  // idiom/grammar speaking twins don't exist yet — this starts vocab-only.
+  const hablarGroups = useMemo(() => {
+    const vocabByBook = new Map();
+    circles.filter((c) => c.mode === 'speaking' && c.contentType === 'vocab').forEach((c) => {
+      const bookKey = c.textbook || 'Sin libro';
+      if (!vocabByBook.has(bookKey)) vocabByBook.set(bookKey, new Map());
+      const chapterMap = vocabByBook.get(bookKey);
+      const chapterKey = `Cap. ${c.chapter || '?'}`;
+      if (!chapterMap.has(chapterKey)) chapterMap.set(chapterKey, { key: chapterKey, sortKey: Number(c.chapter) || 0, circles: [] });
+      chapterMap.get(chapterKey).circles.push(c);
+    });
+    return Array.from(vocabByBook.entries())
+      .map(([book, chapterMap]) => ({
+        book,
+        chapterGroups: Array.from(chapterMap.values()).sort((a, b) => a.sortKey - b.sortKey),
+      }))
+      .sort((a, b) => a.book.localeCompare(b.book));
+  }, [circles]);
+
+  const hablarUnlocked = (userData?.total_points || 0) >= hablarUnlockPoints;
 
   const playCircle = (circle) => {
     setActiveCircle(circle);
@@ -265,6 +301,17 @@ export default function PracticeHub() {
             >
               Por Evaluación
             </button>
+            <button
+              onClick={() => hablarUnlocked && setView('hablar')}
+              disabled={!hablarUnlocked}
+              title={hablarUnlocked ? '' : `Se desbloquea a los ${hablarUnlockPoints.toLocaleString('es-ES')} puntos`}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                view === 'hablar' ? 'bg-white shadow-sm text-slate-800' : hablarUnlocked ? 'text-slate-500' : 'text-slate-300 cursor-not-allowed'
+              }`}
+            >
+              {!hablarUnlocked && <span aria-hidden="true">🔒</span>}
+              🗣️ Hablar
+            </button>
           </div>
         </div>
 
@@ -311,6 +358,26 @@ export default function PracticeHub() {
         )}
 
         {view === 'quiz' && quizGroups.map(renderGroup)}
+
+        {view === 'hablar' && (
+          hablarGroups.length === 0 ? (
+            <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest">
+              Todavía no hay círculos para hablar disponibles.
+            </div>
+          ) : (
+            <div>
+              <h2 className="text-lg font-black text-indigo-700 mb-2">📖 Vocabulario (Hablado)</h2>
+              {hablarGroups.map(({ book, chapterGroups }) => (
+                <div key={book} className="mb-8 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5">
+                  <h3 className="text-base font-black text-indigo-900 mb-4 flex items-center gap-2">
+                    <span>📗</span> {book}
+                  </h3>
+                  {chapterGroups.map(renderGroup)}
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       {activeCircle && (
