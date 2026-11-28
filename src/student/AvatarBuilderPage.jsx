@@ -174,7 +174,12 @@ export default function AvatarBuilderPage() {
               Ninguno
             </button>
             {accessories.map((item) => {
-              const unlocked = totalPoints >= (item.unlockPoints || 0) || ownedAccessoryIds.includes(item.id);
+              // A seasonal item an admin has turned off (active: false) stops being
+              // newly reachable by points, but a student who already owns it (via
+              // ownedAccessoryIds — e.g. from a past chest pull) keeps it regardless.
+              const unlocked =
+                (item.active !== false && totalPoints >= (item.unlockPoints || 0)) ||
+                ownedAccessoryIds.includes(item.id);
               const selected = accessory?.id === item.id;
               return (
                 <button

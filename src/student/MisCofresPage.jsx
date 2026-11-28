@@ -57,7 +57,11 @@ export default function MisCofresPage() {
     try {
       const tierConfig = chestConfig.tiers.find((t) => t.id === chest.rarity) || chestConfig.tiers[chestConfig.tiers.length - 1];
       const basePoints = tierConfig?.points || 0;
-      const pool = accessories.filter((a) => a.rarity === chest.rarity);
+      // active !== false excludes a seasonal item an admin has temporarily
+      // turned off (e.g. a Halloween pumpkin after October) from the drop
+      // pool — it can still be WORN by anyone who already owns it, it just
+      // can't be newly rolled while inactive.
+      const pool = accessories.filter((a) => a.rarity === chest.rarity && a.active !== false);
       const userRef = doc(db, 'users', currentUser.uid);
 
       await updateDoc(userRef, { pendingChests: arrayRemove(chest) });

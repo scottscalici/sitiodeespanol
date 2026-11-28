@@ -133,7 +133,7 @@ export default function UnlockablesManager() {
         unlockPoints: Number(draft.unlockPoints),
         imageUrl: draft.imageUrl.trim(),
         ...(draft.type === 'avatar_accessory'
-          ? { rarity: draft.rarity || chestConfig.tiers[chestConfig.tiers.length - 1]?.id }
+          ? { rarity: draft.rarity || chestConfig.tiers[chestConfig.tiers.length - 1]?.id, active: true }
           : {}),
       });
       invalidateCollectionCache('unlockables');
@@ -157,6 +157,35 @@ export default function UnlockablesManager() {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, unlockPoints: value } : i)));
     } catch (error) {
       console.error('Error updating unlockable:', error);
+    }
+  };
+
+  // Lets a teacher re-tag an existing accessory into a different chest tier
+  // after the fact — rarity used to only be set once, at creation.
+  const handleUpdateRarity = async (item, newRarity) => {
+    if (!newRarity || newRarity === item.rarity) return;
+    try {
+      await updateDoc(doc(db, 'unlockables', item.id), { rarity: newRarity });
+      invalidateCollectionCache('unlockables');
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, rarity: newRarity } : i)));
+    } catch (error) {
+      console.error('Error updating unlockable rarity:', error);
+    }
+  };
+
+  // `active: false` pulls an accessory out of circulation for NEW unlocks
+  // (chest drops in MisCofresPage.jsx, the points-threshold list in
+  // AvatarBuilderPage.jsx) without touching students who already own it via
+  // `ownedAccessoryIds` — built for seasonal items (a Halloween pumpkin that
+  // should stop being obtainable once the season's over, then come back
+  // next year).
+  const handleUpdateActive = async (item, newActive) => {
+    try {
+      await updateDoc(doc(db, 'unlockables', item.id), { active: newActive });
+      invalidateCollectionCache('unlockables');
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, active: newActive } : i)));
+    } catch (error) {
+      console.error('Error updating unlockable active state:', error);
     }
   };
 
@@ -212,11 +241,21 @@ export default function UnlockablesManager() {
               )}
               <div className="flex-1 min-w-[140px]">
                 <p className="text-white font-bold text-sm">{item.label}</p>
-                <p className="text-slate-500 text-[10px] font-mono uppercase">
-                  {item.type} · {item.targetId}
-                  {item.rarity && ` · ${chestConfig.tiers.find((t) => t.id === item.rarity)?.label || item.rarity}`}
-                </p>
+                <p className="text-slate-500 text-[10px] font-mono uppercase">{item.type} · {item.targetId}</p>
               </div>
+              {item.type === 'avatar_accessory' && (
+                <select
+                  value={item.rarity || chestConfig.tiers[chestConfig.tiers.length - 1]?.id || ''}
+                  onChange={(e) => handleUpdateRarity(item, e.target.value)}
+                  className="bg-slate-800 border border-slate-700 text-white rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+                >
+                  {chestConfig.tiers.map((tier) => (
+                    <option key={tier.id} value={tier.id}>
+                      {tier.label}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -226,6 +265,17 @@ export default function UnlockablesManager() {
                 />
                 <span className="text-slate-500 text-[10px] font-bold uppercase">pts</span>
               </div>
+              {item.type === 'avatar_accessory' && (
+                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={item.active !== false}
+                    onChange={(e) => handleUpdateActive(item, e.target.checked)}
+                    className="accent-indigo-500"
+                  />
+                  Activo
+                </label>
+              )}
               <button
                 onClick={() => handleDelete(item)}
                 className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2"
