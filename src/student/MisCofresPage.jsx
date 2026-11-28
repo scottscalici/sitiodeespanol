@@ -14,8 +14,10 @@ import { getChestConfig, DEFAULT_CHEST_CONFIG, pickRandomItem } from '../utils/c
 // whatever's currently rarest. The LAST tier (the guaranteed fallback) is
 // always styled plain, however many tiers exist above it.
 const RANK_STYLES = [
-  { emoji: '🌟📦', border: 'border-amber-400', bg: 'bg-amber-400/10 hover:bg-amber-400/20' },
+  { emoji: '👑📦', border: 'border-amber-400', bg: 'bg-amber-400/10 hover:bg-amber-400/20' },
+  { emoji: '🌟📦', border: 'border-fuchsia-400', bg: 'bg-fuchsia-400/10 hover:bg-fuchsia-400/20' },
   { emoji: '✨📦', border: 'border-violet-400', bg: 'bg-violet-400/10 hover:bg-violet-400/20' },
+  { emoji: '💠📦', border: 'border-sky-400', bg: 'bg-sky-400/10 hover:bg-sky-400/20' },
 ];
 const DEFAULT_STYLE = { emoji: '📦', border: 'border-white/20', bg: 'bg-white/5 hover:bg-white/10' };
 
@@ -62,8 +64,10 @@ export default function MisCofresPage() {
 
       if (pool.length === 0) {
         // No accessories configured for this rarity yet — don't strand the
-        // chest, just pay out its points with no item.
-        await awardPoints(currentUser.uid, basePoints);
+        // chest, just pay out its points with no item. countsTowardChest:
+        // false so this payout can't re-trigger the chest threshold itself
+        // (see pointsHelper.js's awardPoints for why).
+        await awardPoints(currentUser.uid, basePoints, { countsTowardChest: false });
         setResult({ rarity: chest.rarity, points: basePoints });
         return;
       }
@@ -72,7 +76,7 @@ export default function MisCofresPage() {
       const isDupe = ownedAccessoryIds.includes(picked.id);
       const pointsAwarded = isDupe ? basePoints * (chestConfig.dupeMultiplier || 2) : basePoints;
 
-      await awardPoints(currentUser.uid, pointsAwarded);
+      await awardPoints(currentUser.uid, pointsAwarded, { countsTowardChest: false });
       if (!isDupe) {
         await updateDoc(userRef, { ownedAccessoryIds: arrayUnion(picked.id) });
       }

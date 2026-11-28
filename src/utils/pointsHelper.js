@@ -117,6 +117,17 @@ export const formatMonthLabel = (monthKey) => {
 // field at all, instead keeping its own always-correct chestPoints/
 // chestDayKey pair.
 //
+// `options.countsTowardChest` (default true) — pass false when the points
+// being awarded ARE a chest's own payout (MisCofresPage.jsx's handleOpen).
+// Without this, opening a chest worth e.g. 250 points would immediately
+// re-run computeChestAward with those same 250 points, which could grant
+// 2 more chests on the spot (with 50 points left over carrying toward a
+// 3rd) — a student could cascade into an open-ended chain of chests just
+// from opening one. Setting it false still lets the payout count toward
+// total/weekly/monthly/daily points and the leaderboard, it just never
+// feeds the chestPoints/chestDayKey counter, so "100 points of schoolwork
+// = 1 chest" stays literally true and chest-opening can't earn more chests.
+//
 // This is one of the most frequently-called functions in the app (every
 // point-earning action, across every activity type, for every student), so
 // it deliberately does exactly ONE Firestore read per call — reusing the
@@ -125,7 +136,8 @@ export const formatMonthLabel = (monthKey) => {
 // outgoing period (see archivePeriodIfNeeded) happens after the
 // transaction commits, using the rollover info captured during it — it
 // doesn't need to be atomic with the point award itself.
-export const awardPoints = async (uid, points) => {
+export const awardPoints = async (uid, points, options = {}) => {
+  const { countsTowardChest = true } = options;
   const userRef = doc(db, 'users', uid);
   const weekKey = getWeekKey();
   const monthKey = getMonthKey();
@@ -158,7 +170,7 @@ export const awardPoints = async (uid, points) => {
     const monthlyPoints = data.monthKey === monthKey ? (data.monthly_points || 0) + points : points;
     const dailyPoints = data.dayKey === dayKey ? (data.daily_points || 0) + points : points;
     const streakFields = bumpStreak(data);
-    const chestFields = await computeChestAward(data, points, streakFields.streak_count);
+    const chestFields = await computeChestAward(data, countsTowardChest ? points : 0, streakFields.streak_count);
 
     tx.set(userRef, {
       total_points: increment(points),

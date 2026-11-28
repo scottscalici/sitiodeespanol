@@ -25,14 +25,16 @@ export const CHEST_POINTS_THRESHOLD = 100;
 // configured, or someone deleted it) — same "still works, just at a
 // sensible default" posture as ThemeUnlockToggle's DEFAULT_CALMA_UNLOCK_POINTS.
 // Order matters: rolled rarest-first (see rollChestTier below), so this
-// array is sorted epic → rare → common. The LAST tier is the guaranteed
-// fallback and doesn't need `ratePerStreakDay`/`cap` — it's just whatever's
-// left once nothing rarer hit.
+// array is sorted legendary → mega → epic → rare → common. The LAST tier is
+// the guaranteed fallback and doesn't need `ratePerStreakDay`/`cap` — it's
+// just whatever's left once nothing rarer hit.
 export const DEFAULT_CHEST_CONFIG = {
   tiers: [
-    { id: 'epic', label: 'Épico', ratePerStreakDay: 0.001, cap: 0.1, points: 250 },
-    { id: 'rare', label: 'Rara', ratePerStreakDay: 0.01, cap: 0.5, points: 75 },
-    { id: 'common', label: 'Común', points: 25 },
+    { id: 'legendary', label: 'Legendaria', ratePerStreakDay: 0.0005, cap: 0.05, points: 500 },
+    { id: 'mega', label: 'Mega', ratePerStreakDay: 0.002, cap: 0.15, points: 300 },
+    { id: 'epic', label: 'Épico', ratePerStreakDay: 0.01, cap: 0.3, points: 150 },
+    { id: 'rare', label: 'Rara', ratePerStreakDay: 0.05, cap: 0.6, points: 60 },
+    { id: 'common', label: 'Común', points: 20 },
   ],
   dupeMultiplier: 2,
 };
